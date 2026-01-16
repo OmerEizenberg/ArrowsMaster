@@ -70,7 +70,9 @@
     <Compile Include="Assets/Scripts/Lobby/HomeContoller.cs" />
     <Compile Include="Assets/Scripts/Core/Segment.cs" />
     <Compile Include="Assets/Scripts/Core/ArrowController.cs" />
+    <Compile Include="Assets/Scripts/Core/GameManager.cs" />
     <Compile Include="Assets/Scripts/Core/InputManager.cs" />
+    <Compile Include="Assets/Scripts/Core/CameraController.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets/TextMesh Pro/Shaders/TMPro.cginc" />
