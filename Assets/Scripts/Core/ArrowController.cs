@@ -95,13 +95,39 @@ namespace Assets.Scripts.Core
         {
             if (lineRenderer != null && segments.Count > 0)
             {
-                lineRenderer.positionCount = segments.Count;
-                Vector3[] positions = new Vector3[segments.Count];
+                // Refinment: Use List to filter out points too close to each other
+                // This prevents "zero-length" segments at the corners which look glitchy
+                
+                List<Vector3> points = new List<Vector3>();
+                
                 for (int i = 0; i < segments.Count; i++)
                 {
-                    positions[i] = segments[i].transform.position;
+                    // 1. Current Position
+                    points.Add(segments[i].transform.position);
+
+                    // 2. Corner Anchor
+                    if (i < segments.Count - 1)
+                    {
+                        Vector2Int targetGridPos = segments[i].GridPosition;
+                        Vector3 cornerPos = new Vector3(targetGridPos.x * CellSize, targetGridPos.y * CellSize, 0);
+                        cornerPos.z = segments[i].transform.position.z;
+
+                        // Only add if there is significant distance to BOTH neighbors
+                        // Neighbor 1: Current Segment Position
+                        // Neighbor 2: Next Segment Position (which is moving away from this corner)
+                        
+                        float distToCurrent = Vector3.Distance(segments[i].transform.position, cornerPos);
+                        float distToNext = Vector3.Distance(segments[i+1].transform.position, cornerPos);
+
+                        if (distToCurrent > 0.05f && distToNext > 0.05f)
+                        {
+                            points.Add(cornerPos);
+                        }
+                    }
                 }
-                lineRenderer.SetPositions(positions);
+                
+                lineRenderer.positionCount = points.Count;
+                lineRenderer.SetPositions(points.ToArray());
             }
             else if (lineRenderer != null)
             {
