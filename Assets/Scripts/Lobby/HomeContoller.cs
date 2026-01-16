@@ -23,6 +23,7 @@ public class HomeContoller : MonoBehaviour
 
     public void OnPlayButtonClicked()
     {
+        SoundManager.Instance.PlayClick();
         m_BG.SetActive(false);
         GameManager.Instance.StartLevel("level1");
     }

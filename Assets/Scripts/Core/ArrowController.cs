@@ -140,6 +140,8 @@ namespace Assets.Scripts.Core
             // Allow clicking ANY segment
             if (segments.Contains(clickedSegment))
             {
+                SoundManager.Instance.PlayArrowSelect();
+
                 if (!isMoving)
                 {
                     // Check if path is clear BEFORE starting
@@ -152,6 +154,7 @@ namespace Assets.Scripts.Core
                     }
                     else
                     {
+                        SoundManager.Instance.PlayArrowBlocked();
                         // Optional: Shake feedback?
                         Debug.Log("Arrow Blocked!");
                     }
