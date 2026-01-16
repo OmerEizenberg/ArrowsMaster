@@ -10,11 +10,13 @@ namespace Assets.Scripts.Core
         public ArrowController arrowPrefab; // Drag Prefab here
 
         private List<GameObject> currentLevelObjects = new List<GameObject>();
+        private string currentLevelId;
 
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
         public void LoadLevelFromResources(string levelId)
         {
+            currentLevelId = levelId;
             TextAsset jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
             if (jsonFile != null)
             {
@@ -67,6 +69,10 @@ namespace Assets.Scripts.Core
                 SoundManager.Instance.PlayLevelInitialized();
             }
         }
-
+        public void RestartLevel()
+        {
+            ClearLevel();
+            LoadLevelFromResources(currentLevelId);
+        }
     }
 }

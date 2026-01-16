@@ -91,6 +91,12 @@ namespace Assets.Scripts.Core
             {
                 winScreen.SetActive(true);
             }
+            
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayWin();
+            }
+
             OnLevelWon?.Invoke();
         }
 

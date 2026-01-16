@@ -7,7 +7,8 @@ using Assets.Scripts.Core;
 
 public class HomeContoller : MonoBehaviour
 {
-    [SerializeField] private GameObject m_BG;
+    [SerializeField] private GameObject m_LobbyUI;
+    [SerializeField] private GameObject m_GameUI;
 
     // Start is called before the first frame update
     void Start()
@@ -24,7 +25,8 @@ public class HomeContoller : MonoBehaviour
     public void OnPlayButtonClicked()
     {
         SoundManager.Instance.PlayClick();
-        m_BG.SetActive(false);
+        m_LobbyUI.SetActive(false);
+        m_GameUI.SetActive(true);
         GameManager.Instance.StartLevel("level1");
     }
 }
