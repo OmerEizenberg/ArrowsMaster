@@ -8,14 +8,36 @@ namespace Assets.Scripts.Core
     {
         public TextAsset levelJsonFile; // Drag JSON here
         public ArrowController arrowPrefab; // Drag Prefab here
-        public GameObject wallPrefab; // Drag Wall Prefab here
 
-        void Start()
+        private List<GameObject> currentLevelObjects = new List<GameObject>();
+
+        // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
+
+        public void LoadLevelFromResources(string levelId)
         {
-            if (levelJsonFile != null)
+            TextAsset jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
+            if (jsonFile != null)
             {
-                LoadLevel(levelJsonFile.text);
+                ClearLevel();
+                LoadLevel(jsonFile.text);
             }
+            else
+            {
+                Debug.LogError($"Level with ID {levelId} not found in Resources.");
+            }
+        }
+
+        public void ClearLevel()
+        {
+            foreach (GameObject obj in currentLevelObjects)
+            {
+                if (obj != null)
+                {
+                    Destroy(obj);
+                }
+            }
+            currentLevelObjects.Clear();
+            GridManager.Instance.InitializeGrid(Vector2Int.zero); // Reset with zero or just clear map
         }
 
         public void LoadLevel(string json)
@@ -30,31 +52,16 @@ namespace Assets.Scripts.Core
             {
                 ArrowController arrow = Instantiate(arrowPrefab, Vector3.zero, Quaternion.identity);
                 arrow.Initialize(arrowData);
+                currentLevelObjects.Add(arrow.gameObject);
             }
 
-            GenerateWalls(data.gridSize.ToVector2Int());
+
+            // Set Camera Bounds
+            if (CameraController.Instance != null)
+            {
+                CameraController.Instance.SetBounds(data.gridSize.ToVector2Int());
+            }
         }
 
-        private void GenerateWalls(Vector2Int size)
-        {
-            if (wallPrefab == null) return;
-
-            float step = ArrowController.CellSize;
-
-            // Generate walls around the grid: x from -1 to width, y from -1 to height
-            // Top and Bottom rows
-            for (int x = -1; x <= size.x; x++)
-            {
-                Instantiate(wallPrefab, new Vector3(x * step, -1 * step, 0), Quaternion.identity, transform); // Bottom
-                Instantiate(wallPrefab, new Vector3(x * step, size.y * step, 0), Quaternion.identity, transform); // Top
-            }
-
-            // Left and Right columns (avoid corners already placed)
-            for (int y = 0; y < size.y; y++)
-            {
-                Instantiate(wallPrefab, new Vector3(-1 * step, y * step, 0), Quaternion.identity, transform); // Left
-                Instantiate(wallPrefab, new Vector3(size.x * step, y * step, 0), Quaternion.identity, transform); // Right
-            }
-        }
     }
 }

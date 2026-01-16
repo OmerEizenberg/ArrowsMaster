@@ -12,9 +12,6 @@ namespace Assets.Scripts.Core
         
         [Header("Visuals")]
         public Sprite HeadSprite;
-        public Sprite BodySprite;
-        public Sprite CornerSprite;
-        public Sprite TailSprite; 
         
         // Grid Step size (Standard 1 unit)
         public const float CellSize = 1.0f;
@@ -25,40 +22,91 @@ namespace Assets.Scripts.Core
         
         public int ArrowId { get; private set; }
 
+        // LineRenderer Refactor
+        private LineRenderer lineRenderer;
+
         public void Initialize(ArrowData data)
         {
             ArrowId = data.id;
             Color color = Color.white;
+            
+            // Setup LineRenderer
+            lineRenderer = GetComponent<LineRenderer>();
+            if (lineRenderer == null) lineRenderer = gameObject.AddComponent<LineRenderer>();
+            
+            lineRenderer.startWidth = 0.2f; // 20 pixels (0.2 units at 100 PPU)
+            lineRenderer.endWidth = 0.2f;
+            lineRenderer.useWorldSpace = true;
+            lineRenderer.numCapVertices = 5;
+            lineRenderer.numCornerVertices = 5;
+            lineRenderer.material = new Material(Shader.Find("Sprites/Default")); 
+            lineRenderer.startColor = Color.black;
+            lineRenderer.endColor = Color.black;
+            lineRenderer.sortingOrder = 0; // Behind head
 
             // Instantiate segments from data.path (Tail to Head)
             for (int i = 0; i < data.path.Count; i++)
             {
                 Vector2Int pos = data.path[i].ToVector2Int();
-                
-                // Convert Grid Coordinate to World Position
                 Vector3 worldPos = new Vector3(pos.x * CellSize, pos.y * CellSize, 0);
                 
                 GameObject segObj = Instantiate(segmentPrefab.gameObject, worldPos, Quaternion.identity, transform);
-                
-                // Apply Scale
-                segObj.transform.localScale = new Vector3(segmentScale, segmentScale, 1f);
+                segObj.transform.localScale = Vector3.one; 
 
                 Segment seg = segObj.GetComponent<Segment>();
                 seg.GridPosition = pos;
                 
-                seg.Initialize(BodySprite, color);
+                if (i == data.path.Count - 1)
+                {
+                    // HEAD: Keep Sprite, Set Order
+                    seg.Renderer.sprite = HeadSprite;
+                    seg.Renderer.enabled = true;
+                    seg.Renderer.sortingOrder = 1; // Above line
+                }
+                else
+                {
+                    // But keep Collider!
+                    seg.Renderer.enabled = false;
+                }
                 
                 // Ensure tight collider
                 BoxCollider2D box = seg.GetComponent<BoxCollider2D>();
                 if (box == null) box = seg.gameObject.AddComponent<BoxCollider2D>();
-                box.size = new Vector2(1f, 1f); // Tight fit for 1 unit sprite
+                box.size = new Vector2(1f, 1f); 
                 
                 segments.Add(seg);
                 
                 GridManager.Instance.RegisterOccupancy(pos, this);
             }
             
-            UpdateSegmentVisuals();
+            UpdateHeadVisuals();
+            UpdateLinePositions();
+            
+            GameManager.Instance.RegisterArrow();
+        }
+        
+        private void Update()
+        {
+            // Continuously update line to follow the moving segments
+            UpdateLinePositions();
+        }
+
+        private void UpdateLinePositions()
+        {
+            if (lineRenderer != null && segments.Count > 0)
+            {
+                lineRenderer.positionCount = segments.Count;
+                Vector3[] positions = new Vector3[segments.Count];
+                for (int i = 0; i < segments.Count; i++)
+                {
+                    positions[i] = segments[i].transform.position;
+                }
+                lineRenderer.SetPositions(positions);
+            }
+            else if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = 0;
+            }
         }
 
         public void OnArrowClicked(Segment clickedSegment)
@@ -72,8 +120,8 @@ namespace Assets.Scripts.Core
                     if (CanMoveForward())
                     {
                         isMoving = true;
-                        // Start destruction timer immediately on click (3 seconds)
-                        Invoke("DestroySelf", 3.0f);
+                        // Start destruction timer immediately on click (5 seconds)
+                        Invoke("DestroySelf", 5.0f);
                         moveCoroutine = StartCoroutine(AutoMoveRoutine());
                     }
                     else
@@ -87,7 +135,8 @@ namespace Assets.Scripts.Core
 
         private void DestroySelf()
         {
-            Destroy(gameObject);
+            GameManager.Instance.NotifyArrowSuccess();
+            Destroy(gameObject,1.0f);
         }
 
         private IEnumerator AutoMoveRoutine()
@@ -109,9 +158,9 @@ namespace Assets.Scripts.Core
                 // Actually, TryMoveForward now clears segments if all OOB.
                 if (segments.Count == 0)
                 {
-                    // We already set a 3s destruction timer on click, 
+                    // We already set a 5s destruction timer on click, 
                     // but if it escapes fast, we might want to just let it finish.
-                    // The user said "3 seconds after... pressed".
+                    // The user said "5 seconds after... pressed".
                     // So the Invoke handles it. 
                     // We can just stop the routine.
                     yield break;
@@ -182,10 +231,9 @@ namespace Assets.Scripts.Core
             {
                 segments[i].GridPosition = newPositions[i];
             }
-
-            // CRITICAL: Update visuals BEFORE starting the move animation.
-            // This ensures segments look like their DESTINATION shape while sliding.
-            UpdateSegmentVisuals();
+            
+            // Only update visuals for the Head
+            UpdateHeadVisuals();
 
             for (int i = 0; i < segments.Count; i++)
             {
@@ -193,85 +241,44 @@ namespace Assets.Scripts.Core
                 // Faster move speed (0.04f)
                 segments[i].MoveTo(newWorldPos, 0.04f);
             }
-
-            bool allOOB = true;
-            foreach(var seg in segments)
-            {
-                if (!GridManager.Instance.IsOutOfBounds(seg.GridPosition))
-                {
-                    allOOB = false;
-                    break;
-                }
-            }
             
-            if (allOOB)
-            {
-                // Simpler: Just destroy the object 6 seconds after the HEAD exits? Or the TAIL?
-                // Probably Tail.
-                // Let's check strict "All OOB".
-            }
-            // But wait, if I don't remove segments from the list, `segments.Count` is never 0.
-            // So my previous code `if (segments.Count == 0)` was dead code unless I removed them.
-            // I should probably NOT remove them, just let them exist in OOB coordinates.
-            
-            UpdateSegmentVisuals();
             return true;
         }
 
-        private void UpdateSegmentVisuals()
+        private void UpdateHeadVisuals()
         {
-            if (segments.Count < 2) return;
-
+            if (segments.Count == 0) return;
+            
+            // Ensure only Head is enabled, others disabled
             for (int i = 0; i < segments.Count; i++)
             {
                 Segment seg = segments[i];
-                Transform t = seg.transform;
-                t.rotation = Quaternion.identity;
-                
-                Vector2Int current = seg.GridPosition;
-                Vector2Int prev = (i > 0) ? segments[i-1].GridPosition : current;
-                Vector2Int next = (i < segments.Count - 1) ? segments[i+1].GridPosition : current;
-
-                if (i == segments.Count - 1) // Head
+                if (i == segments.Count - 1)
                 {
+                    // HEAD
+                    seg.Renderer.enabled = true;
                     seg.Renderer.sprite = HeadSprite;
-                    RotateComponent(t, current - prev);
+                    seg.Renderer.color = Color.black; // Match line color
+                    seg.Renderer.sortingOrder = 10;   // Ensure on top
+                    
+                    // Rotation
+                    if (segments.Count >= 2)
+                    {
+                        Segment neck = segments[segments.Count - 2];
+                        Vector2Int dir = seg.GridPosition - neck.GridPosition;
+                        Transform t = seg.transform;
+                        if (dir == Vector2Int.up) t.rotation = Quaternion.Euler(0,0,0);
+                        else if (dir == Vector2Int.right) t.rotation = Quaternion.Euler(0,0,-90);
+                        else if (dir == Vector2Int.down) t.rotation = Quaternion.Euler(0,0,180);
+                        else if (dir == Vector2Int.left) t.rotation = Quaternion.Euler(0,0,90);
+                    }
                 }
-                else if (i == 0) // Tail
+                else
                 {
-                    seg.Renderer.sprite = TailSprite;
-                    RotateComponent(t, next - current);
-                }
-                else 
-                {
-                     Vector2Int dirIn = current - prev;
-                     Vector2Int dirOut = next - current;
-                     
-                     if (dirIn == dirOut) 
-                     {
-                         seg.Renderer.sprite = BodySprite;
-                         RotateComponent(t, dirIn);
-                     }
-                     else 
-                     {
-                         seg.Renderer.sprite = CornerSprite;
-                         Vector2Int sum = (prev - current) + (next - current);
-                         
-                         if (sum == new Vector2Int(-1, -1)) t.rotation = Quaternion.Euler(0,0,0);       
-                         else if (sum == new Vector2Int(1, -1)) t.rotation = Quaternion.Euler(0,0,90);  
-                         else if (sum == new Vector2Int(1, 1)) t.rotation = Quaternion.Euler(0,0,180);  
-                         else if (sum == new Vector2Int(-1, 1)) t.rotation = Quaternion.Euler(0,0,270); 
-                     }
+                    // BODY
+                    seg.Renderer.enabled = false;
                 }
             }
-        }
-        
-        private void RotateComponent(Transform t, Vector2Int dir)
-        {
-            if (dir == Vector2Int.up) t.rotation = Quaternion.Euler(0,0,0);
-            else if (dir == Vector2Int.right) t.rotation = Quaternion.Euler(0,0,-90);
-            else if (dir == Vector2Int.down) t.rotation = Quaternion.Euler(0,0,180);
-            else if (dir == Vector2Int.left) t.rotation = Quaternion.Euler(0,0,90);
         }
     }
 }
