@@ -61,6 +61,11 @@ namespace Assets.Scripts.Core
             {
                 CameraController.Instance.SetBounds(data.gridSize.ToVector2Int());
             }
+
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayLevelInitialized();
+            }
         }
 
     }

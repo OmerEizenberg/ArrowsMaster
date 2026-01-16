@@ -13,6 +13,7 @@ namespace Assets.Scripts.Core
         public AudioClip ClickSound;
         public AudioClip ArrowSelectSound;
         public AudioClip ArrowBlockedSound;
+        public AudioClip LevelInitializedSound;
 
         private void Awake()
         {
@@ -47,6 +48,11 @@ namespace Assets.Scripts.Core
         public void PlayArrowBlocked()
         {
             PlaySound(ArrowBlockedSound);
+        }
+
+        public void PlayLevelInitialized()
+        {
+            PlaySound(LevelInitializedSound);
         }
 
         private void PlaySound(AudioClip clip)
