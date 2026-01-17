@@ -153,12 +153,12 @@ namespace Assets.Scripts.Core
             cam.orthographicSize = defaultZoom;
         }
 
-        public void PlayInitializationZoomAnimation(Vector2Int gridSize)
+        public void PlayInitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
-            StartCoroutine(InitializationZoomAnimation(gridSize));
+            StartCoroutine(InitializationZoomAnimation(gridSize, focusPosition));
         }
 
-        private System.Collections.IEnumerator InitializationZoomAnimation(Vector2Int gridSize)
+        private System.Collections.IEnumerator InitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
             float padding = 2f;
             float cellSize = ArrowController.CellSize;
@@ -174,13 +174,14 @@ namespace Assets.Scripts.Core
             // Limit target zoom by max zoom
             targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
 
-            Vector3 gridCenter = new Vector3(gridSize.x * cellSize / 2f, gridSize.y * cellSize / 2f, transform.position.z);
             Vector3 finalPos = transform.position;
             float finalZoom = cam.orthographicSize;
 
             // Start almost zoomed out (85% of target zoom for more movement)
             float startZoom = targetZoom * 0.85f;
-            Vector3 startPos = Vector3.Lerp(gridCenter, finalPos, 0.15f);
+            // Center focal point for the main part of the animation
+            Vector3 targetAnimPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
+            Vector3 startPos = Vector3.Lerp(targetAnimPos, finalPos, 0.15f);
 
             float totalDuration = initZoomOutDuration + initWaitDuration + initZoomInDuration;
             
@@ -195,20 +196,20 @@ namespace Assets.Scripts.Core
                     // Phase 1: Zoom Out
                     float t = elapsed / initZoomOutDuration;
                     cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, t);
-                    transform.position = Vector3.Lerp(startPos, gridCenter, t);
+                    transform.position = Vector3.Lerp(startPos, targetAnimPos, t);
                 }
                 else if (elapsed < initZoomOutDuration + initWaitDuration)
                 {
                     // Phase 2: Wait
                     cam.orthographicSize = targetZoom;
-                    transform.position = gridCenter;
+                    transform.position = targetAnimPos;
                 }
                 else
                 {
                     // Phase 3: Zoom In
                     float t = (elapsed - initZoomOutDuration - initWaitDuration) / initZoomInDuration;
                     cam.orthographicSize = Mathf.Lerp(targetZoom, finalZoom, t);
-                    transform.position = Vector3.Lerp(gridCenter, finalPos, t);
+                    transform.position = Vector3.Lerp(targetAnimPos, finalPos, t);
                 }
 
                 yield return null;

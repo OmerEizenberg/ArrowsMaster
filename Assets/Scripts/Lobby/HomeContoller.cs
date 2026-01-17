@@ -10,6 +10,11 @@ public class HomeContoller : MonoBehaviour
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
 
+    [SerializeField] private Color m_SuperHardColor;
+    [SerializeField] private Color m_HardColor;
+    [SerializeField] private Color m_EasyColor;
+    [SerializeField] private Color m_LevelColor;
+
     // Start is called before the first frame update
     void Start()
     {

@@ -349,6 +349,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_LobbyUI: {fileID: 0}
   m_GameUI: {fileID: 0}
+  m_SuperHardColor: {r: 0, g: 0, b: 0, a: 0}
+  m_HardColor: {r: 0, g: 0, b: 0, a: 0}
+  m_EasyColor: {r: 0, g: 0, b: 0, a: 0}
+  m_LevelColor: {r: 0, g: 0, b: 0, a: 0}
 --- !u!1 &33321434
 GameObject:
   m_ObjectHideFlags: 0
@@ -981,9 +985,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_LobbyUI: {fileID: 823707117}
   m_GameUI: {fileID: 937078174}
-  m_LevelManager: {fileID: 0}
-  m_RestartButton: {fileID: 0}
-  m_QuitButton: {fileID: 0}
+  m_LevelManager: {fileID: 946353436}
+  m_Hearts:
+  - {fileID: 344433170}
+  - {fileID: 1542021784}
+  - {fileID: 1435196976}
 --- !u!1 &306613316
 GameObject:
   m_ObjectHideFlags: 0
@@ -1498,6 +1504,10 @@ MonoBehaviour:
   maxZoom: 15
   mobileZoomSpeed: 0.1
   panSensitivity: 0.01
+  initZoomMultiplier: 2
+  initZoomOutDuration: 0.3
+  initWaitDuration: 1.2
+  initZoomInDuration: 0.25
 --- !u!1 &550872158
 GameObject:
   m_ObjectHideFlags: 0
@@ -1632,8 +1642,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4278190080
-  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
+    rgba: 4294936732
+  m_fontColor: {r: 0.6117647, g: 0.53333336, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1766,8 +1776,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4282265378
+  m_fontColor: {r: 0.13333334, g: 0.18431373, b: 0.24313726, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1900,8 +1910,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4278190080
-  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
+    rgba: 4282265378
+  m_fontColor: {r: 0.13333334, g: 0.18431373, b: 0.24313726, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -2089,6 +2099,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_LobbyUI: {fileID: 823707117}
   m_GameUI: {fileID: 937078174}
+  m_SuperHardColor: {r: 0.8784314, g: 0.3372549, b: 0.99215686, a: 0}
+  m_HardColor: {r: 0.9764706, g: 0.7921569, b: 0.14117648, a: 0}
+  m_EasyColor: {r: 0.7294118, g: 0.8627451, b: 0.34509805, a: 0}
+  m_LevelColor: {r: 0.6117647, g: 0.53333336, b: 1, a: 0}
 --- !u!1 &907632658
 GameObject:
   m_ObjectHideFlags: 0
@@ -2421,7 +2435,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   levelManager: {fileID: 946353436}
   failureScreen: {fileID: 1994231231}
-  winScreen: {fileID: 907632658}
+  m_GameUI: {fileID: 937078174}
+  m_LobbyUI: {fileID: 823707117}
   maxLives: 3
 --- !u!1 &984738667
 GameObject:
@@ -2539,8 +2554,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4282265378
+  m_fontColor: {r: 0.13333334, g: 0.18431373, b: 0.24313726, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -3477,8 +3492,8 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1768384686}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0, y: 0.1}
+  m_AnchorMax: {x: 1, y: 0.9}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3511,8 +3526,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -3529,7 +3544,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 72
+  m_fontSize: 40.85
   m_fontSizeBase: 24
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -3720,8 +3735,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4282265378
+  m_fontColor: {r: 0.13333334, g: 0.18431373, b: 0.24313726, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -4352,16 +4367,16 @@ RectTransform:
   m_GameObject: {fileID: 1768384685}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2.5, y: 2.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1552099926}
   m_Father: {fileID: 823707121}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.3, y: 0}
-  m_AnchorMax: {x: 0.7, y: 0}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: 0, y: 400}
-  m_SizeDelta: {x: 0, y: 160}
+  m_SizeDelta: {x: 256, y: 64}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1768384687
 MonoBehaviour:
@@ -4439,8 +4454,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
-  m_Type: 1
+  m_Sprite: {fileID: 21300000, guid: 0861cd781a4704d59900208d0c1c0512, type: 3}
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4

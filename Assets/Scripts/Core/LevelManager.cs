@@ -63,11 +63,26 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator CoordinatedLevelInitialization(List<ArrowController> arrows, LevelData data)
         {
-            // 1. Start Camera Animation
+            // 1. Calculate Average Head Position for Camera Focus
+            Vector3 avgHeadPos = Vector3.zero;
+            if (data.arrows != null && data.arrows.Count > 0)
+            {
+                foreach (var arrowData in data.arrows)
+                {
+                    if (arrowData.path != null && arrowData.path.Count > 0)
+                    {
+                        var headPos = arrowData.path[arrowData.path.Count - 1].ToVector2Int();
+                        avgHeadPos += new Vector3(headPos.x * ArrowController.CellSize, headPos.y * ArrowController.CellSize, 0);
+                    }
+                }
+                avgHeadPos /= data.arrows.Count;
+            }
+
+            // 2. Start Camera Animation
             if (CameraController.Instance != null)
             {
                 CameraController.Instance.SetBounds(data.gridSize.ToVector2Int());
-                CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int());
+                CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), avgHeadPos);
             }
 
             if (SoundManager.Instance != null)
