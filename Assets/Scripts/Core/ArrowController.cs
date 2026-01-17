@@ -26,6 +26,7 @@ namespace Assets.Scripts.Core
 
         // LineRenderer Refactor
         private LineRenderer lineRenderer;
+        private LineRenderer previewLineRenderer;
 
         public void Initialize(ArrowData data)
         {
@@ -54,8 +55,20 @@ namespace Assets.Scripts.Core
             lineRenderer.startColor = Color.black;
             lineRenderer.endColor = Color.black;
             lineRenderer.sortingOrder = 0; 
-            currentArrowColor = Color.black;
             hasReducedLife = false;
+
+            // Setup Preview LineRenderer
+            GameObject previewObj = new GameObject("PreviewLine");
+            previewObj.transform.SetParent(this.transform);
+            previewLineRenderer = previewObj.AddComponent<LineRenderer>();
+            previewLineRenderer.startWidth = 0.1f;
+            previewLineRenderer.endWidth = 0.1f;
+            previewLineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+            previewLineRenderer.startColor = new Color(0.5f, 0.5f, 0.5f, 0.5f); // Grey Transparent
+            previewLineRenderer.endColor = new Color(0.5f, 0.5f, 0.5f, 0.2f); // Fading
+            previewLineRenderer.useWorldSpace = true;
+            previewLineRenderer.positionCount = 0;
+            previewLineRenderer.sortingOrder = -1; // Behind head
 
             segments.Clear();
             
@@ -477,6 +490,34 @@ namespace Assets.Scripts.Core
                     // BODY
                     seg.Renderer.enabled = false;
                 }
+            }
+        }
+
+        public void ShowPreview()
+        {
+            if (segments.Count == 0 || isMoving) return;
+
+            Segment head = segments[segments.Count - 1];
+            Vector2Int currentDir = Vector2Int.up;
+            if (segments.Count >= 2)
+            {
+                Segment neck = segments[segments.Count - 2];
+                currentDir = head.GridPosition - neck.GridPosition;
+            }
+
+            Vector3 startPos = head.transform.position;
+            Vector3 endPos = startPos + new Vector3(currentDir.x, currentDir.y, 0) * 20f * CellSize;
+
+            previewLineRenderer.positionCount = 2;
+            previewLineRenderer.SetPosition(0, startPos);
+            previewLineRenderer.SetPosition(1, endPos);
+        }
+
+        public void HidePreview()
+        {
+            if (previewLineRenderer != null)
+            {
+                previewLineRenderer.positionCount = 0;
             }
         }
     }

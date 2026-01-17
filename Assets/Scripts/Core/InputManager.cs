@@ -8,6 +8,11 @@ namespace Assets.Scripts.Core
         private Vector2 startTouchPos;
         private bool wasMultiTouch;
         [SerializeField] private float moveThreshold = 10f; // Pixels
+        [SerializeField] private float holdThreshold = 0.5f;
+
+        private float mouseDownTime;
+        private bool hasTriggeredHold;
+        private ArrowController activePreviewArrow;
 
         void Update()
         {
@@ -18,10 +23,41 @@ namespace Assets.Scripts.Core
                 pendingSegment = GetHitSegment();
                 startTouchPos = Input.mousePosition;
                 wasMultiTouch = false;
+                mouseDownTime = Time.time;
+                hasTriggeredHold = false;
+                activePreviewArrow = null;
+            }
+
+            if (Input.GetMouseButton(0) && pendingSegment != null && !wasMultiTouch && !hasTriggeredHold)
+            {
+                float dist = Vector2.Distance(startTouchPos, (Vector2)Input.mousePosition);
+                if (dist < moveThreshold)
+                {
+                    if (Time.time - mouseDownTime > holdThreshold)
+                    {
+                        hasTriggeredHold = true;
+                        activePreviewArrow = pendingSegment.GetComponentInParent<ArrowController>();
+                        if (activePreviewArrow != null)
+                        {
+                            activePreviewArrow.ShowPreview();
+                        }
+                    }
+                }
+                else
+                {
+                    // If panned too far, cancel potential hold
+                    pendingSegment = null;
+                }
             }
 
             if (Input.GetMouseButtonUp(0))
             {
+                // Always hide preview if one was active
+                if (activePreviewArrow != null)
+                {
+                    activePreviewArrow.HidePreview();
+                }
+
                 Vector2 endTouchPos = Input.mousePosition;
                 float dist = Vector2.Distance(startTouchPos, endTouchPos);
 

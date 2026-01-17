@@ -218,5 +218,40 @@ namespace Assets.Scripts.Core
             cam.orthographicSize = finalZoom;
             transform.position = finalPos;
         }
+
+        public void PlayWinZoomAnimation(Vector3 focusPosition)
+        {
+            StartCoroutine(WinZoomAnimation(focusPosition));
+        }
+
+        private System.Collections.IEnumerator WinZoomAnimation(Vector3 focusPosition)
+        {
+            float duration = 0.5f;
+            float elapsed = 0f;
+            
+            float startZoom = cam.orthographicSize;
+            Vector3 startPos = transform.position;
+            
+            // Zoom out to maxZoom or similar level-fit zoom
+            float targetZoom = maxZoom * 0.8f; 
+            Vector3 targetPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                // Use SmoothStep for a nice feel
+                float smoothT = Mathf.SmoothStep(0, 1, t);
+                
+                cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, smoothT);
+                transform.position = Vector3.Lerp(startPos, targetPos, smoothT);
+                
+                yield return null;
+            }
+
+            cam.orthographicSize = targetZoom;
+            transform.position = targetPos;
+        }
     }
 }

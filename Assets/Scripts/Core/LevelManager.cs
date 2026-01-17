@@ -12,8 +12,10 @@ namespace Assets.Scripts.Core
         public Color m_CircleColor;
 
         private List<GameObject> currentLevelObjects = new List<GameObject>();
+        private List<SpriteRenderer> m_BackgroundCircles = new List<SpriteRenderer>();
         private string currentLevelId;
         private HashSet<Vector2Int> m_SpawnedCirclePositions = new HashSet<Vector2Int>();
+        private Vector3 m_LevelCenter;
 
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
@@ -42,6 +44,7 @@ namespace Assets.Scripts.Core
                 }
             }
             currentLevelObjects.Clear();
+            m_BackgroundCircles.Clear();
             m_SpawnedCirclePositions.Clear();
             GridManager.Instance.InitializeGrid(Vector2Int.zero); // Reset with zero or just clear map
         }
@@ -91,6 +94,7 @@ namespace Assets.Scripts.Core
                 }
                 if (hasPoints) levelCenter = (minP + maxP) / 2f;
             }
+            m_LevelCenter = levelCenter;
 
             // 2. Start Camera Animation
             if (CameraController.Instance != null)
@@ -143,6 +147,7 @@ namespace Assets.Scripts.Core
 
                         m_SpawnedCirclePositions.Add(pos);
                         currentLevelObjects.Add(circleObj);
+                        m_BackgroundCircles.Add(sr);
                     }
                 }
             }
@@ -151,6 +156,85 @@ namespace Assets.Scripts.Core
         {
             ClearLevel();
             LoadLevelFromResources(currentLevelId);
+        }
+
+        public void PlayWinAnimation()
+        {
+            if (CameraController.Instance != null)
+            {
+                CameraController.Instance.PlayWinZoomAnimation(m_LevelCenter);
+            }
+            StartCoroutine(DoRippleEffect());
+        }
+
+        private System.Collections.IEnumerator DoRippleEffect()
+        {
+            if (m_BackgroundCircles == null || m_BackgroundCircles.Count == 0) yield break;
+
+            Color targetColor = new Color(0.373f, 0.153f, 0.804f); // #5f27cd
+            float rippleSpeed = 4.0f; // Speed of the wave
+            float maxDist = 0;
+            
+            foreach(var sr in m_BackgroundCircles)
+            {
+                float dist = Vector3.Distance(sr.transform.position, m_LevelCenter);
+                if (dist > maxDist) maxDist = dist;
+            }
+
+            // Repeat the effect twice
+            for (int repeat = 0; repeat < 2; repeat++)
+            {
+                // We'll use a time-based wave approach
+                float duration = (maxDist / rippleSpeed) + 0.5f; // Duration of the whole effect
+                float elapsed = 0;
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.deltaTime;
+
+                    foreach (var sr in m_BackgroundCircles)
+                    {
+                        float dist = Vector3.Distance(sr.transform.position, m_LevelCenter);
+                        
+                        // The "wave" is at dist = elapsed * rippleSpeed
+                        // Calculate a local phase 0->1 based on proximity to the wave front
+                        float waveFront = elapsed * rippleSpeed;
+                        float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveFront) / 2.0f);
+                        
+                        if (proximity > 0)
+                        {
+                            // Scale: 100% -> 130% -> 50% based on proximity curve
+                            float scale = 1.0f;
+                            if (proximity > 0.5f) // Scaling up part
+                                scale = Mathf.Lerp(1.0f, 1.3f, (proximity - 0.5f) * 2f);
+                            else // Scaling down part
+                                scale = Mathf.Lerp(0.5f, 1.0f, proximity * 2f);
+
+                            sr.transform.localScale = Vector3.one * scale;
+                            sr.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                        }
+                        else if (waveFront > dist)
+                        {
+                            sr.transform.localScale = Vector3.one;
+                            sr.color = m_CircleColor;
+                        }
+                    }
+                    yield return null;
+                }
+
+                // Brief pause before next ripple if it's the first one
+                if (repeat == 0) yield return new WaitForSeconds(0.2f);
+            }
+
+            // Final Cleanup/Reset
+            foreach (var sr in m_BackgroundCircles)
+            {
+                if (sr != null)
+                {
+                    sr.transform.localScale = Vector3.one;
+                    sr.color = m_CircleColor;
+                }
+            }
         }
     }
 }

@@ -86,6 +86,12 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("Level Complete! Waiting for win screen...");
             UserDataManager.Instance.IncrementLevel();
+
+            if (levelManager != null)
+            {
+                levelManager.PlayWinAnimation();
+            }
+
             yield return new WaitForSeconds(1.5f);
             
             if (m_GameUI != null)
