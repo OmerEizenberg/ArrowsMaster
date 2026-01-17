@@ -7,6 +7,8 @@ namespace Assets.Scripts.Core
     {
         public static GameManager Instance { get; private set; }
 
+        public Sprite m_CircleSprite;
+        public Color m_CircleColor;
         [Header("References")]
         public LevelManager levelManager;
         public GameObject failureScreen;
