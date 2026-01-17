@@ -10,7 +10,8 @@ namespace Assets.Scripts.Core
         [Header("References")]
         public LevelManager levelManager;
         public GameObject failureScreen;
-        public GameObject winScreen;
+        public GameObject m_GameUI;
+        public GameObject m_LobbyUI;
 
         [Header("Settings")]
         public int maxLives = 3;
@@ -35,7 +36,6 @@ namespace Assets.Scripts.Core
             DontDestroyOnLoad(gameObject);
 
             if (failureScreen != null) failureScreen.SetActive(false);
-            if (winScreen != null) winScreen.SetActive(false);
         }
 
         private void Start()
@@ -87,9 +87,9 @@ namespace Assets.Scripts.Core
             Debug.Log("Level Complete! Waiting for win screen...");
             yield return new WaitForSeconds(1.5f);
             
-            if (winScreen != null)
+            if (m_GameUI != null)
             {
-                winScreen.SetActive(true);
+                m_GameUI.SetActive(false);
             }
             
             if (SoundManager.Instance != null)
@@ -136,7 +136,6 @@ namespace Assets.Scripts.Core
         public void HideScreens()
         {
             if (failureScreen != null) failureScreen.SetActive(false);
-            if (winScreen != null) winScreen.SetActive(false);
         }
 
         public void HideFailureScreen()

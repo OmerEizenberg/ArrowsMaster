@@ -21,20 +21,31 @@ namespace Assets.Scripts.Core
         private Coroutine moveCoroutine;
         
         public int ArrowId { get; private set; }
+        private ArrowData cachedData;
+        private bool hasReducedLife = false;
 
         // LineRenderer Refactor
         private LineRenderer lineRenderer;
 
         public void Initialize(ArrowData data)
         {
+            PrepareIncrementalInit(data);
+            for (int i = 0; i < data.path.Count; i++)
+            {
+                UpdateGrowthSlide(i);
+            }
+        }
+
+        public void PrepareIncrementalInit(ArrowData data)
+        {
+            cachedData = data;
             ArrowId = data.id;
-            Color color = Color.white;
             
             // Setup LineRenderer
             lineRenderer = GetComponent<LineRenderer>();
             if (lineRenderer == null) lineRenderer = gameObject.AddComponent<LineRenderer>();
             
-            lineRenderer.startWidth = 0.2f; // 20 pixels (0.2 units at 100 PPU)
+            lineRenderer.startWidth = 0.2f; 
             lineRenderer.endWidth = 0.2f;
             lineRenderer.useWorldSpace = true;
             lineRenderer.numCapVertices = 5;
@@ -42,47 +53,62 @@ namespace Assets.Scripts.Core
             lineRenderer.material = new Material(Shader.Find("Sprites/Default")); 
             lineRenderer.startColor = Color.black;
             lineRenderer.endColor = Color.black;
-            lineRenderer.sortingOrder = 0; // Behind head
+            lineRenderer.sortingOrder = 0; 
+            currentArrowColor = Color.black;
+            hasReducedLife = false;
 
-            // Instantiate segments from data.path (Tail to Head)
-            for (int i = 0; i < data.path.Count; i++)
+            segments.Clear();
+            
+            GameManager.Instance.RegisterArrow();
+        }
+
+        /// <summary>
+        /// Slide-in animation step. 
+        /// Step 0: Head appears at path[0].
+        /// Step 1: Head moves to path[1], new segment appears at path[0].
+        /// ...and so on.
+        /// </summary>
+        public bool UpdateGrowthSlide(int step)
+        {
+            if (cachedData == null || step >= cachedData.path.Count) return false;
+
+            // 1. Create a new segment at index 0 of the segments list
+            Vector2Int spawnPos = cachedData.path[0].ToVector2Int();
+            Vector3 worldSpawnPos = new Vector3(spawnPos.x * CellSize, spawnPos.y * CellSize, 0);
+
+            GameObject segObj = Instantiate(segmentPrefab.gameObject, worldSpawnPos, Quaternion.identity, transform);
+            segObj.transform.localScale = Vector3.one;
+            Segment newSeg = segObj.GetComponent<Segment>();
+            
+            // Always insert at the start - it represents the "newest" part of the arrow being grown from the tail
+            segments.Insert(0, newSeg);
+
+            // Ensure collider is set up for interaction
+            BoxCollider2D box = newSeg.GetComponent<BoxCollider2D>();
+            if (box == null) box = newSeg.gameObject.AddComponent<BoxCollider2D>();
+            box.size = new Vector2(1f, 1f);
+
+            // 2. Shift all segments forward along the path to their current position in this step
+            // In step k, we have k+1 segments.
+            // segments[0] (newest) should be at path[0].
+            // segments[segments.Count - 1] (oldest/Head) should be at path[step].
+            for (int i = 0; i < segments.Count; i++)
             {
-                Vector2Int pos = data.path[i].ToVector2Int();
-                Vector3 worldPos = new Vector3(pos.x * CellSize, pos.y * CellSize, 0);
+                int pathIndex = step - (segments.Count - 1 - i);
+                Vector2Int pos = cachedData.path[pathIndex].ToVector2Int();
+                segments[i].GridPosition = pos;
                 
-                GameObject segObj = Instantiate(segmentPrefab.gameObject, worldPos, Quaternion.identity, transform);
-                segObj.transform.localScale = Vector3.one; 
-
-                Segment seg = segObj.GetComponent<Segment>();
-                seg.GridPosition = pos;
-                
-                if (i == data.path.Count - 1)
-                {
-                    // HEAD: Keep Sprite, Set Order
-                    seg.Renderer.sprite = HeadSprite;
-                    seg.Renderer.enabled = true;
-                    seg.Renderer.sortingOrder = 1; // Above line
-                }
-                else
-                {
-                    // But keep Collider!
-                    seg.Renderer.enabled = false;
-                }
-                
-                // Ensure tight collider
-                BoxCollider2D box = seg.GetComponent<BoxCollider2D>();
-                if (box == null) box = seg.gameObject.AddComponent<BoxCollider2D>();
-                box.size = new Vector2(1f, 1f); 
-                
-                segments.Add(seg);
+                Vector3 targetWorldPos = new Vector3(pos.x * CellSize, pos.y * CellSize, 0);
+                // To make it look like a flow, we use MoveTo.
+                segments[i].MoveTo(targetWorldPos, 0.08f); 
                 
                 GridManager.Instance.RegisterOccupancy(pos, this);
             }
-            
+
             UpdateHeadVisuals();
             UpdateLinePositions();
-            
-            GameManager.Instance.RegisterArrow();
+
+            return true;
         }
         
         private void Update()
@@ -135,6 +161,9 @@ namespace Assets.Scripts.Core
             }
         }
 
+        [SerializeField] private Color blockedColor = new Color(0.906f, 0.298f, 0.235f); // #e74c3c
+        private Color currentArrowColor = Color.black;
+
         public void OnArrowClicked(Segment clickedSegment)
         {
             // Allow clicking ANY segment
@@ -148,23 +177,94 @@ namespace Assets.Scripts.Core
                     if (CanMoveForward())
                     {
                         isMoving = true;
+                        // Start success color animation (White -> Green -> White)
+                        StartCoroutine(SuccessColorAnimation());
+
                         // Start destruction timer immediately on click (5 seconds)
                         Invoke("DestroySelf", 5.0f);
                         moveCoroutine = StartCoroutine(AutoMoveRoutine());
+                        
+                        // Notify GameManager that this arrow is moving (solved)
+                        GameManager.Instance.NotifyArrowSuccess(); 
                     }
                     else
                     {
                         SoundManager.Instance.PlayArrowBlocked();
-                        // Optional: Shake feedback?
-                        Debug.Log("Arrow Blocked!");
+                        
+                        // Reduce life (only once per arrow per attempt) and show visual feedback
+                        if (!hasReducedLife)
+                        {
+                            GameManager.Instance.LoseLife();
+                            hasReducedLife = true;
+                            Debug.Log("Arrow Blocked! Life lost.");
+                        }
+                        
+                        SetArrowColor(blockedColor);
                     }
+                }
+            }
+        }
+
+        private IEnumerator SuccessColorAnimation()
+        {
+            Color successColor = new Color(0.18f, 0.8f, 0.44f); // #2ecc71
+            Color startFlashColor = Color.white; // #FFFFFF
+            float duration = 0.5f;
+            float halfDuration = duration / 2f;
+
+            // Flash to Green
+            float elapsed = 0;
+            while (elapsed < halfDuration)
+            {
+                SetArrowColor(Color.Lerp(startFlashColor, successColor, elapsed / halfDuration));
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Green back to White (or Black?)
+            // The user said back to #FFFFFF. Let's stick to that.
+            elapsed = 0;
+            while (elapsed < halfDuration)
+            {
+                SetArrowColor(Color.Lerp(successColor, startFlashColor, elapsed / halfDuration));
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Finally reset to black (default line color) as it escapes?
+            // Or keep it white? The user said back to #FFFFFF.
+            // But the line is black. Let's settle on black at the very end so it matches the tray?
+            // "back to #FFFFFF"
+            SetArrowColor(startFlashColor);
+            
+            // After escape finishes, it's destroyed anyway.
+        }
+
+        private void SetArrowColor(Color color)
+        {
+            currentArrowColor = color;
+            SetArrowColorRaw(color);
+        }
+
+        private void SetArrowColorRaw(Color color)
+        {
+            if (lineRenderer != null)
+            {
+                lineRenderer.startColor = color;
+                lineRenderer.endColor = color;
+            }
+
+            foreach (var seg in segments)
+            {
+                if (seg.Renderer.enabled) // Usually just the head
+                {
+                    seg.Renderer.color = color;
                 }
             }
         }
 
         private void DestroySelf()
         {
-            GameManager.Instance.NotifyArrowSuccess();
             Destroy(gameObject,1.0f);
         }
 
@@ -287,7 +387,7 @@ namespace Assets.Scripts.Core
                     // HEAD
                     seg.Renderer.enabled = true;
                     seg.Renderer.sprite = HeadSprite;
-                    seg.Renderer.color = Color.black; // Match line color
+                    seg.Renderer.color = currentArrowColor; // Explicitly set color here
                     seg.Renderer.sortingOrder = 10;   // Ensure on top
                     
                     // Rotation

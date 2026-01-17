@@ -9,9 +9,41 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
     [SerializeField] private LevelManager m_LevelManager;
-    [SerializeField] private Button m_RestartButton;
-    [SerializeField] private Button m_QuitButton;
-    // Start is called before the first frame update
+    [SerializeField] private Image[] m_Hearts;
+    
+    private readonly Color activeColor = Color.white; // #FFFFFF
+    private readonly Color inactiveColor = new Color(0.616f, 0.616f, 0.616f, 0.5f); // #9D9D9D with 128 alpha (0.5f)
+
+    private void Start()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnLivesChanged += UpdateLivesUI;
+            UpdateLivesUI(GameManager.Instance.CurrentLives);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnLivesChanged -= UpdateLivesUI;
+        }
+    }
+
+    private void UpdateLivesUI(int currentLives)
+    {
+        if (m_Hearts == null) return;
+
+        for (int i = 0; i < m_Hearts.Length; i++)
+        {
+            if (m_Hearts[i] != null)
+            {
+                m_Hearts[i].color = (i < currentLives) ? activeColor : inactiveColor;
+            }
+        }
+    }
+
     public void restartLevel()
     {
         SoundManager.Instance.PlayClick();
@@ -21,7 +53,6 @@ public class GameUIContoleer : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
     public void BackToLobby()
     {
         m_LobbyUI.SetActive(true);
