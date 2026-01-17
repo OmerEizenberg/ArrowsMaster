@@ -110,7 +110,7 @@ namespace Assets.Scripts.Core
 
             return true;
         }
-        
+
         private void Update()
         {
             // Continuously update line and head visuals to follow the moving segments and color state
@@ -178,6 +178,7 @@ namespace Assets.Scripts.Core
                     if (CanMoveForward())
                     {
                         isMoving = true;
+                        VibrationManager.VibrateSelection();
                         // Start success color animation (White -> Green -> White)
                         StartCoroutine(SuccessColorAnimation());
 

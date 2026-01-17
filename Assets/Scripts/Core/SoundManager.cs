@@ -8,6 +8,7 @@ namespace Assets.Scripts.Core
 
         [Header("Audio Source")]
         [SerializeField] private AudioSource audioSource;
+        private bool isMuted = false;
 
         [Header("Clips")]
         public AudioClip ClickSound;
@@ -34,11 +35,19 @@ namespace Assets.Scripts.Core
                     audioSource = gameObject.AddComponent<AudioSource>();
                 }
             }
+
+            // Load initial state from PlayerPrefs to ensure synchronization
+            isMuted = PlayerPrefs.GetInt("SoundEnabled", 1) == 0;
+            if (audioSource != null)
+            {
+                audioSource.mute = isMuted;
+            }
         }
 
         public void PlayClick()
         {
             PlaySound(ClickSound);
+            VibrationManager.VibrateSelection();
         }
 
         public void PlayArrowSelect()
@@ -61,8 +70,18 @@ namespace Assets.Scripts.Core
             PlaySound(WinSound);
         }
 
+        public void SetMute(bool mute)
+        {
+            isMuted = mute;
+            if (audioSource != null)
+            {
+                audioSource.mute = mute;
+            }
+        }
+
         private void PlaySound(AudioClip clip)
         {
+            if (isMuted) return;
             if (clip != null && audioSource != null)
             {
                 audioSource.PlayOneShot(clip);

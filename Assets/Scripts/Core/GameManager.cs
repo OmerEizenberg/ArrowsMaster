@@ -85,6 +85,7 @@ namespace Assets.Scripts.Core
         private System.Collections.IEnumerator WinSequence()
         {
             Debug.Log("Level Complete! Waiting for win screen...");
+            UserDataManager.Instance.IncrementLevel();
             yield return new WaitForSeconds(1.5f);
             
             if (m_GameUI != null)
@@ -96,6 +97,8 @@ namespace Assets.Scripts.Core
             {
                 SoundManager.Instance.PlayWin();
             }
+
+            m_LobbyUI.SetActive(true);
 
             OnLevelWon?.Invoke();
         }
