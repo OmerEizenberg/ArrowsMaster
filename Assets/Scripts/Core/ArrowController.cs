@@ -113,8 +113,9 @@ namespace Assets.Scripts.Core
         
         private void Update()
         {
-            // Continuously update line to follow the moving segments
+            // Continuously update line and head visuals to follow the moving segments and color state
             UpdateLinePositions();
+            UpdateHeadVisuals();
         }
 
         private void UpdateLinePositions()
@@ -208,7 +209,7 @@ namespace Assets.Scripts.Core
         private IEnumerator SuccessColorAnimation()
         {
             Color successColor = new Color(0.18f, 0.8f, 0.44f); // #2ecc71
-            Color startFlashColor = Color.white; // #FFFFFF
+            Color startFlashColor = Color.black; // #000000
             float duration = 0.5f;
             float halfDuration = duration / 2f;
 
