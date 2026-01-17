@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.UI;
 using UnityEngine;
+using TMPro; 
 
 using Assets.Scripts.Core;
 
@@ -10,23 +11,26 @@ public class HomeContoller : MonoBehaviour
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
 
+    [SerializeField] private TextMeshProUGUI m_TitleText;
+    [SerializeField] private TextMeshProUGUI m_LevelText;
+    [SerializeField] private TextMeshProUGUI m_DifficultyText;
+
+    [SerializeField] private Color m_CircleColor;
     [SerializeField] private Color m_SuperHardColor;
     [SerializeField] private Color m_HardColor;
     [SerializeField] private Color m_EasyColor;
     [SerializeField] private Color m_LevelColor;
 
-    // Start is called before the first frame update
-    void Start()
+    private void enabled()
     {
-        
+        m_TitleText.text = "Arrows Master";
+        m_LevelText.text = "Level 1";
+        m_DifficultyText.text = "Easy";
+        m_LevelText.color = m_LevelColor;
+        //TODO : COlor by difficulty
+        m_DifficultyText.color = m_EasyColor;
     }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
+    
     public void OnPlayButtonClicked()
     {
         SoundManager.Instance.PlayClick();

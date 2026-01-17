@@ -8,10 +8,12 @@ namespace Assets.Scripts.Core
     {
         public TextAsset levelJsonFile; // Drag JSON here
         public ArrowController arrowPrefab; // Drag Prefab here
+        public Sprite m_CircleSprite;
+        public Color m_CircleColor;
 
         private List<GameObject> currentLevelObjects = new List<GameObject>();
         private string currentLevelId;
-        private SpriteRenderer[,] m_BackgroundCircles;
+        private HashSet<Vector2Int> m_SpawnedCirclePositions = new HashSet<Vector2Int>();
 
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
@@ -40,7 +42,7 @@ namespace Assets.Scripts.Core
                 }
             }
             currentLevelObjects.Clear();
-            m_BackgroundCircles = null;
+            m_SpawnedCirclePositions.Clear();
             GridManager.Instance.InitializeGrid(Vector2Int.zero); // Reset with zero or just clear map
         }
 
@@ -51,8 +53,8 @@ namespace Assets.Scripts.Core
             // Initialize Grid
             GridManager.Instance.InitializeGrid(data.gridSize.ToVector2Int());
 
-            // Initialize Circles Array
-            m_BackgroundCircles = new SpriteRenderer[data.gridSize.x, data.gridSize.y];
+            // Initialize Circles Tracking
+            m_SpawnedCirclePositions.Clear();
 
             List<ArrowController> arrows = new List<ArrowController>();
             foreach (ArrowData arrowData in data.arrows)
@@ -61,29 +63,6 @@ namespace Assets.Scripts.Core
                 arrow.PrepareIncrementalInit(arrowData);
                 currentLevelObjects.Add(arrow.gameObject);
                 arrows.Add(arrow);
-
-                // Spawn Background Circles for this arrow's path
-                foreach (var pathPoint in arrowData.path)
-                {
-                    Vector2Int pos = pathPoint.ToVector2Int();
-                    if (pos.x >= 0 && pos.x < data.gridSize.x && pos.y >= 0 && pos.y < data.gridSize.y)
-                    {
-                        if (m_BackgroundCircles[pos.x, pos.y] == null)
-                        {
-                            GameObject circleObj = new GameObject($"Circle_{pos.x}_{pos.y}");
-                            circleObj.transform.position = new Vector3(pos.x * ArrowController.CellSize, pos.y * ArrowController.CellSize, 0);
-                            circleObj.transform.SetParent(this.transform);
-                            
-                            SpriteRenderer sr = circleObj.AddComponent<SpriteRenderer>();
-                            sr.sprite = GameManager.Instance.m_CircleSprite;
-                            sr.color = GameManager.Instance.m_CircleColor;
-                            sr.sortingOrder = -1; // Behind arrows
-
-                            m_BackgroundCircles[pos.x, pos.y] = sr;
-                            currentLevelObjects.Add(circleObj);
-                        }
-                    }
-                }
             }
 
             StartCoroutine(CoordinatedLevelInitialization(arrows, data));
@@ -135,6 +114,30 @@ namespace Assets.Scripts.Core
                 yield return new WaitForSeconds(0.06f);
 
                 //yield return new WaitForSeconds(stepDelay);
+            }
+
+            // 3. Spawn Background Circles AFTER animation
+            foreach (var arrowData in data.arrows)
+            {
+                foreach (var pathPoint in arrowData.path)
+                {
+                    Vector2Int pos = pathPoint.ToVector2Int();
+                    // Removed bounds check to allow circles for all path points
+                    if (!m_SpawnedCirclePositions.Contains(pos))
+                    {
+                        GameObject circleObj = new GameObject($"Circle_{pos.x}_{pos.y}");
+                        circleObj.transform.position = new Vector3(pos.x * ArrowController.CellSize, pos.y * ArrowController.CellSize, 0);
+                        circleObj.transform.SetParent(this.transform);
+
+                        SpriteRenderer sr = circleObj.AddComponent<SpriteRenderer>();
+                        sr.sprite = m_CircleSprite;
+                        sr.color = m_CircleColor;
+                        sr.sortingOrder = -1; // Behind arrows
+
+                        m_SpawnedCirclePositions.Add(pos);
+                        currentLevelObjects.Add(circleObj);
+                    }
+                }
             }
         }
         public void RestartLevel()

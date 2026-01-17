@@ -266,7 +266,8 @@ namespace Assets.Scripts.Core
 
         private void DestroySelf()
         {
-            Destroy(gameObject,1.0f);
+            GridManager.Instance.UnregisterArrow(this);
+            Destroy(gameObject, 0.5f);
         }
 
         private IEnumerator AutoMoveRoutine()
@@ -310,21 +311,88 @@ namespace Assets.Scripts.Core
                 currentDir = head.GridPosition - neck.GridPosition;
             }
             
-            // Check FULL PATH until Out of Bounds
-            Vector2Int checkPos = head.GridPosition + currentDir;
-            
-            while (!GridManager.Instance.IsOutOfBounds(checkPos))
+            Vector2 headPos = new Vector2(head.GridPosition.x, head.GridPosition.y);
+            Vector2 dirVec = new Vector2(currentDir.x, currentDir.y);
+
+            foreach (var otherArrow in GridManager.Instance.GetAllArrows())
             {
-                if (GridManager.Instance.IsCellOccupied(checkPos))
+                if (otherArrow == this || otherArrow.isMoving) continue;
+                
+                // Check intersection with each segment of the other arrow
+                for (int i = 0; i < otherArrow.segments.Count - 1; i++)
                 {
-                    // Blocked by something (another arrow or self, though self-intersection straight ahead is impossible)
-                    return false;
+                    Vector2 p1 = new Vector2(otherArrow.segments[i].GridPosition.x, otherArrow.segments[i].GridPosition.y);
+                    Vector2 p2 = new Vector2(otherArrow.segments[i+1].GridPosition.x, otherArrow.segments[i+1].GridPosition.y);
+                    
+                    if (RayIntersectsSegment(headPos, dirVec, p1, p2))
+                    {
+                        return false;
+                    }
                 }
-                checkPos += currentDir;
+                
+                // Also check the head of the other arrow if it's the only segment
+                if (otherArrow.segments.Count == 1)
+                {
+                    Vector2 pH = new Vector2(otherArrow.segments[0].GridPosition.x, otherArrow.segments[0].GridPosition.y);
+                    if (RayIntersectsPoint(headPos, dirVec, pH))
+                    {
+                        return false;
+                    }
+                }
             }
             
-            // If we loop until OutOfBounds without hitting anything, path is clear.
             return true;
+        }
+
+        private bool RayIntersectsSegment(Vector2 rayOrigin, Vector2 rayDir, Vector2 p1, Vector2 p2)
+        {
+            // Cardinal directions only
+            if (rayDir.x != 0) // Horizontal ray
+            {
+                if (p1.x == p2.x) // Vertical segment
+                {
+                    float minSY = Mathf.Min(p1.y, p2.y);
+                    float maxSY = Mathf.Max(p1.y, p2.y);
+                    if (rayDir.x > 0) return p1.x > rayOrigin.x && rayOrigin.y >= minSY && rayOrigin.y <= maxSY;
+                    else return p1.x < rayOrigin.x && rayOrigin.y >= minSY && rayOrigin.y <= maxSY;
+                }
+                else if (p1.y == p2.y) // Horizontal segment
+                {
+                    if (Mathf.Abs(p1.y - rayOrigin.y) > 0.01f) return false;
+                    float minSX = Mathf.Min(p1.x, p2.x);
+                    float maxSX = Mathf.Max(p1.x, p2.x);
+                    if (rayDir.x > 0) return maxSX > rayOrigin.x;
+                    else return minSX < rayOrigin.x;
+                }
+            }
+            else // Vertical ray
+            {
+                if (p1.y == p2.y) // Horizontal segment
+                {
+                    float minSX = Mathf.Min(p1.x, p2.x);
+                    float maxSX = Mathf.Max(p1.x, p2.x);
+                    if (rayDir.y > 0) return p1.y > rayOrigin.y && rayOrigin.x >= minSX && rayOrigin.x <= maxSX;
+                    else return p1.y < rayOrigin.y && rayOrigin.x >= minSX && rayOrigin.x <= maxSX;
+                }
+                else if (p1.x == p2.x) // Vertical segment
+                {
+                    if (Mathf.Abs(p1.x - rayOrigin.x) > 0.01f) return false;
+                    float minSY = Mathf.Min(p1.y, p2.y);
+                    float maxSY = Mathf.Max(p1.y, p2.y);
+                    if (rayDir.y > 0) return maxSY > rayOrigin.y;
+                    else return minSY < rayOrigin.y;
+                }
+            }
+            return false;
+        }
+
+        private bool RayIntersectsPoint(Vector2 rayOrigin, Vector2 rayDir, Vector2 point)
+        {
+            if (rayDir.x > 0) return Mathf.Abs(point.y - rayOrigin.y) < 0.01f && point.x > rayOrigin.x;
+            if (rayDir.x < 0) return Mathf.Abs(point.y - rayOrigin.y) < 0.01f && point.x < rayOrigin.x;
+            if (rayDir.y > 0) return Mathf.Abs(point.x - rayOrigin.x) < 0.01f && point.y > rayOrigin.y;
+            if (rayDir.y < 0) return Mathf.Abs(point.x - rayOrigin.x) < 0.01f && point.y < rayOrigin.y;
+            return false;
         }
 
         private bool TryMoveForward()

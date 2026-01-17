@@ -8,6 +8,7 @@ namespace Assets.Scripts.Core
         public static GridManager Instance { get; private set; }
 
         private Dictionary<Vector2Int, ArrowController> occupancyMap = new Dictionary<Vector2Int, ArrowController>();
+        private List<ArrowController> allArrows = new List<ArrowController>();
         private Vector2Int gridSize;
 
         private void Awake()
@@ -24,6 +25,7 @@ namespace Assets.Scripts.Core
         {
             gridSize = size;
             occupancyMap.Clear();
+            allArrows.Clear();
         }
 
         public bool IsOutOfBounds(Vector2Int coord)
@@ -33,12 +35,42 @@ namespace Assets.Scripts.Core
 
         public bool IsCellOccupied(Vector2Int coord)
         {
-            // Only check dictionary. Bounds check should be done separately by the caller if needed
-            // or we assume OOB is NOT "occupied" in the sense of another arrow being there, 
-            // but might be "invalid" for movement unless escaping.
-            // However, to keep existing logic safe, let's say OOB is NOT occupied by an arrow.
-            
             return occupancyMap.ContainsKey(coord);
+        }
+
+        public void RegisterArrow(ArrowController arrow)
+        {
+            if (!allArrows.Contains(arrow))
+            {
+                allArrows.Add(arrow);
+            }
+        }
+
+        public void UnregisterArrow(ArrowController arrow)
+        {
+            if (allArrows.Contains(arrow))
+            {
+                allArrows.Remove(arrow);
+            }
+            
+            // Also clear its occupancy
+            List<Vector2Int> keysToRemove = new List<Vector2Int>();
+            foreach (var kvp in occupancyMap)
+            {
+                if (kvp.Value == arrow)
+                {
+                    keysToRemove.Add(kvp.Key);
+                }
+            }
+            foreach (var key in keysToRemove)
+            {
+                occupancyMap.Remove(key);
+            }
+        }
+
+        public List<ArrowController> GetAllArrows()
+        {
+            return allArrows;
         }
 
         public void RegisterOccupancy(Vector2Int coord, ArrowController arrow)
@@ -51,6 +83,8 @@ namespace Assets.Scripts.Core
             {
                 occupancyMap[coord] = arrow;
             }
+            
+            RegisterArrow(arrow);
         }
 
         public void ReleaseOccupancy(Vector2Int coord)
