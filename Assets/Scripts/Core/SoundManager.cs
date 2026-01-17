@@ -77,11 +77,15 @@ namespace Assets.Scripts.Core
             {
                 audioSource.mute = mute;
             }
+            Debug.Log($"[SoundManager] Mute state set to: {mute}");
         }
 
         private void PlaySound(AudioClip clip)
         {
-            if (isMuted) return;
+            // Double check both the boolean and the source property
+            bool effectivelyMuted = isMuted || (audioSource != null && audioSource.mute);
+            if (effectivelyMuted) return;
+
             if (clip != null && audioSource != null)
             {
                 audioSource.PlayOneShot(clip);

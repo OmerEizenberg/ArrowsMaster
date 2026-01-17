@@ -64,8 +64,11 @@ namespace Assets.Scripts.Core
             UserDataManager.Instance.ResetProgress();
         }
 
-        public void OnSoundToggleChanged(bool enabled)
+        public void OnSoundToggleChanged(bool _)
         {
+            if (soundToggle == null) return;
+            bool enabled = soundToggle.isOn;
+
             // Play click BEFORE applying so it's heard even when muting
             if (!isSyncing && SoundManager.Instance != null)
             {
@@ -78,8 +81,11 @@ namespace Assets.Scripts.Core
             ApplySettings();
         }
 
-        public void OnVibrationToggleChanged(bool enabled)
+        public void OnVibrationToggleChanged(bool _)
         {
+            if (vibrationToggle == null) return;
+            bool enabled = vibrationToggle.isOn;
+
             if (!isSyncing && SoundManager.Instance != null)
             {
                 SoundManager.Instance.PlayClick();
