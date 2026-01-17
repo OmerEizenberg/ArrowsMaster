@@ -27,6 +27,9 @@ namespace Assets.Scripts.Core
         // LineRenderer Refactor
         private LineRenderer lineRenderer;
         private LineRenderer previewLineRenderer;
+        
+        // Flag to disable corner anchors during blocked animation to prevent visual glitches
+        private bool isBlockedAnimationPlaying = false;
 
         public void Initialize(ArrowData data)
         {
@@ -145,8 +148,8 @@ namespace Assets.Scripts.Core
                     // 1. Current Position
                     points.Add(segments[i].transform.position);
 
-                    // 2. Corner Anchor
-                    if (i < segments.Count - 1)
+                    // 2. Corner Anchor - SKIP during blocked animation to prevent visual glitches
+                    if (i < segments.Count - 1 && !isBlockedAnimationPlaying)
                     {
                         Vector2Int targetGridPos = segments[i].GridPosition;
                         Vector3 cornerPos = new Vector3(targetGridPos.x * CellSize, targetGridPos.y * CellSize, 0);
@@ -204,9 +207,10 @@ namespace Assets.Scripts.Core
                     }
                     else
                     {
-                        SoundManager.Instance.PlayArrowBlocked();
+                        // Arrow is blocked - trigger blocked arrow animation
+                        isMoving = true; // Prevent multiple clicks during animation
                         
-                        // Reduce life (only once per arrow per attempt) and show visual feedback
+                        // Reduce life (only once per arrow per attempt)
                         if (!hasReducedLife)
                         {
                             GameManager.Instance.LoseLife();
@@ -214,11 +218,19 @@ namespace Assets.Scripts.Core
                             Debug.Log("Arrow Blocked! Life lost.");
                         }
                         
-                        SetArrowColor(blockedColor);
+                        // Start the blocked arrow animation
+                        StartCoroutine(BlockedArrowAnimationWithCleanup());
                     }
                 }
             }
         }
+
+        private IEnumerator BlockedArrowAnimationWithCleanup()
+        {
+            yield return StartCoroutine(BlockedArrowAnimation());
+            isMoving = false; // Allow clicking again after animation completes
+        }
+
 
         private IEnumerator SuccessColorAnimation()
         {
@@ -356,6 +368,45 @@ namespace Assets.Scripts.Core
             }
             
             return true;
+        }
+
+        /// <summary>
+        /// Checks if the next step position would collide with a segment.
+        /// Unlike RayIntersectsSegment which checks an infinite ray, this only checks
+        /// the immediate next grid position.
+        /// </summary>
+        private bool DoesNextStepCollideWithSegment(Vector2Int currentPos, Vector2Int direction, Vector2Int segmentStart, Vector2Int segmentEnd)
+        {
+            Vector2Int nextPos = currentPos + direction;
+            
+            // Check if nextPos lies on the line segment between segmentStart and segmentEnd
+            // For cardinal directions, segments are either horizontal or vertical
+            
+            if (segmentStart.x == segmentEnd.x) // Vertical segment
+            {
+                if (nextPos.x != segmentStart.x) return false;
+                int minY = Mathf.Min(segmentStart.y, segmentEnd.y);
+                int maxY = Mathf.Max(segmentStart.y, segmentEnd.y);
+                return nextPos.y >= minY && nextPos.y <= maxY;
+            }
+            else if (segmentStart.y == segmentEnd.y) // Horizontal segment
+            {
+                if (nextPos.y != segmentStart.y) return false;
+                int minX = Mathf.Min(segmentStart.x, segmentEnd.x);
+                int maxX = Mathf.Max(segmentStart.x, segmentEnd.x);
+                return nextPos.x >= minX && nextPos.x <= maxX;
+            }
+            
+            return false;
+        }
+
+        /// <summary>
+        /// Checks if the next step position would collide with a point.
+        /// </summary>
+        private bool DoesNextStepCollideWithPoint(Vector2Int currentPos, Vector2Int direction, Vector2Int point)
+        {
+            Vector2Int nextPos = currentPos + direction;
+            return nextPos == point;
         }
 
         private bool RayIntersectsSegment(Vector2 rayOrigin, Vector2 rayDir, Vector2 p1, Vector2 p2)
@@ -520,5 +571,276 @@ namespace Assets.Scripts.Core
                 previewLineRenderer.positionCount = 0;
             }
         }
+
+        // ===== Blocked Arrow Animation System =====
+
+        private List<Vector2Int> SaveCurrentPositions()
+        {
+            List<Vector2Int> positions = new List<Vector2Int>();
+            foreach (var seg in segments)
+            {
+                positions.Add(seg.GridPosition);
+            }
+            return positions;
+        }
+
+        private void RestorePositions(List<Vector2Int> positions)
+        {
+            for (int i = 0; i < segments.Count && i < positions.Count; i++)
+            {
+                segments[i].GridPosition = positions[i];
+            }
+        }
+
+        /// <summary>
+        /// Checks if the next step forward would collide with another arrow.
+        /// This is different from CanMoveForward - it only checks the immediate next position,
+        /// not whether the arrow is legally allowed to move.
+        /// Used for simulating blocked arrow movement.
+        /// </summary>
+        private bool IsNextStepBlocked()
+        {
+            if (segments.Count == 0) return true;
+            
+            Segment head = segments[segments.Count - 1];
+            Vector2Int currentDir = Vector2Int.up;
+            if (segments.Count >= 2)
+            {
+                Segment neck = segments[segments.Count - 2];
+                currentDir = head.GridPosition - neck.GridPosition;
+            }
+            
+            Vector2Int currentHeadPos = head.GridPosition;
+
+            // Check collision with all other arrows
+            foreach (var otherArrow in GridManager.Instance.GetAllArrows())
+            {
+                if (otherArrow == this) continue; // Skip self
+                
+                // Check intersection with each segment of the other arrow
+                for (int i = 0; i < otherArrow.segments.Count - 1; i++)
+                {
+                    Vector2Int p1 = otherArrow.segments[i].GridPosition;
+                    Vector2Int p2 = otherArrow.segments[i+1].GridPosition;
+                    
+                    if (DoesNextStepCollideWithSegment(currentHeadPos, currentDir, p1, p2))
+                    {
+                        return true; // Blocked
+                    }
+                }
+                
+                // Also check the head of the other arrow if it's the only segment
+                if (otherArrow.segments.Count == 1)
+                {
+                    Vector2Int pH = otherArrow.segments[0].GridPosition;
+                    if (DoesNextStepCollideWithPoint(currentHeadPos, currentDir, pH))
+                    {
+                        return true; // Blocked
+                    }
+                }
+            }
+            
+            return false; // Not blocked
+        }
+
+        private int CalculateStepsUntilBlocked()
+        {
+            if (segments.Count == 0) return 0;
+
+            int steps = 0;
+            const int MAX_SIMULATION_STEPS = 50; // Safety limit
+            
+            // Save current state
+            List<Vector2Int> originalPositions = SaveCurrentPositions();
+            
+            // Simulate forward movement until blocked
+            while (steps < MAX_SIMULATION_STEPS)
+            {
+                // Check if the next step would hit an obstacle
+                if (IsNextStepBlocked())
+                {
+                    break;
+                }
+
+                
+                // Simulate one step forward (update positions without visual animation)
+                Segment head = segments[segments.Count - 1];
+                Vector2Int currentDir = Vector2Int.up;
+                if (segments.Count >= 2)
+                {
+                    Segment neck = segments[segments.Count - 2];
+                    currentDir = head.GridPosition - neck.GridPosition;
+                }
+                Vector2Int targetPos = head.GridPosition + currentDir;
+                
+                // Shift all segments forward
+                for (int i = 0; i < segments.Count - 1; i++)
+                {
+                    segments[i].GridPosition = segments[i + 1].GridPosition;
+                }
+                segments[segments.Count - 1].GridPosition = targetPos;
+                
+                steps++;
+            }
+            
+            // Restore original state
+            RestorePositions(originalPositions);
+            
+            return steps;
+        }
+
+        private void SimulateForwardStep()
+        {
+            if (segments.Count == 0) return;
+            
+            Segment head = segments[segments.Count - 1];
+            Vector2Int currentDir = Vector2Int.up;
+            if (segments.Count >= 2)
+            {
+                Segment neck = segments[segments.Count - 2];
+                currentDir = head.GridPosition - neck.GridPosition;
+            }
+            Vector2Int targetPos = head.GridPosition + currentDir;
+            
+            // Update grid positions
+            for (int i = 0; i < segments.Count - 1; i++)
+            {
+                segments[i].GridPosition = segments[i + 1].GridPosition;
+            }
+            segments[segments.Count - 1].GridPosition = targetPos;
+            
+            // Animate to new positions
+            for (int i = 0; i < segments.Count; i++)
+            {
+                Vector3 newWorldPos = new Vector3(segments[i].GridPosition.x * CellSize, 
+                                                   segments[i].GridPosition.y * CellSize, 0);
+                segments[i].MoveTo(newWorldPos, 0.04f);
+            }
+            
+            UpdateHeadVisuals();
+        }
+
+        private void SimulateReverseStep()
+        {
+            if (segments.Count == 0) return;
+            
+            Segment head = segments[segments.Count - 1];
+            Vector2Int currentDir = Vector2Int.up;
+            if (segments.Count >= 2)
+            {
+                Segment neck = segments[segments.Count - 2];
+                currentDir = head.GridPosition - neck.GridPosition;
+            }
+            
+            // Move backwards (opposite direction)
+            Vector2Int reversePos = head.GridPosition - currentDir;
+            
+            // Shift all segments backward
+            for (int i = segments.Count - 1; i > 0; i--)
+            {
+                segments[i].GridPosition = segments[i - 1].GridPosition;
+            }
+            segments[0].GridPosition = reversePos;
+            
+            // Animate to new positions
+            for (int i = 0; i < segments.Count; i++)
+            {
+                Vector3 newWorldPos = new Vector3(segments[i].GridPosition.x * CellSize, 
+                                                   segments[i].GridPosition.y * CellSize, 0);
+                segments[i].MoveTo(newWorldPos, 0.04f);
+            }
+            
+            UpdateHeadVisuals();
+        }
+
+        private IEnumerator BlockedArrowAnimation()
+        {
+            // Set flag to disable corner anchors during animation
+            isBlockedAnimationPlaying = true;
+            
+            // CRITICAL: Save original positions BEFORE any simulation
+            List<Vector2Int> originalPositions = SaveCurrentPositions();
+            
+            // Calculate how many steps we can move before hitting the blocking arrow
+            int stepsUntilBlocked = CalculateStepsUntilBlocked();
+            
+            // Save ALL intermediate positions during forward movement
+            List<List<Vector2Int>> forwardPositionHistory = new List<List<Vector2Int>>();
+            forwardPositionHistory.Add(new List<Vector2Int>(originalPositions)); // Add starting position
+            
+            // Phase 1: Forward animation (simulate moving until blocked)
+            for (int i = 0; i < stepsUntilBlocked; i++)
+            {
+                SimulateForwardStep();
+                
+                // Save current positions after this step
+                forwardPositionHistory.Add(SaveCurrentPositions());
+                
+                yield return new WaitForSeconds(0.04f);
+            }
+            
+            // Phase 2: Half-step impact toward the blocker
+            // Move the head (and only the head) 0.5 units toward the blocking segment
+            Segment head = segments[segments.Count - 1];
+            Vector2Int currentDir = Vector2Int.up;
+            if (segments.Count >= 2)
+            {
+                Segment neck = segments[segments.Count - 2];
+                currentDir = head.GridPosition - neck.GridPosition;
+            }
+            
+            Vector3 currentHeadWorldPos = head.transform.position;
+            Vector3 impactOffset = new Vector3(currentDir.x * 0.5f * CellSize, currentDir.y * 0.5f * CellSize, 0);
+            Vector3 impactPosition = currentHeadWorldPos + impactOffset;
+            
+            // Animate head to impact position
+            head.MoveTo(impactPosition, 0.04f);
+            yield return new WaitForSeconds(0.04f);
+            
+            // Phase 3: Impact feedback - play sound, vibrate, and change color to red
+            SoundManager.Instance.PlayArrowBlocked();
+            VibrationManager.VibrateSelection();
+            SetArrowColor(blockedColor);
+            
+            // Small pause at impact for emphasis
+            yield return new WaitForSeconds(0.1f);
+            
+            // Phase 4: Reverse animation - replay positions in reverse order
+            // Start from second-to-last position (skip the last one since we're already there)
+            for (int step = forwardPositionHistory.Count - 2; step >= 0; step--)
+            {
+                List<Vector2Int> targetPositions = forwardPositionHistory[step];
+                
+                // Set grid positions and animate all segments simultaneously
+                for (int i = 0; i < segments.Count && i < targetPositions.Count; i++)
+                {
+                    segments[i].GridPosition = targetPositions[i];
+                    Vector3 targetWorldPos = new Vector3(targetPositions[i].x * CellSize, 
+                                                         targetPositions[i].y * CellSize, 0);
+                    segments[i].MoveTo(targetWorldPos, 0.04f);
+                }
+                
+                UpdateHeadVisuals();
+                yield return new WaitForSeconds(0.04f);
+            }
+            
+            // Final safety: ensure we're at exact original positions
+            // This handles any potential rounding errors from the step-by-step animation
+            RestorePositions(originalPositions);
+            for (int i = 0; i < segments.Count; i++)
+            {
+                Vector3 originalWorldPos = new Vector3(originalPositions[i].x * CellSize, 
+                                                       originalPositions[i].y * CellSize, 0);
+                segments[i].transform.position = originalWorldPos;
+            }
+            UpdateHeadVisuals();
+            
+            // Re-enable corner anchors now that animation is complete
+            isBlockedAnimationPlaying = false;
+            
+            // Keep the arrow colored red after animation completes
+            // Color is already set, no need to reset
+        }
+
     }
 }
