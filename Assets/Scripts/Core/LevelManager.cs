@@ -104,7 +104,9 @@ namespace Assets.Scripts.Core
                 {
                     arrow.UpdateGrowthSlide(i);
                 }
-                yield return new WaitForSeconds(stepDelay);
+                yield return new WaitForSeconds(0.06f);
+
+                //yield return new WaitForSeconds(stepDelay);
             }
         }
         public void RestartLevel()
