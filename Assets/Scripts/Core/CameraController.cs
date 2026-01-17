@@ -174,14 +174,14 @@ namespace Assets.Scripts.Core
             // Limit target zoom by max zoom
             targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
 
-            Vector3 finalPos = transform.position;
+            Vector3 targetAnimPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
+            Vector3 finalPos = targetAnimPos;
             float finalZoom = cam.orthographicSize;
 
             // Start almost zoomed out (85% of target zoom for more movement)
             float startZoom = targetZoom * 0.85f;
-            // Center focal point for the main part of the animation
-            Vector3 targetAnimPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
-            Vector3 startPos = Vector3.Lerp(targetAnimPos, finalPos, 0.15f);
+            // Slightly offset start position to create some initial movement
+            Vector3 startPos = Vector3.Lerp(targetAnimPos, transform.position, 0.15f);
 
             float totalDuration = initZoomOutDuration + initWaitDuration + initZoomInDuration;
             

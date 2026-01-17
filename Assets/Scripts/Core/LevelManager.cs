@@ -70,26 +70,33 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator CoordinatedLevelInitialization(List<ArrowController> arrows, LevelData data)
         {
-            // 1. Calculate Average Head Position for Camera Focus
-            Vector3 avgHeadPos = Vector3.zero;
+            // 1. Calculate Bounding Box of all arrows for Camera Focus
+            Vector3 levelCenter = Vector3.zero;
             if (data.arrows != null && data.arrows.Count > 0)
             {
+                Vector3 minP = new Vector3(float.MaxValue, float.MaxValue, 0);
+                Vector3 maxP = new Vector3(float.MinValue, float.MinValue, 0);
+                bool hasPoints = false;
+
                 foreach (var arrowData in data.arrows)
                 {
-                    if (arrowData.path != null && arrowData.path.Count > 0)
+                    foreach (var pathPoint in arrowData.path)
                     {
-                        var headPos = arrowData.path[arrowData.path.Count - 1].ToVector2Int();
-                        avgHeadPos += new Vector3(headPos.x * ArrowController.CellSize, headPos.y * ArrowController.CellSize, 0);
+                        Vector2Int p = pathPoint.ToVector2Int();
+                        Vector3 worldP = new Vector3(p.x * ArrowController.CellSize, p.y * ArrowController.CellSize, 0);
+                        minP = Vector3.Min(minP, worldP);
+                        maxP = Vector3.Max(maxP, worldP);
+                        hasPoints = true;
                     }
                 }
-                avgHeadPos /= data.arrows.Count;
+                if (hasPoints) levelCenter = (minP + maxP) / 2f;
             }
 
             // 2. Start Camera Animation
             if (CameraController.Instance != null)
             {
                 CameraController.Instance.SetBounds(data.gridSize.ToVector2Int());
-                CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), avgHeadPos);
+                CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), levelCenter);
             }
 
             if (SoundManager.Instance != null)
