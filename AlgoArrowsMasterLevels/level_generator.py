@@ -13,7 +13,8 @@ GENERATOR_CONFIG = {
     "LONG_PATH_RANGE": (5, 13),        # Min and max length for long paths
     "TURN_PROBABILITY": 0.6,           # Likelihood of changing direction (0-1)
     "MAX_RETRY_ATTEMPTS": 30,          # Number of attempts to find a valid path for each cell
-    "SHAPE_THRESHOLD": 128             # Pixel brightness threshold for detecting shape
+    "WHITE_THRESHOLD": 245,           # RGB value above which a pixel is considered white (background)
+    "ALPHA_THRESHOLD": 128             # Alpha value below which a pixel is considered transparent (background)
 }
 # --------------------------------
 
@@ -23,7 +24,8 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
 
     # 1. עיבוד התמונה למפת גריד
     try:
-        img = Image.open(image_path).convert('L')
+        # Convert to RGBA to ensure we can check both color and transparency
+        img = Image.open(image_path).convert('RGBA')
         # fix the "upside down" issue
         img = img.transpose(Image.FLIP_TOP_BOTTOM)
     except Exception as e:
@@ -32,15 +34,24 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
 
     img = img.resize((grid_width, grid_height), Image.NEAREST)
     
-    # מיפוי התאים שמרכיבים את הצורה (שחור בתמונה המקורית)
+    # מיפוי התאים שמרכיבים את הצורה
     shape_mask = []
     for y in range(grid_height):
         for x in range(grid_width):
-            if img.getpixel((x, y)) < config["SHAPE_THRESHOLD"]:
+            r, g, b, a = img.getpixel((x, y))
+            
+            # Logic:
+            # 1. PNG/Transparency: If alpha is low, it's transparent (background)
+            # 2. JPEG/White: If RGB is close to white, it's background
+            
+            is_transparent = a < config["ALPHA_THRESHOLD"]
+            is_white = r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]
+            
+            if not is_transparent and not is_white:
                 shape_mask.append((x, y))
 
     if not shape_mask:
-        print("No shape detected in image.")
+        print("No shape detected in image based on transparency/color filters.")
         return None
 
     # חישוב מרכז הצורה
