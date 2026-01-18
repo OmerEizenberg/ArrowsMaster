@@ -27,9 +27,6 @@ namespace Assets.Scripts.Core
         // LineRenderer Refactor
         private LineRenderer lineRenderer;
         private LineRenderer previewLineRenderer;
-        
-        // Flag to disable corner anchors during blocked animation to prevent visual glitches
-        private bool isBlockedAnimationPlaying = false;
 
         public void Initialize(ArrowData data)
         {
@@ -145,26 +142,32 @@ namespace Assets.Scripts.Core
                 
                 for (int i = 0; i < segments.Count; i++)
                 {
-                    // 1. Current Position
+                    // 1. Current Position (where segment is visually)
                     points.Add(segments[i].transform.position);
 
-                    // 2. Corner Anchor - SKIP during blocked animation to prevent visual glitches
-                    if (i < segments.Count - 1 && !isBlockedAnimationPlaying)
+                    // 2. Corner Anchor (helper point at grid position to prevent missing corners)
+                    // We check both adjacent segments' GridPositions to find the junction point
+                    if (i < segments.Count - 1)
                     {
-                        Vector2Int targetGridPos = segments[i].GridPosition;
-                        Vector3 cornerPos = new Vector3(targetGridPos.x * CellSize, targetGridPos.y * CellSize, 0);
-                        cornerPos.z = segments[i].transform.position.z;
-
-                        // Only add if there is significant distance to BOTH neighbors
-                        // Neighbor 1: Current Segment Position
-                        // Neighbor 2: Next Segment Position (which is moving away from this corner)
+                        Vector2Int[] candidates = { segments[i].GridPosition, segments[i + 1].GridPosition };
                         
-                        float distToCurrent = Vector3.Distance(segments[i].transform.position, cornerPos);
-                        float distToNext = Vector3.Distance(segments[i+1].transform.position, cornerPos);
-
-                        if (distToCurrent > 0.05f && distToNext > 0.05f)
+                        foreach (var cornerGridPos in candidates)
                         {
-                            points.Add(cornerPos);
+                            Vector3 cornerPos = new Vector3(cornerGridPos.x * CellSize, cornerGridPos.y * CellSize, 0);
+                            cornerPos.z = segments[i].transform.position.z;
+
+                            // A point is a valid junction if:
+                            // 1. It's not too close to either current segment visual (dist > 0.05)
+                            // 2. It lies on the path between them (sum of distances ≈ CellSize)
+                            
+                            float distToCurrent = Vector3.Distance(segments[i].transform.position, cornerPos);
+                            float distToNext = Vector3.Distance(segments[i + 1].transform.position, cornerPos);
+
+                            if (distToCurrent > 0.05f && distToNext > 0.05f && Mathf.Abs(distToCurrent + distToNext - CellSize) < 0.05f)
+                            {
+                                points.Add(cornerPos);
+                                break; // Found the junction
+                            }
                         }
                     }
                 }
@@ -755,9 +758,6 @@ namespace Assets.Scripts.Core
 
         private IEnumerator BlockedArrowAnimation()
         {
-            // Set flag to disable corner anchors during animation
-            isBlockedAnimationPlaying = true;
-            
             // CRITICAL: Save original positions BEFORE any simulation
             List<Vector2Int> originalPositions = SaveCurrentPositions();
             
@@ -834,9 +834,6 @@ namespace Assets.Scripts.Core
                 segments[i].transform.position = originalWorldPos;
             }
             UpdateHeadVisuals();
-            
-            // Re-enable corner anchors now that animation is complete
-            isBlockedAnimationPlaying = false;
             
             // Keep the arrow colored red after animation completes
             // Color is already set, no need to reset
