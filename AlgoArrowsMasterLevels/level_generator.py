@@ -5,7 +5,22 @@ import sys
 import os
 from PIL import Image
 
-def generate_level_json(image_path, grid_width, grid_height, short_prob=0.7):
+# --- CONFIGURATION PARAMETERS ---
+# Edit these values to change the level generation behavior
+GENERATOR_CONFIG = {
+    "SHORT_PATH_PROBABILITY": 0.3,      # Lower means more long paths
+    "SHORT_PATH_RANGE": (2, 4),        # Min and max length for short paths
+    "LONG_PATH_RANGE": (5, 13),        # Min and max length for long paths
+    "TURN_PROBABILITY": 0.6,           # Likelihood of changing direction (0-1)
+    "MAX_RETRY_ATTEMPTS": 30,          # Number of attempts to find a valid path for each cell
+    "SHAPE_THRESHOLD": 128             # Pixel brightness threshold for detecting shape
+}
+# --------------------------------
+
+def generate_level_json(image_path, grid_width, grid_height, config=None):
+    if config is None:
+        config = GENERATOR_CONFIG
+
     # 1. עיבוד התמונה למפת גריד
     try:
         img = Image.open(image_path).convert('L')
@@ -21,7 +36,7 @@ def generate_level_json(image_path, grid_width, grid_height, short_prob=0.7):
     shape_mask = []
     for y in range(grid_height):
         for x in range(grid_width):
-            if img.getpixel((x, y)) < 128:
+            if img.getpixel((x, y)) < config["SHAPE_THRESHOLD"]:
                 shape_mask.append((x, y))
 
     if not shape_mask:
@@ -51,40 +66,56 @@ def generate_level_json(image_path, grid_width, grid_height, short_prob=0.7):
         
         success = False
         # ננסה מספר כיוונים ואורכים כדי למצוא מסלול תקין
-        # נערבב כיוונים אפשריים בכל צעד
-        for _ in range(20): # יותר נסיונות לכל נקודה
-            if random.random() < short_prob:
-                target_length = random.randint(2, 3)
+        for _ in range(config["MAX_RETRY_ATTEMPTS"]):
+            if random.random() < config["SHORT_PATH_PROBABILITY"]:
+                target_length = random.randint(*config["SHORT_PATH_RANGE"])
             else:
-                target_length = random.randint(4, 6)
+                target_length = random.randint(*config["LONG_PATH_RANGE"])
                 
             current_path = [start_node]
             temp_occupied = {start_node}
+            current_direction = None # (dx, dy)
             
             # בניית מסלול
             for i in range(target_length - 1):
                 last_x, last_y = current_path[-1]
-                neighbors = [
-                    (last_x + 1, last_y), (last_x - 1, last_y),
-                    (last_x, last_y + 1), (last_x, last_y - 1)
-                ]
-                # סינון שכנים: בתוך ה-shape_mask, לא ב-occupied הכללי, לא ב-temp_occupied
-                valid_neighbors = [
-                    n for n in neighbors 
-                    if n in remaining_points and n not in temp_occupied
-                ]
+                directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
                 
-                if not valid_neighbors:
+                # העדפת המשך באותו כיוון או פנייה
+                if current_direction and random.random() > config["TURN_PROBABILITY"]:
+                    # נסה להמשיך ישר
+                    preferred_directions = [current_direction]
+                    # שאר הכיוונים למקרה שלא ניתן להמשיך ישר
+                    others = [d for d in directions if d != current_direction]
+                    random.shuffle(others)
+                    ordered_directions = preferred_directions + others
+                else:
+                    # פנייה או תחילת מסלול - ערבוב אקראי
+                    random.shuffle(directions)
+                    ordered_directions = directions
+
+                next_node = None
+                chosen_dir = None
+                
+                for dx, dy in ordered_directions:
+                    candidate = (last_x + dx, last_y + dy)
+                    if candidate in remaining_points and candidate not in temp_occupied:
+                        next_node = candidate
+                        chosen_dir = (dx, dy)
+                        break
+                
+                if not next_node:
                     break
                 
-                next_node = random.choice(valid_neighbors)
                 current_path.append(next_node)
                 temp_occupied.add(next_node)
+                current_direction = chosen_dir
             
             if len(current_path) < 2:
                 continue
 
             # בדיקת יציאה (Escape check)
+            # Arrow logic: head is the last point, previous point determines initial direction out
             head_x, head_y = current_path[-1]
             prev_x, prev_y = current_path[-2]
             dx = head_x - prev_x
@@ -115,19 +146,7 @@ def generate_level_json(image_path, grid_width, grid_height, short_prob=0.7):
         
         if not success:
             # אם לא הצלחנו למצוא מסלול שיוצא מהנקודה הזו, נוריד אותה מהרשימה כדי לא להיתקע
-            # אבל לא נוסיף אותה ל-occupied כדי שלא תחסום אחרים שלא לצורך
             remaining_points.remove(start_node)
-
-    # בניית האובייקט הסופי
-    level_json = {
-        "gridSize": {
-            "x": grid_width,
-            "y": grid_height
-        },
-        "arrows": arrows
-    }
-    
-    return level_json
 
     # בניית האובייקט הסופי
     level_json = {
@@ -161,10 +180,15 @@ def main():
     parser.add_argument("--image", help="Path to the input image file")
     parser.add_argument("--width", type=int, default=15, help="Grid width (default: 15)")
     parser.add_argument("--height", type=int, default=15, help="Grid height (default: 15)")
-    parser.add_argument("--prob", type=float, default=0.6, help="Probability of short arrows (default: 0.6)")
+    parser.add_argument("--prob", type=float, help="Probability of short arrows (overrides config)")
     parser.add_argument("--output", default="level_output.json", help="Output JSON file name (default: level_output.json)")
 
     args = parser.parse_args()
+
+    # Create a local config copy to allow command line overrides
+    local_config = GENERATOR_CONFIG.copy()
+    if args.prob is not None:
+        local_config["SHORT_PATH_PROBABILITY"] = args.prob
 
     image_path = args.image
     if not image_path:
@@ -179,7 +203,7 @@ def main():
         sys.exit(1)
 
     print(f"Processing image: {image_path}")
-    output_data = generate_level_json(image_path, args.width, args.height, args.prob)
+    output_data = generate_level_json(image_path, args.width, args.height, local_config)
 
     if output_data:
         with open(args.output, 'w') as f:
@@ -191,3 +215,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
