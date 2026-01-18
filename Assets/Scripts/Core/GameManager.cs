@@ -104,6 +104,11 @@ namespace Assets.Scripts.Core
                 SoundManager.Instance.PlayWin();
             }
 
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowInterstitial();
+            }
+
             m_LobbyUI.SetActive(true);
 
             OnLevelWon?.Invoke();

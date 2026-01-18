@@ -2,6 +2,37 @@
   "version": 3,
   "targets": {
     ".NETStandard,Version=v2.1": {
+      "MaxSdk.Scripts/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/MaxSdk.Scripts.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/MaxSdk.Scripts.dll": {}
+        }
+      },
+      "MaxSdk.Scripts.IntegrationManager.Editor/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "MaxSdk.Scripts": "1.0.0",
+          "UnityEditor.TestRunner": "1.0.0",
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.TestRunner": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/MaxSdk.Scripts.IntegrationManager.Editor.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/MaxSdk.Scripts.IntegrationManager.Editor.dll": {}
+        }
+      },
       "PsdPlugin/1.0.0": {
         "type": "project",
         "framework": ".NETStandard,Version=v2.1",
@@ -427,6 +458,20 @@
           "bin/placeholder/Unity.InternalAPIEngineBridge.001.dll": {}
         }
       },
+      "Unity.LevelPlay/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Unity.LevelPlay.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Unity.LevelPlay.dll": {}
+        }
+      },
       "Unity.Mathematics/1.0.0": {
         "type": "project",
         "framework": ".NETStandard,Version=v2.1",
@@ -488,6 +533,83 @@
         },
         "runtime": {
           "bin/placeholder/Unity.Rider.Editor.dll": {}
+        }
+      },
+      "Unity.Services.Core/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Unity.Services.Core.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Unity.Services.Core.dll": {}
+        }
+      },
+      "Unity.Services.Core.Analytics/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "Unity.Services.Core": "1.0.0",
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Unity.Services.Core.Analytics.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Unity.Services.Core.Analytics.dll": {}
+        }
+      },
+      "Unity.Services.Core.Components/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "Unity.Services.Core": "1.0.0",
+          "Unity.Services.Core.Environments": "1.0.0",
+          "Unity.Services.Core.Internal": "1.0.0",
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Unity.Services.Core.Components.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Unity.Services.Core.Components.dll": {}
+        }
+      },
+      "Unity.Services.Core.Environments/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "Unity.Services.Core": "1.0.0",
+          "Unity.Services.Core.Internal": "1.0.0",
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Unity.Services.Core.Environments.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Unity.Services.Core.Environments.dll": {}
+        }
+      },
+      "Unity.Services.Core.Internal/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "Unity.Services.Core": "1.0.0",
+          "UnityEditor.UI": "1.0.0",
+          "UnityEngine.UI": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Unity.Services.Core.Internal.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Unity.Services.Core.Internal.dll": {}
         }
       },
       "Unity.TextMeshPro/1.0.0": {
@@ -764,6 +886,16 @@
     }
   },
   "libraries": {
+    "MaxSdk.Scripts/1.0.0": {
+      "type": "project",
+      "path": "MaxSdk.Scripts.csproj",
+      "msbuildProject": "MaxSdk.Scripts.csproj"
+    },
+    "MaxSdk.Scripts.IntegrationManager.Editor/1.0.0": {
+      "type": "project",
+      "path": "MaxSdk.Scripts.IntegrationManager.Editor.csproj",
+      "msbuildProject": "MaxSdk.Scripts.IntegrationManager.Editor.csproj"
+    },
     "PsdPlugin/1.0.0": {
       "type": "project",
       "path": "PsdPlugin.csproj",
@@ -884,6 +1016,11 @@
       "path": "Unity.InternalAPIEngineBridge.001.csproj",
       "msbuildProject": "Unity.InternalAPIEngineBridge.001.csproj"
     },
+    "Unity.LevelPlay/1.0.0": {
+      "type": "project",
+      "path": "Unity.LevelPlay.csproj",
+      "msbuildProject": "Unity.LevelPlay.csproj"
+    },
     "Unity.Mathematics/1.0.0": {
       "type": "project",
       "path": "Unity.Mathematics.csproj",
@@ -903,6 +1040,31 @@
       "type": "project",
       "path": "Unity.Rider.Editor.csproj",
       "msbuildProject": "Unity.Rider.Editor.csproj"
+    },
+    "Unity.Services.Core/1.0.0": {
+      "type": "project",
+      "path": "Unity.Services.Core.csproj",
+      "msbuildProject": "Unity.Services.Core.csproj"
+    },
+    "Unity.Services.Core.Analytics/1.0.0": {
+      "type": "project",
+      "path": "Unity.Services.Core.Analytics.csproj",
+      "msbuildProject": "Unity.Services.Core.Analytics.csproj"
+    },
+    "Unity.Services.Core.Components/1.0.0": {
+      "type": "project",
+      "path": "Unity.Services.Core.Components.csproj",
+      "msbuildProject": "Unity.Services.Core.Components.csproj"
+    },
+    "Unity.Services.Core.Environments/1.0.0": {
+      "type": "project",
+      "path": "Unity.Services.Core.Environments.csproj",
+      "msbuildProject": "Unity.Services.Core.Environments.csproj"
+    },
+    "Unity.Services.Core.Internal/1.0.0": {
+      "type": "project",
+      "path": "Unity.Services.Core.Internal.csproj",
+      "msbuildProject": "Unity.Services.Core.Internal.csproj"
     },
     "Unity.TextMeshPro/1.0.0": {
       "type": "project",
@@ -992,6 +1154,8 @@
   },
   "projectFileDependencyGroups": {
     ".NETStandard,Version=v2.1": [
+      "MaxSdk.Scripts >= 1.0.0",
+      "MaxSdk.Scripts.IntegrationManager.Editor >= 1.0.0",
       "PsdPlugin >= 1.0.0",
       "Unity.2D.Animation.Editor >= 1.0.0",
       "Unity.2D.Animation.Runtime >= 1.0.0",
@@ -1016,10 +1180,15 @@
       "Unity.Collections >= 1.0.0",
       "Unity.InternalAPIEditorBridge.001 >= 1.0.0",
       "Unity.InternalAPIEngineBridge.001 >= 1.0.0",
+      "Unity.LevelPlay >= 1.0.0",
       "Unity.Mathematics >= 1.0.0",
       "Unity.Mathematics.Editor >= 1.0.0",
       "Unity.PlasticSCM.Editor >= 1.0.0",
       "Unity.Rider.Editor >= 1.0.0",
+      "Unity.Services.Core >= 1.0.0",
+      "Unity.Services.Core.Analytics >= 1.0.0",
+      "Unity.Services.Core.Components >= 1.0.0",
+      "Unity.Services.Core.Environments >= 1.0.0",
       "Unity.TextMeshPro >= 1.0.0",
       "Unity.TextMeshPro.Editor >= 1.0.0",
       "Unity.Timeline >= 1.0.0",
@@ -1062,6 +1231,12 @@
         "netstandard2.1": {
           "targetAlias": "netstandard2.1",
           "projectReferences": {
+            "/Users/omereizenberg/Documents/ArrowsMasterGit/MaxSdk.Scripts.csproj": {
+              "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/MaxSdk.Scripts.csproj"
+            },
+            "/Users/omereizenberg/Documents/ArrowsMasterGit/MaxSdk.Scripts.IntegrationManager.Editor.csproj": {
+              "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/MaxSdk.Scripts.IntegrationManager.Editor.csproj"
+            },
             "/Users/omereizenberg/Documents/ArrowsMasterGit/PsdPlugin.csproj": {
               "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/PsdPlugin.csproj"
             },
@@ -1134,6 +1309,9 @@
             "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.InternalAPIEngineBridge.001.csproj": {
               "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.InternalAPIEngineBridge.001.csproj"
             },
+            "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.LevelPlay.csproj": {
+              "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.LevelPlay.csproj"
+            },
             "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Mathematics.csproj": {
               "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Mathematics.csproj"
             },
@@ -1145,6 +1323,18 @@
             },
             "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Rider.Editor.csproj": {
               "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Rider.Editor.csproj"
+            },
+            "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.Analytics.csproj": {
+              "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.Analytics.csproj"
+            },
+            "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.Components.csproj": {
+              "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.Components.csproj"
+            },
+            "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.csproj": {
+              "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.csproj"
+            },
+            "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.Environments.csproj": {
+              "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Services.Core.Environments.csproj"
             },
             "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.TextMeshPro.csproj": {
               "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.TextMeshPro.csproj"

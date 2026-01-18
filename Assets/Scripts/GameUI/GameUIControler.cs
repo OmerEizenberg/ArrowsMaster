@@ -55,6 +55,11 @@ public class GameUIContoleer : MonoBehaviour
 
     public void BackToLobby()
     {
+        if (AdsManager.Instance != null)
+        {
+            AdsManager.Instance.ShowInterstitial();
+        }
+        
         m_LobbyUI.SetActive(true);
         m_GameUI.SetActive(false);
     }
