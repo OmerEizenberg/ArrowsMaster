@@ -12,11 +12,19 @@ GENERATOR_CONFIG = {
     "SHORT_PATH_RANGE": (2, 4),        # Min and max length for short paths
     "LONG_PATH_RANGE": (5, 13),        # Min and max length for long paths
     "TURN_PROBABILITY": 0.6,           # Likelihood of changing direction (0-1)
+    "COLOR_SIMILARITY_WEIGHT": 0.8,    # 0 to 1. Higher means arrows stay strictly within same color
     "MAX_RETRY_ATTEMPTS": 30,          # Number of attempts to find a valid path for each cell
     "WHITE_THRESHOLD": 245,           # RGB value above which a pixel is considered white (background)
     "ALPHA_THRESHOLD": 128             # Alpha value below which a pixel is considered transparent (background)
 }
 # --------------------------------
+
+def rgb_to_hex(rgb):
+    return '#{:02x}{:02x}{:02x}'.format(rgb[0], rgb[1], rgb[2])
+
+def color_distance(c1, c2):
+    """Simple Euclidean distance between two colors."""
+    return ((c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 + (c1[2]-c2[2])**2)**0.5
 
 def generate_level_json(image_path, grid_width, grid_height, config=None):
     if config is None:
@@ -34,15 +42,15 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
 
     img = img.resize((grid_width, grid_height), Image.NEAREST)
     
-    # מיפוי התאים שמרכיבים את הצורה
+    # מיפוי התאים שמרכיבים את הצורה ומידע צבע
     shape_mask = []
+    pixel_colors = {} # (x,y) -> (r,g,b,a)
+    
     for y in range(grid_height):
         for x in range(grid_width):
-            r, g, b, a = img.getpixel((x, y))
-            
-            # Logic:
-            # 1. PNG/Transparency: If alpha is low, it's transparent (background)
-            # 2. JPEG/White: If RGB is close to white, it's background
+            color = img.getpixel((x, y))
+            r, g, b, a = color
+            pixel_colors[(x, y)] = color
             
             is_transparent = a < config["ALPHA_THRESHOLD"]
             is_white = r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]
@@ -71,9 +79,10 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
 
     # נמשיך לנסות למלא כל עוד יש נקודות פנויות
     while remaining_points:
-        # בחר את הנקודה הפנויה הקרובה ביותר למרכז
+        # בחר את הנקודה הפנויה הקרובה ביותר לממרכז
         sorted_remaining = sorted(list(remaining_points), key=get_dist)
         start_node = sorted_remaining[0]
+        start_color = pixel_colors[start_node][:3]
         
         success = False
         # ננסה מספר כיוונים ואורכים כדי למצוא מסלול תקין
@@ -92,31 +101,41 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                 last_x, last_y = current_path[-1]
                 directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
                 
-                # העדפת המשך באותו כיוון או פנייה
-                if current_direction and random.random() > config["TURN_PROBABILITY"]:
-                    # נסה להמשיך ישר
-                    preferred_directions = [current_direction]
-                    # שאר הכיוונים למקרה שלא ניתן להמשיך ישר
-                    others = [d for d in directions if d != current_direction]
-                    random.shuffle(others)
-                    ordered_directions = preferred_directions + others
-                else:
-                    # פנייה או תחילת מסלול - ערבוב אקראי
-                    random.shuffle(directions)
-                    ordered_directions = directions
-
-                next_node = None
-                chosen_dir = None
+                # Check neighbors and their color scores
+                scored_neighbors = []
+                for dx, dy in directions:
+                    neighbor = (last_x + dx, last_y + dy)
+                    if neighbor in remaining_points and neighbor not in temp_occupied:
+                        n_color = pixel_colors[neighbor][:3]
+                        # Score: 1.0 (perfect match) to 0.0 (max difference)
+                        # Root mean square color diff can be up to ~441
+                        dist = color_distance(start_color, n_color)
+                        color_score = max(0, 1 - (dist / 441.0))
+                        
+                        # Directional bias
+                        dir_score = 1.0
+                        if current_direction:
+                            if (dx, dy) == current_direction:
+                                dir_score = 1.0 # Keep going straight
+                            else:
+                                dir_score = config["TURN_PROBABILITY"] # Allowed to turn
+                        
+                        # Weight color similarity significantly
+                        total_score = (color_score * config["COLOR_SIMILARITY_WEIGHT"] + 
+                                       dir_score * (1 - config["COLOR_SIMILARITY_WEIGHT"]))
+                        scored_neighbors.append((neighbor, total_score, (dx, dy)))
                 
-                for dx, dy in ordered_directions:
-                    candidate = (last_x + dx, last_y + dy)
-                    if candidate in remaining_points and candidate not in temp_occupied:
-                        next_node = candidate
-                        chosen_dir = (dx, dy)
-                        break
-                
-                if not next_node:
+                if not scored_neighbors:
                     break
+                
+                # Weighted random selection among top scoring neighbors OR just pick best
+                # To bring more order to details, let's favor the best color matches heavily
+                scored_neighbors.sort(key=lambda x: x[1], reverse=True)
+                
+                # Take top candidates (similar scores) and pick one
+                best_score = scored_neighbors[0][1]
+                top_candidates = [n for n in scored_neighbors if n[1] >= best_score * 0.9]
+                next_node, _, chosen_dir = random.choice(top_candidates)
                 
                 current_path.append(next_node)
                 temp_occupied.add(next_node)
@@ -126,7 +145,6 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                 continue
 
             # בדיקת יציאה (Escape check)
-            # Arrow logic: head is the last point, previous point determines initial direction out
             head_x, head_y = current_path[-1]
             prev_x, prev_y = current_path[-2]
             dx = head_x - prev_x
@@ -142,9 +160,14 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                 check_y += dy
             
             if escapable:
+                # Sample the median color of the path to represent it
+                avg_r = sum(pixel_colors[p][0] for p in current_path) // len(current_path)
+                avg_g = sum(pixel_colors[p][1] for p in current_path) // len(current_path)
+                avg_b = sum(pixel_colors[p][2] for p in current_path) // len(current_path)
+                
                 arrow_obj = {
                     "id": arrow_id,
-                    "color": "#FFFFFF",
+                    "color": rgb_to_hex((avg_r, avg_g, avg_b)),
                     "path": [{"x": p[0], "y": p[1]} for p in current_path]
                 }
                 arrows.append(arrow_obj)
