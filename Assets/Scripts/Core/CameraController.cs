@@ -20,7 +20,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private float initWaitDuration = 1.2f;
         [SerializeField] private float initZoomInDuration = 0.25f;
 
-        [SerializeField] private float winZoomMultiplier = 2.0f;
+        [SerializeField] private float winZoomMultiplier = 2.5f;
 
         public static CameraController Instance { get; private set; }
 
