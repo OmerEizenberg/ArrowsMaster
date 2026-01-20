@@ -219,12 +219,12 @@ namespace Assets.Scripts.Core
             transform.position = finalPos;
         }
 
-        public void PlayWinZoomAnimation(Vector3 focusPosition)
+        public void PlayWinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
-            StartCoroutine(WinZoomAnimation(focusPosition));
+            StartCoroutine(WinZoomAnimation(gridSize, focusPosition));
         }
 
-        private System.Collections.IEnumerator WinZoomAnimation(Vector3 focusPosition)
+        private System.Collections.IEnumerator WinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
             float duration = 0.5f;
             float elapsed = 0f;
@@ -232,8 +232,22 @@ namespace Assets.Scripts.Core
             float startZoom = cam.orthographicSize;
             Vector3 startPos = transform.position;
             
-            // Zoom out to maxZoom or similar level-fit zoom
-            float targetZoom = maxZoom * 0.8f; 
+            float padding = 2f;
+            float cellSize = ArrowController.CellSize;
+            float aspectRatio = cam.aspect;
+
+            // Calculate target zoom to fit grid
+            float fitVertical = (gridSize.y * cellSize + padding * 2) / 2f;
+            float fitHorizontal = (gridSize.x * cellSize + padding * 2) / (2f * aspectRatio);
+            
+            // Use a multiplier to ensure we see the whole level and a bit more for the "wow" factor
+            // The user mentionedportrait mode needs extra zoom out. 
+            // Max(fitVertical, fitHorizontal) already accounts for aspect ratio.
+            float targetZoom = Mathf.Max(fitVertical, fitHorizontal) * 1.2f; 
+            
+            // Limit target zoom by max zoom
+            targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
+
             Vector3 targetPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
 
             while (elapsed < duration)

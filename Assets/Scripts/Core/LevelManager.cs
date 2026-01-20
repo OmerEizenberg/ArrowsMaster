@@ -16,6 +16,7 @@ namespace Assets.Scripts.Core
         private string currentLevelId;
         private HashSet<Vector2Int> m_SpawnedCirclePositions = new HashSet<Vector2Int>();
         private Vector3 m_LevelCenter;
+        private Vector2Int m_CurrentGridSize;
 
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
@@ -54,7 +55,8 @@ namespace Assets.Scripts.Core
             LevelData data = JsonUtility.FromJson<LevelData>(json);
             
             // Initialize Grid
-            GridManager.Instance.InitializeGrid(data.gridSize.ToVector2Int());
+            m_CurrentGridSize = data.gridSize.ToVector2Int();
+            GridManager.Instance.InitializeGrid(m_CurrentGridSize);
 
             // Initialize Circles Tracking
             m_SpawnedCirclePositions.Clear();
@@ -162,7 +164,7 @@ namespace Assets.Scripts.Core
         {
             if (CameraController.Instance != null)
             {
-                CameraController.Instance.PlayWinZoomAnimation(m_LevelCenter);
+                CameraController.Instance.PlayWinZoomAnimation(m_CurrentGridSize, m_LevelCenter);
             }
             StartCoroutine(DoRippleEffect());
         }
