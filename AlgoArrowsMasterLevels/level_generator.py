@@ -13,12 +13,14 @@ GENERATOR_CONFIG = {
     "LONG_PATH_RANGE": (5, 13),        # Min and max length for long paths
     "TURN_PROBABILITY": 0.6,           # Likelihood of changing direction (0-1)
     "COLOR_SIMILARITY_WEIGHT": 0.8,    # 0 to 1. Higher means arrows stay strictly within same color
-    "MAX_ARROW_ATTEMPTS": 300,         # More attempts to find paths
-    "BACKTRACK_DEPTH": 12,             # Deeper backtracks
-    "MAX_BACKTRACK_RETRIES": 300,      # More room to escape dead ends
-    "MAX_LEVEL_RESETS": 5,             # Reset if completely stuck
+    "MAX_ARROW_ATTEMPTS": 1000,         # Much more patience to find valid paths
+    "BACKTRACK_DEPTH": 50,             # Deeper starting backtrack depth
+    "MAX_BACKTRACK_RETRIES": 2000,     # Huge limit for complex shapes
+    "MAX_LEVEL_RESETS": 10,             # Reset if completely stuck
     "WHITE_THRESHOLD": 245,           # RGB value above which a pixel is considered white (background)
-    "ALPHA_THRESHOLD": 128             # Alpha value below which a pixel is considered transparent (background)
+    "ALPHA_THRESHOLD": 128,            # Alpha value below which a pixel is considered transparent (background)
+    "CROSS_BLOCK_PROBABILITY": 0.5,    # Balanced for convergence
+    "CROSS_BLOCK_WEIGHT": 1.2          # Sufficient difficulty without over-constraining
 }
 # --------------------------------
 
@@ -45,11 +47,13 @@ def get_escape_options(p, grid_width, grid_height, occupied):
             options += 1
     return options
 
-def get_neighbor_count(p, remaining):
+def get_neighbor_count(p, remaining_points, temp_occupied=None):
     count = 0
-    for dx, dy in [(1,0), (-1,0), (0,1), (0,-1)]:
-        if (p[0] + dx, p[1] + dy) in remaining:
-            count += 1
+    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+        nb = (p[0] + dx, p[1] + dy)
+        if nb in remaining_points:
+            if temp_occupied is None or nb not in temp_occupied:
+                count += 1
     return count
 
 def generate_level_json(image_path, grid_width, grid_height, config=None):
@@ -103,32 +107,61 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
         occupied = set()
         arrows = []
         remaining_points = set(shape_mask)
+        escape_pixel_map = {} # Maps pixel -> list of escape directions that pass through it
         backtrack_count = 0
         
         while remaining_points:
             # HEURISTIC: 
             # 1. Prioritize pixels with 0 or 1 neighbors in remaining_points (Critical/Isolated)
-            # 2. Then prioritize pixels with high depth (Inside-Out)
-            # 3. Then few escape options
-            def selection_priority(p):
-                # 1. Prioritize bottlenecks (0 or 1 neighbors left)
-                # 2. Fewest escape options
-                # 3. Deepest points (Tie breaker)
-                nb_count = get_neighbor_count(p, remaining_points)
-                esc = get_escape_options(p, grid_width, grid_height, occupied)
-                return (nb_count, esc, -pixel_depth[p])
-
-            sorted_remaining = sorted(list(remaining_points), key=selection_priority)
-            start_node = sorted_remaining[0]
+            # 2. Prioritize pixels in escape_pixel_map (Cross-Blocking)
+            # 3. Then prioritize pixels with high depth (Inside-Out)
+            # 4. Then few escape options
+            # Optimized selection: nb_count is primary, priority to fewer neighbors (bottlenecks)
+            # We don't need to sort EVERYTHING, just find the best point.
+            best_node = None
+            best_priority = (5, 1, 5, 1) # (nb_count, cross_bonus, esc, depth) - lower is better for nb_count
             
-            # Check if start_node is isolated (0 neighbors)
-            if get_neighbor_count(start_node, remaining_points) == 0:
-                print(f"Terminal failure: Isolated pixel found at {start_node}. Triggering backtrack.")
+            # For speed on large grids, if we have many points, we can sample or use a faster heuristic
+            # but for 33x33 (~1000 points), a single pass is fine.
+            trapped_pixel = None
+            for p in remaining_points:
+                nbc = get_neighbor_count(p, remaining_points)
+                esc = get_escape_options(p, grid_width, grid_height, occupied)
+                
+                # DEADLOCK DETECTION: If a pixel has neighbors but cannot escape, this level state is invalid
+                if nbc > 0 and esc == 0:
+                    trapped_pixel = p
+                    break
+
+                if nbc > best_priority[0]: continue
+                cb = -1 if p in escape_pixel_map else 0
+                if nbc == best_priority[0] and cb > best_priority[1]: continue
+                
+                depth = -pixel_depth[p]
+                pri = (nbc, cb, esc, depth)
+                if pri < best_priority:
+                    best_priority = pri
+                    best_node = p
+            
+            if trapped_pixel:
+                print(f"Deadlock detected: Pixel {trapped_pixel} has neighbors but no escape. Backtracking.")
                 found_arrow = False
+            else:
+                start_node = best_node
+                # Check if start_node is isolated (0 neighbors)
+                if start_node and get_neighbor_count(start_node, remaining_points) == 0:
+                    print(f"Terminal failure: Isolated pixel found at {start_node}. Triggering backtrack.")
+                    found_arrow = False
             else:
                 start_color = pixel_colors[start_node][:3]
                 found_arrow = False
                 
+                # ADAPTIVE DIFFICULTY: Fades as grid fills up
+                difficulty_factor = len(remaining_points) / len(shape_mask)
+                # STALL PROTECTION: Disable cross-blocking if stuck
+                if backtrack_count > (config["MAX_BACKTRACK_RETRIES"] // 2):
+                    difficulty_factor = 0.0
+
                 for _ in range(config["MAX_ARROW_ATTEMPTS"]):
                     if random.random() < config["SHORT_PATH_PROBABILITY"]:
                         base_length = random.randint(*config["SHORT_PATH_RANGE"])
@@ -149,8 +182,8 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                                 neighbor = (last_x + dx, last_y + dy)
                                 if neighbor in remaining_points and neighbor not in temp_occupied:
                                     # NEIGHBOR ANALYSIS
-                                    remaining_after = remaining_points - temp_occupied - {neighbor}
-                                    nb_count = get_neighbor_count(neighbor, remaining_after)
+                                    # NEIGHBOR ANALYSIS: Optimized to avoid set creation
+                                    nb_count = get_neighbor_count(neighbor, remaining_points, temp_occupied | {neighbor})
                                     
                                     # MUST-PICK: If this neighbor has NO other way out, we must take it
                                     if nb_count == 0:
@@ -163,13 +196,24 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                                     if current_dir:
                                         dir_score = 1.0 if (dx, dy) == current_dir else config["TURN_PROBABILITY"]
                                     
-                                    # ORPHAN PREVENTION: Boost neighbors that have few remaining neighbors (bottlenecks)
-                                    orphan_score = (4 - nb_count) * 0.5
+                                    # ORPHAN PREVENTION: Massive weight to ensure absolute priority
+                                    # If nb_count is low, this node is a bottleneck
+                                    orphan_score = (4 - nb_count) ** 2 # Exponential boost
+                                    
+                                    # CROSS BLOCKING: Boost perpendicular directions if on an escape path
+                                    perp_score = 0
+                                    if difficulty_factor > 0 and neighbor in escape_pixel_map and random.random() < (config["CROSS_BLOCK_PROBABILITY"] * difficulty_factor):
+                                        for escape_dir in escape_pixel_map[neighbor]:
+                                            if dx * escape_dir[0] + dy * escape_dir[1] == 0:
+                                                perp_score = 1.0 
+                                                break
                                     
                                     noise = random.uniform(0, 0.1)
+                                    # SAFETY FIRST: orphan_score must dominate everything else
                                     score = (color_score * config["COLOR_SIMILARITY_WEIGHT"] + 
                                              dir_score * (0.2 * (1 - config["COLOR_SIMILARITY_WEIGHT"])) + 
-                                             orphan_score * 0.8) + noise
+                                             orphan_score * 5.0 + # Massive weight
+                                             perp_score * (config["CROSS_BLOCK_WEIGHT"] * difficulty_factor)) + noise
                                     neighbors.append((neighbor, score, (dx, dy)))
                             
                             if must_pick:
@@ -212,9 +256,22 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                             for p in path:
                                 occupied.add(p)
                                 remaining_points.remove(p)
+                                # Remove from escape map if it was there (it's now occupied)
+                                if p in escape_pixel_map:
+                                    del escape_pixel_map[p]
+                            
+                            # Record new escape path
+                            check_x, check_y = head_x + dx, head_y + dy
+                            while 0 <= check_x < grid_width and 0 <= check_y < grid_height:
+                                ep = (check_x, check_y)
+                                if ep not in escape_pixel_map:
+                                    escape_pixel_map[ep] = []
+                                escape_pixel_map[ep].append((dx, dy))
+                                check_x += dx
+                                check_y += dy
                             
                             if len(arrows) % 20 == 0:
-                                print(f"Progress: {len(arrows)} arrows, {len(remaining_points)} points left.")
+                                print(f"Progress: {len(arrows)} arrows, {len(remaining_points)} points left. Difficulty factor: {difficulty_factor:.2f}")
                                 
                             found_arrow = True
                             break # Exit target_length loop
@@ -229,10 +286,27 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                     print(f"Stuck at {start_node} (nb={get_neighbor_count(start_node, remaining_points)}, esc={get_escape_options(start_node, grid_width, grid_height, occupied)}). Backtracking {depth} (Total: {backtrack_count})...")
                     for _ in range(depth):
                         removed_arrow = arrows.pop()
+                        # Re-calculate and remove its escape path from the map
+                        h_x, h_y = removed_arrow["path"][-1]["x"], removed_arrow["path"][-1]["y"]
+                        p_x, p_y = removed_arrow["path"][-2]["x"], removed_arrow["path"][-2]["y"]
+                        d_x, d_y = h_x - p_x, h_y - p_y
+                        
+                        c_x, c_y = h_x + d_x, h_y + d_y
+                        while 0 <= c_x < grid_width and 0 <= c_y < grid_height:
+                            ep = (c_x, c_y)
+                            if ep in escape_pixel_map and (d_x, d_y) in escape_pixel_map[ep]:
+                                escape_pixel_map[ep].remove((d_x, d_y))
+                                if not escape_pixel_map[ep]:
+                                    del escape_pixel_map[ep]
+                            c_x += d_x
+                            c_y += d_y
+
                         for p_dict in removed_arrow["path"]:
                             p = (p_dict["x"], p_dict["y"])
                             occupied.remove(p)
                             remaining_points.add(p)
+                            # (Heuristic: we don't re-populate escape map for removed arrows' targets, 
+                            # because we primarily want to block arrows that are currently on the board)
                 else: break
         
         if not remaining_points:
