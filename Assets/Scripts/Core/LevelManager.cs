@@ -13,6 +13,7 @@ namespace Assets.Scripts.Core
 
         private List<GameObject> currentLevelObjects = new List<GameObject>();
         private List<SpriteRenderer> m_BackgroundCircles = new List<SpriteRenderer>();
+        public string CurrentLevelId => currentLevelId;
         private string currentLevelId;
         private HashSet<Vector2Int> m_SpawnedCirclePositions = new HashSet<Vector2Int>();
         private Vector3 m_LevelCenter;

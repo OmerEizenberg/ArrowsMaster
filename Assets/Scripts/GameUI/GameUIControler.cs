@@ -46,10 +46,14 @@ public class GameUIContoleer : MonoBehaviour
 
     public void restartLevel()
     {
-        SoundManager.Instance.PlayClick();
-        if (m_LevelManager != null)
+        if (SoundManager.Instance != null)
         {
-            m_LevelManager.RestartLevel();
+            SoundManager.Instance.PlayClick();
+        }
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.RestartCurrentLevel();
         }
     }
 

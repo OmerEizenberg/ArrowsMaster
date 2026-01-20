@@ -43,6 +43,14 @@ namespace Assets.Scripts.Core
             CurrentLives = maxLives;
         }
 
+        public void RestartCurrentLevel()
+        {
+            if (levelManager != null && !string.IsNullOrEmpty(levelManager.CurrentLevelId))
+            {
+                StartLevel(levelManager.CurrentLevelId);
+            }
+        }
+
         public void StartLevel(string levelId)
         {
             ResetLives();

@@ -20,6 +20,8 @@ namespace Assets.Scripts.Core
         [SerializeField] private float initWaitDuration = 1.2f;
         [SerializeField] private float initZoomInDuration = 0.25f;
 
+        [SerializeField] private float winZoomMultiplier = 2.0f;
+
         public static CameraController Instance { get; private set; }
 
         private Camera cam;
@@ -241,9 +243,9 @@ namespace Assets.Scripts.Core
             float fitHorizontal = (gridSize.x * cellSize + padding * 2) / (2f * aspectRatio);
             
             // Use a multiplier to ensure we see the whole level and a bit more for the "wow" factor
-            // The user mentionedportrait mode needs extra zoom out. 
+            // The user mentioned portrait mode needs extra zoom out. 
             // Max(fitVertical, fitHorizontal) already accounts for aspect ratio.
-            float targetZoom = Mathf.Max(fitVertical, fitHorizontal) * 1.2f; 
+            float targetZoom = Mathf.Max(fitVertical, fitHorizontal) * winZoomMultiplier; 
             
             // Limit target zoom by max zoom
             targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
