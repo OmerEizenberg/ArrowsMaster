@@ -75,6 +75,7 @@
     <Compile Include="Assets/Scripts/Core/ArrowController.cs" />
     <Compile Include="Assets/Scripts/Core/GameManager.cs" />
     <Compile Include="Assets/Scripts/Core/UserDataManager.cs" />
+    <Compile Include="Assets/Scripts/Lobby/MonthlyChallengeController.cs" />
     <Compile Include="Assets/Scripts/Core/InputManager.cs" />
     <Compile Include="Assets/Scripts/Core/VibrationManager.cs" />
     <Compile Include="Assets/Scripts/Core/CameraController.cs" />
