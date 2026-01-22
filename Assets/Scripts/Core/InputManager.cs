@@ -86,6 +86,8 @@ namespace Assets.Scripts.Core
 
         private Segment GetHitSegment()
         {
+            if (IsScreenPositionBlocked(Input.mousePosition)) return null;
+
             Vector2 worldPoint = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(worldPoint, Vector2.zero);
 
@@ -94,6 +96,12 @@ namespace Assets.Scripts.Core
                 return hit.collider.GetComponent<Segment>();
             }
             return null;
+        }
+
+        private bool IsScreenPositionBlocked(Vector2 screenPos)
+        {
+            float normalizedY = screenPos.y / Screen.height;
+            return normalizedY > 0.85f;
         }
     }
 }

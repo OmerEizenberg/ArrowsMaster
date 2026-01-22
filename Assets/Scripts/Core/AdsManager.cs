@@ -14,7 +14,7 @@ namespace Assets.Scripts.Core
         private bool isInitialized = false;
 
         public enum AdRewardType { None, PlayOn, Hint }
-        public AdRewardType m_CurrentRequestType = AdRewardType.None;
+        public AdRewardType m_CurrentRequestType = AdRewardType.PlayOn;
         
         public event Action<bool> OnRewardReceived;
 
@@ -190,12 +190,10 @@ namespace Assets.Scripts.Core
             playOnRewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
             playOnRewardedAd.OnAdClosed += (info) => { 
                 Debug.Log($"[AdsManager] PlayOn Ad Closed. Request type was: {m_CurrentRequestType}");
-                m_CurrentRequestType = AdRewardType.None; 
                 LoadPlayOnRewarded(); 
             };
             playOnRewardedAd.OnAdDisplayFailed += (info, err) => { 
                 Debug.LogError($"[AdsManager] PlayOn Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
-                m_CurrentRequestType = AdRewardType.None; 
                 LoadPlayOnRewarded(); 
             };
             playOnRewardedAd.OnAdRewarded += (info, reward) => {
@@ -236,12 +234,10 @@ namespace Assets.Scripts.Core
             hintRewardedAd = new LevelPlayRewardedAd(HintAdUnitId);
             hintRewardedAd.OnAdClosed += (info) => { 
                 Debug.Log($"[AdsManager] Hint Ad Closed. Request type was: {m_CurrentRequestType}");
-                m_CurrentRequestType = AdRewardType.None; 
                 LoadHintRewarded(); 
             };
             hintRewardedAd.OnAdDisplayFailed += (info, err) => { 
                 Debug.LogError($"[AdsManager] Hint Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
-                m_CurrentRequestType = AdRewardType.None; 
                 LoadHintRewarded(); 
             };
             hintRewardedAd.OnAdRewarded += (info, reward) => {
