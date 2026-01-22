@@ -131,15 +131,32 @@ public class MonthlyChallengeController : MonoBehaviour
             m_monthlyProgress.value = passedCount;
         }
         
-        // Auto-select latest available day
+        // Auto-select latest available day that is NOT yet passed
         int latestDay = daysInMonth;
         if (month == DateTime.Now.Month && year == DateTime.Now.Year)
         {
             latestDay = DateTime.Now.Day;
         }
+
+        int selectedDayIndex = -1;
+        for (int d = latestDay; d >= 1; d--)
+        {
+            if (!UserDataManager.Instance.IsDayCompleted(year, month, d))
+            {
+                selectedDayIndex = d + dayOffset - 1;
+                break;
+            }
+        }
         
-        int targetIndex = latestDay + dayOffset - 1;
-        MarkAsSelected(dayImages[targetIndex]);
+        if (selectedDayIndex != -1)
+        {
+            MarkAsSelected(dayImages[selectedDayIndex]);
+        }
+        else
+        {
+            // All available days are completed
+            ClearSelection();
+        }
         
         UpdateNavButtons();
     }
@@ -175,16 +192,14 @@ public class MonthlyChallengeController : MonoBehaviour
 
     public void MarkAsSelected(Image i_bgDate)
     {
-        if (m_SelectedDateBg != null)
-        {
-            m_SelectedDateBg.color = m_NormalColor;
-            m_SelectedDateTxt.color = m_NormalColorTxt;
-        }
+        ClearSelection();
+
+        if (i_bgDate == null) return;
 
         m_SelectedDateBg = i_bgDate;
         m_SelectedDateTxt = m_SelectedDateBg.GetComponentInChildren<TextMeshProUGUI>();
         
-        if (int.TryParse(m_SelectedDateTxt.text, out int selectedDay))
+        if (m_SelectedDateTxt != null && int.TryParse(m_SelectedDateTxt.text, out int selectedDay))
         {
             p_CurrentDay = selectedDay;
         }
@@ -192,10 +207,24 @@ public class MonthlyChallengeController : MonoBehaviour
         MarkAsSelected();
     }
 
+    private void ClearSelection()
+    {
+        if (m_SelectedDateBg != null)
+        {
+            m_SelectedDateBg.color = m_NormalColor;
+            if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_NormalColorTxt;
+        }
+        m_SelectedDateBg = null;
+        m_SelectedDateTxt = null;
+    }
+
     public void MarkAsSelected()
     {
-        m_SelectedDateBg.color = m_SelectedDateColor;
-        m_SelectedDateTxt.color = m_SelectedDateTxtColor;
+        if (m_SelectedDateBg != null)
+        {
+            m_SelectedDateBg.color = m_SelectedDateColor;
+            if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_SelectedDateTxtColor;
+        }
     }
 
    public void MarkAsPassed()

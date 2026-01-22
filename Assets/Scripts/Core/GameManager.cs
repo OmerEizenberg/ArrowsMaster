@@ -50,6 +50,11 @@ namespace Assets.Scripts.Core
 
         public void RestartCurrentLevel()
         {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowInterstitial();
+            }
+
             if (levelManager != null && !string.IsNullOrEmpty(levelManager.CurrentLevelId))
             {
                 if (p_isLevelProgression)
