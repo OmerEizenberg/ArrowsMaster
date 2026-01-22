@@ -70,6 +70,7 @@ public class MonthlyChallengeController : MonoBehaviour
         // 3. Get total days in the month
         int daysInMonth = DateTime.DaysInMonth(year, month);
 
+        p_CurrentDay = DateTime.Now.Day;
         // 4. Loop through all 35 slots
         for (int i = 0; i < dayImages.Length; i++)
         {
@@ -78,13 +79,18 @@ public class MonthlyChallengeController : MonoBehaviour
 
             if (dateNumber >= 1 && dateNumber <= daysInMonth)
             {
-                // Active day
-                dayImages[i].GetComponent<Button>().interactable = true;
-                dayImages[i].gameObject.SetActive(true);
-                if(m_dayTexts[i] == null) m_dayTexts[i] = dayImages[i].transform.GetChild(0).GetComponent<TextMeshProUGUI>();
-                m_dayTexts[i].text = dateNumber.ToString();
-                dayImages[i].color = m_NormalColor;
-                m_dayTexts[i].color = m_NormalColorTxt;
+                if(year == DateTime.Now.Year && month == DateTime.Now.Month && DateTime.Now.Day < dateNumber)
+                {
+                    dayImages[i].gameObject.SetActive(false);
+                }else{
+                     // Active day
+                    dayImages[i].GetComponent<Button>().interactable = true;
+                    dayImages[i].gameObject.SetActive(true);
+                    if(m_dayTexts[i] == null) m_dayTexts[i] = dayImages[i].transform.GetChild(0).GetComponent<TextMeshProUGUI>();
+                    m_dayTexts[i].text = dateNumber.ToString();
+                    dayImages[i].color = m_NormalColor;
+                    m_dayTexts[i].color = m_NormalColorTxt;
+                }
             }
             else
             {
