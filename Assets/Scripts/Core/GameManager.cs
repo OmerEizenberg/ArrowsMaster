@@ -67,6 +67,22 @@ namespace Assets.Scripts.Core
             OnLevelStarted?.Invoke();
         }
 
+        public void StartChallengeLevel(string levelId)
+        {
+            ResetLives();
+            HideScreens();
+            
+            // Reset arrow count before loading new level
+            activeArrowsCount = 0; 
+
+            if (levelManager != null)
+            {
+                levelManager.LoadChallengeLevelFromResources(levelId);
+            }
+
+            OnLevelStarted?.Invoke();
+        }
+
         private void ResetLives()
         {
             CurrentLives = maxLives;

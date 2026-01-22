@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -14,37 +15,47 @@ public class MonthlyChallengeController : MonoBehaviour
     [SerializeField] private Image[] dayImages;
     [SerializeField] private Color m_NormalColor;
     [SerializeField] private Color m_PassedColor;
-    [SerializeField] private Color m_TodayColor;
+    [SerializeField] private Color m_SelectedDateColor;
 
     [SerializeField] private Color m_NormalColorTxt;
     [SerializeField] private Color m_PassedColorTxt;
-    [SerializeField] private Color m_TodayColorTxt;
+    [SerializeField] private Color m_SelectedDateTxtColor;
     
     [Tooltip("Assign all 35 day text components here")]
-    [SerializeField] private TextMeshProUGUI[] dayTexts;
+    [SerializeField] private TextMeshProUGUI[] m_dayTexts;
+    [SerializeField] private TextMeshProUGUI m_challengeMonthTitle;
+
+    [SerializeField] private HomeContoller m_HomeController;
 
     public Image m_SelectedDateBg;
     public TextMeshProUGUI m_SelectedDateTxt;
+
+    public int p_CurrentDay = 1;
+    public int p_CurrentMonth = 1;
+    public int p_CurrentYear = 2026;
 
     private void OnEnable()
     {
         m_NormalColor.a = 256f;
         m_PassedColor.a = 256f;
-        m_TodayColor.a = 256f;
+        m_SelectedDateColor.a = 256f;
         m_NormalColorTxt.a = 256f;
         m_PassedColorTxt.a = 256f;
-        m_TodayColorTxt.a = 256f;
+        m_SelectedDateTxtColor.a = 256f;
 
         // Automatically initialize to the current month and year
         Init(DateTime.Now.Month, DateTime.Now.Year);
-        MarkAsPassed();
     }
 
     public void Init(int month, int year)
     {
         // 1. Get the first day of the month
         DateTime firstDayOfMonth = new DateTime(year, month, 1);
-        
+        m_challengeMonthTitle.text = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month) + " "+year;
+        p_CurrentDay = DateTime.Now.Day;
+        //TODO Search for latest none passed day
+        p_CurrentYear = year;
+        p_CurrentMonth = month;
         // 2. Calculate the starting offset
         // DayOfWeek enum: Sunday = 0, Monday = 1 ... Saturday = 6
         // Your calendar starts on Monday, so we adjust the offset:
@@ -62,10 +73,11 @@ public class MonthlyChallengeController : MonoBehaviour
             if (dateNumber >= 1 && dateNumber <= daysInMonth)
             {
                 // Active day
+                dayImages[i].GetComponent<Button>().interactable = true;
                 dayImages[i].gameObject.SetActive(true);
-                dayTexts[i].text = dateNumber.ToString();
+                m_dayTexts[i].text = dateNumber.ToString();
                 dayImages[i].color = m_NormalColor;
-                dayTexts[i].color = m_NormalColorTxt;
+                m_dayTexts[i].color = m_NormalColorTxt;
             }
             else
             {
@@ -79,12 +91,19 @@ public class MonthlyChallengeController : MonoBehaviour
     {
         m_SelectedDateBg = i_bgDate;
         m_SelectedDateTxt = m_SelectedDateBg.GetComponentInChildren<TextMeshProUGUI>();;
-    MarkAsPassed();
+        MarkAsSelected();
+    }
+
+    public void MarkAsSelected()
+    {
+        m_SelectedDateBg.color = m_SelectedDateColor;
+        m_SelectedDateTxt.color = m_SelectedDateTxtColor;
     }
 
    public void MarkAsPassed()
     {
         m_SelectedDateBg.color = m_PassedColor;
         m_SelectedDateTxt.color = m_PassedColorTxt;
+        m_SelectedDateBg.GetComponent<Button>().interactable = false;
     }
 }

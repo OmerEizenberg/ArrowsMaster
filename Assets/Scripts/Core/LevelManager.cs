@@ -35,6 +35,20 @@ namespace Assets.Scripts.Core
                 Debug.LogError($"Level with ID {levelId} not found in Resources.");
             }
         }
+          public void LoadChallengeLevelFromResources(string levelId)
+        {
+            currentLevelId = levelId;
+            TextAsset jsonFile = Resources.Load<TextAsset>($"ChallengeLevels/{levelId}");
+            if (jsonFile != null)
+            {
+                ClearLevel();
+                LoadLevel(jsonFile.text);
+            }
+            else
+            {
+                Debug.LogError($"Level with ID {levelId} not found in Resources.");
+            }
+        }
 
         public void ClearLevel()
         {

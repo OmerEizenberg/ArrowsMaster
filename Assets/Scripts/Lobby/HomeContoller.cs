@@ -23,6 +23,7 @@ public class HomeContoller : MonoBehaviour
     [SerializeField] private Color m_HardColor;
     [SerializeField] private Color m_EasyColor;
     [SerializeField] private Color m_LevelColor;
+    [SerializeField] private MonthlyChallengeController m_MonthlyChallengeController;
 
     private void OnEnable()
     {
@@ -65,5 +66,15 @@ public class HomeContoller : MonoBehaviour
         
         string levelName = $"level{UserDataManager.Instance.CurrentLevel}";
         GameManager.Instance.StartLevel(levelName);
+    }
+
+    public void OnCalenderPlayButtonClicked()
+    {
+        SoundManager.Instance.PlayClick();
+        m_LobbyUI.SetActive(false);
+        m_GameUI.SetActive(true);
+        
+        string levelName = $"level{m_MonthlyChallengeController.p_CurrentMonth+m_MonthlyChallengeController.p_CurrentDay+(m_MonthlyChallengeController.p_CurrentYear%10)}";
+        GameManager.Instance.StartChallengeLevel(levelName);
     }
 }
