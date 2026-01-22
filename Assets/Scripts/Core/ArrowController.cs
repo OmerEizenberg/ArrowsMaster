@@ -118,10 +118,13 @@ namespace Assets.Scripts.Core
                 GridManager.Instance.RegisterOccupancy(pos, this);
             }
 
-            UpdateHeadVisuals();
-            UpdateLinePositions();
-
             return true;
+        }
+
+        public Vector3 GetHeadPosition()
+        {
+            if (segments.Count == 0) return transform.position;
+            return segments[segments.Count - 1].transform.position;
         }
 
         private void Update()

@@ -269,5 +269,29 @@ namespace Assets.Scripts.Core
             cam.orthographicSize = targetZoom;
             transform.position = targetPos;
         }
+
+        public void FocusOn(Vector3 worldPosition, float duration)
+        {
+            StartCoroutine(FocusCoroutine(worldPosition, duration));
+        }
+
+        private System.Collections.IEnumerator FocusCoroutine(Vector3 worldPosition, float duration)
+        {
+            float elapsed = 0f;
+            Vector3 startPos = transform.position;
+            Vector3 targetPos = new Vector3(worldPosition.x, worldPosition.y, transform.position.z);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float smoothT = Mathf.SmoothStep(0, 1, t);
+                
+                transform.position = Vector3.Lerp(startPos, targetPos, smoothT);
+                yield return null;
+            }
+
+            transform.position = targetPos;
+        }
     }
 }

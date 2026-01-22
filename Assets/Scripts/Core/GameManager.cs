@@ -128,12 +128,12 @@ namespace Assets.Scripts.Core
         {
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.ShowRewarded();
+                AdsManager.Instance.ShowPlayOnRewarded();
             }
             else
             {
                 // Fallback if no AdsManager
-                HandleRewardGranted();
+                HandlePlayOnRewardGranted();
             }
         }
 
