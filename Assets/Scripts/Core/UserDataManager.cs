@@ -1,4 +1,6 @@
 using UnityEngine;
+using Assets.Scripts.Data;
+using System.Collections.Generic;
 
 namespace Assets.Scripts.Core
 {
@@ -81,6 +83,37 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(LevelKey, CurrentLevel);
             PlayerPrefs.Save();
             OnLevelChanged?.Invoke();
+        }
+
+        private string GetMonthlyKey(int year, int month)
+        {
+            return $"MonthlyChallenge_{year}_{month}";
+        }
+
+        public void SaveMonthlyChallengeProgress(int year, int month, int day)
+        {
+            string key = GetMonthlyKey(year, month);
+            int currentMask = PlayerPrefs.GetInt(key, 0);
+            
+            // Set the bit corresponding to the day (day 1 is bit 0)
+            int newMask = currentMask | (1 << (day - 1));
+            
+            if (newMask != currentMask)
+            {
+                PlayerPrefs.SetInt(key, newMask);
+                PlayerPrefs.Save();
+            }
+        }
+
+        public int GetMonthlyChallengeBitmask(int year, int month)
+        {
+            return PlayerPrefs.GetInt(GetMonthlyKey(year, month), 0);
+        }
+
+        public bool IsDayCompleted(int year, int month, int day)
+        {
+            int mask = GetMonthlyChallengeBitmask(year, month);
+            return (mask & (1 << (day - 1))) != 0;
         }
     }
 }

@@ -25,6 +25,11 @@ namespace Assets.Scripts.Core
         public event Action OnGameOver;
         public event Action OnLevelWon;
         public bool p_isLevelProgression = true;
+
+        public int currentChallengeYear;
+        public int currentChallengeMonth;
+        public int currentChallengeDay;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -47,7 +52,14 @@ namespace Assets.Scripts.Core
         {
             if (levelManager != null && !string.IsNullOrEmpty(levelManager.CurrentLevelId))
             {
-                StartLevel(levelManager.CurrentLevelId);
+                if (p_isLevelProgression)
+                {
+                    StartLevel(levelManager.CurrentLevelId);
+                }
+                else
+                {
+                    StartChallengeLevel(levelManager.CurrentLevelId, currentChallengeYear, currentChallengeMonth, currentChallengeDay);
+                }
             }
         }
 
@@ -68,12 +80,16 @@ namespace Assets.Scripts.Core
             OnLevelStarted?.Invoke();
         }
 
-        public void StartChallengeLevel(string levelId)
+        public void StartChallengeLevel(string levelId, int year, int month, int day)
         {
             ResetLives();
             HideScreens();
             
             p_isLevelProgression = false;
+            currentChallengeYear = year;
+            currentChallengeMonth = month;
+            currentChallengeDay = day;
+
             // Reset arrow count before loading new level
             activeArrowsCount = 0; 
 
@@ -117,7 +133,7 @@ namespace Assets.Scripts.Core
             }
             else
             {
-                //TODO save date format and mark as passed
+                UserDataManager.Instance.SaveMonthlyChallengeProgress(currentChallengeYear, currentChallengeMonth, currentChallengeDay);
             }
 
             if (levelManager != null)

@@ -8,6 +8,9 @@ using System;
 using UnityEditor.UI;
 using Assets.Scripts.Core;
 
+namespace Assets.Scripts.Lobby
+{
+
 
 
 public class MonthlyChallengeController : MonoBehaviour
@@ -73,7 +76,9 @@ public class MonthlyChallengeController : MonoBehaviour
         // 3. Get total days in the month
         int daysInMonth = DateTime.DaysInMonth(year, month);
 
-        p_CurrentDay = DateTime.Now.Day;
+        // Load progress
+        int passedCount = 0;
+
         // 4. Loop through all 35 slots
         for (int i = 0; i < dayImages.Length; i++)
         {
@@ -93,6 +98,12 @@ public class MonthlyChallengeController : MonoBehaviour
                     m_dayTexts[i].text = dateNumber.ToString();
                     dayImages[i].color = m_NormalColor;
                     m_dayTexts[i].color = m_NormalColorTxt;
+
+                    if (UserDataManager.Instance.IsDayCompleted(year, month, dateNumber))
+                    {
+                        MarkAsPassed(dayImages[i]);
+                        passedCount++;
+                    }
                 }
             }
             else
@@ -101,13 +112,18 @@ public class MonthlyChallengeController : MonoBehaviour
                 dayImages[i].gameObject.SetActive(false);
             }
         }
+
+        if (m_monthlyActualProgressText != null)
+        {
+            m_monthlyActualProgressText.text = passedCount.ToString();
+        }
         
         // Auto-select latest available day
         int latestDay = daysInMonth;
         if (month == DateTime.Now.Month && year == DateTime.Now.Year)
         {
             latestDay = DateTime.Now.Day;
-        }//TODO check if was completed already
+        }
         
         int targetIndex = latestDay + dayOffset - 1;
         MarkAsSelected(dayImages[targetIndex]);
@@ -171,8 +187,18 @@ public class MonthlyChallengeController : MonoBehaviour
 
    public void MarkAsPassed()
     {
-        m_SelectedDateBg.color = m_PassedColor;
-        m_SelectedDateTxt.color = m_PassedColorTxt;
-        m_SelectedDateBg.GetComponent<Button>().interactable = false;
+        MarkAsPassed(m_SelectedDateBg);
     }
+
+    public void MarkAsPassed(Image dateBg)
+    {
+        dateBg.color = m_PassedColor;
+        TextMeshProUGUI txt = dateBg.GetComponentInChildren<TextMeshProUGUI>();
+        if (txt != null)
+        {
+            txt.color = m_PassedColorTxt;
+        }
+        dateBg.GetComponent<Button>().interactable = false;
+    }
+}
 }
