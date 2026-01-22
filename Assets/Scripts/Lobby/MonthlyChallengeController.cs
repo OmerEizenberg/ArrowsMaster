@@ -33,7 +33,7 @@ public class MonthlyChallengeController : MonoBehaviour
     [SerializeField] private Button m_PrevMonthBtn;
 
     [SerializeField] private HomeContoller m_HomeController;
-    [SerializeField] private InputField m_monthlyProgress;
+    [SerializeField] private Slider m_monthlyProgress;
     [SerializeField] private TextMeshProUGUI m_monthlyProgressGoalTxt;
     [SerializeField] private TextMeshProUGUI m_monthlyActualProgressText;
 
@@ -116,6 +116,19 @@ public class MonthlyChallengeController : MonoBehaviour
         if (m_monthlyActualProgressText != null)
         {
             m_monthlyActualProgressText.text = passedCount.ToString();
+        }
+
+        if (m_monthlyProgressGoalTxt != null)
+        {
+            m_monthlyProgressGoalTxt.text = daysInMonth.ToString();
+            m_monthlyProgress.maxValue = daysInMonth;
+        }
+
+        if (m_monthlyActualProgressText != null)
+        {
+            // Update textual progress
+            m_monthlyActualProgressText.text = ""+passedCount;
+            m_monthlyProgress.value = passedCount;
         }
         
         // Auto-select latest available day

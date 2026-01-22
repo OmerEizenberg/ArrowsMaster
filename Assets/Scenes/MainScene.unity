@@ -8708,9 +8708,9 @@ MonoBehaviour:
   m_NextMonthBtn: {fileID: 1242218326}
   m_PrevMonthBtn: {fileID: 985538277}
   m_HomeController: {fileID: 28547073}
-  m_monthlyProgress: {fileID: 0}
-  m_monthlyProgressGoalTxt: {fileID: 0}
-  m_monthlyActualProgressText: {fileID: 0}
+  m_monthlyProgress: {fileID: 1924022534}
+  m_monthlyProgressGoalTxt: {fileID: 310149568}
+  m_monthlyActualProgressText: {fileID: 423059752}
   m_SelectedDateBg: {fileID: 1164294969}
   m_SelectedDateTxt: {fileID: 1615622516}
   p_CurrentDay: 1
