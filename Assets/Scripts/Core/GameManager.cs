@@ -46,6 +46,38 @@ namespace Assets.Scripts.Core
         private void Start()
         {
             CurrentLives = maxLives;
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.OnRewardGranted += HandleRewardGranted;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.OnRewardGranted -= HandleRewardGranted;
+            }
+        }
+
+        private void HandleRewardGranted()
+        {
+            // Give 3 lives back and hide failure screen
+            ResetLives();
+            HideFailureScreen();
+        }
+
+        public void PlayOn()
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowRewarded();
+            }
+            else
+            {
+                // Fallback if no AdsManager
+                HandleRewardGranted();
+            }
         }
 
         public void RestartCurrentLevel()
