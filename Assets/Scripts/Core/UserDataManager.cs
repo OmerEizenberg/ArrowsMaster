@@ -27,6 +27,8 @@ namespace Assets.Scripts.Core
         public int CurrentLevel { get; private set; } = 1;
         public System.DateTime InstallDate { get; private set; }
 
+        private Dictionary<string, int> m_MonthlyCache = new Dictionary<string, int>();
+
         private UserDataManager()
         {
             LoadData();
@@ -93,13 +95,14 @@ namespace Assets.Scripts.Core
         public void SaveMonthlyChallengeProgress(int year, int month, int day)
         {
             string key = GetMonthlyKey(year, month);
-            int currentMask = PlayerPrefs.GetInt(key, 0);
+            int currentMask = GetMonthlyChallengeBitmask(year, month);
             
             // Set the bit corresponding to the day (day 1 is bit 0)
             int newMask = currentMask | (1 << (day - 1));
             
             if (newMask != currentMask)
             {
+                m_MonthlyCache[key] = newMask;
                 PlayerPrefs.SetInt(key, newMask);
                 PlayerPrefs.Save();
             }
@@ -107,7 +110,15 @@ namespace Assets.Scripts.Core
 
         public int GetMonthlyChallengeBitmask(int year, int month)
         {
-            return PlayerPrefs.GetInt(GetMonthlyKey(year, month), 0);
+            string key = GetMonthlyKey(year, month);
+            if (m_MonthlyCache.ContainsKey(key))
+            {
+                return m_MonthlyCache[key];
+            }
+
+            int mask = PlayerPrefs.GetInt(key, 0);
+            m_MonthlyCache[key] = mask;
+            return mask;
         }
 
         public bool IsDayCompleted(int year, int month, int day)
