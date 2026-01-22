@@ -81,10 +81,9 @@ namespace Assets.Scripts.Core
             }
         }
 
-        private void HandleRewardReceived(bool isHint)
+        private void HandleRewardReceived()
         {
-            Debug.Log($"[GameManager] Reward received. IsHint: {isHint}");
-            if (isHint || p_isHintRewarded)
+            if (p_isHintRewarded)
             {
                 Debug.Log("[GameManager] Hint Reward Received! Triggering show hint...");
                 ShowHint();
@@ -150,7 +149,7 @@ namespace Assets.Scripts.Core
             else
             {
                 // Fallback if no AdsManager
-                HandleRewardReceived(false);
+                HandleRewardReceived();
             }
         }
 

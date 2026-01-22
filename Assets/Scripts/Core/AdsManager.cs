@@ -16,7 +16,7 @@ namespace Assets.Scripts.Core
         public enum AdRewardType { None, PlayOn, Hint }
         public AdRewardType m_CurrentRequestType = AdRewardType.PlayOn;
         
-        public event Action<bool> OnRewardReceived;
+        public event Action OnRewardReceived;
 
         private string AppKey
         {
@@ -196,12 +196,17 @@ namespace Assets.Scripts.Core
                 Debug.LogError($"[AdsManager] PlayOn Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
                 LoadPlayOnRewarded(); 
             };
+
+            if(m_CurrentRequestType == AdRewardType.Hint)
+            {
+                CreateHintRewardedAd();
+            }
             playOnRewardedAd.OnAdRewarded += (info, reward) => {
                 Debug.Log($"[AdsManager] PlayOn Ad Rewarded Event Received. Current request: {m_CurrentRequestType}");
                 if (m_CurrentRequestType == AdRewardType.PlayOn)
                 {
                     Debug.Log("[AdsManager] Granting PlayOn reward event.");
-                    OnRewardReceived?.Invoke(false); // false = PlayOn
+                    OnRewardReceived?.Invoke();
                 }
             };
             LoadPlayOnRewarded();
@@ -240,12 +245,16 @@ namespace Assets.Scripts.Core
                 Debug.LogError($"[AdsManager] Hint Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
                 LoadHintRewarded(); 
             };
+            if(m_CurrentRequestType == AdRewardType.PlayOn)
+            {
+                CreatePlayOnRewardedAd();
+            }
             hintRewardedAd.OnAdRewarded += (info, reward) => {
                 Debug.Log($"[AdsManager] Hint Ad Rewarded Event Received. Current request: {m_CurrentRequestType}");
                 if (m_CurrentRequestType == AdRewardType.Hint)
                 {
                     Debug.Log("[AdsManager] Granting Hint reward event.");
-                    OnRewardReceived?.Invoke(true); // true = Hint
+                    OnRewardReceived?.Invoke(); 
                 }
             };
             LoadHintRewarded();
