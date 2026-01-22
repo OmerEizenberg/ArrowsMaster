@@ -30,6 +30,10 @@ public class HomeContoller : MonoBehaviour
     {
         RefreshLobbyUI();
         UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
+        if(!GameManager.Instance.p_isLevelProgression)
+        {
+            OnCalanderButtonClicked();
+        }
     }
 
     private void OnDisable()

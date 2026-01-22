@@ -30,6 +30,9 @@ public class MonthlyChallengeController : MonoBehaviour
     [SerializeField] private Button m_PrevMonthBtn;
 
     [SerializeField] private HomeContoller m_HomeController;
+    [SerializeField] private InputField m_monthlyProgress;
+    [SerializeField] private TextMeshProUGUI m_monthlyProgressGoalTxt;
+    [SerializeField] private TextMeshProUGUI m_monthlyActualProgressText;
 
     public Image m_SelectedDateBg;
     public TextMeshProUGUI m_SelectedDateTxt;

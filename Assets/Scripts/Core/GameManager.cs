@@ -24,7 +24,7 @@ namespace Assets.Scripts.Core
         public event Action OnLevelStarted;
         public event Action OnGameOver;
         public event Action OnLevelWon;
-
+        public bool p_isLevelProgression = true;
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -56,6 +56,7 @@ namespace Assets.Scripts.Core
             ResetLives();
             HideScreens();
             
+            p_isLevelProgression = true;
             // Reset arrow count before loading new level
             activeArrowsCount = 0; 
 
@@ -72,6 +73,7 @@ namespace Assets.Scripts.Core
             ResetLives();
             HideScreens();
             
+            p_isLevelProgression = false;
             // Reset arrow count before loading new level
             activeArrowsCount = 0; 
 
@@ -109,7 +111,14 @@ namespace Assets.Scripts.Core
         private System.Collections.IEnumerator WinSequence()
         {
             Debug.Log("Level Complete! Waiting for win screen...");
-            UserDataManager.Instance.IncrementLevel();
+            if(p_isLevelProgression)
+            {
+                UserDataManager.Instance.IncrementLevel();
+            }
+            else
+            {
+                //TODO save date format and mark as passed
+            }
 
             if (levelManager != null)
             {
