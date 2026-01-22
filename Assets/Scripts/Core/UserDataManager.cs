@@ -92,6 +92,8 @@ namespace Assets.Scripts.Core
             return $"MonthlyChallenge_{year}_{month}";
         }
 
+        public event System.Action OnMonthlyProgressChanged;
+
         public void SaveMonthlyChallengeProgress(int year, int month, int day)
         {
             string key = GetMonthlyKey(year, month);
@@ -105,6 +107,7 @@ namespace Assets.Scripts.Core
                 m_MonthlyCache[key] = newMask;
                 PlayerPrefs.SetInt(key, newMask);
                 PlayerPrefs.Save();
+                OnMonthlyProgressChanged?.Invoke();
             }
         }
 

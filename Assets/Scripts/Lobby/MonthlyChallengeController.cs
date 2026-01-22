@@ -5,7 +5,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
-using UnityEditor.UI;
 using Assets.Scripts.Core;
 
 namespace Assets.Scripts.Lobby
@@ -46,18 +45,37 @@ public class MonthlyChallengeController : MonoBehaviour
 
     private void OnEnable()
     {
-        m_NormalColor.a = 256f;
-        m_PassedColor.a = 256f;
-        m_SelectedDateColor.a = 256f;
-        m_NormalColorTxt.a = 256f;
-        m_PassedColorTxt.a = 256f;
-        m_SelectedDateTxtColor.a = 256f;
+        m_NormalColor.a = 1f;
+        m_PassedColor.a = 1f;
+        m_SelectedDateColor.a = 1f;
+        m_NormalColorTxt.a = 1f;
+        m_PassedColorTxt.a = 1f;
+        m_SelectedDateTxtColor.a = 1f;
 
         // Automatically initialize to the current month and year
         p_CurrentMonth = DateTime.Now.Month;
         p_CurrentYear = DateTime.Now.Year;
         p_CurrentDay = DateTime.Now.Day;
         
+        Init(p_CurrentMonth, p_CurrentYear);
+
+        if (UserDataManager.Instance != null)
+        {
+            UserDataManager.Instance.OnMonthlyProgressChanged += HandleMonthlyProgressChanged;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (UserDataManager.Instance != null)
+        {
+            UserDataManager.Instance.OnMonthlyProgressChanged -= HandleMonthlyProgressChanged;
+        }
+    }
+
+    private void HandleMonthlyProgressChanged()
+    {
+        // Re-initialize with current view parameters to show updated status
         Init(p_CurrentMonth, p_CurrentYear);
     }
 
@@ -211,8 +229,25 @@ public class MonthlyChallengeController : MonoBehaviour
     {
         if (m_SelectedDateBg != null)
         {
-            m_SelectedDateBg.color = m_NormalColor;
-            if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_NormalColorTxt;
+            // Determine if the day we're unselecting was already passed
+            bool wasPassed = false;
+            if (m_SelectedDateTxt != null && int.TryParse(m_SelectedDateTxt.text, out int dayNum))
+            {
+                wasPassed = UserDataManager.Instance.IsDayCompleted(p_CurrentYear, p_CurrentMonth, dayNum);
+            }
+
+            if (wasPassed)
+            {
+                m_SelectedDateBg.color = m_PassedColor;
+                if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_PassedColorTxt;
+                m_SelectedDateBg.GetComponent<Button>().interactable = false;
+            }
+            else
+            {
+                m_SelectedDateBg.color = m_NormalColor;
+                if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_NormalColorTxt;
+                m_SelectedDateBg.GetComponent<Button>().interactable = true;
+            }
         }
         m_SelectedDateBg = null;
         m_SelectedDateTxt = null;

@@ -13,6 +13,7 @@ namespace Assets.Scripts.Core
 
         private List<GameObject> currentLevelObjects = new List<GameObject>();
         private List<SpriteRenderer> m_BackgroundCircles = new List<SpriteRenderer>();
+        public event System.Action OnEntranceAnimationFinished;
         public string CurrentLevelId => currentLevelId;
         private string currentLevelId;
         private HashSet<Vector2Int> m_SpawnedCirclePositions = new HashSet<Vector2Int>();
@@ -164,10 +165,11 @@ namespace Assets.Scripts.Core
 
                         m_SpawnedCirclePositions.Add(pos);
                         currentLevelObjects.Add(circleObj);
-                        m_BackgroundCircles.Add(sr);
                     }
                 }
             }
+
+            OnEntranceAnimationFinished?.Invoke();
         }
         public void RestartLevel()
         {

@@ -10,6 +10,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_GameUI;
     [SerializeField] private LevelManager m_LevelManager;
     [SerializeField] private Image[] m_Hearts;
+    [SerializeField] private GameObject m_HintButton;
     
     private readonly Color activeColor = Color.white; // #FFFFFF
     private readonly Color inactiveColor = new Color(0.616f, 0.616f, 0.616f, 0.5f); // #9D9D9D with 128 alpha (0.5f)
@@ -19,7 +20,9 @@ public class GameUIContoleer : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnLivesChanged += UpdateLivesUI;
+            GameManager.Instance.OnHintVisibilityChanged += ToggleHintButton;
             UpdateLivesUI(GameManager.Instance.CurrentLives);
+            ToggleHintButton(false); // Hide by default
         }
     }
 
@@ -28,6 +31,7 @@ public class GameUIContoleer : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnLivesChanged -= UpdateLivesUI;
+            GameManager.Instance.OnHintVisibilityChanged -= ToggleHintButton;
         }
     }
 
@@ -66,5 +70,21 @@ public class GameUIContoleer : MonoBehaviour
         
         m_LobbyUI.SetActive(true);
         m_GameUI.SetActive(false);
+    }
+
+    private void ToggleHintButton(bool visible)
+    {
+        if (m_HintButton != null)
+        {
+            m_HintButton.SetActive(visible);
+        }
+    }
+
+    public void OnHintButtonClicked()
+    {
+        if (AdsManager.Instance != null)
+        {
+            AdsManager.Instance.ShowHintRewarded();
+        }
     }
 }

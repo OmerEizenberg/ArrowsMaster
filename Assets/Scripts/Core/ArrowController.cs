@@ -190,6 +190,7 @@ namespace Assets.Scripts.Core
             if (segments.Contains(clickedSegment))
             {
                 SoundManager.Instance.PlayArrowSelect();
+                GameManager.Instance.ResetHintTimer();
 
                 if (!isMoving)
                 {
@@ -328,7 +329,7 @@ namespace Assets.Scripts.Core
             }
         }
 
-        private bool CanMoveForward()
+        public bool CanMoveForward()
         {
             if (segments.Count == 0) return false;
             

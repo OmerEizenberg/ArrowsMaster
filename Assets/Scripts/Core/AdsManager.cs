@@ -9,10 +9,12 @@ namespace Assets.Scripts.Core
         public static AdsManager Instance { get; private set; }
 
         private LevelPlayInterstitialAd interstitialAd;
-        private LevelPlayRewardedAd rewardedAd;
+        private LevelPlayRewardedAd playOnRewardedAd;
+        private LevelPlayRewardedAd hintRewardedAd;
         private bool isInitialized = false;
         
-        public event Action OnRewardGranted;
+        public event Action OnPlayOnRewardGranted;
+        public event Action OnHintRewardGranted;
 
         private string AppKey
         {
@@ -50,6 +52,20 @@ namespace Assets.Scripts.Core
                 return "if9z8hp6gm6ukwvh"; // play_on_rewarded
 #elif UNITY_IPHONE
                 return "if9z8hp6gm6ukwvh"; // play_on_rewarded
+#else
+                return "unexpected_platform";
+#endif
+            }
+        }
+
+        private string HintAdUnitId
+        {
+            get
+            {
+#if UNITY_ANDROID
+                return "yawx693hhwww7my2"; // hint_rewarded
+#elif UNITY_IPHONE
+                return "yawx693hhwww7my2"; // hint_rewarded
 #else
                 return "unexpected_platform";
 #endif
@@ -96,7 +112,8 @@ namespace Assets.Scripts.Core
             Debug.Log("[AdsManager] LevelPlay SDK Initialized Successfully.");
             isInitialized = true;
             CreateInterstitialAd();
-            CreateRewardedAd();
+            CreatePlayOnRewardedAd();
+            CreateHintRewardedAd();
         }
 
         private void OnSdkInitFailed(LevelPlayInitError error)
@@ -164,83 +181,57 @@ namespace Assets.Scripts.Core
             LoadInterstitial();
         }
 
-        private void CreateRewardedAd()
+        // --- PlayOn Rewarded Ad ---
+        private void CreatePlayOnRewardedAd()
         {
-            if (rewardedAd != null)
-            {
-                rewardedAd.DestroyAd();
-            }
-
-            rewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
-            
-            rewardedAd.OnAdLoaded += OnRewardedLoaded;
-            rewardedAd.OnAdLoadFailed += OnRewardedLoadFailed;
-            rewardedAd.OnAdClosed += OnRewardedClosed;
-            rewardedAd.OnAdDisplayFailed += OnRewardedDisplayFailed;
-            rewardedAd.OnAdRewarded += OnRewardedAdRewarded;
-
-            LoadRewarded();
+            if (playOnRewardedAd != null) playOnRewardedAd.DestroyAd();
+            playOnRewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
+            playOnRewardedAd.OnAdClosed += (info) => LoadPlayOnRewarded();
+            playOnRewardedAd.OnAdDisplayFailed += (info, err) => LoadPlayOnRewarded();
+            playOnRewardedAd.OnAdRewarded += (info, reward) => OnPlayOnRewardGranted?.Invoke();
+            LoadPlayOnRewarded();
         }
 
-        public void LoadRewarded()
+        public void LoadPlayOnRewarded()
         {
             if (!isInitialized) return;
-            Debug.Log("[AdsManager] Loading Rewarded Ad...");
-            rewardedAd.LoadAd();
+            playOnRewardedAd.LoadAd();
         }
 
-        public void ShowRewarded()
+        public void ShowPlayOnRewarded()
         {
-            if (rewardedAd != null && rewardedAd.IsAdReady())
-            {
-                Debug.Log("[AdsManager] Showing Rewarded Ad.");
-                rewardedAd.ShowAd();
-            }
-            else
-            {
-                Debug.Log("[AdsManager] Rewarded Ad is not ready. Loading one now.");
-                LoadRewarded();
-            }
+            if (playOnRewardedAd != null && playOnRewardedAd.IsAdReady()) playOnRewardedAd.ShowAd();
+            else LoadPlayOnRewarded();
         }
 
-        private void OnRewardedLoaded(LevelPlayAdInfo adInfo)
+        // --- Hint Rewarded Ad ---
+        private void CreateHintRewardedAd()
         {
-            Debug.Log($"[AdsManager] Rewarded Ad Loaded: {adInfo}");
+            if (hintRewardedAd != null) hintRewardedAd.DestroyAd();
+            hintRewardedAd = new LevelPlayRewardedAd(HintAdUnitId);
+            hintRewardedAd.OnAdClosed += (info) => LoadHintRewarded();
+            hintRewardedAd.OnAdDisplayFailed += (info, err) => LoadHintRewarded();
+            hintRewardedAd.OnAdRewarded += (info, reward) => OnHintRewardGranted?.Invoke();
+            LoadHintRewarded();
         }
 
-        private void OnRewardedLoadFailed(LevelPlayAdError error)
+        public void LoadHintRewarded()
         {
-            Debug.LogWarning($"[AdsManager] Rewarded Ad Load Failed: {error}");
+            if (!isInitialized) return;
+            hintRewardedAd.LoadAd();
         }
 
-        private void OnRewardedClosed(LevelPlayAdInfo adInfo)
+        public void ShowHintRewarded()
         {
-            Debug.Log("[AdsManager] Rewarded Ad Closed. Loading next one.");
-            LoadRewarded();
-        }
-
-        private void OnRewardedDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
-        {
-            Debug.LogError($"[AdsManager] Rewarded Ad Display Failed: {error}");
-            LoadRewarded();
-        }
-
-        private void OnRewardedAdRewarded(LevelPlayAdInfo adInfo, LevelPlayReward reward)
-        {
-            Debug.Log("[AdsManager] Reward Granted!");
-            OnRewardGranted?.Invoke();
+            if (hintRewardedAd != null && hintRewardedAd.IsAdReady()) hintRewardedAd.ShowAd();
+            else LoadHintRewarded();
         }
 
         private void OnDestroy()
         {
-            if (interstitialAd != null)
-            {
-                interstitialAd.DestroyAd();
-            }
-            if (rewardedAd != null)
-            {
-                rewardedAd.DestroyAd();
-            }
+            if (interstitialAd != null) interstitialAd.DestroyAd();
+            if (playOnRewardedAd != null) playOnRewardedAd.DestroyAd();
+            if (hintRewardedAd != null) hintRewardedAd.DestroyAd();
         }
     }
 }

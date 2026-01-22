@@ -24,11 +24,17 @@ namespace Assets.Scripts.Core
         public event Action OnLevelStarted;
         public event Action OnGameOver;
         public event Action OnLevelWon;
+        public event Action<bool> OnHintVisibilityChanged;
         public bool p_isLevelProgression = true;
 
         public int currentChallengeYear;
         public int currentChallengeMonth;
         public int currentChallengeDay;
+
+        private float hintTimer = 0f;
+        private bool isEntranceFinished = false;
+        private bool isHintVisible = false;
+        private bool isWinning = false;
 
         private void Awake()
         {
@@ -48,7 +54,16 @@ namespace Assets.Scripts.Core
             CurrentLives = maxLives;
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.OnRewardGranted += HandleRewardGranted;
+                AdsManager.Instance.OnPlayOnRewardGranted += HandlePlayOnRewardGranted;
+                AdsManager.Instance.OnHintRewardGranted += HandleHintRewardGranted;
+            }
+
+            if (levelManager != null)
+            {
+                levelManager.OnEntranceAnimationFinished += () => {
+                    isEntranceFinished = true;
+                    ResetHintTimer();
+                };
             }
         }
 
@@ -56,15 +71,57 @@ namespace Assets.Scripts.Core
         {
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.OnRewardGranted -= HandleRewardGranted;
+                AdsManager.Instance.OnPlayOnRewardGranted -= HandlePlayOnRewardGranted;
+                AdsManager.Instance.OnHintRewardGranted -= HandleHintRewardGranted;
             }
         }
 
-        private void HandleRewardGranted()
+        private void HandlePlayOnRewardGranted()
         {
             // Give 3 lives back and hide failure screen
             ResetLives();
             HideFailureScreen();
+        }
+
+        private void HandleHintRewardGranted()
+        {
+            Debug.Log("Hint Reward Granted! Showing hint...");
+            // Trigger actual hint mechanism here
+            ShowHint();
+        }
+
+        private void ShowHint()
+        {
+            // Logic to show a hint: find an arrow that can actually be picked
+            ArrowController[] arrows = GameObject.FindObjectsOfType<ArrowController>();
+            ArrowController bestArrow = null;
+
+            foreach (var arrow in arrows)
+            {
+                if (arrow != null && arrow.gameObject.activeInHierarchy && arrow.CanMoveForward())
+                {
+                    bestArrow = arrow;
+                    break;
+                }
+            }
+
+            // Fallback to any arrow if none are "clear" (though there should be one)
+            if (bestArrow == null && arrows.Length > 0) bestArrow = arrows[0];
+
+            if (bestArrow != null)
+            {
+                // 1. Pan Camera to the head of the pickable arrow
+                if (CameraController.Instance != null)
+                {
+                    CameraController.Instance.FocusOn(bestArrow.GetHeadPosition(), 0.5f);
+                }
+
+                // 2. Flash trajectory preview
+                bestArrow.ShowPreview();
+                bestArrow.Invoke("HidePreview", 3.0f);
+            }
+
+            ResetHintTimer();
         }
 
         public void PlayOn()
@@ -115,6 +172,9 @@ namespace Assets.Scripts.Core
             }
 
             OnLevelStarted?.Invoke();
+            isEntranceFinished = false;
+            isWinning = false;
+            ResetHintTimer();
         }
 
         public void StartChallengeLevel(string levelId, int year, int month, int day)
@@ -136,6 +196,9 @@ namespace Assets.Scripts.Core
             }
 
             OnLevelStarted?.Invoke();
+            isEntranceFinished = false;
+            isWinning = false;
+            ResetHintTimer();
         }
 
         private void ResetLives()
@@ -156,6 +219,8 @@ namespace Assets.Scripts.Core
                 activeArrowsCount--;
                 if (activeArrowsCount == 0)
                 {
+                    isWinning = true;
+                    SetHintVisibility(false);
                     StartCoroutine(WinSequence());
                 }
             }
@@ -244,6 +309,30 @@ namespace Assets.Scripts.Core
             {
                 failureScreen.SetActive(false);
             }
+        }
+
+        private void Update()
+        {
+            if (isEntranceFinished && !isWinning && !isHintVisible)
+            {
+                hintTimer += Time.deltaTime;
+                if (hintTimer >= 5.0f)
+                {
+                    SetHintVisibility(true);
+                }
+            }
+        }
+
+        public void ResetHintTimer()
+        {
+            hintTimer = 0f;
+            SetHintVisibility(false);
+        }
+
+        private void SetHintVisibility(bool visible)
+        {
+            isHintVisible = visible;
+            OnHintVisibilityChanged?.Invoke(visible);
         }
     }
 }
