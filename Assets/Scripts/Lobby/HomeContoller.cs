@@ -12,7 +12,8 @@ public class HomeContoller : MonoBehaviour
     [SerializeField] private GameObject m_GameUI;
 
 
-    [SerializeField] private GameObject m_SettingsPopup;
+    [SerializeField] private GameObject m_CalanderLayer;
+    [SerializeField] private GameObject m_SettingsLayer;
 
     [SerializeField] private TextMeshProUGUI m_TitleText;
     [SerializeField] private TextMeshProUGUI m_LevelText;
@@ -50,11 +51,45 @@ public class HomeContoller : MonoBehaviour
     {
         SoundManager.Instance.PlayClick();
 
-        if(m_SettingsPopup.activeInHierarchy)
+        if(m_SettingsLayer.activeInHierarchy)
         {
-            m_SettingsPopup.SetActive(false);
+            m_SettingsLayer.SetActive(false);
         }else{
-            m_SettingsPopup.SetActive(true);
+            m_SettingsLayer.SetActive(true);
+            m_CalanderLayer.SetActive(false);
+        }
+    }
+    public void OnCalanderButtonClicked()
+    {
+        SoundManager.Instance.PlayClick();
+
+        if(m_CalanderLayer.activeInHierarchy)
+        {
+            m_CalanderLayer.SetActive(false);
+        }else{
+            m_SettingsLayer.SetActive(false);
+            m_CalanderLayer.SetActive(true);
+        }
+    }
+    public void OnHomeButtonClicked()
+    {
+        SoundManager.Instance.PlayClick();
+
+        m_SettingsLayer.SetActive(false);
+        m_CalanderLayer.SetActive(false);
+    }
+
+    public void OnShopButtonClicked()
+    {
+        SoundManager.Instance.PlayClick();
+       
+        if(m_CalanderLayer.activeInHierarchy)
+        { //TODO change to shop
+            m_CalanderLayer.SetActive(false);
+        }else{
+            m_SettingsLayer.SetActive(false);
+            m_CalanderLayer.SetActive(false);
+            //TODO Add shop layer
         }
     }
 
