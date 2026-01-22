@@ -12,9 +12,11 @@ namespace Assets.Scripts.Core
         private LevelPlayRewardedAd playOnRewardedAd;
         private LevelPlayRewardedAd hintRewardedAd;
         private bool isInitialized = false;
+
+        public enum AdRewardType { None, PlayOn, Hint }
+        public AdRewardType m_CurrentRequestType = AdRewardType.None;
         
-        public event Action OnPlayOnRewardGranted;
-        public event Action OnHintRewardGranted;
+        public event Action<bool> OnRewardReceived;
 
         private string AppKey
         {
@@ -48,7 +50,7 @@ namespace Assets.Scripts.Core
         {
             get
             {
-#if UNITY_ANDROID
+#if UNITY_ANDROID || UNITY_EDITOR
                 return "if9z8hp6gm6ukwvh"; // play_on_rewarded
 #elif UNITY_IPHONE
                 return "if9z8hp6gm6ukwvh"; // play_on_rewarded
@@ -62,7 +64,7 @@ namespace Assets.Scripts.Core
         {
             get
             {
-#if UNITY_ANDROID
+#if UNITY_ANDROID || UNITY_EDITOR
                 return "yawx693hhwww7my2"; // hint_rewarded
 #elif UNITY_IPHONE
                 return "yawx693hhwww7my2"; // hint_rewarded
@@ -186,9 +188,24 @@ namespace Assets.Scripts.Core
         {
             if (playOnRewardedAd != null) playOnRewardedAd.DestroyAd();
             playOnRewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
-            playOnRewardedAd.OnAdClosed += (info) => LoadPlayOnRewarded();
-            playOnRewardedAd.OnAdDisplayFailed += (info, err) => LoadPlayOnRewarded();
-            playOnRewardedAd.OnAdRewarded += (info, reward) => OnPlayOnRewardGranted?.Invoke();
+            playOnRewardedAd.OnAdClosed += (info) => { 
+                Debug.Log($"[AdsManager] PlayOn Ad Closed. Request type was: {m_CurrentRequestType}");
+                m_CurrentRequestType = AdRewardType.None; 
+                LoadPlayOnRewarded(); 
+            };
+            playOnRewardedAd.OnAdDisplayFailed += (info, err) => { 
+                Debug.LogError($"[AdsManager] PlayOn Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
+                m_CurrentRequestType = AdRewardType.None; 
+                LoadPlayOnRewarded(); 
+            };
+            playOnRewardedAd.OnAdRewarded += (info, reward) => {
+                Debug.Log($"[AdsManager] PlayOn Ad Rewarded Event Received. Current request: {m_CurrentRequestType}");
+                if (m_CurrentRequestType == AdRewardType.PlayOn)
+                {
+                    Debug.Log("[AdsManager] Granting PlayOn reward event.");
+                    OnRewardReceived?.Invoke(false); // false = PlayOn
+                }
+            };
             LoadPlayOnRewarded();
         }
 
@@ -200,8 +217,16 @@ namespace Assets.Scripts.Core
 
         public void ShowPlayOnRewarded()
         {
-            if (playOnRewardedAd != null && playOnRewardedAd.IsAdReady()) playOnRewardedAd.ShowAd();
-            else LoadPlayOnRewarded();
+            if (playOnRewardedAd != null && playOnRewardedAd.IsAdReady())
+            {
+                m_CurrentRequestType = AdRewardType.PlayOn;
+                playOnRewardedAd.ShowAd();
+            }
+            else 
+            {
+                Debug.LogWarning("[AdsManager] PlayOn Ad is not ready yet. Loading one now.");
+                LoadPlayOnRewarded();
+            }
         }
 
         // --- Hint Rewarded Ad ---
@@ -209,9 +234,24 @@ namespace Assets.Scripts.Core
         {
             if (hintRewardedAd != null) hintRewardedAd.DestroyAd();
             hintRewardedAd = new LevelPlayRewardedAd(HintAdUnitId);
-            hintRewardedAd.OnAdClosed += (info) => LoadHintRewarded();
-            hintRewardedAd.OnAdDisplayFailed += (info, err) => LoadHintRewarded();
-            hintRewardedAd.OnAdRewarded += (info, reward) => OnHintRewardGranted?.Invoke();
+            hintRewardedAd.OnAdClosed += (info) => { 
+                Debug.Log($"[AdsManager] Hint Ad Closed. Request type was: {m_CurrentRequestType}");
+                m_CurrentRequestType = AdRewardType.None; 
+                LoadHintRewarded(); 
+            };
+            hintRewardedAd.OnAdDisplayFailed += (info, err) => { 
+                Debug.LogError($"[AdsManager] Hint Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
+                m_CurrentRequestType = AdRewardType.None; 
+                LoadHintRewarded(); 
+            };
+            hintRewardedAd.OnAdRewarded += (info, reward) => {
+                Debug.Log($"[AdsManager] Hint Ad Rewarded Event Received. Current request: {m_CurrentRequestType}");
+                if (m_CurrentRequestType == AdRewardType.Hint)
+                {
+                    Debug.Log("[AdsManager] Granting Hint reward event.");
+                    OnRewardReceived?.Invoke(true); // true = Hint
+                }
+            };
             LoadHintRewarded();
         }
 
@@ -223,8 +263,16 @@ namespace Assets.Scripts.Core
 
         public void ShowHintRewarded()
         {
-            if (hintRewardedAd != null && hintRewardedAd.IsAdReady()) hintRewardedAd.ShowAd();
-            else LoadHintRewarded();
+            if (hintRewardedAd != null && hintRewardedAd.IsAdReady())
+            {
+                m_CurrentRequestType = AdRewardType.Hint;
+                hintRewardedAd.ShowAd();
+            }
+            else 
+            {
+                Debug.LogWarning("[AdsManager] Hint Ad is not ready yet. Loading one now.");
+                LoadHintRewarded();
+            }
         }
 
         private void OnDestroy()

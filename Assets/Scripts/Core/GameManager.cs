@@ -35,6 +35,13 @@ namespace Assets.Scripts.Core
         private bool isEntranceFinished = false;
         private bool isHintVisible = false;
         private bool isWinning = false;
+        private bool isHintActive = false;
+
+        public bool p_isPlayOnRewarded = false;
+        public bool p_isHintRewarded = false;
+
+        public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && 
+                                (failureScreen == null || !failureScreen.activeInHierarchy);
 
         private void Awake()
         {
@@ -54,8 +61,7 @@ namespace Assets.Scripts.Core
             CurrentLives = maxLives;
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.OnPlayOnRewardGranted += HandlePlayOnRewardGranted;
-                AdsManager.Instance.OnHintRewardGranted += HandleHintRewardGranted;
+                AdsManager.Instance.OnRewardReceived += HandleRewardReceived;
             }
 
             if (levelManager != null)
@@ -71,23 +77,28 @@ namespace Assets.Scripts.Core
         {
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.OnPlayOnRewardGranted -= HandlePlayOnRewardGranted;
-                AdsManager.Instance.OnHintRewardGranted -= HandleHintRewardGranted;
+                AdsManager.Instance.OnRewardReceived -= HandleRewardReceived;
             }
         }
 
-        private void HandlePlayOnRewardGranted()
+        private void HandleRewardReceived(bool isHint)
         {
-            // Give 3 lives back and hide failure screen
-            ResetLives();
-            HideFailureScreen();
-        }
-
-        private void HandleHintRewardGranted()
-        {
-            Debug.Log("Hint Reward Granted! Showing hint...");
-            // Trigger actual hint mechanism here
-            ShowHint();
+            Debug.Log($"[GameManager] Reward received. IsHint: {isHint}");
+            if (isHint || p_isHintRewarded)
+            {
+                Debug.Log("[GameManager] Hint Reward Received! Triggering show hint...");
+                ShowHint();
+            }
+            else
+            {
+                if(p_isPlayOnRewarded)
+                {
+                    Debug.Log("[GameManager] PlayOn Reward Received! Refilling lives and hiding failure screen.");
+                    ResetLives();
+                    HideFailureScreen();
+                    ResetHintTimer();
+                }
+            }
         }
 
         private void ShowHint()
@@ -117,8 +128,10 @@ namespace Assets.Scripts.Core
                 }
 
                 // 2. Flash trajectory preview
+                isHintActive = true;
                 bestArrow.ShowPreview();
-                bestArrow.Invoke("HidePreview", 3.0f);
+                // We'll reset hint active state via a delayed call or coroutine
+                StartCoroutine(ClearHintActive(3.0f, bestArrow));
             }
 
             ResetHintTimer();
@@ -126,6 +139,10 @@ namespace Assets.Scripts.Core
 
         public void PlayOn()
         {
+            p_isPlayOnRewarded = true;
+            p_isHintRewarded = false;
+            AdsManager.Instance.m_CurrentRequestType = AdsManager.AdRewardType.PlayOn;
+            Debug.Log("[GameManager] PlayOn method called.");
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.ShowPlayOnRewarded();
@@ -133,7 +150,7 @@ namespace Assets.Scripts.Core
             else
             {
                 // Fallback if no AdsManager
-                HandlePlayOnRewardGranted();
+                HandleRewardReceived(false);
             }
         }
 
@@ -333,6 +350,13 @@ namespace Assets.Scripts.Core
         {
             isHintVisible = visible;
             OnHintVisibilityChanged?.Invoke(visible);
+        }
+
+        private System.Collections.IEnumerator ClearHintActive(float delay, ArrowController arrow)
+        {
+            yield return new WaitForSeconds(delay);
+            if (arrow != null) arrow.HidePreview();
+            isHintActive = false;
         }
     }
 }

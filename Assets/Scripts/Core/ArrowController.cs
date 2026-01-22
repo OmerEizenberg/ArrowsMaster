@@ -189,6 +189,8 @@ namespace Assets.Scripts.Core
 
         public void OnArrowClicked(Segment clickedSegment)
         {
+            if (GameManager.Instance != null && !GameManager.Instance.CanInteract) return;
+
             // Allow clicking ANY segment
             if (segments.Contains(clickedSegment))
             {
