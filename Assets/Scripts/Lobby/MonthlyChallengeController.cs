@@ -6,6 +6,8 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using UnityEditor.UI;
+using Assets.Scripts.Core;
+
 
 
 public class MonthlyChallengeController : MonoBehaviour
@@ -24,6 +26,8 @@ public class MonthlyChallengeController : MonoBehaviour
     [Tooltip("Assign all 35 day text components here")]
     [SerializeField] private TextMeshProUGUI[] m_dayTexts;
     [SerializeField] private TextMeshProUGUI m_challengeMonthTitle;
+    [SerializeField] private Button m_NextMonthBtn;
+    [SerializeField] private Button m_PrevMonthBtn;
 
     [SerializeField] private HomeContoller m_HomeController;
 
@@ -44,7 +48,11 @@ public class MonthlyChallengeController : MonoBehaviour
         m_SelectedDateTxtColor.a = 256f;
 
         // Automatically initialize to the current month and year
-        Init(DateTime.Now.Month, DateTime.Now.Year);
+        p_CurrentMonth = DateTime.Now.Month;
+        p_CurrentYear = DateTime.Now.Year;
+        p_CurrentDay = DateTime.Now.Day;
+        
+        Init(p_CurrentMonth, p_CurrentYear);
     }
 
     public void Init(int month, int year)
@@ -52,8 +60,6 @@ public class MonthlyChallengeController : MonoBehaviour
         // 1. Get the first day of the month
         DateTime firstDayOfMonth = new DateTime(year, month, 1);
         m_challengeMonthTitle.text = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month) + " "+year;
-        p_CurrentDay = DateTime.Now.Day;
-        //TODO Search for latest none passed day
         p_CurrentYear = year;
         p_CurrentMonth = month;
         // 2. Calculate the starting offset
@@ -75,6 +81,7 @@ public class MonthlyChallengeController : MonoBehaviour
                 // Active day
                 dayImages[i].GetComponent<Button>().interactable = true;
                 dayImages[i].gameObject.SetActive(true);
+                if(m_dayTexts[i] == null) m_dayTexts[i] = dayImages[i].transform.GetChild(0).GetComponent<TextMeshProUGUI>();
                 m_dayTexts[i].text = dateNumber.ToString();
                 dayImages[i].color = m_NormalColor;
                 m_dayTexts[i].color = m_NormalColorTxt;
@@ -85,12 +92,65 @@ public class MonthlyChallengeController : MonoBehaviour
                 dayImages[i].gameObject.SetActive(false);
             }
         }
+        
+        // Auto-select latest available day
+        int latestDay = daysInMonth;
+        if (month == DateTime.Now.Month && year == DateTime.Now.Year)
+        {
+            latestDay = DateTime.Now.Day;
+        }//TODO check if was completed already
+        
+        int targetIndex = latestDay + dayOffset - 1;
+        MarkAsSelected(dayImages[targetIndex]);
+        
+        UpdateNavButtons();
+    }
+
+    private void UpdateNavButtons()
+    {
+        DateTime currentDisplayed = new DateTime(p_CurrentYear, p_CurrentMonth, 1);
+        DateTime now = DateTime.Now;
+        DateTime firstAllowed = new DateTime(UserDataManager.Instance.InstallDate.Year, UserDataManager.Instance.InstallDate.Month, 1).AddMonths(-1);
+
+        // Hide Next button if show current month (or future, though shouldn't happen)
+        m_NextMonthBtn.gameObject.SetActive(currentDisplayed.Year < now.Year || (currentDisplayed.Year == now.Year && currentDisplayed.Month < now.Month));
+        
+        // Hide Previous button if reached the limit (1 month before install date)
+        m_PrevMonthBtn.gameObject.SetActive(currentDisplayed > firstAllowed);
+    }
+
+    public void NextMonth()
+    {
+        DateTime next = new DateTime(p_CurrentYear, p_CurrentMonth, 1).AddMonths(1);
+        p_CurrentMonth = next.Month;
+        p_CurrentYear = next.Year;
+        Init(p_CurrentMonth, p_CurrentYear);
+    }
+
+    public void PrevMonth()
+    {
+        DateTime prev = new DateTime(p_CurrentYear, p_CurrentMonth, 1).AddMonths(-1);
+        p_CurrentMonth = prev.Month;
+        p_CurrentYear = prev.Year;
+        Init(p_CurrentMonth, p_CurrentYear);
     }
 
     public void MarkAsSelected(Image i_bgDate)
     {
+        if (m_SelectedDateBg != null)
+        {
+            m_SelectedDateBg.color = m_NormalColor;
+            m_SelectedDateTxt.color = m_NormalColorTxt;
+        }
+
         m_SelectedDateBg = i_bgDate;
-        m_SelectedDateTxt = m_SelectedDateBg.GetComponentInChildren<TextMeshProUGUI>();;
+        m_SelectedDateTxt = m_SelectedDateBg.GetComponentInChildren<TextMeshProUGUI>();
+        
+        if (int.TryParse(m_SelectedDateTxt.text, out int selectedDay))
+        {
+            p_CurrentDay = selectedDay;
+        }
+
         MarkAsSelected();
     }
 

@@ -20,7 +20,10 @@ namespace Assets.Scripts.Core
         public event System.Action OnLevelChanged;
 
         private const string LevelKey = "CurrentLevel";
+        private const string InstallDateKey = "InstallDate";
+
         public int CurrentLevel { get; private set; } = 1;
+        public System.DateTime InstallDate { get; private set; }
 
         private UserDataManager()
         {
@@ -30,6 +33,25 @@ namespace Assets.Scripts.Core
         private void LoadData()
         {
             CurrentLevel = PlayerPrefs.GetInt(LevelKey, 1);
+            
+            string installDateStr = PlayerPrefs.GetString(InstallDateKey, string.Empty);
+            if (string.IsNullOrEmpty(installDateStr))
+            {
+                InstallDate = System.DateTime.Now;
+                PlayerPrefs.SetString(InstallDateKey, InstallDate.ToBinary().ToString());
+                PlayerPrefs.Save();
+            }
+            else
+            {
+                if (long.TryParse(installDateStr, out long binaryDate))
+                {
+                    InstallDate = System.DateTime.FromBinary(binaryDate);
+                }
+                else
+                {
+                    InstallDate = System.DateTime.Now;
+                }
+            }
         }
 
         public void IncrementLevel()
