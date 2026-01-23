@@ -11,6 +11,7 @@ namespace Assets.Scripts.Core
         public Sprite m_CircleSprite;
         public Color m_CircleColor;
 
+        private List<ArrowController> arrows = new List<ArrowController>();
         private List<GameObject> currentLevelObjects = new List<GameObject>();
         private List<SpriteRenderer> m_BackgroundCircles = new List<SpriteRenderer>();
         public event System.Action OnEntranceAnimationFinished;
@@ -78,7 +79,7 @@ namespace Assets.Scripts.Core
             // Initialize Circles Tracking
             m_SpawnedCirclePositions.Clear();
 
-            List<ArrowController> arrows = new List<ArrowController>();
+            arrows = new List<ArrowController>();
             foreach (ArrowData arrowData in data.arrows)
             {
                 ArrowController arrow = Instantiate(arrowPrefab, Vector3.zero, Quaternion.identity);
@@ -172,6 +173,17 @@ namespace Assets.Scripts.Core
             }
 
             OnEntranceAnimationFinished?.Invoke();
+        }
+
+        public void HideArrows()
+        {
+            foreach (ArrowController AC in arrows)
+            {
+                if(AC != null)
+                {
+                    AC.gameObject.SetActive(false);
+                }
+            }
         }
         public void RestartLevel()
         {

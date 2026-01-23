@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
-using TMPro; 
+using TMPro;
+using System.Collections.Generic;
 
 
 namespace Assets.Scripts.Core
@@ -258,6 +259,8 @@ namespace Assets.Scripts.Core
             {
                 UserDataManager.Instance.SaveMonthlyChallengeProgress(currentChallengeYear, currentChallengeMonth, currentChallengeDay);
             }
+            yield return new WaitForSeconds(0.2f);
+            levelManager.HideArrows();
 
             if (levelManager != null)
             {
@@ -266,7 +269,7 @@ namespace Assets.Scripts.Core
                 m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
             }
 
-            yield return new WaitForSeconds(1.5f);
+            yield return new WaitForSeconds(2.5f);
             
             if (m_GameUI != null)
             {
@@ -285,7 +288,7 @@ namespace Assets.Scripts.Core
 
             m_LobbyUI.SetActive(true);
             m_WinParticles.SetActive(false);
-            
+            CameraController.Instance.ResetZoom();
             OnLevelWon?.Invoke();
         }
 
