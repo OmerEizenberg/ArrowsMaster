@@ -8,7 +8,7 @@ namespace Assets.Scripts.Core
         [Header("Zoom Settings")]
         [SerializeField] private float zoomSpeed = 2f;
         [SerializeField] private float minZoom = 2f;
-        [SerializeField] private float maxZoom = 15f;
+        [SerializeField] private float maxZoom = 50f;
         [SerializeField] private float mobileZoomSpeed = 0.1f;
 
         [Header("Pan Settings")]
@@ -20,7 +20,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private float initWaitDuration = 1.2f;
         [SerializeField] private float initZoomInDuration = 0.25f;
 
-        [SerializeField] private float winZoomMultiplier = 2.5f;
+        [SerializeField] private float winZoomMultiplier = 3.0f;
 
         public static CameraController Instance { get; private set; }
 
@@ -246,11 +246,10 @@ namespace Assets.Scripts.Core
             // The user mentioned portrait mode needs extra zoom out. 
             // Max(fitVertical, fitHorizontal) already accounts for aspect ratio.
             float targetZoom = Mathf.Max(fitVertical, fitHorizontal) * winZoomMultiplier; 
-            
-            // Limit target zoom by max zoom
-            targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
-
-            Vector3 targetPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
+                
+            // Calculate Grid Center to ensure the whole level is visible
+            Vector3 gridCenter = new Vector3((gridSize.x - 1) * cellSize / 2f, (gridSize.y - 1) * cellSize / 2f, transform.position.z);
+            Vector3 targetPos = gridCenter;
 
             while (elapsed < duration)
             {

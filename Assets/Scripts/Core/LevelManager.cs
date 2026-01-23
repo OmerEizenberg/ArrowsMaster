@@ -19,6 +19,7 @@ namespace Assets.Scripts.Core
         private HashSet<Vector2Int> m_SpawnedCirclePositions = new HashSet<Vector2Int>();
         private Vector3 m_LevelCenter;
         private Vector2Int m_CurrentGridSize;
+        private float m_WinCirclesAlpha = 1.0f;
 
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
@@ -163,6 +164,7 @@ namespace Assets.Scripts.Core
                         sr.color = m_CircleColor;
                         sr.sortingOrder = -1; // Behind arrows
 
+                        m_BackgroundCircles.Add(sr);
                         m_SpawnedCirclePositions.Add(pos);
                         currentLevelObjects.Add(circleObj);
                     }
@@ -179,11 +181,27 @@ namespace Assets.Scripts.Core
 
         public void PlayWinAnimation()
         {
+            m_WinCirclesAlpha = 1.0f;
             if (CameraController.Instance != null)
             {
                 CameraController.Instance.PlayWinZoomAnimation(m_CurrentGridSize, m_LevelCenter);
             }
             StartCoroutine(DoRippleEffect());
+            StartCoroutine(FadeOutCircles(1.5f));
+        }
+
+        private System.Collections.IEnumerator FadeOutCircles(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            float duration = 0.5f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                m_WinCirclesAlpha = Mathf.Lerp(1.0f, 0f, elapsed / duration);
+                yield return null;
+            }
+            m_WinCirclesAlpha = 0f;
         }
 
         private System.Collections.IEnumerator DoRippleEffect()
@@ -230,12 +248,16 @@ namespace Assets.Scripts.Core
                                 scale = Mathf.Lerp(0.5f, 1.0f, proximity * 2f);
 
                             sr.transform.localScale = Vector3.one * scale;
-                            sr.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                            Color c = Color.Lerp(m_CircleColor, targetColor, proximity);
+                            c.a *= m_WinCirclesAlpha;
+                            sr.color = c;
                         }
                         else if (waveFront > dist)
                         {
                             sr.transform.localScale = Vector3.one;
-                            sr.color = m_CircleColor;
+                            Color c = m_CircleColor;
+                            c.a *= m_WinCirclesAlpha;
+                            sr.color = c;
                         }
                     }
                     yield return null;
@@ -251,7 +273,9 @@ namespace Assets.Scripts.Core
                 if (sr != null)
                 {
                     sr.transform.localScale = Vector3.one;
-                    sr.color = m_CircleColor;
+                    Color c = m_CircleColor;
+                    c.a = m_WinCirclesAlpha;
+                    sr.color = c;
                 }
             }
         }
