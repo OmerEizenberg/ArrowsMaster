@@ -565,6 +565,7 @@ MonoBehaviour:
   m_DifficultyText: {fileID: 4259226}
   m_CircleColor: {r: 0, g: 0, b: 0, a: 1}
   m_SuperHardColor: {r: 0.8784314, g: 0.3372549, b: 0.99215686, a: 1}
+  m_NightmareColor: {r: 0.92156863, g: 0.3019608, b: 0.29411766, a: 0}
   m_HardColor: {r: 0.9764706, g: 0.7921569, b: 0.14117648, a: 1}
   m_EasyColor: {r: 0.7294118, g: 0.8627451, b: 0.34509805, a: 1}
   m_LevelColor: {r: 0.6117647, g: 0.53333336, b: 1, a: 1}
