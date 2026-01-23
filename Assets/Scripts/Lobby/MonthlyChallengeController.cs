@@ -220,6 +220,7 @@ public class MonthlyChallengeController : MonoBehaviour
         if (m_SelectedDateTxt != null && int.TryParse(m_SelectedDateTxt.text, out int selectedDay))
         {
             p_CurrentDay = selectedDay;
+            if (m_HomeController != null) m_HomeController.RefreshLobbyUI();
         }
 
         MarkAsSelected();

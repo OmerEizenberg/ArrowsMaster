@@ -5,6 +5,7 @@ using UnityEngine;
 using TMPro; 
 
 using Assets.Scripts.Core;
+using Assets.Scripts.Data;
 
 namespace Assets.Scripts.Lobby
 {
@@ -23,8 +24,10 @@ namespace Assets.Scripts.Lobby
 
         [SerializeField] private Color m_CircleColor;
         [SerializeField] private Color m_SuperHardColor;
+        [SerializeField] private Color m_NightmareColor;
         [SerializeField] private Color m_HardColor;
         [SerializeField] private Color m_EasyColor;
+        
         [SerializeField] private Color m_LevelColor;
         [SerializeField] private MonthlyChallengeController m_MonthlyChallengeController;
 
@@ -43,14 +46,76 @@ namespace Assets.Scripts.Lobby
             UserDataManager.Instance.OnLevelChanged -= RefreshLobbyUI;
         }
 
-        private void RefreshLobbyUI()
+        public void RefreshLobbyUI()
         {
             m_TitleText.text = "Arrows Master";
-            m_LevelText.text = $"Level {UserDataManager.Instance.CurrentLevel}";
-            m_DifficultyText.text = "Easy";
+            
+            string levelId;
+            string folder;
+            
+            if (GameManager.Instance != null && !GameManager.Instance.p_isLevelProgression)
+            {
+                m_LevelText.text = $"Challenge {m_MonthlyChallengeController.p_CurrentMonth}/{m_MonthlyChallengeController.p_CurrentDay}/{m_MonthlyChallengeController.p_CurrentYear}";
+                int month = m_MonthlyChallengeController.p_CurrentMonth;
+                int day = m_MonthlyChallengeController.p_CurrentDay;
+                int year = m_MonthlyChallengeController.p_CurrentYear;
+                levelId = $"level{month + day + (year % 10)}";
+                folder = "ChallengeLevels";
+            }
+            else
+            {
+                m_LevelText.text = $"Level {UserDataManager.Instance.CurrentLevel}";
+                levelId = $"level{UserDataManager.Instance.CurrentLevel}";
+                folder = "Levels";
+            }
+
+            TextAsset jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId}");
+            
+            if (jsonFile != null)
+            {
+                LevelData data = JsonUtility.FromJson<LevelData>(jsonFile.text);
+                int totalPoints = 0;
+                if (data != null && data.arrows != null)
+                {
+                    foreach (var arrow in data.arrows)
+                    {
+                        if (arrow.path != null) totalPoints += arrow.path.Count;
+                    }
+                }
+
+                if (totalPoints < 50)
+                {
+                    m_DifficultyText.text = "Easy Level";
+                    Color c = m_EasyColor; c.a = 1f;
+                    m_DifficultyText.color = c;
+                }
+                else if (totalPoints < 100)
+                {
+                    m_DifficultyText.text = "Hard Level";
+                    Color c = m_HardColor; c.a = 1f;
+                    m_DifficultyText.color = c;
+                }
+                else if (totalPoints < 200)
+                {
+                    m_DifficultyText.text = "Super Hard Level";
+                    Color c = m_SuperHardColor; c.a = 1f;
+                    m_DifficultyText.color = c;
+                }
+                else
+                {
+                    m_DifficultyText.text = "Nightmare Level";
+                    Color c = m_NightmareColor; c.a = 1f;
+                    m_DifficultyText.color = c;
+                }
+            }
+            else
+            {
+                m_DifficultyText.text = "Level Info Unavailable";
+                Color c = m_EasyColor; c.a = 1f;
+                m_DifficultyText.color = c;
+            }
+
             m_LevelText.color = m_LevelColor;
-            //TODO : Color by difficulty
-            m_DifficultyText.color = m_EasyColor;
         }
         
         public void OnSettingsButtonClicked()
@@ -72,10 +137,13 @@ namespace Assets.Scripts.Lobby
             if(m_CalanderLayer.activeInHierarchy)
             {
                 m_CalanderLayer.SetActive(false);
+                if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
             }else{
                 m_SettingsLayer.SetActive(false);
                 m_CalanderLayer.SetActive(true);
+                if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = false;
             }
+            RefreshLobbyUI();
         }
         public void OnHomeButtonClicked()
         {
@@ -83,6 +151,8 @@ namespace Assets.Scripts.Lobby
 
             m_SettingsLayer.SetActive(false);
             m_CalanderLayer.SetActive(false);
+            if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
+            RefreshLobbyUI();
         }
 
         public void OnShopButtonClicked()
