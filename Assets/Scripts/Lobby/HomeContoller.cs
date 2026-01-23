@@ -83,19 +83,19 @@ namespace Assets.Scripts.Lobby
                     }
                 }
 
-                if (totalPoints < 50)
+                if (totalPoints < 120)
                 {
                     m_DifficultyText.text = "Easy Level";
                     Color c = m_EasyColor; c.a = 1f;
                     m_DifficultyText.color = c;
                 }
-                else if (totalPoints < 100)
+                else if (totalPoints < 400)
                 {
                     m_DifficultyText.text = "Hard Level";
                     Color c = m_HardColor; c.a = 1f;
                     m_DifficultyText.color = c;
                 }
-                else if (totalPoints < 200)
+                else if (totalPoints < 900)
                 {
                     m_DifficultyText.text = "Super Hard Level";
                     Color c = m_SuperHardColor; c.a = 1f;
