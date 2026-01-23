@@ -9,13 +9,9 @@ namespace Assets.Scripts.Core
         public static AdsManager Instance { get; private set; }
 
         private LevelPlayInterstitialAd interstitialAd;
-        private LevelPlayRewardedAd playOnRewardedAd;
-        private LevelPlayRewardedAd hintRewardedAd;
+        private LevelPlayRewardedAd RewardedAd;
         private bool isInitialized = false;
 
-        public enum AdRewardType { None, PlayOn, Hint }
-        public AdRewardType m_CurrentRequestType = AdRewardType.PlayOn;
-        
         public event Action OnRewardReceived;
 
         private string AppKey
@@ -51,28 +47,15 @@ namespace Assets.Scripts.Core
             get
             {
 #if UNITY_ANDROID || UNITY_EDITOR
-                return "if9z8hp6gm6ukwvh"; // play_on_rewarded
+                return "if9z8hp6gm6ukwvh"; // Android ad_rewarded
 #elif UNITY_IPHONE
-                return "if9z8hp6gm6ukwvh"; // play_on_rewarded
+                return "if9z8hp6gm6ukwvh"; // iOS ad_rewarded
 #else
                 return "unexpected_platform";
 #endif
             }
         }
 
-        private string HintAdUnitId
-        {
-            get
-            {
-#if UNITY_ANDROID || UNITY_EDITOR
-                return "yawx693hhwww7my2"; // hint_rewarded
-#elif UNITY_IPHONE
-                return "yawx693hhwww7my2"; // hint_rewarded
-#else
-                return "unexpected_platform";
-#endif
-            }
-        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoInitialize()
@@ -114,8 +97,7 @@ namespace Assets.Scripts.Core
             Debug.Log("[AdsManager] LevelPlay SDK Initialized Successfully.");
             isInitialized = true;
             CreateInterstitialAd();
-            CreatePlayOnRewardedAd();
-            CreateHintRewardedAd();
+            CreateRewardedAd();
         }
 
         private void OnSdkInitFailed(LevelPlayInitError error)
@@ -183,108 +165,50 @@ namespace Assets.Scripts.Core
             LoadInterstitial();
         }
 
-        // --- PlayOn Rewarded Ad ---
-        private void CreatePlayOnRewardedAd()
+        // ---  Rewarded Ad ---
+        private void CreateRewardedAd()
         {
-            if (playOnRewardedAd != null) playOnRewardedAd.DestroyAd();
-            playOnRewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
-            playOnRewardedAd.OnAdClosed += (info) => { 
-                Debug.Log($"[AdsManager] PlayOn Ad Closed. Request type was: {m_CurrentRequestType}");
-                LoadPlayOnRewarded(); 
+            if (RewardedAd != null) RewardedAd.DestroyAd();
+            RewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
+            RewardedAd.OnAdClosed += (info) => { 
+                Debug.Log("[AdsManager]  Ad Closed. Request");
+                LoadRewarded(); 
             };
-            playOnRewardedAd.OnAdDisplayFailed += (info, err) => { 
-                Debug.LogError($"[AdsManager] PlayOn Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
-                LoadPlayOnRewarded(); 
+            RewardedAd.OnAdDisplayFailed += (info, err) => { 
+                Debug.LogError($"[AdsManager]  Ad Display Failed: {err}. ");
+                LoadRewarded(); 
             };
 
-            if(m_CurrentRequestType == AdRewardType.Hint)
-            {
-                CreateHintRewardedAd();
-            }
-            playOnRewardedAd.OnAdRewarded += (info, reward) => {
-                Debug.Log($"[AdsManager] PlayOn Ad Rewarded Event Received. Current request: {m_CurrentRequestType}");
-                if (m_CurrentRequestType == AdRewardType.PlayOn)
-                {
-                    Debug.Log("[AdsManager] Granting PlayOn reward event.");
-                    OnRewardReceived?.Invoke();
-                }
+            RewardedAd.OnAdRewarded += (info, reward) => {
+                Debug.Log("[AdsManager]  Ad Rewarded Event Received. ");
+                OnRewardReceived?.Invoke();
             };
-            LoadPlayOnRewarded();
+            LoadRewarded();
         }
 
-        public void LoadPlayOnRewarded()
+        public void LoadRewarded()
         {
             if (!isInitialized) return;
-            playOnRewardedAd.LoadAd();
+            RewardedAd.LoadAd();
         }
 
-        public void ShowPlayOnRewarded()
+        public void ShowRewarded()
         {
-            if (playOnRewardedAd != null && playOnRewardedAd.IsAdReady())
+            if (RewardedAd != null && RewardedAd.IsAdReady())
             {
-                m_CurrentRequestType = AdRewardType.PlayOn;
-                playOnRewardedAd.ShowAd();
+                RewardedAd.ShowAd();
             }
             else 
             {
-                Debug.LogWarning("[AdsManager] PlayOn Ad is not ready yet. Loading one now.");
-                LoadPlayOnRewarded();
-            }
-        }
-
-        // --- Hint Rewarded Ad ---
-        private void CreateHintRewardedAd()
-        {
-            if (hintRewardedAd != null) hintRewardedAd.DestroyAd();
-            hintRewardedAd = new LevelPlayRewardedAd(HintAdUnitId);
-            hintRewardedAd.OnAdClosed += (info) => { 
-                Debug.Log($"[AdsManager] Hint Ad Closed. Request type was: {m_CurrentRequestType}");
-                LoadHintRewarded(); 
-            };
-            hintRewardedAd.OnAdDisplayFailed += (info, err) => { 
-                Debug.LogError($"[AdsManager] Hint Ad Display Failed: {err}. Request type was: {m_CurrentRequestType}");
-                LoadHintRewarded(); 
-            };
-            if(m_CurrentRequestType == AdRewardType.PlayOn)
-            {
-                CreatePlayOnRewardedAd();
-            }
-            hintRewardedAd.OnAdRewarded += (info, reward) => {
-                Debug.Log($"[AdsManager] Hint Ad Rewarded Event Received. Current request: {m_CurrentRequestType}");
-                if (m_CurrentRequestType == AdRewardType.Hint)
-                {
-                    Debug.Log("[AdsManager] Granting Hint reward event.");
-                    OnRewardReceived?.Invoke(); 
-                }
-            };
-            LoadHintRewarded();
-        }
-
-        public void LoadHintRewarded()
-        {
-            if (!isInitialized) return;
-            hintRewardedAd.LoadAd();
-        }
-
-        public void ShowHintRewarded()
-        {
-            if (hintRewardedAd != null && hintRewardedAd.IsAdReady())
-            {
-                m_CurrentRequestType = AdRewardType.Hint;
-                hintRewardedAd.ShowAd();
-            }
-            else 
-            {
-                Debug.LogWarning("[AdsManager] Hint Ad is not ready yet. Loading one now.");
-                LoadHintRewarded();
+                Debug.LogWarning("[AdsManager]  Ad is not ready yet. Loading one now.");
+                LoadRewarded();
             }
         }
 
         private void OnDestroy()
         {
             if (interstitialAd != null) interstitialAd.DestroyAd();
-            if (playOnRewardedAd != null) playOnRewardedAd.DestroyAd();
-            if (hintRewardedAd != null) hintRewardedAd.DestroyAd();
+            if (RewardedAd != null) RewardedAd.DestroyAd();
         }
     }
 }

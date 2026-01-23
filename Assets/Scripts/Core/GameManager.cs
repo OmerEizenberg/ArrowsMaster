@@ -140,11 +140,10 @@ namespace Assets.Scripts.Core
         {
             p_isPlayOnRewarded = true;
             p_isHintRewarded = false;
-            AdsManager.Instance.m_CurrentRequestType = AdsManager.AdRewardType.PlayOn;
             Debug.Log("[GameManager] PlayOn method called.");
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.ShowPlayOnRewarded();
+                AdsManager.Instance.ShowRewarded();
             }
             else
             {
