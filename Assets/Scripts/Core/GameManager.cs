@@ -1,5 +1,7 @@
 using System;
 using UnityEngine;
+using TMPro; 
+
 
 namespace Assets.Scripts.Core
 {
@@ -42,6 +44,10 @@ namespace Assets.Scripts.Core
 
         public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && 
                                 (failureScreen == null || !failureScreen.activeInHierarchy);
+
+        [SerializeField] private GameObject m_WinParticles;
+        [SerializeField] private TextMeshProUGUI m_WinLevelText;
+        private string[] m_LevelWinFeedbacks = new string[] { "Perfect !", "Well Done !", "Excellent !", "Amazing !", "Incredible !", "Masterpiece !", "Legendary !" , "You're a Legend !" , "Fantastic!" , "Awesome !" , "Phenomenal!"};
 
         private void Awake()
         {
@@ -256,6 +262,8 @@ namespace Assets.Scripts.Core
             if (levelManager != null)
             {
                 levelManager.PlayWinAnimation();
+                m_WinParticles.SetActive(true);
+                m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
             }
 
             yield return new WaitForSeconds(1.5f);
@@ -276,7 +284,8 @@ namespace Assets.Scripts.Core
             }
 
             m_LobbyUI.SetActive(true);
-
+            m_WinParticles.SetActive(false);
+            
             OnLevelWon?.Invoke();
         }
 
