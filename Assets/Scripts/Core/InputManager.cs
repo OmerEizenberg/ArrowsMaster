@@ -16,6 +16,8 @@ namespace Assets.Scripts.Core
 
         void Update()
         {
+            if (GameManager.Instance != null && !GameManager.Instance.CanInteract) return;
+
             if (Input.touchCount > 1) wasMultiTouch = true;
 
             if (Input.GetMouseButtonDown(0))

@@ -239,15 +239,6 @@
         },
         {
             "managedAssemblyName": "UnityEngine.dll",
-            "nativeClass": "AudioSource",
-            "fullManagedTypeName": "UnityEngine.AudioSource",
-            "moduleName": "Audio",
-            "usedInScenes": [
-                "Assets/Scenes/MainScene.unity"
-            ]
-        },
-        {
-            "managedAssemblyName": "UnityEngine.dll",
             "nativeClass": "Behaviour",
             "fullManagedTypeName": "UnityEngine.Behaviour",
             "moduleName": "Core",

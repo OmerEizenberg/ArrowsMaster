@@ -21,6 +21,8 @@ namespace Assets.Scripts.Core
         private Vector3 m_LevelCenter;
         private Vector2Int m_CurrentGridSize;
         private float m_WinCirclesAlpha = 1.0f;
+        private int m_TotalPointsInLevel;
+        public int TotalPointsInLevel => m_TotalPointsInLevel;
 
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
@@ -78,6 +80,15 @@ namespace Assets.Scripts.Core
 
             // Initialize Circles Tracking
             m_SpawnedCirclePositions.Clear();
+
+            m_TotalPointsInLevel = 0;
+            if (data.arrows != null)
+            {
+                foreach (var arrow in data.arrows)
+                {
+                    if (arrow.path != null) m_TotalPointsInLevel += arrow.path.Count;
+                }
+            }
 
             arrows = new List<ArrowController>();
             foreach (ArrowData arrowData in data.arrows)

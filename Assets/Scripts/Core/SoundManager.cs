@@ -16,6 +16,12 @@ namespace Assets.Scripts.Core
         public AudioClip ArrowBlockedSound;
         public AudioClip LevelInitializedSound;
         public AudioClip WinSound;
+        public AudioClip SmallCheer;
+        public AudioClip MediumCheer;
+        public AudioClip BigCheer;
+        public AudioClip BackgroundMusic;
+
+        [SerializeField] private AudioSource musicSource;
 
         private void Awake()
         {
@@ -36,11 +42,29 @@ namespace Assets.Scripts.Core
                 }
             }
 
+            if (musicSource == null)
+            {
+                // Create a secondary source for looping music
+                GameObject musicObj = new GameObject("MusicSource");
+                musicObj.transform.SetParent(this.transform);
+                musicSource = musicObj.AddComponent<AudioSource>();
+                musicSource.loop = true;
+                musicSource.playOnAwake = false;
+            }
+
             // Load initial state from PlayerPrefs to ensure synchronization
             isMuted = PlayerPrefs.GetInt("SoundEnabled", 1) == 0;
-            if (audioSource != null)
+            ApplyMuteState();
+            
+            StartBackgroundMusic();
+        }
+
+        private void StartBackgroundMusic()
+        {
+            if (BackgroundMusic != null && musicSource != null)
             {
-                audioSource.mute = isMuted;
+                musicSource.clip = BackgroundMusic;
+                musicSource.Play();
             }
         }
 
@@ -70,14 +94,38 @@ namespace Assets.Scripts.Core
             PlaySound(WinSound);
         }
 
+        public void PlaySmallCheer()
+        {
+            PlaySound(SmallCheer);
+        }
+
+        public void PlayMediumCheer()
+        {
+            PlaySound(MediumCheer);
+        }
+
+        public void PlayBigCheer()
+        {
+            PlaySound(BigCheer);
+        }
+
         public void SetMute(bool mute)
         {
             isMuted = mute;
+            ApplyMuteState();
+            Debug.Log($"[SoundManager] Mute state set to: {mute}");
+        }
+
+        private void ApplyMuteState()
+        {
             if (audioSource != null)
             {
-                audioSource.mute = mute;
+                audioSource.mute = isMuted;
             }
-            Debug.Log($"[SoundManager] Mute state set to: {mute}");
+            if (musicSource != null)
+            {
+                musicSource.mute = isMuted;
+            }
         }
 
         private void PlaySound(AudioClip clip)

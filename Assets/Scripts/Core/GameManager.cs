@@ -44,7 +44,8 @@ namespace Assets.Scripts.Core
         public bool p_isHintRewarded = false;
 
         public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && 
-                                (failureScreen == null || !failureScreen.activeInHierarchy);
+                                (failureScreen == null || !failureScreen.activeInHierarchy) &&
+                                (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy);
 
         [SerializeField] private GameObject m_WinParticles;
         [SerializeField] private TextMeshProUGUI m_WinLevelText;
@@ -265,6 +266,25 @@ namespace Assets.Scripts.Core
             if (levelManager != null)
             {
                 levelManager.PlayWinAnimation();
+                
+                // Play cheer sound based on difficulty
+                if (SoundManager.Instance != null)
+                {
+                    int points = levelManager.TotalPointsInLevel;
+                    if (points < 400) // Easy or Hard
+                    {
+                        SoundManager.Instance.PlaySmallCheer();
+                    }
+                    else if (points < 900) // Super Hard
+                    {
+                        SoundManager.Instance.PlayMediumCheer();
+                    }
+                    else // Nightmare
+                    {
+                        SoundManager.Instance.PlayBigCheer();
+                    }
+                }
+
                 m_WinParticles.SetActive(true);
                 m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
             }
@@ -274,11 +294,6 @@ namespace Assets.Scripts.Core
             if (m_GameUI != null)
             {
                 m_GameUI.SetActive(false);
-            }
-            
-            if (SoundManager.Instance != null)
-            {
-                SoundManager.Instance.PlayWin();
             }
 
             if (AdsManager.Instance != null)
