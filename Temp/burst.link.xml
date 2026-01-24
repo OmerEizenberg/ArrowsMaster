@@ -3,9 +3,6 @@
   <type fullname="Unity.Burst.LowLevel.BurstCompilerService">
    <method name="GetOrCreateSharedMemory"/>
   </type>
-  <type fullname="Unity.Burst.LowLevel.BurstCompilerService">
-   <method name="RuntimeLog"/>
-  </type>
  </assembly>
  <assembly fullname="Unity.Collections">
   <type fullname="Unity.Collections.AllocatorManager.SharedStatics.TableEntry">
@@ -19,12 +16,6 @@
   </type>
  </assembly>
  <assembly fullname="UnityEngine.CoreModule">
-  <type fullname="Unity.Collections.LowLevel.Unsafe.UnsafeUtility">
-   <method name="FreeTracked"/>
-  </type>
-  <type fullname="Unity.Collections.LowLevel.Unsafe.UnsafeUtility">
-   <method name="MallocTracked"/>
-  </type>
   <type fullname="Unity.Jobs.LowLevel.Unsafe.JobsUtility">
    <method name="GetWorkStealingRange"/>
   </type>

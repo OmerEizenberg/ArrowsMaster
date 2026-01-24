@@ -99,9 +99,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.TextMeshPro", "Unity.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.Services.Core.Networking", "Unity.Services.Core.Networking.csproj", "{9AC44B0D-D853-34CB-4440-F55E8526F7F1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.2D.Aseprite.Common", "Unity.2D.Aseprite.Common.csproj", "{E023E0D4-2956-CB44-FFED-62475B5F2813}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.Services.Core.Scheduler", "Unity.Services.Core.Scheduler.csproj", "{3F16F69A-103F-FA87-214A-A604D604EA47}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.2D.Aseprite.Common", "Unity.2D.Aseprite.Common.csproj", "{E023E0D4-2956-CB44-FFED-62475B5F2813}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.2D.IK.Editor", "Unity.2D.IK.Editor.csproj", "{7304A9FE-38A9-2B7A-8653-F989F5C99212}"
 EndProject
@@ -345,14 +345,14 @@ Global
 		{9AC44B0D-D853-34CB-4440-F55E8526F7F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9AC44B0D-D853-34CB-4440-F55E8526F7F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9AC44B0D-D853-34CB-4440-F55E8526F7F1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3F16F69A-103F-FA87-214A-A604D604EA47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3F16F69A-103F-FA87-214A-A604D604EA47}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3F16F69A-103F-FA87-214A-A604D604EA47}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3F16F69A-103F-FA87-214A-A604D604EA47}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E023E0D4-2956-CB44-FFED-62475B5F2813}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7304A9FE-38A9-2B7A-8653-F989F5C99212}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7304A9FE-38A9-2B7A-8653-F989F5C99212}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7304A9FE-38A9-2B7A-8653-F989F5C99212}.Release|Any CPU.ActiveCfg = Release|Any CPU
