@@ -407,16 +407,16 @@
       <HintPath>/Applications/Unity/Hub/Editor/2022.3.62f3/PlaybackEngines/iOSSupport/UnityEditor.iOS.Extensions.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Google.PackageManagerResolver">
-      <HintPath>Library/PackageCache/com.google.external-dependency-manager@1.2.182/ExternalDependencyManager/Editor/1.2.182/Google.PackageManagerResolver.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Unity.VisualScripting.YamlDotNet">
       <HintPath>Library/PackageCache/com.unity.visualscripting@1.9.4/Editor/VisualScripting.Core/Dependencies/YamlDotNet/Unity.VisualScripting.YamlDotNet.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Google.VersionHandler">
-      <HintPath>Library/PackageCache/com.google.external-dependency-manager@1.2.182/ExternalDependencyManager/Editor/Google.VersionHandler.dll</HintPath>
+      <HintPath>Assets/MobileDependencyResolver/Editor/Google.VersionHandler.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Google.IOSResolver">
+      <HintPath>Assets/MobileDependencyResolver/Editor/1.2.185/Google.IOSResolver.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Collections.LowLevel.ILSupport">
@@ -424,15 +424,15 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Google.VersionHandlerImpl">
-      <HintPath>Library/PackageCache/com.google.external-dependency-manager@1.2.182/ExternalDependencyManager/Editor/1.2.182/Google.VersionHandlerImpl.dll</HintPath>
+      <HintPath>Assets/MobileDependencyResolver/Editor/1.2.185/Google.VersionHandlerImpl.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Plastic.Antlr3.Runtime">
       <HintPath>Library/PackageCache/com.unity.collab-proxy@2.11.2/Lib/Editor/Unity.Plastic.Antlr3.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Google.IOSResolver">
-      <HintPath>Library/PackageCache/com.google.external-dependency-manager@1.2.182/ExternalDependencyManager/Editor/1.2.182/Google.IOSResolver.dll</HintPath>
+    <Reference Include="Google.JarResolver">
+      <HintPath>Assets/MobileDependencyResolver/Editor/1.2.185/Google.JarResolver.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Plastic.Newtonsoft.Json">
@@ -455,16 +455,16 @@
       <HintPath>Library/PackageCache/com.unity.visualscripting@1.9.4/Runtime/VisualScripting.Flow/Dependencies/NCalc/Unity.VisualScripting.Antlr3.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Google.JarResolver">
-      <HintPath>Library/PackageCache/com.google.external-dependency-manager@1.2.182/ExternalDependencyManager/Editor/1.2.182/Google.JarResolver.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>Library/PackageCache/com.unity.nuget.newtonsoft-json@3.2.1/Runtime/Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.TextureAssets">
       <HintPath>Library/PackageCache/com.unity.visualscripting@1.9.4/Editor/VisualScripting.Core/EditorAssetResources/Unity.VisualScripting.TextureAssets.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Google.PackageManagerResolver">
+      <HintPath>Assets/MobileDependencyResolver/Editor/1.2.185/Google.PackageManagerResolver.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.iOS.Extensions.Xcode">

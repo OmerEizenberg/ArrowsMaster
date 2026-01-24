@@ -1,6 +1,8 @@
 using Unity.Services.LevelPlay;
+using Unity.Services.Core;
 using UnityEngine;
 using System;
+using System.Threading.Tasks;
 
 namespace Assets.Scripts.Core
 {
@@ -79,17 +81,27 @@ namespace Assets.Scripts.Core
             Instance = this;
             DontDestroyOnLoad(gameObject);
             
-            InitializeSDK();
+            _ = InitializeSDK();
         }
 
-        private void InitializeSDK()
+        private async Task InitializeSDK()
         {
             if (isInitialized) return;
 
-            Debug.Log("[AdsManager] Initializing LevelPlay SDK...");
-            LevelPlay.OnInitSuccess += OnSdkInitSuccess;
-            LevelPlay.OnInitFailed += OnSdkInitFailed;
-            LevelPlay.Init(AppKey);
+            try
+            {
+                Debug.Log("[AdsManager] Initializing Unity Services...");
+                await UnityServices.InitializeAsync();
+                
+                Debug.Log("[AdsManager] Initializing LevelPlay SDK...");
+                LevelPlay.OnInitSuccess += OnSdkInitSuccess;
+                LevelPlay.OnInitFailed += OnSdkInitFailed;
+                LevelPlay.Init(AppKey);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[AdsManager] Unity Services Initialization Failed: {e.Message}");
+            }
         }
 
         private void OnSdkInitSuccess(LevelPlayConfiguration config)

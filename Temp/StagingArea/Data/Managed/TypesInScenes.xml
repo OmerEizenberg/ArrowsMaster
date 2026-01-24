@@ -18,6 +18,9 @@
 		<type fullname="UnityEngine.U2D.Animation.SpriteSkinComposite" preserve="nothing"/>
 		<type fullname="UnityEngine.U2D.Animation.SpriteSkinUpdateHelper" preserve="nothing"/>
 	</assembly>
+	<assembly fullname="Unity.LevelPlay">
+		<type fullname="LevelPlayMediationSettings" preserve="nothing"/>
+	</assembly>
 	<assembly fullname="Unity.TextMeshPro">
 		<type fullname="TMPro.TextMeshProUGUI" preserve="nothing"/>
 		<type fullname="TMPro.TMP_FontAsset" preserve="nothing"/>

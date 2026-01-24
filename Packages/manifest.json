@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.applovin.mediation.ads": "8.5.1",
     "com.unity.collab-proxy": "2.11.2",
     "com.unity.feature.2d": "2.0.1",
     "com.unity.ide.rider": "3.0.36",
@@ -44,15 +43,6 @@
     "com.unity.modules.xr": "1.0.0"
   },
   "scopedRegistries": [
-    {
-      "name": "AppLovin MAX Unity",
-      "url": "https://unity.packages.applovin.com/",
-      "scopes": [
-        "com.applovin.mediation.ads",
-        "com.applovin.mediation.adapters",
-        "com.applovin.mediation.dsp"
-      ]
-    },
     {
       "name": "package.openupm.com",
       "url": "https://package.openupm.com",
