@@ -73,11 +73,40 @@ namespace Assets.Scripts.Core
         public void ResetProgress()
         {
             CurrentLevel = 1;
+            
+            // Reset Monthly Challenge data
+            ClearAllMonthlyProgress();
+
+            // Reset Install Date (so the challenge starts from now)
+            InstallDate = System.DateTime.Now;
+            PlayerPrefs.SetString(InstallDateKey, InstallDate.ToBinary().ToString());
+
             SaveData();
+            
             if (SoundManager.Instance != null)
             {
                 SoundManager.Instance.PlayClick();
             }
+            
+            OnMonthlyProgressChanged?.Invoke();
+        }
+
+        private void ClearAllMonthlyProgress()
+        {
+            // Clear cache
+            m_MonthlyCache.Clear();
+
+            // Clear PlayerPrefs for monthly challenges
+            // We'll clear a search range to ensure everything is removed
+            for (int year = 2024; year <= 2030; year++)
+            {
+                for (int month = 1; month <= 12; month++)
+                {
+                    string key = GetMonthlyKey(year, month);
+                    PlayerPrefs.DeleteKey(key);
+                }
+            }
+            PlayerPrefs.Save();
         }
 
         private void SaveData()

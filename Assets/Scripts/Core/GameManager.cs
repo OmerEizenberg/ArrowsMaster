@@ -219,11 +219,11 @@ namespace Assets.Scripts.Core
             {
                 levelManager.LoadLevelFromResources(levelId);
             }
-
             OnLevelStarted?.Invoke();
             isEntranceFinished = false;
             isWinning = false;
             ResetHintTimer();
+m_GameUI.gameObject.SetActive(true);
         }
 
         public void StartChallengeLevel(string levelId, int year, int month, int day)
@@ -254,6 +254,7 @@ namespace Assets.Scripts.Core
             isEntranceFinished = false;
             isWinning = false;
             ResetHintTimer();
+            m_GameUI.gameObject.SetActive(true);
         }
 
         private void ResetLives()
