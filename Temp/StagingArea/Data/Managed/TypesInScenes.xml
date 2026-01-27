@@ -15,7 +15,6 @@
 		<type fullname="GameUIContoleer" preserve="nothing"/>
 	</assembly>
 	<assembly fullname="Unity.2D.Animation.Runtime">
-		<type fullname="UnityEngine.U2D.Animation.BufferManager" preserve="nothing"/>
 		<type fullname="UnityEngine.U2D.Animation.SpriteSkinComposite" preserve="nothing"/>
 		<type fullname="UnityEngine.U2D.Animation.SpriteSkinUpdateHelper" preserve="nothing"/>
 	</assembly>

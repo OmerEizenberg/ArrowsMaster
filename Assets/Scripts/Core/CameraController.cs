@@ -10,7 +10,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private float zoomSpeed = 3f;
         [SerializeField] private float minZoom = 2f;
         [SerializeField] private float maxZoom = 50f;
-        [SerializeField] private float mobileZoomSpeed = 0.6f;
+        [SerializeField] private float mobileZoomSpeed = 1f;
 
         [Header("Pan Settings")]
         [SerializeField] private float panSensitivity = 0.005f; // Adjusted for pixel delta

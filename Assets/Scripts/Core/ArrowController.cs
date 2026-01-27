@@ -23,6 +23,7 @@ namespace Assets.Scripts.Core
         public int ArrowId { get; private set; }
         private ArrowData cachedData;
         private bool hasReducedLife = false;
+        private Vector2Int m_LookDirection = Vector2Int.up;
 
         // LineRenderer Refactor
         private LineRenderer lineRenderer;
@@ -71,6 +72,24 @@ namespace Assets.Scripts.Core
             previewLineRenderer.sortingOrder = -1; // Behind head
 
             segments.Clear();
+
+            // Set head direction from data
+            m_LookDirection = Vector2Int.up;
+            if (!string.IsNullOrEmpty(data.lookDirection))
+            {
+                switch (data.lookDirection.ToLower())
+                {
+                    case "up": m_LookDirection = Vector2Int.up; break;
+                    case "down": m_LookDirection = Vector2Int.down; break;
+                    case "left": m_LookDirection = Vector2Int.left; break;
+                    case "right": m_LookDirection = Vector2Int.right; break;
+                }
+            }
+            else if (data.path.Count >= 2)
+            {
+                // Fallback to path-based direction
+                m_LookDirection = data.path[data.path.Count - 1].ToVector2Int() - data.path[data.path.Count - 2].ToVector2Int();
+            }
             
             GameManager.Instance.RegisterArrow();
         }
@@ -370,12 +389,7 @@ namespace Assets.Scripts.Core
             if (segments.Count == 0) return false;
             
             Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = Vector2Int.up;
-            if (segments.Count >= 2)
-            {
-                Segment neck = segments[segments.Count - 2];
-                currentDir = head.GridPosition - neck.GridPosition;
-            }
+            Vector2Int currentDir = m_LookDirection;
             
             Vector2 headPos = new Vector2(head.GridPosition.x, head.GridPosition.y);
             Vector2 dirVec = new Vector2(currentDir.x, currentDir.y);
@@ -512,12 +526,7 @@ namespace Assets.Scripts.Core
             if (!CanMoveForward()) return false;
             
             Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = Vector2Int.up;
-            if (segments.Count >= 2)
-            {
-                Segment neck = segments[segments.Count - 2];
-                currentDir = head.GridPosition - neck.GridPosition;
-            }
+            Vector2Int currentDir = m_LookDirection;
             Vector2Int targetPos = head.GridPosition + currentDir;
             bool isEscaping = GridManager.Instance.IsOutOfBounds(targetPos);
 
@@ -592,27 +601,13 @@ namespace Assets.Scripts.Core
                     seg.Renderer.color = currentArrowColor; // Explicitly set color here
                     seg.Renderer.sortingOrder = 10;   // Ensure on top
                     
-                    // Rotation - Use visual direction for smooth rotation
-                    if (segments.Count >= 2)
-                    {
-                        Segment neck = segments[segments.Count - 2];
-                        Vector3 visualDir = (seg.transform.position - neck.transform.position).normalized;
-                        
-                        if (visualDir.sqrMagnitude > 0.01f)
-                        {
-                            float angle = Mathf.Atan2(visualDir.y, visualDir.x) * Mathf.Rad2Deg - 90f;
-                            seg.transform.rotation = Quaternion.Euler(0, 0, angle);
-                        }
-                        else
-                        {
-                            // Fallback to grid dir if stationary
-                            Vector2Int gridDir = seg.GridPosition - neck.GridPosition;
-                            if (gridDir == Vector2Int.up) seg.transform.rotation = Quaternion.Euler(0,0,0);
-                            else if (gridDir == Vector2Int.right) seg.transform.rotation = Quaternion.Euler(0,0,-90);
-                            else if (gridDir == Vector2Int.down) seg.transform.rotation = Quaternion.Euler(0,0,180);
-                            else if (gridDir == Vector2Int.left) seg.transform.rotation = Quaternion.Euler(0,0,90);
-                        }
-                    }
+                    // Rotation - Use explicit look direction from level data
+                    float angle = Mathf.Atan2(m_LookDirection.y, m_LookDirection.x) * Mathf.Rad2Deg - 90f;
+                    seg.transform.rotation = Quaternion.Euler(0, 0, angle);
+#if UNITY_EDITOR
+                    // Helpful for debugging in scene view
+                    seg.name = $"Head_{ArrowId}_{cachedData?.lookDirection}";
+#endif
                 }
                 else
                 {
@@ -627,12 +622,7 @@ namespace Assets.Scripts.Core
             if (segments.Count == 0 || isMoving) return;
 
             Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = Vector2Int.up;
-            if (segments.Count >= 2)
-            {
-                Segment neck = segments[segments.Count - 2];
-                currentDir = head.GridPosition - neck.GridPosition;
-            }
+            Vector2Int currentDir = m_LookDirection;
 
             Vector3 startPos = head.transform.position;
             Vector3 endPos = startPos + new Vector3(currentDir.x, currentDir.y, 0) * 20f * CellSize;
@@ -681,12 +671,7 @@ namespace Assets.Scripts.Core
             if (segments.Count == 0) return true;
             
             Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = Vector2Int.up;
-            if (segments.Count >= 2)
-            {
-                Segment neck = segments[segments.Count - 2];
-                currentDir = head.GridPosition - neck.GridPosition;
-            }
+            Vector2Int currentDir = m_LookDirection;
             
             Vector2Int currentHeadPos = head.GridPosition;
 
@@ -743,12 +728,7 @@ namespace Assets.Scripts.Core
                 
                 // Simulate one step forward (update positions without visual animation)
                 Segment head = segments[segments.Count - 1];
-                Vector2Int currentDir = Vector2Int.up;
-                if (segments.Count >= 2)
-                {
-                    Segment neck = segments[segments.Count - 2];
-                    currentDir = head.GridPosition - neck.GridPosition;
-                }
+                Vector2Int currentDir = m_LookDirection;
                 Vector2Int targetPos = head.GridPosition + currentDir;
                 
                 // Shift all segments forward
@@ -772,12 +752,7 @@ namespace Assets.Scripts.Core
             if (segments.Count == 0) yield break;
             
             Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = Vector2Int.up;
-            if (segments.Count >= 2)
-            {
-                Segment neck = segments[segments.Count - 2];
-                currentDir = head.GridPosition - neck.GridPosition;
-            }
+            Vector2Int currentDir = m_LookDirection;
             Vector2Int targetPos = head.GridPosition + currentDir;
             
             for (int i = 0; i < segments.Count - 1; i++)
@@ -797,20 +772,15 @@ namespace Assets.Scripts.Core
             if (segments.Count == 0) yield break;
             
             Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = Vector2Int.up;
-            if (segments.Count >= 2)
-            {
-                Segment neck = segments[segments.Count - 2];
-                currentDir = head.GridPosition - neck.GridPosition;
-            }
+            Vector2Int currentDir = m_LookDirection;
             
-            Vector2Int reversePos = head.GridPosition - currentDir;
+            // Reconstruct historical positions by moving in reverse from current Dir;
             
             for (int i = segments.Count - 1; i > 0; i--)
             {
                 segments[i].GridPosition = segments[i - 1].GridPosition;
             }
-            segments[0].GridPosition = reversePos;
+            segments[0].GridPosition = head.GridPosition - currentDir; // The new tail position is one step back from the original head
             
             List<Vector3> targets = new List<Vector3>();
             foreach (var seg in segments) targets.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
@@ -842,12 +812,7 @@ namespace Assets.Scripts.Core
             // Phase 2: Half-step impact toward the blocker
             // Move the head (and only the head) 0.5 units toward the blocking segment
             Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = Vector2Int.up;
-            if (segments.Count >= 2)
-            {
-                Segment neck = segments[segments.Count - 2];
-                currentDir = head.GridPosition - neck.GridPosition;
-            }
+            Vector2Int currentDir = m_LookDirection;
             
             Vector3 currentHeadWorldPos = head.transform.position;
             Vector3 impactOffset = new Vector3(currentDir.x * 0.5f * CellSize, currentDir.y * 0.5f * CellSize, 0);

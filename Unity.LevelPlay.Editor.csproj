@@ -159,8 +159,8 @@
     <Compile Include="Assets/LevelPlay/Editor/Service/NetworkingService/Serialization/IDeserializable.cs" />
     <Compile Include="Assets/LevelPlay/Editor/NetworkManager/IntegrationManagerDownloader.cs" />
     <Compile Include="Assets/LevelPlay/Editor/Settings/LevelPlayMenu.cs" />
-    <Compile Include="Assets/LevelPlay/Editor/Service/ILevelPlayLogger.cs" />
     <Compile Include="Assets/LevelPlay/Editor/Service/LevelPlayLogger.cs" />
+    <Compile Include="Assets/LevelPlay/Editor/Service/ILevelPlayLogger.cs" />
     <Compile Include="Assets/LevelPlay/Editor/Service/IOnLoadService.cs" />
     <Compile Include="Assets/LevelPlay/Editor/Service/LevelPlayEditorCoroutines.cs" />
     <Compile Include="Assets/LevelPlay/Editor/NetworkManager/IntegrationManagerUIUtils.cs" />

@@ -8,17 +8,21 @@ from PIL import Image
 # --- CONFIGURATION PARAMETERS ---
 GENERATOR_CONFIG = {
     "SHORT_PATH_PROBABILITY": 0.3,
+    # SHORT_PATH_RANGE: The number of segments (points) in a 'short' arrow. Default 3-7.
     "SHORT_PATH_RANGE": (3, 7),
+    # LONG_PATH_RANGE: The number of segments (points) in a 'long' arrow. Default 7-22.
     "LONG_PATH_RANGE": (7, 22),
     "TURN_PROBABILITY": 0.6,
     "COLOR_SIMILARITY_WEIGHT": 0.8,
     "ENFORCE_DIFFICULTY": True,
     "MAX_RETRY_ATTEMPTS": 50,
     "WHITE_THRESHOLD": 245,
-    "ALPHA_THRESHOLD": 128
+    "ALPHA_THRESHOLD": 128,
+    "MIN_SEEDS": 1,
+    "MAX_SEEDS": 3
 }
 
-DURATION_MULTIPLIER = 0.1
+DURATION_MULTIPLIER = 0.11
 
 def rgb_to_hex(rgb):
     return '#{:02x}{:02x}{:02x}'.format(rgb[0], rgb[1], rgb[2])
@@ -57,9 +61,12 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
     if not shape_mask:
         return None
 
-    avg_x = sum(p[0] for p in shape_mask) / len(shape_mask)
-    avg_y = sum(p[1] for p in shape_mask) / len(shape_mask)
-    center = (avg_x, avg_y)
+    # --- UPDATED: Select 1-3 random seed points for "parallel" growth ---
+    num_seeds = random.randint(config["MIN_SEEDS"], config["MAX_SEEDS"])
+    seeds = random.sample(shape_mask, min(num_seeds, len(shape_mask)))
+    
+    def get_min_dist_to_seeds(p):
+        return min((p[0] - s[0])**2 + (p[1] - s[1])**2 for s in seeds)
 
     occupied = set()
     escape_routes = {} 
@@ -68,11 +75,9 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
 
     remaining_points = set(shape_mask)
     
-    def get_dist(p):
-        return (p[0] - center[0])**2 + (p[1] - center[1])**2
-
     while remaining_points:
-        sorted_remaining = sorted(list(remaining_points), key=get_dist)
+        # Start node selection based on proximity to random seeds
+        sorted_remaining = sorted(list(remaining_points), key=get_min_dist_to_seeds)
         start_node = sorted_remaining[0]
         start_color = pixel_colors[start_node][:3]
         
@@ -126,29 +131,37 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
             prev_x, prev_y = current_path[-2]
             dx, dy = head_x - prev_x, head_y - prev_y
             
+            # Enforce difficulty: don't point in same direction as an existing escape route here
             if config["ENFORCE_DIFFICULTY"] and (head_x, head_y) in escape_routes:
-                blocking_dir = escape_routes[(head_x, head_y)]
-                if (dx, dy) == blocking_dir:
+                if (dx, dy) == escape_routes[(head_x, head_y)]:
                     continue
 
+            # --- STEP 5: Solvability & Self-Aiming Check ---
+            # Point 4 fix: Cannot point at any part of its OWN segments (temp_occupied)
+            # and cannot point at any already placed arrows (occupied).
             escapable = True
             check_x, check_y = head_x + dx, head_y + dy
             while 0 <= check_x < grid_width and 0 <= check_y < grid_height:
-                if (check_x, check_y) in occupied:
+                if (check_x, check_y) in occupied or (check_x, check_y) in temp_occupied:
                     escapable = False
                     break
                 check_x += dx
                 check_y += dy
             
             if escapable:
+                best_dir = (dx, dy)
                 avg_r = sum(pixel_colors[p][0] for p in current_path) // len(current_path)
                 avg_g = sum(pixel_colors[p][1] for p in current_path) // len(current_path)
                 avg_b = sum(pixel_colors[p][2] for p in current_path) // len(current_path)
                 
+                # Convert (dx, dy) to a direction name for easier debugging/json
+                dir_map = {(1, 0): "right", (-1, 0): "left", (0, 1): "up", (0, -1): "down"}
+                
                 arrow_obj = {
                     "id": arrow_id,
                     "color": rgb_to_hex((avg_r, avg_g, avg_b)),
-                    "path": [{"x": p[0], "y": p[1]} for p in current_path]
+                    "path": [{"x": p[0], "y": p[1]} for p in current_path],
+                    "lookDirection": dir_map[best_dir]
                 }
                 arrows.append(arrow_obj)
                 arrow_id += 1
@@ -157,6 +170,7 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
                     occupied.add(p)
                     remaining_points.remove(p)
                 
+                # Record escape route to influence future neighbors
                 curr_ex, curr_ey = head_x + dx, head_y + dy
                 while 0 <= curr_ex < grid_width and 0 <= curr_ey < grid_height:
                     escape_routes[(curr_ex, curr_ey)] = (dx, dy)
@@ -183,8 +197,8 @@ def generate_level_json(image_path, grid_width, grid_height, config=None):
 def main():
     parser = argparse.ArgumentParser(description="Bulk generate AlgoArrows levels from a folder of images.")
     parser.add_argument("folder", help="Path to the folder containing source images")
-    parser.add_argument("--min_width", type=int, default=30, help="Minimum grid width (default: 15)")
-    parser.add_argument("--max_width", type=int, default=60, help="Maximum grid width (default: 50)")
+    parser.add_argument("--min_width", type=int, default=20, help="Minimum grid width (default: 15)")
+    parser.add_argument("--max_width", type=int, default=45, help="Maximum grid width (default: 50)")
     
     args = parser.parse_args()
     

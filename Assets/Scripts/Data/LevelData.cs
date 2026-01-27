@@ -17,6 +17,7 @@ namespace Assets.Scripts.Data
     {
         public int id;
         public string color;
+        public string lookDirection;
         public List<Vector2IntData> path;
     }
 
