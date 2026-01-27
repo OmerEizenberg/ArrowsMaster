@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Assets/Scripts/Core/SettingsManager.cs" />
     <Compile Include="Assets/Scripts/Core/LevelManager.cs" />
+    <Compile Include="Assets/Scripts/Core/DeveloperCheats.cs" />
     <Compile Include="Assets/Scripts/Data/LevelData.cs" />
     <Compile Include="Assets/Scripts/Core/SoundManager.cs" />
     <Compile Include="Assets/Scripts/Core/GridManager.cs" />

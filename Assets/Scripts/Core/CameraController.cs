@@ -30,7 +30,9 @@ namespace Assets.Scripts.Core
         private float defaultZoom;
 
         private Vector3 dragOrigin;
-        private bool isDragging = false;
+        private Vector3 touchStartPosition;
+        private bool isTouching = false;
+        private bool isPanningActive = false;
         
         // Bounds
         private Vector2 minBounds;
@@ -88,46 +90,74 @@ namespace Assets.Scripts.Core
                 // If we are starting with multiple fingers, ignore panning
                 if (Input.touchCount > 1)
                 {
-                    isDragging = false;
+                    isTouching = false;
+                    isPanningActive = false;
                     return;
                 }
 
-                dragOrigin = Input.mousePosition;
-                isDragging = true;
+                touchStartPosition = Input.mousePosition;
+                isTouching = true;
+                isPanningActive = false;
             }
 
-            if (Input.GetMouseButton(0) && isDragging)
+            if (Input.GetMouseButton(0) && isTouching)
             {
                 // If a second finger is added while dragging, cancel the drag to allow zooming
                 if (Input.touchCount > 1)
                 {
-                    isDragging = false;
+                    isTouching = false;
+                    isPanningActive = false;
                     return;
                 }
 
                 Vector3 currentPos = Input.mousePosition;
-                Vector3 delta = dragOrigin - currentPos; // Drag World style (Move mouse Left -> Camera Right)
-                
-                // Convert screen delta to world delta roughly, or just use sensitivity
-                // Proper way: (ScreenToWorld(dragOrigin) - ScreenToWorld(currentPos))
-                // But simplified:
-                
-                Vector3 move = new Vector3(delta.x * panSensitivity * (cam.orthographicSize/5f), delta.y * panSensitivity * (cam.orthographicSize/5f), 0);
-                
-                transform.position += move;
-                
-                // Clamp
-                Vector3 clampedPos = transform.position;
-                clampedPos.x = Mathf.Clamp(clampedPos.x, minBounds.x, maxBounds.x);
-                clampedPos.y = Mathf.Clamp(clampedPos.y, minBounds.y, maxBounds.y);
-                transform.position = clampedPos;
 
-                dragOrigin = currentPos;
+                // Check if panning should be activated based on threshold
+                if (!isPanningActive)
+                {
+                    float distanceMoved = Vector3.Distance(touchStartPosition, currentPos);
+                    float threshold = Screen.width * (dragThresholdPercent / 100f);
+                    
+                    if (distanceMoved >= threshold)
+                    {
+                        // Activate panning and set dragOrigin to current position for smooth start
+                        isPanningActive = true;
+                        dragOrigin = currentPos;
+                    }
+                    else
+                    {
+                        // Don't pan yet, threshold not reached
+                        return;
+                    }
+                }
+
+                // Only pan if panning is active
+                if (isPanningActive)
+                {
+                    Vector3 delta = dragOrigin - currentPos; // Drag World style (Move mouse Left -> Camera Right)
+                    
+                    // Convert screen delta to world delta roughly, or just use sensitivity
+                    // Proper way: (ScreenToWorld(dragOrigin) - ScreenToWorld(currentPos))
+                    // But simplified:
+                    
+                    Vector3 move = new Vector3(delta.x * panSensitivity * (cam.orthographicSize/5f), delta.y * panSensitivity * (cam.orthographicSize/5f), 0);
+                    
+                    transform.position += move;
+                    
+                    // Clamp
+                    Vector3 clampedPos = transform.position;
+                    clampedPos.x = Mathf.Clamp(clampedPos.x, minBounds.x, maxBounds.x);
+                    clampedPos.y = Mathf.Clamp(clampedPos.y, minBounds.y, maxBounds.y);
+                    transform.position = clampedPos;
+
+                    dragOrigin = currentPos;
+                }
             }
 
             if (Input.GetMouseButtonUp(0))
             {
-                isDragging = false;
+                isTouching = false;
+                isPanningActive = false;
             }
         }
 
