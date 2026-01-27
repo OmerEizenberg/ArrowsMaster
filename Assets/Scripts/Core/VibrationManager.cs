@@ -40,18 +40,25 @@ namespace Assets.Scripts.Core
         private static AndroidJavaObject vibrator;
         private static void VibrateAndroid(long milliseconds)
         {
-            if (vibrator == null)
+            try
             {
-                using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                using (AndroidJavaObject currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                if (vibrator == null)
                 {
-                    vibrator = currentActivity.Call<AndroidJavaObject>("getSystemService", "vibrator");
+                    using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                    using (AndroidJavaObject currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                    {
+                        vibrator = currentActivity.Call<AndroidJavaObject>("getSystemService", "vibrator");
+                    }
+                }
+
+                if (vibrator != null)
+                {
+                    vibrator.Call("vibrate", milliseconds);
                 }
             }
-
-            if (vibrator != null)
+            catch (System.Exception e)
             {
-                vibrator.Call("vibrate", milliseconds);
+                Debug.LogWarning($"[VibrationManager] Android Vibration failed (Check AndroidManifest for VIBRATE permission): {e.Message}");
             }
         }
         #endif

@@ -171,26 +171,72 @@ namespace Assets.Scripts.Lobby
 
         public void OnPlayButtonClicked()
         {
-            SoundManager.Instance.PlayClick();
-            m_LobbyUI.SetActive(false);
-            m_GameUI.SetActive(true);
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
             
             string levelName = $"level{UserDataManager.Instance.CurrentLevel}";
-            GameManager.Instance.StartLevel(levelName);
+            Debug.Log($"[HomeContoller] Play clicked. Starting Level: {levelName}");
+            
+            SwitchToGameUI();
+            
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.StartLevel(levelName);
+            }
         }
 
         public void OnCalenderPlayButtonClicked()
         {
-            SoundManager.Instance.PlayClick();
-            m_LobbyUI.SetActive(false);
-            m_GameUI.SetActive(true);
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
             
+            if (m_MonthlyChallengeController == null)
+            {
+                Debug.LogError("[HomeContoller] MonthlyChallengeController reference missing!");
+                return;
+            }
+
             int month = m_MonthlyChallengeController.p_CurrentMonth;
             int day = m_MonthlyChallengeController.p_CurrentDay;
             int year = m_MonthlyChallengeController.p_CurrentYear;
 
             string levelName = $"level{month + day + (year % 10)}";
-            GameManager.Instance.StartChallengeLevel(levelName, year, month, day);
+            Debug.Log($"[HomeContoller] Calendar Play clicked. Starting Challenge: {levelName}");
+
+            SwitchToGameUI();
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.StartChallengeLevel(levelName, year, month, day);
+            }
+        }
+
+        private void SwitchToGameUI()
+        {
+            // Use local references if assigned, otherwise fallback to GameManager
+            GameObject lobby = m_LobbyUI;
+            GameObject game = m_GameUI;
+
+            if (lobby == null && GameManager.Instance != null) lobby = GameManager.Instance.m_LobbyUI;
+            if (game == null && GameManager.Instance != null) game = GameManager.Instance.m_GameUI;
+
+            if (lobby != null)
+            {
+                Debug.Log($"[HomeContoller] Hiding Lobby UI: {lobby.name}");
+                lobby.SetActive(false);
+            }
+            else
+            {
+                Debug.LogWarning("[HomeContoller] Could not find Lobby UI reference to hide!");
+            }
+
+            if (game != null)
+            {
+                Debug.Log($"[HomeContoller] Showing Game UI: {game.name}");
+                game.SetActive(true);
+            }
+            else
+            {
+                Debug.LogWarning("[HomeContoller] Could not find Game UI reference to show!");
+            }
         }
     }
 }

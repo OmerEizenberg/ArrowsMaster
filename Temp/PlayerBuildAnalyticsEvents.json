@@ -3,12 +3,12 @@
     {
       "type": "il2cppData",
       "msg": {
-        "build_event_id": "4fc4e286c86884780b696f0e56b56e8d",
+        "build_event_id": "30f86d15b6f0a453f836ab3d8f9a6af2",
         "node_executed": true,
         "attribute_total_count_eager_static_constructor": 80,
         "attribute_total_count_set_option": 0,
         "attribute_total_count_generate_into_own_cpp_file": 0,
-        "attribute_total_count_ignore_by_deep_profiler": 18,
+        "attribute_total_count_ignore_by_deep_profiler": 20,
         "extra_types_total_count": 0,
         "option_extra_types_file_count": 0,
         "option_debug_assembly_name_count": 0,
@@ -42,25 +42,24 @@
     {
       "type": "playerBuildTimingData",
       "msg": {
-        "build_event_id": "4fc4e286c86884780b696f0e56b56e8d",
-        "build_player": 50715,
-        "preprocess_player": 68,
-        "produce_player_script_assemblies": 1888,
-        "build_scripts_dlls": 12,
-        "writing_asset_files": 112,
-        "postprocess_built_player": 41485,
+        "build_event_id": "30f86d15b6f0a453f836ab3d8f9a6af2",
+        "build_player": 33286,
+        "preprocess_player": 72,
+        "produce_player_script_assemblies": 2101,
+        "build_scripts_dlls": 9,
+        "postprocess_built_player": 30464,
         "node_summary_table": [
           {
             "name": "Csc",
-            "duration": 161
+            "duration": 235
           },
           {
             "name": "UnityLinker.exe",
-            "duration": 4360
+            "duration": 4450
           },
           {
             "name": "il2cpp.exe",
-            "duration": 7022
+            "duration": 6566
           }
         ]
       },
@@ -69,7 +68,7 @@
     {
       "type": "unityLinkerData",
       "msg": {
-        "build_event_id": "4fc4e286c86884780b696f0e56b56e8d",
+        "build_event_id": "30f86d15b6f0a453f836ab3d8f9a6af2",
         "node_executed": true,
         "attribute_marked_count_always_link_assembly": 0,
         "attribute_swept_count_always_link_assembly": 0,
