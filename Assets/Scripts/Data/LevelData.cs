@@ -9,6 +9,7 @@ namespace Assets.Scripts.Data
     {
         public Vector2IntData gridSize;
         public List<ArrowData> arrows;
+        public int duration; // Optional: duration in seconds for time-based levels (0 = no time limit)
     }
 
     [Serializable]

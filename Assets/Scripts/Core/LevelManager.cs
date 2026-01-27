@@ -77,7 +77,11 @@ namespace Assets.Scripts.Core
         public void LoadLevel(string json)
         {
             LevelData data = JsonUtility.FromJson<LevelData>(json);
-            
+            // Initialize timer if level has duration
+            if (GameManager.Instance != null && data.duration > 0)
+            {
+                GameManager.Instance.InitializeTimer(data.duration);
+            }
             // Initialize Grid
             m_CurrentGridSize = data.gridSize.ToVector2Int();
             GridManager.Instance.InitializeGrid(m_CurrentGridSize);
@@ -102,6 +106,8 @@ namespace Assets.Scripts.Core
                 currentLevelObjects.Add(arrow.gameObject);
                 arrows.Add(arrow);
             }
+            
+          
 
             StartCoroutine(CoordinatedLevelInitialization(arrows, data));
         }

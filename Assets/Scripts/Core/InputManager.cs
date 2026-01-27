@@ -76,6 +76,12 @@ namespace Assets.Scripts.Core
                         ArrowController arrow = upSegment.GetComponentInParent<ArrowController>();
                         if (arrow != null)
                         {
+                            // Start timer on first touch (if it's a timed level)
+                            if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
+                            {
+                                GameManager.Instance.StartTimer();
+                            }
+                            
                             arrow.OnArrowClicked(upSegment);
                         }
                     }

@@ -13,7 +13,7 @@ namespace Assets.Scripts.Core
         [Header("References")]
         public LevelManager levelManager;
         public GameObject failureScreen;
-        public GameObject m_GameUI;
+        public GameUIContoleer m_GameUI;
         public GameObject m_LobbyUI;
 
         [Header("Settings")]
@@ -22,12 +22,21 @@ namespace Assets.Scripts.Core
         public int CurrentLives { get; private set; }
         private int activeArrowsCount = 0;
 
+        // Timer-related fields
+        private float currentTime = 0f;
+        private int levelDuration = 0; // 0 means no time limit
+        private bool isTimerActive = false;
+        public bool IsTimedLevel => levelDuration > 0;
+        public float CurrentTime => currentTime;
+        public int LevelDuration => levelDuration;
+
         // Events
         public event Action<int> OnLivesChanged;
         public event Action OnLevelStarted;
         public event Action OnGameOver;
         public event Action OnLevelWon;
         public event Action<bool> OnHintVisibilityChanged;
+        public event Action<string> OnTimerUpdated; // Passes formatted time string MM:SS
         public bool p_isLevelProgression = true;
 
         public int currentChallengeYear;
@@ -39,11 +48,12 @@ namespace Assets.Scripts.Core
         private bool isHintVisible = false;
         private bool isWinning = false;
         private bool isHintActive = false;
+        private bool isTimeUp = false;
 
         public bool p_isPlayOnRewarded = false;
         public bool p_isHintRewarded = false;
 
-        public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && 
+        public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && !isTimeUp &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
                                 (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy);
 
@@ -102,6 +112,16 @@ namespace Assets.Scripts.Core
                 {
                     Debug.Log("[GameManager] PlayOn Reward Received! Refilling lives and hiding failure screen.");
                     ResetLives();
+                    
+                    // For time-based levels, add 60 seconds
+                    if (IsTimedLevel)
+                    {
+                        currentTime += 60f;
+                        isTimeUp = false;
+                        isTimerActive = true;
+                        UpdateTimerUI();
+                    }
+                    
                     HideFailureScreen();
                     ResetHintTimer();
                 }
@@ -187,7 +207,13 @@ namespace Assets.Scripts.Core
             
             p_isLevelProgression = true;
             // Reset arrow count before loading new level
-            activeArrowsCount = 0; 
+            activeArrowsCount = 0;
+            
+            // Reset timer state
+            isTimerActive = false;
+            isTimeUp = false;
+            currentTime = 0f;
+            levelDuration = 0;
 
             if (levelManager != null)
             {
@@ -211,7 +237,13 @@ namespace Assets.Scripts.Core
             currentChallengeDay = day;
 
             // Reset arrow count before loading new level
-            activeArrowsCount = 0; 
+            activeArrowsCount = 0;
+            
+            // Reset timer state
+            isTimerActive = false;
+            isTimeUp = false;
+            currentTime = 0f;
+            levelDuration = 0;
 
             if (levelManager != null)
             {
@@ -293,7 +325,7 @@ namespace Assets.Scripts.Core
             
             if (m_GameUI != null)
             {
-                m_GameUI.SetActive(false);
+                m_GameUI.gameObject.SetActive(false);
             }
 
             if (AdsManager.Instance != null)
@@ -363,6 +395,22 @@ namespace Assets.Scripts.Core
                     SetHintVisibility(true);
                 }
             }
+            
+            // Update countdown timer
+            if (isTimerActive && isEntranceFinished && !isWinning)
+            {
+                currentTime -= Time.deltaTime;
+                
+                if (currentTime <= 0f)
+                {
+                    currentTime = 0f;
+                    isTimerActive = false;
+                    isTimeUp = true;
+                    HandleTimeUp();
+                }
+                
+                UpdateTimerUI();
+            }
         }
 
         public void ResetHintTimer()
@@ -382,6 +430,58 @@ namespace Assets.Scripts.Core
             yield return new WaitForSeconds(delay);
             if (arrow != null) arrow.HidePreview();
             isHintActive = false;
+        }
+        
+        // Timer-related methods
+        public void InitializeTimer(int durationInSeconds)
+        {
+            levelDuration = durationInSeconds;
+            if (levelDuration > 0)
+            {
+                currentTime = levelDuration;
+                // Timer will start when first touch happens (when isEntranceFinished is true)
+                UpdateTimerUI();
+            }
+        }
+        
+        public void StartTimer()
+        {
+            if (IsTimedLevel && !isTimerActive)
+            {
+                isTimerActive = true;
+                isTimeUp = false;
+            }
+        }
+        
+        private void UpdateTimerUI()
+        {
+            if (IsTimedLevel || levelDuration>0)
+            {
+                int minutes = Mathf.FloorToInt(currentTime / 60f);
+                int seconds = Mathf.FloorToInt(currentTime % 60f);
+                string timeString = string.Format("{0:00}:{1:00}", minutes, seconds);
+                m_GameUI.UpdateTimerUI(timeString);
+            }
+        }
+        
+        private void HandleTimeUp()
+        {
+            Debug.Log("Time's up!");
+            if (failureScreen != null)
+            {
+                failureScreen.SetActive(true);
+            }
+            OnGameOver?.Invoke();
+        }
+        
+        public string GetFailureTitle()
+        {
+            return IsTimedLevel ? "Time's Up!" : "Out of Lives!";
+        }
+        
+        public string GetFailureSubtitle()
+        {
+            return IsTimedLevel ? "Watch an ad to get 60 seconds, refill livees\nand Keep Playing!" : "Watch an ad to refill livees\nand Keep Playing!";
         }
     }
 }

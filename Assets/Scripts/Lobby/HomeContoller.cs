@@ -216,7 +216,7 @@ namespace Assets.Scripts.Lobby
             GameObject game = m_GameUI;
 
             if (lobby == null && GameManager.Instance != null) lobby = GameManager.Instance.m_LobbyUI;
-            if (game == null && GameManager.Instance != null) game = GameManager.Instance.m_GameUI;
+            if (game == null && GameManager.Instance != null) game = GameManager.Instance.m_GameUI.gameObject;
 
             if (lobby != null)
             {
