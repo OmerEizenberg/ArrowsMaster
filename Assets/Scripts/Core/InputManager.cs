@@ -7,7 +7,7 @@ namespace Assets.Scripts.Core
         private Segment pendingSegment;
         private Vector2 startTouchPos;
         private bool wasMultiTouch;
-        [SerializeField] private float moveThreshold = 10f; // Pixels
+        [SerializeField] private float moveThreshold = 20f; // Pixels
         [SerializeField] private float holdThreshold = 0.5f;
 
         private float mouseDownTime;

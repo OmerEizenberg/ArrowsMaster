@@ -102,6 +102,14 @@ namespace Assets.Scripts.Core
             StartCoroutine(CoordinatedLevelInitialization(arrows, data));
         }
 
+        private struct BackgroundCircleInfo
+        {
+            public SpriteRenderer renderer;
+            public Transform transform;
+            public float distanceFromCenter;
+        }
+        private List<BackgroundCircleInfo> m_BackgroundCircleInfos = new List<BackgroundCircleInfo>();
+
         private System.Collections.IEnumerator CoordinatedLevelInitialization(List<ArrowController> arrows, LevelData data)
         {
             // 1. Calculate Bounding Box of all arrows for Camera Focus
@@ -140,12 +148,8 @@ namespace Assets.Scripts.Core
             }
 
             // 2. Animate Arrow Growth
-            // Spread growth over ~1.2 seconds (during the camera "wait" phase)
             int maxPath = 0;
             foreach (var arrow in data.arrows) maxPath = Mathf.Max(maxPath, arrow.path.Count);
-
-            float totalGrowthTime = 1.0f; // Finish slightly before zoom-in starts
-            float stepDelay = totalGrowthTime / Mathf.Max(1, maxPath);
 
             for (int i = 0; i < maxPath; i++)
             {
@@ -154,17 +158,16 @@ namespace Assets.Scripts.Core
                     arrow.UpdateGrowthSlide(i);
                 }
                 yield return new WaitForSeconds(0.06f);
-
-                //yield return new WaitForSeconds(stepDelay);
             }
 
             // 3. Spawn Background Circles AFTER animation
+            m_BackgroundCircleInfos.Clear();
+            int spawnCount = 0;
             foreach (var arrowData in data.arrows)
             {
                 foreach (var pathPoint in arrowData.path)
                 {
                     Vector2Int pos = pathPoint.ToVector2Int();
-                    // Removed bounds check to allow circles for all path points
                     if (!m_SpawnedCirclePositions.Contains(pos))
                     {
                         GameObject circleObj = new GameObject($"Circle_{pos.x}_{pos.y}");
@@ -174,11 +177,19 @@ namespace Assets.Scripts.Core
                         SpriteRenderer sr = circleObj.AddComponent<SpriteRenderer>();
                         sr.sprite = m_CircleSprite;
                         sr.color = m_CircleColor;
-                        sr.sortingOrder = -1; // Behind arrows
+                        sr.sortingOrder = -1; 
 
-                        m_BackgroundCircles.Add(sr);
+                        m_BackgroundCircleInfos.Add(new BackgroundCircleInfo {
+                            renderer = sr,
+                            transform = circleObj.transform,
+                            distanceFromCenter = Vector3.Distance(circleObj.transform.position, m_LevelCenter)
+                        });
+                        
                         m_SpawnedCirclePositions.Add(pos);
                         currentLevelObjects.Add(circleObj);
+
+                        spawnCount++;
+                        if (spawnCount % 50 == 0) yield return null; // Prevent massive hitch
                     }
                 }
             }
@@ -196,6 +207,7 @@ namespace Assets.Scripts.Core
                 }
             }
         }
+
         public void RestartLevel()
         {
             ClearLevel();
@@ -229,76 +241,66 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator DoRippleEffect()
         {
-            if (m_BackgroundCircles == null || m_BackgroundCircles.Count == 0) yield break;
+            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
 
             Color targetColor = new Color(0.373f, 0.153f, 0.804f); // #5f27cd
-            float rippleSpeed = 4.0f; // Speed of the wave
+            float rippleSpeed = 4.0f; 
             float maxDist = 0;
             
-            foreach(var sr in m_BackgroundCircles)
+            foreach(var info in m_BackgroundCircleInfos)
             {
-                float dist = Vector3.Distance(sr.transform.position, m_LevelCenter);
-                if (dist > maxDist) maxDist = dist;
+                if (info.distanceFromCenter > maxDist) maxDist = info.distanceFromCenter;
             }
 
-            // Repeat the effect twice
             for (int repeat = 0; repeat < 2; repeat++)
             {
-                // We'll use a time-based wave approach
-                float duration = (maxDist / rippleSpeed) + 0.5f; // Duration of the whole effect
+                float duration = (maxDist / rippleSpeed) + 0.5f; 
                 float elapsed = 0;
 
                 while (elapsed < duration)
                 {
                     elapsed += Time.deltaTime;
+                    float waveFront = elapsed * rippleSpeed;
 
-                    foreach (var sr in m_BackgroundCircles)
+                    foreach (var info in m_BackgroundCircleInfos)
                     {
-                        float dist = Vector3.Distance(sr.transform.position, m_LevelCenter);
-                        
-                        // The "wave" is at dist = elapsed * rippleSpeed
-                        // Calculate a local phase 0->1 based on proximity to the wave front
-                        float waveFront = elapsed * rippleSpeed;
+                        float dist = info.distanceFromCenter;
                         float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveFront) / 2.0f);
                         
                         if (proximity > 0)
                         {
-                            // Scale: 100% -> 130% -> 50% based on proximity curve
                             float scale = 1.0f;
-                            if (proximity > 0.5f) // Scaling up part
+                            if (proximity > 0.5f)
                                 scale = Mathf.Lerp(1.0f, 1.3f, (proximity - 0.5f) * 2f);
-                            else // Scaling down part
+                            else
                                 scale = Mathf.Lerp(0.5f, 1.0f, proximity * 2f);
 
-                            sr.transform.localScale = Vector3.one * scale;
+                            info.transform.localScale = Vector3.one * scale;
                             Color c = Color.Lerp(m_CircleColor, targetColor, proximity);
                             c.a *= m_WinCirclesAlpha;
-                            sr.color = c;
+                            info.renderer.color = c;
                         }
                         else if (waveFront > dist)
                         {
-                            sr.transform.localScale = Vector3.one;
+                            info.transform.localScale = Vector3.one;
                             Color c = m_CircleColor;
                             c.a *= m_WinCirclesAlpha;
-                            sr.color = c;
+                            info.renderer.color = c;
                         }
                     }
                     yield return null;
                 }
-
-                // Brief pause before next ripple if it's the first one
                 if (repeat == 0) yield return new WaitForSeconds(0.2f);
             }
 
-            // Final Cleanup/Reset
-            foreach (var sr in m_BackgroundCircles)
+            foreach (var info in m_BackgroundCircleInfos)
             {
-                if (sr != null)
+                if (info.renderer != null)
                 {
-                    sr.transform.localScale = Vector3.one;
+                    info.transform.localScale = Vector3.one;
                     Color c = m_CircleColor;
                     c.a = m_WinCirclesAlpha;
-                    sr.color = c;
+                    info.renderer.color = c;
                 }
             }
         }

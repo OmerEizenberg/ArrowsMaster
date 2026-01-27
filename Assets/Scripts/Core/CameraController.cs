@@ -6,13 +6,13 @@ namespace Assets.Scripts.Core
     public class CameraController : MonoBehaviour
     {
         [Header("Zoom Settings")]
-        [SerializeField] private float zoomSpeed = 2f;
+        [SerializeField] private float zoomSpeed = 3f;
         [SerializeField] private float minZoom = 2f;
         [SerializeField] private float maxZoom = 50f;
-        [SerializeField] private float mobileZoomSpeed = 0.1f;
+        [SerializeField] private float mobileZoomSpeed = 0.3f;
 
         [Header("Pan Settings")]
-        [SerializeField] private float panSensitivity = 0.05f; // Adjusted for pixel delta
+        [SerializeField] private float panSensitivity = 0.01f; // Adjusted for pixel delta
         
         [Header("Level Initialization Animation")]
         [SerializeField] private float initZoomMultiplier = 2.0f;
@@ -83,12 +83,26 @@ namespace Assets.Scripts.Core
             // Handle Mouse/Touch Pan (Drag)
             if (Input.GetMouseButtonDown(0))
             {
+                // If we are starting with multiple fingers, ignore panning
+                if (Input.touchCount > 1)
+                {
+                    isDragging = false;
+                    return;
+                }
+
                 dragOrigin = Input.mousePosition;
                 isDragging = true;
             }
 
             if (Input.GetMouseButton(0) && isDragging)
             {
+                // If a second finger is added while dragging, cancel the drag to allow zooming
+                if (Input.touchCount > 1)
+                {
+                    isDragging = false;
+                    return;
+                }
+
                 Vector3 currentPos = Input.mousePosition;
                 Vector3 delta = dragOrigin - currentPos; // Drag World style (Move mouse Left -> Camera Right)
                 
@@ -130,9 +144,15 @@ namespace Assets.Scripts.Core
             // If there are two touches on the device...
             if (Input.touchCount == 2)
             {
-                // Store both touches.
                 Touch touchZero = Input.GetTouch(0);
                 Touch touchOne = Input.GetTouch(1);
+
+                // If any touch just began, skip this frame to establish a clean baseline
+                // and prevent the "jump" caused by the first finger's existing deltaPosition.
+                if (touchZero.phase == TouchPhase.Began || touchOne.phase == TouchPhase.Began)
+                {
+                    return;
+                }
 
                 // Find the position in the previous frame of each touch.
                 Vector2 touchZeroPrevPos = touchZero.position - touchZero.deltaPosition;

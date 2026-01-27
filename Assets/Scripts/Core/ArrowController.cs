@@ -134,54 +134,80 @@ namespace Assets.Scripts.Core
             UpdateHeadVisuals();
         }
 
+        private List<Vector3> linePoints = new List<Vector3>();
+        private Vector3[] linePointsArray;
+        private Vector3 lastHeadPos;
+        private bool forceLineUpdate = true;
+
         private void UpdateLinePositions()
         {
-            if (lineRenderer != null && segments.Count > 0)
+            if (lineRenderer == null || segments.Count == 0)
             {
-                // Refinment: Use List to filter out points too close to each other
-                // This prevents "zero-length" segments at the corners which look glitchy
-                
-                List<Vector3> points = new List<Vector3>();
-                
-                for (int i = 0; i < segments.Count; i++)
+                if (lineRenderer != null) lineRenderer.positionCount = 0;
+                return;
+            }
+
+            // Performance: Only update if the head has moved significantly or update is forced
+            Vector3 currentHeadPos = segments[segments.Count - 1].transform.position;
+            if (!forceLineUpdate && (currentHeadPos - lastHeadPos).sqrMagnitude < 0.0001f)
+            {
+                return;
+            }
+            lastHeadPos = currentHeadPos;
+            forceLineUpdate = false;
+
+            linePoints.Clear();
+            
+            for (int i = 0; i < segments.Count; i++)
+            {
+                // 1. Current Position
+                linePoints.Add(segments[i].transform.position);
+
+                // 2. Corner Anchor
+                if (i < segments.Count - 1)
                 {
-                    // 1. Current Position (where segment is visually)
-                    points.Add(segments[i].transform.position);
+                    Vector2Int p1Grid = segments[i].GridPosition;
+                    Vector2Int p2Grid = segments[i+1].GridPosition;
 
-                    // 2. Corner Anchor (helper point at grid position to prevent missing corners)
-                    // We check both adjacent segments' GridPositions to find the junction point
-                    if (i < segments.Count - 1)
+                    if (p1Grid != p2Grid)
                     {
-                        Vector2Int[] candidates = { segments[i].GridPosition, segments[i + 1].GridPosition };
-                        
-                        foreach (var cornerGridPos in candidates)
+                        // Potential junction point at either p1Grid or p2Grid
+                        // We check both to ensure corners are sharp
+                        Vector3 c1 = new Vector3(p1Grid.x * CellSize, p1Grid.y * CellSize, currentHeadPos.z);
+                        Vector3 c2 = new Vector3(p2Grid.x * CellSize, p2Grid.y * CellSize, currentHeadPos.z);
+
+                        Vector3 p1 = segments[i].transform.position;
+                        Vector3 p2 = segments[i+1].transform.position;
+
+                        // Check c1
+                        float d1sq = (p1 - c1).sqrMagnitude;
+                        float d2sq = (p2 - c1).sqrMagnitude;
+                        if (d1sq > 0.0025f && d2sq > 0.0025f && Mathf.Abs(Mathf.Sqrt(d1sq) + Mathf.Sqrt(d2sq) - CellSize) < 0.05f)
                         {
-                            Vector3 cornerPos = new Vector3(cornerGridPos.x * CellSize, cornerGridPos.y * CellSize, 0);
-                            cornerPos.z = segments[i].transform.position.z;
-
-                            // A point is a valid junction if:
-                            // 1. It's not too close to either current segment visual (dist > 0.05)
-                            // 2. It lies on the path between them (sum of distances ≈ CellSize)
-                            
-                            float distToCurrent = Vector3.Distance(segments[i].transform.position, cornerPos);
-                            float distToNext = Vector3.Distance(segments[i + 1].transform.position, cornerPos);
-
-                            if (distToCurrent > 0.05f && distToNext > 0.05f && Mathf.Abs(distToCurrent + distToNext - CellSize) < 0.05f)
+                            linePoints.Add(c1);
+                        }
+                        else
+                        {
+                            // Check c2
+                            d1sq = (p1 - c2).sqrMagnitude;
+                            d2sq = (p2 - c2).sqrMagnitude;
+                            if (d1sq > 0.0025f && d2sq > 0.0025f && Mathf.Abs(Mathf.Sqrt(d1sq) + Mathf.Sqrt(d2sq) - CellSize) < 0.05f)
                             {
-                                points.Add(cornerPos);
-                                break; // Found the junction
+                                linePoints.Add(c2);
                             }
                         }
                     }
                 }
-                
-                lineRenderer.positionCount = points.Count;
-                lineRenderer.SetPositions(points.ToArray());
             }
-            else if (lineRenderer != null)
+            
+            if (linePointsArray == null || linePointsArray.Length != linePoints.Count)
             {
-                lineRenderer.positionCount = 0;
+                linePointsArray = new Vector3[linePoints.Count];
             }
+            
+            linePoints.CopyTo(linePointsArray);
+            lineRenderer.positionCount = linePointsArray.Length;
+            lineRenderer.SetPositions(linePointsArray);
         }
 
         [SerializeField] private Color blockedColor = new Color(0.906f, 0.298f, 0.235f); // #e74c3c
