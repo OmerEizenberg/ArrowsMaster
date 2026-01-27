@@ -10,10 +10,11 @@ namespace Assets.Scripts.Core
         [SerializeField] private float zoomSpeed = 3f;
         [SerializeField] private float minZoom = 2f;
         [SerializeField] private float maxZoom = 50f;
-        [SerializeField] private float mobileZoomSpeed = 0.3f;
+        [SerializeField] private float mobileZoomSpeed = 0.6f;
 
         [Header("Pan Settings")]
-        [SerializeField] private float panSensitivity = 0.01f; // Adjusted for pixel delta
+        [SerializeField] private float panSensitivity = 0.005f; // Adjusted for pixel delta
+        [SerializeField] private float dragThresholdPercent = 2f; // Percentage of screen width to start panning
         
         [Header("Level Initialization Animation")]
         [SerializeField] private float initZoomMultiplier = 1.3f;
