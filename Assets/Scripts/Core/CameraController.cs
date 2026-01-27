@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 namespace Assets.Scripts.Core
 {
@@ -15,10 +16,10 @@ namespace Assets.Scripts.Core
         [SerializeField] private float panSensitivity = 0.01f; // Adjusted for pixel delta
         
         [Header("Level Initialization Animation")]
-        [SerializeField] private float initZoomMultiplier = 2.0f;
-        [SerializeField] private float initZoomOutDuration = 0.3f;
-        [SerializeField] private float initWaitDuration = 1.2f;
-        [SerializeField] private float initZoomInDuration = 0.25f;
+        [SerializeField] private float initZoomMultiplier = 1.3f;
+        [SerializeField] private float initZoomInDuration = 1.2f;
+        [SerializeField] private float initPaddingMultiplier = 1.1f; // How much extra space around level (1.0 = exact fit, 1.2 = 20% extra)
+        [SerializeField] private float initExtraZoomBuffer = 0.5f; // Additional units of zoom out beyond calculated fit
 
         [SerializeField] private float winZoomMultiplier = 3.0f;
 
@@ -175,70 +176,65 @@ namespace Assets.Scripts.Core
             cam.orthographicSize = defaultZoom;
         }
 
-        public void PlayInitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
+        public IEnumerator PlayInitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
-            StartCoroutine(InitializationZoomAnimation(gridSize, focusPosition));
+            yield return StartCoroutine(InitializationZoomAnimation(gridSize, focusPosition));
         }
 
         private System.Collections.IEnumerator InitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
-            float padding = 2f;
             float cellSize = ArrowController.CellSize;
             float aspectRatio = cam.aspect;
 
-            // Calculate target zoom to fit grid
-            float fitVertical = (gridSize.y * cellSize + padding * 2) / 2f;
-            float fitHorizontal = (gridSize.x * cellSize + padding * 2) / (2f * aspectRatio);
+            // Calculate the actual level bounds (from 0,0 to gridSize)
+            float levelWidth = gridSize.x * cellSize;
+            float levelHeight = gridSize.y * cellSize;
+
+            // Calculate minimum zoom to fit level with padding multiplier
+            // For vertical fit: we need to show levelHeight, so orthographicSize = (levelHeight * paddingMultiplier) / 2
+            // For horizontal fit: we need to show levelWidth, accounting for aspect ratio
+            float fitVertical = (levelHeight * initPaddingMultiplier) / 2f;
+            float fitHorizontal = (levelWidth * initPaddingMultiplier) / (2f * aspectRatio);
             
-            // Zoom out even more (multiplier)
-            float targetZoom = Mathf.Max(fitVertical, fitHorizontal) * initZoomMultiplier;
+            // Take the larger of the two to ensure entire level fits
+            float minZoomToFit = Mathf.Max(fitVertical, fitHorizontal);
             
-            // Limit target zoom by max zoom
-            targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
+            // Add the extra buffer for a bit more breathing room
+            float startZoom = minZoomToFit + initExtraZoomBuffer;
 
-            Vector3 targetAnimPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
-            Vector3 finalPos = targetAnimPos;
-            float finalZoom = cam.orthographicSize;
-
-            // Start almost zoomed out (85% of target zoom for more movement)
-            float startZoom = targetZoom * 0.85f;
-            // Slightly offset start position to create some initial movement
-            Vector3 startPos = Vector3.Lerp(targetAnimPos, transform.position, 0.15f);
-
-            float totalDuration = initZoomOutDuration + initWaitDuration + initZoomInDuration;
+            Vector3 centerPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
+            
+            // Immediately set to zoomed out view
+            cam.orthographicSize = startZoom;
+            transform.position = centerPos;
+            
+            // This coroutine will be yielded by LevelManager, so we just hold the zoomed out state
+            // The zoom-in will happen AFTER arrows finish animating
+            yield return null;
+        }
+        
+        public IEnumerator ZoomInToDefault(Vector3 focusPosition)
+        {
+            float duration = initZoomInDuration;
+            float startZoom = cam.orthographicSize;
+            float targetZoom = defaultZoom;
+            Vector3 startPos = transform.position;
+            Vector3 targetPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
             
             float elapsed = 0f;
-
-            while (elapsed < totalDuration)
+            while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0, 1, elapsed / duration);
                 
-                if (elapsed < initZoomOutDuration)
-                {
-                    // Phase 1: Zoom Out
-                    float t = elapsed / initZoomOutDuration;
-                    cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, t);
-                    transform.position = Vector3.Lerp(startPos, targetAnimPos, t);
-                }
-                else if (elapsed < initZoomOutDuration + initWaitDuration)
-                {
-                    // Phase 2: Wait
-                    cam.orthographicSize = targetZoom;
-                    transform.position = targetAnimPos;
-                }
-                else
-                {
-                    // Phase 3: Zoom In
-                    float t = (elapsed - initZoomOutDuration - initWaitDuration) / initZoomInDuration;
-                    cam.orthographicSize = Mathf.Lerp(targetZoom, finalZoom, t);
-                    transform.position = Vector3.Lerp(targetAnimPos, finalPos, t);
-                }
-
+                cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, t);
+                transform.position = Vector3.Lerp(startPos, targetPos, t);
+                
                 yield return null;
             }
-
-            cam.orthographicSize = finalZoom;
-            transform.position = finalPos;
+            
+            cam.orthographicSize = targetZoom;
+            transform.position = targetPos;
         }
 
         public void PlayWinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)

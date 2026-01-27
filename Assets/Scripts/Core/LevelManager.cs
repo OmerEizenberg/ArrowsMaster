@@ -57,6 +57,9 @@ namespace Assets.Scripts.Core
 
         public void ClearLevel()
         {
+            // Stop all running coroutines (including win animations) before clearing
+            StopAllCoroutines();
+            
             foreach (GameObject obj in currentLevelObjects)
             {
                 if (obj != null)
@@ -66,6 +69,7 @@ namespace Assets.Scripts.Core
             }
             currentLevelObjects.Clear();
             m_BackgroundCircles.Clear();
+            m_BackgroundCircleInfos.Clear();
             m_SpawnedCirclePositions.Clear();
             GridManager.Instance.InitializeGrid(Vector2Int.zero); // Reset with zero or just clear map
         }
@@ -135,11 +139,11 @@ namespace Assets.Scripts.Core
             }
             m_LevelCenter = levelCenter;
 
-            // 2. Start Camera Animation
+            // 1. Set camera to zoomed out position showing entire level
             if (CameraController.Instance != null)
             {
                 CameraController.Instance.SetBounds(data.gridSize.ToVector2Int());
-                CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), levelCenter);
+                yield return StartCoroutine(CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), levelCenter));
             }
 
             if (SoundManager.Instance != null)
@@ -147,7 +151,7 @@ namespace Assets.Scripts.Core
                 SoundManager.Instance.PlayLevelInitialized();
             }
 
-            // 2. Animate Arrow Growth
+            // 2. Animate Arrow Growth while camera is zoomed out
             int maxPath = 0;
             foreach (var arrow in data.arrows) maxPath = Mathf.Max(maxPath, arrow.path.Count);
 
@@ -160,7 +164,13 @@ namespace Assets.Scripts.Core
                 yield return new WaitForSeconds(0.06f);
             }
 
-            // 3. Spawn Background Circles AFTER animation
+            // 3. After arrows finish, zoom camera in to default
+            if (CameraController.Instance != null)
+            {
+                yield return StartCoroutine(CameraController.Instance.ZoomInToDefault(levelCenter));
+            }
+
+            // 4. Spawn Background Circles AFTER animation
             m_BackgroundCircleInfos.Clear();
             int spawnCount = 0;
             foreach (var arrowData in data.arrows)
@@ -264,6 +274,9 @@ namespace Assets.Scripts.Core
 
                     foreach (var info in m_BackgroundCircleInfos)
                     {
+                        // Check if objects still exist
+                        if (info.transform == null || info.renderer == null) continue;
+
                         float dist = info.distanceFromCenter;
                         float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveFront) / 2.0f);
                         
@@ -295,7 +308,7 @@ namespace Assets.Scripts.Core
 
             foreach (var info in m_BackgroundCircleInfos)
             {
-                if (info.renderer != null)
+                if (info.renderer != null && info.transform != null)
                 {
                     info.transform.localScale = Vector3.one;
                     Color c = m_CircleColor;

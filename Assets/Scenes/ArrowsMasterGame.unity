@@ -1129,10 +1129,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1440, y: 2560}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
@@ -6350,9 +6350,9 @@ MonoBehaviour:
   mobileZoomSpeed: 0.1
   panSensitivity: 0.01
   initZoomMultiplier: 2
-  initZoomOutDuration: 0.3
-  initWaitDuration: 1.2
   initZoomInDuration: 0.25
+  initPaddingMultiplier: 1.1
+  initExtraZoomBuffer: 0.5
   winZoomMultiplier: 1.5
 --- !u!1 &539683537
 GameObject:
@@ -10221,7 +10221,7 @@ MonoBehaviour:
   SmallCheer: {fileID: 8300000, guid: abbf74dc97dc348ca9ff5113a7849f3a, type: 3}
   MediumCheer: {fileID: 8300000, guid: 93c69b7afbc1646bc82d3f1800a7ab05, type: 3}
   BigCheer: {fileID: 8300000, guid: d0f8f29d5ad7a4992b6bff45c8de84f0, type: 3}
-  BackgroundMusic: {fileID: 0}
+  BackgroundMusic: {fileID: 8300000, guid: e1f3dba82fd0e40cebf5b19cc77f5759, type: 3}
   musicSource: {fileID: 0}
 --- !u!1 &985538275
 GameObject:
