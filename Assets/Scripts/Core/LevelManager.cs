@@ -155,7 +155,7 @@ namespace Assets.Scripts.Core
             {
                 foreach (var arrow in arrows)
                 {
-                    arrow.UpdateGrowthSlide(i);
+                    StartCoroutine(arrow.UpdateGrowthSlide(i, 0.06f));
                 }
                 yield return new WaitForSeconds(0.06f);
             }

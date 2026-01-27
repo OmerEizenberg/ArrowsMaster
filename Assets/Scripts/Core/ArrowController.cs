@@ -33,7 +33,7 @@ namespace Assets.Scripts.Core
             PrepareIncrementalInit(data);
             for (int i = 0; i < data.path.Count; i++)
             {
-                UpdateGrowthSlide(i);
+                SpawnSegmentStep(i, true);
             }
         }
 
@@ -81,11 +81,11 @@ namespace Assets.Scripts.Core
         /// Step 1: Head moves to path[1], new segment appears at path[0].
         /// ...and so on.
         /// </summary>
-        public bool UpdateGrowthSlide(int step)
+        private void SpawnSegmentStep(int step, bool instant)
         {
-            if (cachedData == null || step >= cachedData.path.Count) return false;
+            if (cachedData == null || step >= cachedData.path.Count) return;
 
-            // 1. Create a new segment at index 0 of the segments list
+            // 1. Create a new segment at index 0 (the tail end of the growing path)
             Vector2Int spawnPos = cachedData.path[0].ToVector2Int();
             Vector3 worldSpawnPos = new Vector3(spawnPos.x * CellSize, spawnPos.y * CellSize, 0);
 
@@ -93,32 +93,50 @@ namespace Assets.Scripts.Core
             segObj.transform.localScale = Vector3.one;
             Segment newSeg = segObj.GetComponent<Segment>();
             
-            // Always insert at the start - it represents the "newest" part of the arrow being grown from the tail
             segments.Insert(0, newSeg);
 
-            // Ensure collider is set up for interaction
             BoxCollider2D box = newSeg.GetComponent<BoxCollider2D>();
             if (box == null) box = newSeg.gameObject.AddComponent<BoxCollider2D>();
             box.size = new Vector2(1f, 1f);
 
-            // 2. Shift all segments forward along the path to their current position in this step
-            // In step k, we have k+1 segments.
-            // segments[0] (newest) should be at path[0].
-            // segments[segments.Count - 1] (oldest/Head) should be at path[step].
+            // 2. Determine target positions for all segments in this growth step
+            List<Vector3> targets = new List<Vector3>();
             for (int i = 0; i < segments.Count; i++)
             {
                 int pathIndex = step - (segments.Count - 1 - i);
                 Vector2Int pos = cachedData.path[pathIndex].ToVector2Int();
                 segments[i].GridPosition = pos;
-                
                 Vector3 targetWorldPos = new Vector3(pos.x * CellSize, pos.y * CellSize, 0);
-                // To make it look like a flow, we use MoveTo.
-                segments[i].MoveTo(targetWorldPos, 0.08f); 
+                targets.Add(targetWorldPos);
                 
+                if (instant) segments[i].transform.position = targetWorldPos;
+
                 GridManager.Instance.RegisterOccupancy(pos, this);
             }
 
-            return true;
+            forceLineUpdate = true;
+            if (!instant)
+            {
+                // If not instant, we rely on the caller to start the animation coroutine
+                // with the calculated targets. But for better API, we'll keep the IEnumerator wrapper.
+            }
+        }
+
+        public IEnumerator UpdateGrowthSlide(int step, float duration)
+        {
+            if (cachedData == null || step >= cachedData.path.Count) yield break;
+
+            // Use the synch helper to setup data, but don't place instantly
+            SpawnSegmentStep(step, false);
+
+            // Calculate targets again for the animation (or we could pass them out)
+            List<Vector3> targets = new List<Vector3>();
+            for (int i = 0; i < segments.Count; i++)
+            {
+                targets.Add(new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, 0));
+            }
+
+            yield return StartCoroutine(AnimateAllSegments(targets, duration));
         }
 
         public Vector3 GetHeadPosition()
@@ -129,7 +147,12 @@ namespace Assets.Scripts.Core
 
         private void Update()
         {
-            // Continuously update line and head visuals to follow the moving segments and color state
+            // Update logic (if any)
+        }
+
+        private void LateUpdate()
+        {
+            // Sync visuals in LateUpdate after all positions have been updated in this frame
             UpdateLinePositions();
             UpdateHeadVisuals();
         }
@@ -148,8 +171,9 @@ namespace Assets.Scripts.Core
             }
 
             // Performance: Only update if the head has moved significantly or update is forced
+            // Using a slightly more sensitive threshold for smooth visuals
             Vector3 currentHeadPos = segments[segments.Count - 1].transform.position;
-            if (!forceLineUpdate && (currentHeadPos - lastHeadPos).sqrMagnitude < 0.0001f)
+            if (!forceLineUpdate && (currentHeadPos - lastHeadPos).sqrMagnitude < 0.00001f)
             {
                 return;
             }
@@ -158,47 +182,34 @@ namespace Assets.Scripts.Core
 
             linePoints.Clear();
             
-            for (int i = 0; i < segments.Count; i++)
+            // Junction Corners (prevent geometry gaps during turns)
+            for (int i = 0; i < segments.Count - 1; i++)
             {
-                // 1. Current Position
+                // Current segment visual pos
                 linePoints.Add(segments[i].transform.position);
 
-                // 2. Corner Anchor
-                if (i < segments.Count - 1)
+                // Add a corner anchor ONLY if the segments are currently in a turn
+                // We detect a turn if their target GridPositions don't share an axis with their visual positions
+                Vector3 p1 = segments[i].transform.position;
+                Vector3 p2 = segments[i+1].transform.position;
+                
+                // If they are not aligned on X or Y visually, we need a junction point
+                if (Mathf.Abs(p1.x - p2.x) > 0.01f && Mathf.Abs(p1.y - p2.y) > 0.01f)
                 {
-                    Vector2Int p1Grid = segments[i].GridPosition;
-                    Vector2Int p2Grid = segments[i+1].GridPosition;
-
-                    if (p1Grid != p2Grid)
-                    {
-                        // Potential junction point at either p1Grid or p2Grid
-                        // We check both to ensure corners are sharp
-                        Vector3 c1 = new Vector3(p1Grid.x * CellSize, p1Grid.y * CellSize, currentHeadPos.z);
-                        Vector3 c2 = new Vector3(p2Grid.x * CellSize, p2Grid.y * CellSize, currentHeadPos.z);
-
-                        Vector3 p1 = segments[i].transform.position;
-                        Vector3 p2 = segments[i+1].transform.position;
-
-                        // Check c1
-                        float d1sq = (p1 - c1).sqrMagnitude;
-                        float d2sq = (p2 - c1).sqrMagnitude;
-                        if (d1sq > 0.0025f && d2sq > 0.0025f && Mathf.Abs(Mathf.Sqrt(d1sq) + Mathf.Sqrt(d2sq) - CellSize) < 0.05f)
-                        {
-                            linePoints.Add(c1);
-                        }
-                        else
-                        {
-                            // Check c2
-                            d1sq = (p1 - c2).sqrMagnitude;
-                            d2sq = (p2 - c2).sqrMagnitude;
-                            if (d1sq > 0.0025f && d2sq > 0.0025f && Mathf.Abs(Mathf.Sqrt(d1sq) + Mathf.Sqrt(d2sq) - CellSize) < 0.05f)
-                            {
-                                linePoints.Add(c2);
-                            }
-                        }
-                    }
+                    // The junction is at the GridPosition that they both "share" during this step
+                    // This is usually the GridPosition of the leading segment (i+1) before it moved
+                    // or simply the grid point at the corner.
+                    Vector2Int g1 = segments[i].GridPosition;
+                    Vector2Int g2 = segments[i+1].GridPosition;
+                    
+                    // The junction is the target position of the follower segment
+                    Vector3 corner = new Vector3(g1.x * CellSize, g1.y * CellSize, currentHeadPos.z);
+                    linePoints.Add(corner);
                 }
             }
+            
+            // 3. Always add the final visual position of the head at the VERY end
+            linePoints.Add(segments[segments.Count - 1].transform.position);
             
             if (linePointsArray == null || linePointsArray.Length != linePoints.Count)
             {
@@ -336,25 +347,19 @@ namespace Assets.Scripts.Core
             // Continuous movement - No sleep between steps
             while (true)
             {
-                if (!TryMoveForward())
+                List<Vector3> targets;
+                if (!TryMoveForwardStep(out targets))
                 {
                     isMoving = false;
                     yield break;
                 }
                 
-                // Wait for the move animation to finish before starting next step
-                // To make it continuous, we wait exactly the duration of the move.
-                yield return new WaitForSeconds(0.04f); 
+                // Animate the batch move and wait for it
+                yield return StartCoroutine(AnimateAllSegments(targets, 0.04f));
                 
                 // Check if completely escaped (no segments left)
-                // Actually, TryMoveForward now clears segments if all OOB.
                 if (segments.Count == 0)
                 {
-                    // We already set a 5s destruction timer on click, 
-                    // but if it escapes fast, we might want to just let it finish.
-                    // The user said "5 seconds after... pressed".
-                    // So the Invoke handles it. 
-                    // We can just stop the routine.
                     yield break;
                 }
             }
@@ -379,25 +384,31 @@ namespace Assets.Scripts.Core
             {
                 if (otherArrow == this || otherArrow.isMoving) continue;
                 
-                // Check intersection with each segment of the other arrow
-                for (int i = 0; i < otherArrow.segments.Count - 1; i++)
+                // PERFORMANCE: Broad phase check using integer grid coords
+                foreach (var seg in otherArrow.segments)
                 {
-                    Vector2 p1 = new Vector2(otherArrow.segments[i].GridPosition.x, otherArrow.segments[i].GridPosition.y);
-                    Vector2 p2 = new Vector2(otherArrow.segments[i+1].GridPosition.x, otherArrow.segments[i+1].GridPosition.y);
+                    Vector2Int gp = seg.GridPosition;
+                    bool potentialBlocker = false;
+                    if (currentDir.x > 0) potentialBlocker = gp.x > head.GridPosition.x && gp.y == head.GridPosition.y;
+                    else if (currentDir.x < 0) potentialBlocker = gp.x < head.GridPosition.x && gp.y == head.GridPosition.y;
+                    else if (currentDir.y > 0) potentialBlocker = gp.y > head.GridPosition.y && gp.x == head.GridPosition.x;
+                    else if (currentDir.y < 0) potentialBlocker = gp.y < head.GridPosition.y && gp.x == head.GridPosition.x;
                     
-                    if (RayIntersectsSegment(headPos, dirVec, p1, p2))
+                    if (potentialBlocker)
                     {
-                        return false;
-                    }
-                }
-                
-                // Also check the head of the other arrow if it's the only segment
-                if (otherArrow.segments.Count == 1)
-                {
-                    Vector2 pH = new Vector2(otherArrow.segments[0].GridPosition.x, otherArrow.segments[0].GridPosition.y);
-                    if (RayIntersectsPoint(headPos, dirVec, pH))
-                    {
-                        return false;
+                        // Found at least one segment in the path, now do exact checks
+                        for (int i = 0; i < otherArrow.segments.Count - 1; i++)
+                        {
+                            Vector2 p1 = new Vector2(otherArrow.segments[i].GridPosition.x, otherArrow.segments[i].GridPosition.y);
+                            Vector2 p2 = new Vector2(otherArrow.segments[i+1].GridPosition.x, otherArrow.segments[i+1].GridPosition.y);
+                            if (RayIntersectsSegment(headPos, dirVec, p1, p2)) return false;
+                        }
+                        if (otherArrow.segments.Count == 1)
+                        {
+                            Vector2 pH = new Vector2(otherArrow.segments[0].GridPosition.x, otherArrow.segments[0].GridPosition.y);
+                            if (RayIntersectsPoint(headPos, dirVec, pH)) return false;
+                        }
+                        break; 
                     }
                 }
             }
@@ -495,12 +506,12 @@ namespace Assets.Scripts.Core
             return false;
         }
 
-        private bool TryMoveForward()
+        private bool TryMoveForwardStep(out List<Vector3> targetWorldPositions)
         {
+            targetWorldPositions = null;
             if (!CanMoveForward()) return false;
             
             Segment head = segments[segments.Count - 1];
-            // Calculate Dir again or cache it? Recalculating is safe.
             Vector2Int currentDir = Vector2Int.up;
             if (segments.Count >= 2)
             {
@@ -530,17 +541,39 @@ namespace Assets.Scripts.Core
                 segments[i].GridPosition = newPositions[i];
             }
             
-            // Only update visuals for the Head
-            UpdateHeadVisuals();
+            forceLineUpdate = true;
 
-            for (int i = 0; i < segments.Count; i++)
+            // Prepare target world positions for batch animation
+            targetWorldPositions = new List<Vector3>();
+            foreach (var pos in newPositions)
             {
-                Vector3 newWorldPos = new Vector3(newPositions[i].x * CellSize, newPositions[i].y * CellSize, 0);
-                // Faster move speed (0.04f)
-                segments[i].MoveTo(newWorldPos, 0.04f);
+                targetWorldPositions.Add(new Vector3(pos.x * CellSize, pos.y * CellSize, 0));
             }
             
             return true;
+        }
+
+        private IEnumerator AnimateAllSegments(List<Vector3> targets, float duration)
+        {
+            int count = segments.Count;
+            if (count == 0 || targets.Count != count) yield break;
+
+            Vector3[] starts = new Vector3[count];
+            for (int i = 0; i < count; i++) starts[i] = segments[i].transform.position;
+
+            float elapsed = 0;
+            while (elapsed < duration)
+            {
+                float t = elapsed / duration;
+                for (int i = 0; i < count; i++)
+                {
+                    segments[i].transform.position = Vector3.Lerp(starts[i], targets[i], t);
+                }
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            for (int i = 0; i < count; i++) segments[i].transform.position = targets[i];
         }
 
         private void UpdateHeadVisuals()
@@ -559,16 +592,26 @@ namespace Assets.Scripts.Core
                     seg.Renderer.color = currentArrowColor; // Explicitly set color here
                     seg.Renderer.sortingOrder = 10;   // Ensure on top
                     
-                    // Rotation
+                    // Rotation - Use visual direction for smooth rotation
                     if (segments.Count >= 2)
                     {
                         Segment neck = segments[segments.Count - 2];
-                        Vector2Int dir = seg.GridPosition - neck.GridPosition;
-                        Transform t = seg.transform;
-                        if (dir == Vector2Int.up) t.rotation = Quaternion.Euler(0,0,0);
-                        else if (dir == Vector2Int.right) t.rotation = Quaternion.Euler(0,0,-90);
-                        else if (dir == Vector2Int.down) t.rotation = Quaternion.Euler(0,0,180);
-                        else if (dir == Vector2Int.left) t.rotation = Quaternion.Euler(0,0,90);
+                        Vector3 visualDir = (seg.transform.position - neck.transform.position).normalized;
+                        
+                        if (visualDir.sqrMagnitude > 0.01f)
+                        {
+                            float angle = Mathf.Atan2(visualDir.y, visualDir.x) * Mathf.Rad2Deg - 90f;
+                            seg.transform.rotation = Quaternion.Euler(0, 0, angle);
+                        }
+                        else
+                        {
+                            // Fallback to grid dir if stationary
+                            Vector2Int gridDir = seg.GridPosition - neck.GridPosition;
+                            if (gridDir == Vector2Int.up) seg.transform.rotation = Quaternion.Euler(0,0,0);
+                            else if (gridDir == Vector2Int.right) seg.transform.rotation = Quaternion.Euler(0,0,-90);
+                            else if (gridDir == Vector2Int.down) seg.transform.rotation = Quaternion.Euler(0,0,180);
+                            else if (gridDir == Vector2Int.left) seg.transform.rotation = Quaternion.Euler(0,0,90);
+                        }
                     }
                 }
                 else
@@ -724,9 +767,9 @@ namespace Assets.Scripts.Core
             return steps;
         }
 
-        private void SimulateForwardStep()
+        private IEnumerator SimulateForwardStep()
         {
-            if (segments.Count == 0) return;
+            if (segments.Count == 0) yield break;
             
             Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = Vector2Int.up;
@@ -737,27 +780,21 @@ namespace Assets.Scripts.Core
             }
             Vector2Int targetPos = head.GridPosition + currentDir;
             
-            // Update grid positions
             for (int i = 0; i < segments.Count - 1; i++)
             {
                 segments[i].GridPosition = segments[i + 1].GridPosition;
             }
             segments[segments.Count - 1].GridPosition = targetPos;
             
-            // Animate to new positions
-            for (int i = 0; i < segments.Count; i++)
-            {
-                Vector3 newWorldPos = new Vector3(segments[i].GridPosition.x * CellSize, 
-                                                   segments[i].GridPosition.y * CellSize, 0);
-                segments[i].MoveTo(newWorldPos, 0.04f);
-            }
+            List<Vector3> targets = new List<Vector3>();
+            foreach (var seg in segments) targets.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            UpdateHeadVisuals();
+            yield return StartCoroutine(AnimateAllSegments(targets, 0.04f));
         }
 
-        private void SimulateReverseStep()
+        private IEnumerator SimulateReverseStep()
         {
-            if (segments.Count == 0) return;
+            if (segments.Count == 0) yield break;
             
             Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = Vector2Int.up;
@@ -767,25 +804,18 @@ namespace Assets.Scripts.Core
                 currentDir = head.GridPosition - neck.GridPosition;
             }
             
-            // Move backwards (opposite direction)
             Vector2Int reversePos = head.GridPosition - currentDir;
             
-            // Shift all segments backward
             for (int i = segments.Count - 1; i > 0; i--)
             {
                 segments[i].GridPosition = segments[i - 1].GridPosition;
             }
             segments[0].GridPosition = reversePos;
             
-            // Animate to new positions
-            for (int i = 0; i < segments.Count; i++)
-            {
-                Vector3 newWorldPos = new Vector3(segments[i].GridPosition.x * CellSize, 
-                                                   segments[i].GridPosition.y * CellSize, 0);
-                segments[i].MoveTo(newWorldPos, 0.04f);
-            }
+            List<Vector3> targets = new List<Vector3>();
+            foreach (var seg in segments) targets.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            UpdateHeadVisuals();
+            yield return StartCoroutine(AnimateAllSegments(targets, 0.04f));
         }
 
         private IEnumerator BlockedArrowAnimation()
@@ -803,12 +833,10 @@ namespace Assets.Scripts.Core
             // Phase 1: Forward animation (simulate moving until blocked)
             for (int i = 0; i < stepsUntilBlocked; i++)
             {
-                SimulateForwardStep();
+                yield return StartCoroutine(SimulateForwardStep());
                 
                 // Save current positions after this step
                 forwardPositionHistory.Add(SaveCurrentPositions());
-                
-                yield return new WaitForSeconds(0.04f);
             }
             
             // Phase 2: Half-step impact toward the blocker
@@ -825,9 +853,11 @@ namespace Assets.Scripts.Core
             Vector3 impactOffset = new Vector3(currentDir.x * 0.5f * CellSize, currentDir.y * 0.5f * CellSize, 0);
             Vector3 impactPosition = currentHeadWorldPos + impactOffset;
             
-            // Animate head to impact position
-            head.MoveTo(impactPosition, 0.04f);
-            yield return new WaitForSeconds(0.04f);
+            // Animate head to impact position - using centralized animator for consistency
+            List<Vector3> impactTargets = new List<Vector3>();
+            for(int i=0; i < segments.Count - 1; i++) impactTargets.Add(segments[i].transform.position);
+            impactTargets.Add(impactPosition);
+            yield return StartCoroutine(AnimateAllSegments(impactTargets, 0.04f));
             
             // Phase 3: Impact feedback - play sound, vibrate, and change color to red
             SoundManager.Instance.PlayArrowBlocked();
@@ -838,31 +868,24 @@ namespace Assets.Scripts.Core
             yield return new WaitForSeconds(0.1f);
             
             // Phase 4: Reverse animation - replay positions in reverse order
-            // Start from second-to-last position (skip the last one since we're already there)
             for (int step = forwardPositionHistory.Count - 2; step >= 0; step--)
             {
                 List<Vector2Int> targetPositions = forwardPositionHistory[step];
+                List<Vector3> targetWorldPositions = new List<Vector3>();
                 
-                // Set grid positions and animate all segments simultaneously
                 for (int i = 0; i < segments.Count && i < targetPositions.Count; i++)
                 {
                     segments[i].GridPosition = targetPositions[i];
-                    Vector3 targetWorldPos = new Vector3(targetPositions[i].x * CellSize, 
-                                                         targetPositions[i].y * CellSize, 0);
-                    segments[i].MoveTo(targetWorldPos, 0.04f);
+                    targetWorldPositions.Add(new Vector3(targetPositions[i].x * CellSize, targetPositions[i].y * CellSize, 0));
                 }
                 
-                UpdateHeadVisuals();
-                yield return new WaitForSeconds(0.04f);
+                yield return StartCoroutine(AnimateAllSegments(targetWorldPositions, 0.04f));
             }
             
-            // Final safety: ensure we're at exact original positions
-            // This handles any potential rounding errors from the step-by-step animation
             RestorePositions(originalPositions);
             for (int i = 0; i < segments.Count; i++)
             {
-                Vector3 originalWorldPos = new Vector3(originalPositions[i].x * CellSize, 
-                                                       originalPositions[i].y * CellSize, 0);
+                Vector3 originalWorldPos = new Vector3(originalPositions[i].x * CellSize, originalPositions[i].y * CellSize, 0);
                 segments[i].transform.position = originalWorldPos;
             }
             UpdateHeadVisuals();
