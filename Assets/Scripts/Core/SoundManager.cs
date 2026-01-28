@@ -19,6 +19,7 @@ namespace Assets.Scripts.Core
         public AudioClip SmallCheer;
         public AudioClip MediumCheer;
         public AudioClip BigCheer;
+        public AudioClip ThumbUp;
         public AudioClip BackgroundMusic;
 
         [SerializeField] private AudioSource musicSource;
@@ -72,6 +73,11 @@ namespace Assets.Scripts.Core
         {
             PlaySound(ClickSound);
             VibrationManager.VibrateSelection();
+        }
+
+        public void PlayLike()
+        {
+            PlaySound(ThumbUp);
         }
 
         public void PlayArrowSelect()

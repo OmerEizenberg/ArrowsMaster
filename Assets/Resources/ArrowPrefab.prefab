@@ -47,6 +47,6 @@ MonoBehaviour:
   segments: []
   segmentPrefab: {fileID: 1122043530654661600, guid: fceef0829fcfd4f559a5179ba102fed0, type: 3}
   HeadSprite: {fileID: 21300000, guid: 2a288f8992feb46bb90c925249dcc180, type: 3}
-  BodySprite: {fileID: 21300000, guid: 6c6386744ce4b40c0b6a735d1d283b72, type: 3}
-  CornerSprite: {fileID: 21300000, guid: 09c24967479434c1f9d44ce6a786386b, type: 3}
-  TailSprite: {fileID: 21300000, guid: ab18009532f424da3bcda58930ecbdc0, type: 3}
+  pointEffectPrefab: {fileID: 4100442713912203939, guid: 2134d0faf9d314154a9ac013ca27a02c, type: 3}
+  segmentScale: 1
+  blockedColor: {r: 0.906, g: 0.298, b: 0.235, a: 1}

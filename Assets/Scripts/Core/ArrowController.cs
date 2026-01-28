@@ -12,6 +12,8 @@ namespace Assets.Scripts.Core
         
         [Header("Visuals")]
         public Sprite HeadSprite;
+        public GameObject pointEffectPrefab;
+        private List<GameObject> instantiatedEffects = new List<GameObject>();
         
         // Grid Step size (Standard 1 unit)
         public const float CellSize = 1.0f;
@@ -260,6 +262,21 @@ namespace Assets.Scripts.Core
                     {
                         isMoving = true;
                         VibrationManager.VibrateSelection();
+                        float tempProbLike = Random.Range(0f,1f);
+                        if (tempProbLike < 0.12f)
+                        {
+                            SoundManager.Instance.PlayLike();
+                            if (pointEffectPrefab != null)
+                            {
+                                foreach (var seg in segments)
+                                {
+                                    GameObject effect = Instantiate(pointEffectPrefab, seg.transform.position, Quaternion.identity);
+                                    instantiatedEffects.Add(effect);
+                                }
+                            }
+                        }
+                        // Instantiate prefabs at each arrow point
+                        
                         // Start success color animation (White -> Green -> White)
                         StartCoroutine(SuccessColorAnimation());
 
@@ -358,7 +375,23 @@ namespace Assets.Scripts.Core
         private void DestroySelf()
         {
             GridManager.Instance.UnregisterArrow(this);
+            // Destroy all instantiated effects
+            foreach (var effect in instantiatedEffects)
+            {
+                if (effect != null) Destroy(effect);
+            }
+            instantiatedEffects.Clear();
             Destroy(gameObject, 0.5f);
+        }
+
+        private void OnDestroy()
+        {
+            // Fallback cleanup if destroyed by other means
+            foreach (var effect in instantiatedEffects)
+            {
+                if (effect != null) Destroy(effect);
+            }
+            instantiatedEffects.Clear();
         }
 
         private IEnumerator AutoMoveRoutine()
