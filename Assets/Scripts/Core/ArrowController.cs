@@ -262,6 +262,16 @@ namespace Assets.Scripts.Core
                     {
                         isMoving = true;
                         VibrationManager.VibrateSelection();
+
+                        if (CameraController.Instance != null && GameManager.Instance != null)
+                        {
+                            bool timeCondition = (Time.time - GameManager.Instance.LastArrowSelectionTime) <= 2.0f;
+                            bool panCondition = !CameraController.Instance.HasPannedSinceLastReset;
+
+                            // Update state for next pick
+                            GameManager.Instance.NotifyArrowSelection();
+                            CameraController.Instance.ResetPanState();
+                        }
                         float tempProbLike = Random.Range(0f,1f);
                         if (tempProbLike < 0.12f)
                         {
@@ -861,7 +871,7 @@ namespace Assets.Scripts.Core
             SoundManager.Instance.PlayArrowBlocked();
             VibrationManager.VibrateSelection();
             SetArrowColor(blockedColor);
-            
+            GameManager.Instance.PlayWrongAnimation();
             // Small pause at impact for emphasis
             yield return new WaitForSeconds(0.1f);
             

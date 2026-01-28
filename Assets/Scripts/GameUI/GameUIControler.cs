@@ -10,6 +10,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
     [SerializeField] private LevelManager m_LevelManager;
+    [SerializeField] private Animator m_XIndicatAnim;
     [SerializeField] private Image[] m_Hearts;
     [SerializeField] private GameObject m_HintButton;
     [SerializeField] private GameObject m_TimerContainer; // Container for timer UI
@@ -62,6 +63,11 @@ public class GameUIContoleer : MonoBehaviour
         }
     }
     
+    public void PlayWrongAnimation()
+    {
+        m_XIndicatAnim.SetTrigger("Wrong");
+    }
+
     public void UpdateTimerUI(string timeString)
     {
         if (m_TimerText != null)

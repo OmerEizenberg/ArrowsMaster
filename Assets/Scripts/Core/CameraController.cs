@@ -16,6 +16,10 @@ namespace Assets.Scripts.Core
         [SerializeField] private float panSensitivity = 0.005f; // Adjusted for pixel delta
         [SerializeField] private float dragThresholdPercent = 2f; // Percentage of screen width to start panning
         
+        [Header("Shake Settings")]
+        [SerializeField] private float shakeDuration = 0.1f;
+        [SerializeField] private float shakeMagnitude = 0.1f;
+        
         [Header("Level Initialization Animation")]
         [SerializeField] private float initZoomMultiplier = 1.3f;
         [SerializeField] private float initZoomInDuration = 1.2f;
@@ -38,6 +42,8 @@ namespace Assets.Scripts.Core
         private Vector2 minBounds;
         private Vector2 maxBounds;
         private bool boundsSet = false;
+        public bool HasPannedSinceLastReset { get; private set; }
+
 
         private void Awake()
         {
@@ -52,12 +58,65 @@ namespace Assets.Scripts.Core
             defaultZoom = cam.orthographicSize;
         }
 
+        private Vector3 shakeOffset;
+        private Vector3 lastShakeOffset;
+
         private void Update()
         {
+            // Restore position from previous frame's shake
+            transform.position -= lastShakeOffset;
+            lastShakeOffset = Vector3.zero;
+
             HandleDesktopZoom();
             HandleMobileZoom();
             HandlePanning();
         }
+
+        private void LateUpdate()
+        {
+            // Apply current shake offset
+            lastShakeOffset = shakeOffset;
+            transform.position += lastShakeOffset;
+        }
+
+        private Coroutine shakeCoroutine;
+
+        public void Shake()
+        {
+            if (shakeCoroutine != null) StopCoroutine(shakeCoroutine);
+            shakeCoroutine = StartCoroutine(ShakeCoroutine(shakeDuration, shakeMagnitude));
+        }
+
+        public void Shake(float duration = 0.15f, float magnitude = 0.15f)
+        {
+            if (shakeCoroutine != null) StopCoroutine(shakeCoroutine);
+            shakeCoroutine = StartCoroutine(ShakeCoroutine(duration, magnitude));
+        }
+
+        private IEnumerator ShakeCoroutine(float duration, float magnitude)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                // Scale magnitude by current zoom level so it feels consistent
+                float scaledMagnitude = magnitude * (cam.orthographicSize / defaultZoom);
+                shakeOffset = new Vector3(
+                    Random.Range(-1f, 1f) * scaledMagnitude,
+                    Random.Range(-1f, 1f) * scaledMagnitude,
+                    0
+                );
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            shakeOffset = Vector3.zero;
+            shakeCoroutine = null;
+        }
+
+        public void ResetPanState()
+        {
+            HasPannedSinceLastReset = false;
+        }
+
 
         public void SetBounds(Vector2Int gridSize)
         {
@@ -134,6 +193,7 @@ namespace Assets.Scripts.Core
                 // Only pan if panning is active
                 if (isPanningActive)
                 {
+                    HasPannedSinceLastReset = true;
                     Vector3 delta = dragOrigin - currentPos; // Drag World style (Move mouse Left -> Camera Right)
                     
                     // Convert screen delta to world delta roughly, or just use sensitivity

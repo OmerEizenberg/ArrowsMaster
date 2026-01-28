@@ -49,6 +49,8 @@ namespace Assets.Scripts.Core
         private bool isWinning = false;
         private bool isHintActive = false;
         private bool isTimeUp = false;
+        public float LastArrowSelectionTime { get; private set; } = -10f;
+
 
         public bool p_isPlayOnRewarded = false;
         public bool p_isHintRewarded = false;
@@ -223,6 +225,8 @@ namespace Assets.Scripts.Core
             isEntranceFinished = false;
             isWinning = false;
             ResetHintTimer();
+            ResetSelectionStates();
+
 m_GameUI.gameObject.SetActive(true);
         }
 
@@ -254,6 +258,8 @@ m_GameUI.gameObject.SetActive(true);
             isEntranceFinished = false;
             isWinning = false;
             ResetHintTimer();
+            ResetSelectionStates();
+
             m_GameUI.gameObject.SetActive(true);
         }
 
@@ -281,6 +287,19 @@ m_GameUI.gameObject.SetActive(true);
                 }
             }
         }
+
+        public void NotifyArrowSelection()
+        {
+            LastArrowSelectionTime = Time.time;
+        }
+
+        public void ResetSelectionStates()
+        {
+            LastArrowSelectionTime = -10f;
+            if (CameraController.Instance != null)
+                CameraController.Instance.ResetPanState();
+        }
+
 
         private System.Collections.IEnumerator WinSequence()
         {
@@ -444,7 +463,10 @@ m_GameUI.gameObject.SetActive(true);
                 UpdateTimerUI();
             }
         }
-        
+        public void PlayWrongAnimation()
+        {
+            m_GameUI.PlayWrongAnimation();
+        }
         public void StartTimer()
         {
             if (IsTimedLevel && !isTimerActive)
