@@ -133,8 +133,10 @@ namespace Assets.Scripts.Core
 
         private void ShowHint()
         {
-            // Logic to show a hint: find an arrow that can actually be picked
-            ArrowController[] arrows = GameObject.FindObjectsOfType<ArrowController>();
+            // Optimization: Use cached arrow list from GridManager instead of FindObjectsOfType
+            if (GridManager.Instance == null) return;
+            
+            List<ArrowController> arrows = GridManager.Instance.GetAllArrows();
             ArrowController bestArrow = null;
 
             foreach (var arrow in arrows)
@@ -146,8 +148,8 @@ namespace Assets.Scripts.Core
                 }
             }
 
-            // Fallback to any arrow if none are "clear" (though there should be one)
-            if (bestArrow == null && arrows.Length > 0) bestArrow = arrows[0];
+            // Fallback to any arrow if none are "clear"
+            if (bestArrow == null && arrows.Count > 0) bestArrow = arrows[0];
 
             if (bestArrow != null)
             {
@@ -216,6 +218,7 @@ namespace Assets.Scripts.Core
             isTimerActive = false;
             isTimeUp = false;
             currentTime = 0f;
+            lastDisplayedSecond = -1;
             levelDuration = 0;
 
             if (levelManager != null)
@@ -248,6 +251,7 @@ m_GameUI.gameObject.SetActive(true);
             isTimerActive = false;
             isTimeUp = false;
             currentTime = 0f;
+            lastDisplayedSecond = -1;
             levelDuration = 0;
 
             if (levelManager != null)
@@ -473,6 +477,7 @@ m_GameUI.gameObject.SetActive(true);
             if (levelDuration > 0)
             {
                 currentTime = levelDuration;
+                lastDisplayedSecond = -1;
                 // Timer will start when first touch happens (when isEntranceFinished is true)
                 UpdateTimerUI();
             }
@@ -492,14 +497,20 @@ m_GameUI.gameObject.SetActive(true);
             }
         }
         
+        private int lastDisplayedSecond = -1;
         private void UpdateTimerUI()
         {
-            if (IsTimedLevel || levelDuration>0)
+            if (IsTimedLevel || levelDuration > 0)
             {
-                int minutes = Mathf.FloorToInt(currentTime / 60f);
-                int seconds = Mathf.FloorToInt(currentTime % 60f);
-                string timeString = string.Format("{0:00}:{1:00}", minutes, seconds);
-                m_GameUI.UpdateTimerUI(timeString);
+                int currentSecond = Mathf.Max(0, Mathf.FloorToInt(currentTime));
+                if (currentSecond != lastDisplayedSecond)
+                {
+                    lastDisplayedSecond = currentSecond;
+                    int minutes = currentSecond / 60;
+                    int seconds = currentSecond % 60;
+                    string timeString = string.Format("{0:00}:{1:00}", minutes, seconds);
+                    m_GameUI.UpdateTimerUI(timeString);
+                }
             }
         }
         

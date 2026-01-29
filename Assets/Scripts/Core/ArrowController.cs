@@ -38,6 +38,7 @@ namespace Assets.Scripts.Core
             {
                 SpawnSegmentStep(i, true);
             }
+            UpdateVisuals(); // Initial visual sync
         }
 
         public void PrepareIncrementalInit(ArrowData data)
@@ -171,9 +172,8 @@ namespace Assets.Scripts.Core
             // Update logic (if any)
         }
 
-        private void LateUpdate()
+        private void UpdateVisuals()
         {
-            // Sync visuals in LateUpdate after all positions have been updated in this frame
             UpdateLinePositions();
             UpdateHeadVisuals();
         }
@@ -629,11 +629,13 @@ namespace Assets.Scripts.Core
                 {
                     segments[i].transform.position = Vector3.Lerp(starts[i], targets[i], t);
                 }
+                UpdateVisuals(); // Update visuals during animation for smoothness
                 elapsed += Time.deltaTime;
                 yield return null;
             }
 
             for (int i = 0; i < count; i++) segments[i].transform.position = targets[i];
+            UpdateVisuals(); // Final sync
         }
 
         private void UpdateHeadVisuals()

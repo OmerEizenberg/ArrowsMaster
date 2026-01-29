@@ -14,7 +14,7 @@ namespace Assets.Scripts.Core
 
         [Header("Pan Settings")]
         [SerializeField] private float panSensitivity = 0.005f; // Adjusted for pixel delta
-        [SerializeField] private float dragThresholdPercent = 2f; // Percentage of screen width to start panning
+        [SerializeField] private float dragThresholdPercent = 5f; // Percentage of screen width to start panning
         
         [Header("Shake Settings")]
         [SerializeField] private float shakeDuration = 0.1f;

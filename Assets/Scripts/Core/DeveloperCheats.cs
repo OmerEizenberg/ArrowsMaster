@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
 
 namespace Assets.Scripts.Core
 {
@@ -31,8 +32,11 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[CHEAT] Attempting to instantly win level...");
 
-            // Find all arrow controllers in the scene
-            ArrowController[] arrows = FindObjectsOfType<ArrowController>();
+            // Optimization: Use cached arrow list from GridManager
+            if (GridManager.Instance == null) return;
+            
+            List<ArrowController> arrowsList = GridManager.Instance.GetAllArrows();
+            ArrowController[] arrows = arrowsList.ToArray();
             
             if (arrows == null || arrows.Length == 0)
             {

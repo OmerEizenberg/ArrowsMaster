@@ -6363,9 +6363,9 @@ MonoBehaviour:
   zoomSpeed: 2
   minZoom: 5
   maxZoom: 15
-  mobileZoomSpeed: 0.1
-  panSensitivity: 0.01
-  dragThresholdPercent: 2
+  mobileZoomSpeed: 0.5
+  panSensitivity: 0.008
+  dragThresholdPercent: 5
   shakeDuration: 0.1
   shakeMagnitude: 0.05
   initZoomMultiplier: 2
