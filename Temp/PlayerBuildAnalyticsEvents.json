@@ -3,12 +3,12 @@
     {
       "type": "il2cppData",
       "msg": {
-        "build_event_id": "b2bf8cbaac69b46cf96c0316275233fa",
+        "build_event_id": "b8ceae5c09350494aade309e6299b68f",
         "node_executed": true,
         "attribute_total_count_eager_static_constructor": 80,
         "attribute_total_count_set_option": 0,
         "attribute_total_count_generate_into_own_cpp_file": 0,
-        "attribute_total_count_ignore_by_deep_profiler": 20,
+        "attribute_total_count_ignore_by_deep_profiler": 18,
         "extra_types_total_count": 0,
         "option_extra_types_file_count": 0,
         "option_debug_assembly_name_count": 0,
@@ -42,24 +42,25 @@
     {
       "type": "playerBuildTimingData",
       "msg": {
-        "build_event_id": "b2bf8cbaac69b46cf96c0316275233fa",
-        "build_player": 113385,
-        "preprocess_player": 69,
-        "produce_player_script_assemblies": 2181,
-        "build_scripts_dlls": 9,
-        "postprocess_built_player": 105347,
+        "build_event_id": "b8ceae5c09350494aade309e6299b68f",
+        "build_player": 47381,
+        "preprocess_player": 83,
+        "produce_player_script_assemblies": 2267,
+        "build_scripts_dlls": 13,
+        "writing_asset_files": 152,
+        "postprocess_built_player": 37700,
         "node_summary_table": [
           {
             "name": "Csc",
-            "duration": 233
+            "duration": 239
           },
           {
             "name": "UnityLinker.exe",
-            "duration": 4568
+            "duration": 5100
           },
           {
             "name": "il2cpp.exe",
-            "duration": 6718
+            "duration": 7710
           }
         ]
       },
@@ -68,7 +69,7 @@
     {
       "type": "unityLinkerData",
       "msg": {
-        "build_event_id": "b2bf8cbaac69b46cf96c0316275233fa",
+        "build_event_id": "b8ceae5c09350494aade309e6299b68f",
         "node_executed": true,
         "attribute_marked_count_always_link_assembly": 0,
         "attribute_swept_count_always_link_assembly": 0,
