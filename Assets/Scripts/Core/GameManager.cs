@@ -50,6 +50,7 @@ namespace Assets.Scripts.Core
         private bool isHintActive = false;
         private bool isTimeUp = false;
         public float LastArrowSelectionTime { get; private set; } = -10f;
+        public int p_StreakCount { get; private set; } = 0;
 
 
         public bool p_isPlayOnRewarded = false;
@@ -293,9 +294,21 @@ m_GameUI.gameObject.SetActive(true);
             LastArrowSelectionTime = Time.time;
         }
 
+        public void IncrementStreak()
+        {
+            p_StreakCount++;
+            m_GameUI.PlayStreakAnimation();
+        }
+
+        public void ResetStreak()
+        {
+            p_StreakCount = 0;
+        }
+
         public void ResetSelectionStates()
         {
             LastArrowSelectionTime = -10f;
+            p_StreakCount = 0;
             if (CameraController.Instance != null)
                 CameraController.Instance.ResetPanState();
         }
@@ -413,6 +426,7 @@ m_GameUI.gameObject.SetActive(true);
                 if (hintTimer >= 5.0f)
                 {
                     SetHintVisibility(true);
+                    SoundManager.Instance.PlayHint();
                 }
             }
             
@@ -463,10 +477,12 @@ m_GameUI.gameObject.SetActive(true);
                 UpdateTimerUI();
             }
         }
+
         public void PlayWrongAnimation()
         {
             m_GameUI.PlayWrongAnimation();
         }
+
         public void StartTimer()
         {
             if (IsTimedLevel && !isTimerActive)

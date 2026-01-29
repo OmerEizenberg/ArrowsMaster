@@ -3311,7 +3311,6 @@ RectTransform:
   - {fileID: 1717584026}
   - {fileID: 2097041988}
   - {fileID: 1572046004}
-  - {fileID: 922740203}
   m_Father: {fileID: 937078175}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.85}
@@ -3384,6 +3383,15 @@ MonoBehaviour:
   m_FailureSubtitle: {fileID: 598936578}
   m_TimerDefaultColor: {r: 0.14901961, g: 0.21568628, b: 0.3372549, a: 1}
   m_TimerWarningColor: {r: 0.92156863, g: 0.3019608, b: 0.29411766, a: 1}
+  m_streakColors:
+  - {r: 0.18039216, g: 0.8352941, b: 0.4509804, a: 0}
+  - {r: 0.11764706, g: 0.5647059, b: 1, a: 0}
+  - {r: 0.28235295, g: 0.20392157, b: 0.83137256, a: 0}
+  - {r: 1, g: 0.49803922, b: 0.3137255, a: 0}
+  - {r: 1, g: 0.64705884, b: 0.007843138, a: 0}
+  - {r: 0.49411765, g: 0.8392157, b: 0.8745098, a: 0}
+  m_wrongColor: {r: 0.92156863, g: 0.3019608, b: 0.29411766, a: 0}
+  m_ColorIndication: {fileID: 922740204}
 --- !u!1 &239118669
 GameObject:
   m_ObjectHideFlags: 0
@@ -9627,10 +9635,10 @@ RectTransform:
   m_GameObject: {fileID: 922740202}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 235480550}
+  m_Father: {fileID: 937078175}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0.85}
@@ -9803,6 +9811,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 235480550}
+  - {fileID: 922740203}
   - {fileID: 907632661}
   - {fileID: 1994231232}
   m_Father: {fileID: 0}
@@ -10330,7 +10339,19 @@ MonoBehaviour:
   MediumCheer: {fileID: 8300000, guid: 93c69b7afbc1646bc82d3f1800a7ab05, type: 3}
   BigCheer: {fileID: 8300000, guid: d0f8f29d5ad7a4992b6bff45c8de84f0, type: 3}
   ThumbUp: {fileID: 8300000, guid: 73c4fe6991f664f66992f4a46c105eb2, type: 3}
+  HintIn: {fileID: 0}
   BackgroundMusic: {fileID: 8300000, guid: e1f3dba82fd0e40cebf5b19cc77f5759, type: 3}
+  streakSounds:
+  - {fileID: 8300000, guid: be97228d6672a467cb2437ffee048a00, type: 3}
+  - {fileID: 8300000, guid: 19f0166c2ec424eed861bdd9233c237e, type: 3}
+  - {fileID: 8300000, guid: dcbc36fd037be4e189d0dc83fd6ce2cd, type: 3}
+  - {fileID: 8300000, guid: 207161f64d50a4fe0aba3c059ebd0150, type: 3}
+  - {fileID: 8300000, guid: 82d46330eb09447aaa7f6404bf2b91bd, type: 3}
+  - {fileID: 8300000, guid: 8182f28d5dd394145b0dc6f645962a3a, type: 3}
+  - {fileID: 8300000, guid: 318d92cba3ada406cafba5226853eef8, type: 3}
+  - {fileID: 8300000, guid: 98903be5b4b7e4b3fac9407a20b109be, type: 3}
+  - {fileID: 8300000, guid: 3ee59d2f3b806411e8603bf46ddf0c94, type: 3}
+  - {fileID: 8300000, guid: a6212c03d85514f46ada012ca4d563e1, type: 3}
   musicSource: {fileID: 0}
 --- !u!1 &985538275
 GameObject:
@@ -23298,6 +23319,10 @@ PrefabInstance:
     - target: {fileID: 4823175171773133148, guid: c186afed293704484bd3837c89b24cdd, type: 3}
       propertyPath: m_Name
       value: TESTINGONLY
+      objectReference: {fileID: 0}
+    - target: {fileID: 4823175171773133148, guid: c186afed293704484bd3837c89b24cdd, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

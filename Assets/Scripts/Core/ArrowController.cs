@@ -265,9 +265,17 @@ namespace Assets.Scripts.Core
 
                         if (CameraController.Instance != null && GameManager.Instance != null)
                         {
-                            bool timeCondition = (Time.time - GameManager.Instance.LastArrowSelectionTime) <= 2.0f;
-                            bool panCondition = !CameraController.Instance.HasPannedSinceLastReset;
-
+                            bool timeCondition = (Time.time - GameManager.Instance.LastArrowSelectionTime) <= 0.75f;
+                            //bool panCondition = !CameraController.Instance.HasPannedSinceLastReset;
+                            if (timeCondition )//&& panCondition)
+                            {
+                                GameManager.Instance.IncrementStreak();
+                                SoundManager.Instance.PlayStreak(GameManager.Instance.p_StreakCount - 1);
+                            }
+                            else
+                            {
+                                GameManager.Instance.ResetStreak();
+                            }
                             // Update state for next pick
                             GameManager.Instance.NotifyArrowSelection();
                             CameraController.Instance.ResetPanState();

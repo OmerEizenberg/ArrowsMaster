@@ -25,6 +25,10 @@ public class GameUIContoleer : MonoBehaviour
     private readonly Color activeColor = Color.white; // #FFFFFF
     private readonly Color inactiveColor = new Color(0.616f, 0.616f, 0.616f, 0.5f); // #9D9D9D with 128 alpha (0.5f)
 
+    [SerializeField] private Color[] m_streakColors;
+    [SerializeField] private Color m_wrongColor;
+    [SerializeField] private Image m_ColorIndication;
+
     private void Start()
     {
         if (GameManager.Instance != null)
@@ -62,9 +66,17 @@ public class GameUIContoleer : MonoBehaviour
             }
         }
     }
-    
+
     public void PlayWrongAnimation()
     {
+        m_ColorIndication.color = m_wrongColor;
+        m_XIndicatAnim.SetTrigger("Wrong");
+    }
+
+    public void PlayStreakAnimation()
+    {
+        Debug.Log(">>>>STREAK INDEX:"+GameManager.Instance.p_StreakCount%m_streakColors.Length);
+        m_ColorIndication.color = m_streakColors[GameManager.Instance.p_StreakCount%m_streakColors.Length];
         m_XIndicatAnim.SetTrigger("Wrong");
     }
 

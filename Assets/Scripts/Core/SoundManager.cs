@@ -20,7 +20,9 @@ namespace Assets.Scripts.Core
         public AudioClip MediumCheer;
         public AudioClip BigCheer;
         public AudioClip ThumbUp;
+        public AudioClip HintIn;
         public AudioClip BackgroundMusic;
+        public AudioClip[] streakSounds;
 
         [SerializeField] private AudioSource musicSource;
 
@@ -68,11 +70,24 @@ namespace Assets.Scripts.Core
                 musicSource.Play();
             }
         }
+        public void PlayStreak(int index=0)
+        {
+            if (index > streakSounds.Length-1)
+            {
+                index = streakSounds.Length-1;
+            }
 
+            PlaySound(streakSounds[index]);
+        }
+        
         public void PlayClick()
         {
             PlaySound(ClickSound);
             VibrationManager.VibrateSelection();
+        }
+        public void PlayHint()
+        {
+            PlaySound(HintIn);
         }
 
         public void PlayLike()
