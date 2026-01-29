@@ -206,31 +206,47 @@ namespace Assets.Scripts.Core
             // Junction Corners (prevent geometry gaps during turns)
             for (int i = 0; i < segments.Count - 1; i++)
             {
-                // Current segment visual pos
-                linePoints.Add(segments[i].transform.position);
-
-                // Add a corner anchor ONLY if the segments are currently in a turn
-                // We detect a turn if their target GridPositions don't share an axis with their visual positions
+                // Current segment visual pos (Snapped for stability)
                 Vector3 p1 = segments[i].transform.position;
                 Vector3 p2 = segments[i+1].transform.position;
                 
-                // If they are not aligned on X or Y visually, we need a junction point
-                if (Mathf.Abs(p1.x - p2.x) > 0.01f && Mathf.Abs(p1.y - p2.y) > 0.01f)
+                // Snap points that are extremely close to their target grid position
+                // This prevents 'tiny diagonal' artifacts at the start/end of a move
+                Vector3 target1 = new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, p1.z);
+                Vector3 target2 = new Vector3(segments[i+1].GridPosition.x * CellSize, segments[i+1].GridPosition.y * CellSize, p2.z);
+                
+                if (Vector3.Distance(p1, target1) < 0.001f) p1 = target1;
+                if (Vector3.Distance(p2, target2) < 0.001f) p2 = target2;
+
+                linePoints.Add(p1);
+
+                // Add a corner anchor ONLY if the segments are currently in a turn
+                // We use a slightly more generous threshold to avoid jittery state switching
+                if (Mathf.Abs(p1.x - p2.x) > 0.02f && Mathf.Abs(p1.y - p2.y) > 0.02f)
                 {
-                    // The junction is at the GridPosition that they both "share" during this step
-                    // This is usually the GridPosition of the leading segment (i+1) before it moved
-                    // or simply the grid point at the corner.
+                    // The junction is the grid point that acts as the "pivot" of the turn.
                     Vector2Int g1 = segments[i].GridPosition;
                     Vector2Int g2 = segments[i+1].GridPosition;
                     
-                    // The junction is the target position of the follower segment
-                    Vector3 corner = new Vector3(g1.x * CellSize, g1.y * CellSize, currentHeadPos.z);
+                    Vector3 c1 = new Vector3(g1.x * CellSize, g1.y * CellSize, currentHeadPos.z);
+                    Vector3 c2 = new Vector3(g2.x * CellSize, g2.y * CellSize, currentHeadPos.z);
+                    
+                    // Manhattan score logic...
+                    float s1 = Mathf.Min(Mathf.Abs(p1.x - c1.x), Mathf.Abs(p1.y - c1.y)) + 
+                               Mathf.Min(Mathf.Abs(p2.x - c1.x), Mathf.Abs(p2.y - c1.y));
+                    float s2 = Mathf.Min(Mathf.Abs(p1.x - c2.x), Mathf.Abs(p1.y - c2.y)) + 
+                               Mathf.Min(Mathf.Abs(p2.x - c2.x), Mathf.Abs(p2.y - c2.y));
+                    
+                    Vector3 corner = (s1 <= s2) ? c1 : c2;
                     linePoints.Add(corner);
                 }
             }
             
             // 3. Always add the final visual position of the head at the VERY end
-            linePoints.Add(segments[segments.Count - 1].transform.position);
+            // Optimization: Offset the line slightly back from the head's center to prevent overlap
+            Vector3 finalHeadPos = segments[segments.Count - 1].transform.position;
+            Vector3 headOffset = new Vector3(m_LookDirection.x, m_LookDirection.y, 0) * -0.2f * CellSize;
+            linePoints.Add(finalHeadPos + headOffset);
             
             if (linePointsArray == null || linePointsArray.Length != linePoints.Count)
             {
@@ -652,7 +668,8 @@ namespace Assets.Scripts.Core
                     seg.Renderer.enabled = true;
                     seg.Renderer.sprite = HeadSprite;
                     seg.Renderer.color = currentArrowColor; // Explicitly set color here
-                    seg.Renderer.sortingOrder = 10;   // Ensure on top
+                    seg.Renderer.sortingOrder = 10;   // Ensure head is on top
+                    if (lineRenderer != null) lineRenderer.sortingOrder = 5; // Ensure line is below head
                     
                     // Rotation - Use explicit look direction from level data
                     float angle = Mathf.Atan2(m_LookDirection.y, m_LookDirection.x) * Mathf.Rad2Deg - 90f;
@@ -906,7 +923,8 @@ namespace Assets.Scripts.Core
                 Vector3 originalWorldPos = new Vector3(originalPositions[i].x * CellSize, originalPositions[i].y * CellSize, 0);
                 segments[i].transform.position = originalWorldPos;
             }
-            UpdateHeadVisuals();
+            forceLineUpdate = true;
+            UpdateVisuals();
             
             // Keep the arrow colored red after animation completes
             // Color is already set, no need to reset
