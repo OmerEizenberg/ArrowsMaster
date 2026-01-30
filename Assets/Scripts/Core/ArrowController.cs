@@ -299,19 +299,13 @@ namespace Assets.Scripts.Core
                                         Vector3 worldPos = clickedSegment.transform.position;
                                         Vector3 screenPos = Camera.main.WorldToScreenPoint(worldPos);
 
-                                        // Apply 15% screen distance offset
+                                        // Apply 15% screen distance offset ideally
                                         float maxOffset = Screen.width * 0.15f;
-                                        Vector2 randomOffset = Random.insideUnitCircle * maxOffset;
-                                        Vector3 finalScreenPos = screenPos + (Vector3)randomOffset;
+                                        Vector2 randomOffset = UnityEngine.Random.insideUnitCircle * maxOffset;
+                                        Vector3 idealScreenPos = screenPos + (Vector3)randomOffset;
 
-                                        // Clamp within normalized bounds (0.1-0.9 X, 0.1-0.75 Y)
-                                        float minX = Screen.width * 0.1f;
-                                        float maxX = Screen.width * 0.9f;
-                                        float minY = Screen.height * 0.1f;
-                                        float maxY = Screen.height * 0.75f;
-                                        
-                                        finalScreenPos.x = Mathf.Clamp(finalScreenPos.x, minX, maxX);
-                                        finalScreenPos.y = Mathf.Clamp(finalScreenPos.y, minY, maxY);
+                                        // Get valid position with 20% min distance from others
+                                        Vector3 finalScreenPos = GameManager.Instance.GetValidComboPosition(idealScreenPos, 0.2f);
 
                                         // Convert screen point to local position in parent
                                         RectTransform parentRect = (RectTransform)GameManager.Instance.m_GameUI.transform.parent;
@@ -319,6 +313,8 @@ namespace Assets.Scripts.Core
                                         {
                                             rect.anchoredPosition = localPos;
                                         }
+                                        
+                                        GameManager.Instance.RegisterCombo(rect);
                                     }
 
                                     ComboController comboCtrl = comboObj.GetComponent<ComboController>();

@@ -56,6 +56,8 @@ namespace Assets.Scripts.Core
         public bool p_isPlayOnRewarded = false;
         public bool p_isHintRewarded = false;
 
+        private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
+
         public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && !isTimeUp &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
                                 (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy);
@@ -532,6 +534,62 @@ m_GameUI.gameObject.SetActive(true);
         public string GetFailureSubtitle()
         {
             return IsTimedLevel ? "Watch an ad to get 60 seconds, refill livees\nand Keep Playing!" : "Watch an ad to refill livees\nand Keep Playing!";
+        }
+
+        public void RegisterCombo(RectTransform rect)
+        {
+            if (rect != null) m_ActiveCombos.Add(rect);
+        }
+
+        public Vector2 GetValidComboPosition(Vector2 idealScreenPos, float minDistancePercent)
+        {
+            // 1. Clean list (Remove nulls or inactive objects)
+            m_ActiveCombos.RemoveAll(c => c == null || !c.gameObject.activeInHierarchy);
+
+            float minDistancePx = Screen.width * minDistancePercent;
+            float sqrMinDistance = minDistancePx * minDistancePx;
+
+            // Define bounds
+            float minX = Screen.width * 0.15f;
+            float maxX = Screen.width * 0.85f;
+            float minY = Screen.height * 0.1f;
+            float maxY = Screen.height * 0.75f;
+
+            Vector2 bestPos = idealScreenPos;
+            bestPos.x = Mathf.Clamp(bestPos.x, minX, maxX);
+            bestPos.y = Mathf.Clamp(bestPos.y, minY, maxY);
+
+            // Attempt to find a non-overlapping position
+            // We use a small spiral or random trials to avoid overlap
+            const int maxTrials = 12;
+            bool foundValid = true;
+
+            for (int trial = 0; trial < maxTrials; trial++)
+            {
+                foundValid = true;
+                Vector2 currentPos = (trial == 0) ? bestPos : bestPos + UnityEngine.Random.insideUnitCircle * (minDistancePx * 1.5f);
+                
+                // Keep within screen bounds
+                currentPos.x = Mathf.Clamp(currentPos.x, minX, maxX);
+                currentPos.y = Mathf.Clamp(currentPos.y, minY, maxY);
+
+                foreach (var combo in m_ActiveCombos)
+                {
+                    if (combo == null) continue;
+                    // Note: combo.position is screen space usually for UI if Canvas is ScreenSpaceOverlay
+                    // If it's Camera space, we might need a different check, but usually anchoredPosition
+                    // is relative to parent. However, since we are siblings, screen space is safer for comparison.
+                    if (Vector2.SqrMagnitude((Vector2)combo.position - currentPos) < sqrMinDistance)
+                    {
+                        foundValid = false;
+                        break;
+                    }
+                }
+
+                if (foundValid) return currentPos;
+            }
+
+            return bestPos; // Return best even if overlapping if no valid found
         }
     }
 }

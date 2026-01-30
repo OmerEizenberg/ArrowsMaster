@@ -12,6 +12,7 @@
 		<type fullname="Assets.Scripts.Core.SoundManager" preserve="nothing"/>
 		<type fullname="Assets.Scripts.Lobby.HomeContoller" preserve="nothing"/>
 		<type fullname="Assets.Scripts.Lobby.MonthlyChallengeController" preserve="nothing"/>
+		<type fullname="ComboController" preserve="nothing"/>
 		<type fullname="GameUIContoleer" preserve="nothing"/>
 		<type fullname="LikeBehaviour" preserve="nothing"/>
 	</assembly>
