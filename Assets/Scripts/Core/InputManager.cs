@@ -114,6 +114,7 @@ namespace Assets.Scripts.Core
 
         private void TrySelectClosestArrow(Vector2 screenPos)
         {
+            if (IsScreenPositionBlocked(screenPos)) return;
             if (GridManager.Instance == null) return;
 
             // Use 15% of the smaller screen dimension as the threshold

@@ -57,6 +57,7 @@ namespace Assets.Scripts.Core
         public bool p_isHintRewarded = false;
 
         private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
+        private bool wasTimerActiveBeforeAd = false;
 
         public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && !isTimeUp &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
@@ -85,6 +86,8 @@ namespace Assets.Scripts.Core
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnRewardReceived += HandleRewardReceived;
+                AdsManager.Instance.OnAdOpened += HandleAdOpened;
+                AdsManager.Instance.OnAdClosed += HandleAdClosed;
             }
 
             if (levelManager != null)
@@ -101,6 +104,8 @@ namespace Assets.Scripts.Core
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnRewardReceived -= HandleRewardReceived;
+                AdsManager.Instance.OnAdOpened -= HandleAdOpened;
+                AdsManager.Instance.OnAdClosed -= HandleAdClosed;
             }
         }
 
@@ -124,12 +129,38 @@ namespace Assets.Scripts.Core
                         currentTime += 60f;
                         isTimeUp = false;
                         isTimerActive = true;
+                        // Since we are setting isTimerActive here, we don't want HandleAdClosed to mess with it
+                        wasTimerActiveBeforeAd = false; 
                         UpdateTimerUI();
                     }
                     
                     HideFailureScreen();
                     ResetHintTimer();
                 }
+            }
+        }
+
+        private void HandleAdOpened()
+        {
+            if (isTimerActive)
+            {
+                Debug.Log("[GameManager] Ad Opened. Pausing timer.");
+                wasTimerActiveBeforeAd = true;
+                isTimerActive = false;
+            }
+            else
+            {
+                wasTimerActiveBeforeAd = false;
+            }
+        }
+
+        private void HandleAdClosed()
+        {
+            if (wasTimerActiveBeforeAd)
+            {
+                Debug.Log("[GameManager] Ad Closed. Resuming timer.");
+                isTimerActive = true;
+                wasTimerActiveBeforeAd = false;
             }
         }
 

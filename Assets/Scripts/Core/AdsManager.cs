@@ -15,6 +15,8 @@ namespace Assets.Scripts.Core
         private bool isInitialized = false;
 
         public event Action OnRewardReceived;
+        public event Action OnAdOpened;
+        public event Action OnAdClosed;
 
         private string AppKey
         {
@@ -151,6 +153,7 @@ namespace Assets.Scripts.Core
             if (interstitialAd != null && interstitialAd.IsAdReady())
             {
                 Debug.Log("[AdsManager] Showing Interstitial Ad.");
+                OnAdOpened?.Invoke();
                 interstitialAd.ShowAd();
             }
             else
@@ -173,12 +176,14 @@ namespace Assets.Scripts.Core
         private void OnInterstitialClosed(LevelPlayAdInfo adInfo)
         {
             Debug.Log("[AdsManager] Interstitial Ad Closed. Loading next one.");
+            OnAdClosed?.Invoke();
             LoadInterstitial();
         }
 
         private void OnInterstitialDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
         {
             Debug.LogError($"[AdsManager] Interstitial Ad Display Failed: {error}");
+            OnAdClosed?.Invoke();
             LoadInterstitial();
         }
 
@@ -189,12 +194,15 @@ namespace Assets.Scripts.Core
             RewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
             RewardedAd.OnAdClosed += (info) => { 
                 Debug.Log("[AdsManager]  Ad Closed. Request");
+                OnAdClosed?.Invoke();
                 LoadRewarded(); 
             };
             RewardedAd.OnAdDisplayFailed += (info, err) => { 
                 Debug.LogError($"[AdsManager]  Ad Display Failed: {err}. ");
+                OnAdClosed?.Invoke();
                 LoadRewarded(); 
             };
+            RewardedAd.OnAdDisplayed += (info) => Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}");
 
             RewardedAd.OnAdRewarded += (info, reward) => {
                 Debug.Log("[AdsManager]  Ad Rewarded Event Received. ");
@@ -214,6 +222,7 @@ namespace Assets.Scripts.Core
             if (RewardedAd != null && RewardedAd.IsAdReady())
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad.");
+                OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
             else 
