@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace Assets.Scripts.Core
 {
@@ -85,6 +86,11 @@ namespace Assets.Scripts.Core
                             arrow.OnArrowClicked(upSegment);
                         }
                     }
+                    else if (upSegment == null && pendingSegment == null)
+                    {
+                        // If we missed both at start and end, try closest arrow selection
+                        TrySelectClosestArrow(endTouchPos);
+                    }
                 }
                 
                 pendingSegment = null;
@@ -104,6 +110,51 @@ namespace Assets.Scripts.Core
                 return hit.collider.GetComponent<Segment>();
             }
             return null;
+        }
+
+        private void TrySelectClosestArrow(Vector2 screenPos)
+        {
+            if (GridManager.Instance == null) return;
+
+            // Use 15% of the smaller screen dimension as the threshold
+            float screenThreshold = Mathf.Min(Screen.width, Screen.height) * 0.15f; 
+            float minDistance = screenThreshold;
+            ArrowController closestArrow = null;
+            Segment closestSegment = null;
+
+            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+            foreach (var arrow in allArrows)
+            {
+                if (arrow == null || arrow.segments == null) continue;
+                foreach (var segment in arrow.segments)
+                {
+                    if (segment == null) continue;
+                    
+                    // Convert segment world position to screen position
+                    Vector2 segScreenPos = Camera.main.WorldToScreenPoint(segment.transform.position);
+                    float dist = Vector2.Distance(screenPos, segScreenPos);
+                    
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        closestArrow = arrow;
+                        closestSegment = segment;
+                    }
+                }
+            }
+
+            if (closestArrow != null)
+            {
+                Debug.Log($"[InputManager] Selection Guard: Selecting closest arrow {closestArrow.ArrowId} at distance {minDistance}");
+                
+                // Start timer on first touch (if it's a timed level)
+                if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
+                {
+                    GameManager.Instance.StartTimer();
+                }
+                
+                closestArrow.OnArrowClicked(closestSegment);
+            }
         }
 
         private bool IsScreenPositionBlocked(Vector2 screenPos)

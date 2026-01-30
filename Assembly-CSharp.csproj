@@ -70,6 +70,7 @@
     <Compile Include="Assets/Scripts/Data/LevelData.cs" />
     <Compile Include="Assets/Scripts/Core/SoundManager.cs" />
     <Compile Include="Assets/Scripts/Core/GridManager.cs" />
+    <Compile Include="Assets/Scripts/GameUI/ComboController.cs" />
     <Compile Include="Assets/Scripts/Lobby/HomeContoller.cs" />
     <Compile Include="Assets/Scripts/Core/AdsManager.cs" />
     <Compile Include="Assets/Scripts/Core/Segment.cs" />

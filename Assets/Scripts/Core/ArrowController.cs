@@ -281,7 +281,7 @@ namespace Assets.Scripts.Core
 
                         if (CameraController.Instance != null && GameManager.Instance != null)
                         {
-                            bool timeCondition = (Time.time - GameManager.Instance.LastArrowSelectionTime) <= 0.75f;
+                            bool timeCondition = (Time.time - GameManager.Instance.LastArrowSelectionTime) <= 0.9f;
                             //bool panCondition = !CameraController.Instance.HasPannedSinceLastReset;
                             if (timeCondition )//&& panCondition)
                             {

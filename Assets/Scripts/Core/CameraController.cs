@@ -14,7 +14,7 @@ namespace Assets.Scripts.Core
 
         [Header("Pan Settings")]
         [SerializeField] private float panSensitivity = 0.005f; // Adjusted for pixel delta
-        [SerializeField] private float dragThresholdPercent = 5f; // Percentage of screen width to start panning
+        [SerializeField] private float dragThresholdPercent = 3.0f; // Percentage of screen width to start panning
         
         [Header("Shake Settings")]
         [SerializeField] private float shakeDuration = 0.1f;
@@ -194,15 +194,14 @@ namespace Assets.Scripts.Core
                 if (isPanningActive)
                 {
                     HasPannedSinceLastReset = true;
-                    Vector3 delta = dragOrigin - currentPos; // Drag World style (Move mouse Left -> Camera Right)
                     
-                    // Convert screen delta to world delta roughly, or just use sensitivity
-                    // Proper way: (ScreenToWorld(dragOrigin) - ScreenToWorld(currentPos))
-                    // But simplified:
+                    // Perfect Panning: Use world-space positions to calculate delta
+                    // This ensures the point under the finger stays under the finger regardless of zoom
+                    Vector3 currentWorldPos = cam.ScreenToWorldPoint(new Vector3(currentPos.x, currentPos.y, cam.nearClipPlane));
+                    Vector3 prevWorldPos = cam.ScreenToWorldPoint(new Vector3(dragOrigin.x, dragOrigin.y, cam.nearClipPlane));
+                    Vector3 worldDelta = prevWorldPos - currentWorldPos;
                     
-                    Vector3 move = new Vector3(delta.x * panSensitivity * (cam.orthographicSize/5f), delta.y * panSensitivity * (cam.orthographicSize/5f), 0);
-                    
-                    transform.position += move;
+                    transform.position += worldDelta;
                     
                     // Clamp
                     Vector3 clampedPos = transform.position;
