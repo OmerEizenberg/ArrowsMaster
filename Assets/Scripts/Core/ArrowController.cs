@@ -296,15 +296,36 @@ namespace Assets.Scripts.Core
                                     RectTransform rect = comboObj.GetComponent<RectTransform>();
                                     if (rect != null)
                                     {
+                                        Vector3 worldPos = clickedSegment.transform.position;
+                                        Vector3 screenPos = Camera.main.WorldToScreenPoint(worldPos);
+
+                                        // Apply 15% screen distance offset
+                                        float maxOffset = Screen.width * 0.15f;
+                                        Vector2 randomOffset = Random.insideUnitCircle * maxOffset;
+                                        Vector3 finalScreenPos = screenPos + (Vector3)randomOffset;
+
+                                        // Clamp within normalized bounds (0.1-0.9 X, 0.1-0.75 Y)
+                                        float minX = Screen.width * 0.1f;
+                                        float maxX = Screen.width * 0.9f;
+                                        float minY = Screen.height * 0.1f;
+                                        float maxY = Screen.height * 0.75f;
+                                        
+                                        finalScreenPos.x = Mathf.Clamp(finalScreenPos.x, minX, maxX);
+                                        finalScreenPos.y = Mathf.Clamp(finalScreenPos.y, minY, maxY);
+
+                                        // Convert screen point to local position in parent
                                         RectTransform parentRect = (RectTransform)GameManager.Instance.m_GameUI.transform.parent;
-                                        float x = (Random.Range(0.1f, 0.9f) - 0.5f) * parentRect.rect.width;
-                                        float y = (Random.Range(0.1f, 0.75f) - 0.5f) * parentRect.rect.height;
-                                        rect.anchoredPosition = new Vector2(x, y);
+                                        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, finalScreenPos, Camera.main, out Vector2 localPos))
+                                        {
+                                            rect.anchoredPosition = localPos;
+                                        }
                                     }
 
                                     ComboController comboCtrl = comboObj.GetComponent<ComboController>();
                                     if (comboCtrl != null)
                                     {
+                                        comboCtrl.UpdateUpComingComboNumber(GameManager.Instance.p_StreakCount-1);
+                                        comboCtrl.UpdateComboNumber();
                                         comboCtrl.UpdateUpComingComboNumber(GameManager.Instance.p_StreakCount);
                                     }
                                 }
