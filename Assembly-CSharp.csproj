@@ -84,6 +84,7 @@
     <Compile Include="Assets/Scripts/GameUI/LikeBehaviour.cs" />
     <Compile Include="Assets/LevelPlay/Samples/UnityLevelPlaySample/Scripts/LevelPlaySample.cs" />
     <Compile Include="Assets/LevelPlay/Samples/UnityLevelPlaySample/Scripts/AdConfig.cs" />
+    <Compile Include="Assets/Scripts/Core/IOSAdsHelper.cs" />
     <Compile Include="Assets/Scripts/GameUI/GameUIControler.cs" />
   </ItemGroup>
   <ItemGroup>

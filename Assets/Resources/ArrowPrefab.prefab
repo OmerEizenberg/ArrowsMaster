@@ -48,5 +48,6 @@ MonoBehaviour:
   segmentPrefab: {fileID: 1122043530654661600, guid: fceef0829fcfd4f559a5179ba102fed0, type: 3}
   HeadSprite: {fileID: 21300000, guid: 2a288f8992feb46bb90c925249dcc180, type: 3}
   pointEffectPrefab: {fileID: 4100442713912203939, guid: 2134d0faf9d314154a9ac013ca27a02c, type: 3}
+  m_ComboPrefab: {fileID: 7912194092593699715, guid: 67c4834f9c4b44571bd7218f8062e37d, type: 3}
   segmentScale: 1
   blockedColor: {r: 0.906, g: 0.298, b: 0.235, a: 1}

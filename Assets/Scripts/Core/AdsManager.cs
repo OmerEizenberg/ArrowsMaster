@@ -93,10 +93,13 @@ namespace Assets.Scripts.Core
                 Debug.Log("[AdsManager] Initializing Unity Services...");
                 await UnityServices.InitializeAsync();
                 
+                // Request ATT for iOS mandatory check
+                IOSAdsHelper.RequestATT();
+
                 Debug.Log("[AdsManager] Initializing LevelPlay SDK...");
                 LevelPlay.OnInitSuccess += OnSdkInitSuccess;
                 LevelPlay.OnInitFailed += OnSdkInitFailed;
-                LevelPlay.Init(AppKey);
+                LevelPlay.Init(AppKey   );
             }
             catch (Exception e)
             {
@@ -130,6 +133,8 @@ namespace Assets.Scripts.Core
             interstitialAd.OnAdLoadFailed += OnInterstitialLoadFailed;
             interstitialAd.OnAdClosed += OnInterstitialClosed;
             interstitialAd.OnAdDisplayFailed += OnInterstitialDisplayFailed;
+            interstitialAd.OnAdDisplayed += (info) => Debug.Log($"[AdsManager] Interstitial Ad Displayed: {info}");
+            interstitialAd.OnAdClicked += (info) => Debug.Log($"[AdsManager] Interstitial Ad Clicked: {info}");
 
             LoadInterstitial();
         }
@@ -150,7 +155,7 @@ namespace Assets.Scripts.Core
             }
             else
             {
-                Debug.Log("[AdsManager] Interstitial Ad is not ready. Loading one now.");
+                Debug.LogWarning($"[AdsManager] Interstitial Ad is not ready. Initialized: {isInitialized}");
                 LoadInterstitial();
             }
         }
@@ -208,11 +213,12 @@ namespace Assets.Scripts.Core
         {
             if (RewardedAd != null && RewardedAd.IsAdReady())
             {
+                Debug.Log("[AdsManager] Showing Rewarded Ad.");
                 RewardedAd.ShowAd();
             }
             else 
             {
-                Debug.LogWarning("[AdsManager]  Ad is not ready yet. Loading one now.");
+                Debug.LogWarning($"[AdsManager] Rewarded Ad is not ready. Initialized: {isInitialized}");
                 LoadRewarded();
             }
         }

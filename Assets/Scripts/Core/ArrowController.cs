@@ -13,6 +13,7 @@ namespace Assets.Scripts.Core
         [Header("Visuals")]
         public Sprite HeadSprite;
         public GameObject pointEffectPrefab;
+        [SerializeField] private GameObject m_ComboPrefab;
         private List<GameObject> instantiatedEffects = new List<GameObject>();
         
         // Grid Step size (Standard 1 unit)
@@ -287,6 +288,26 @@ namespace Assets.Scripts.Core
                             {
                                 GameManager.Instance.IncrementStreak();
                                 SoundManager.Instance.PlayStreak(GameManager.Instance.p_StreakCount - 1);
+
+                                // Instantiate Combo Feedback
+                                if (m_ComboPrefab != null)
+                                {
+                                    GameObject comboObj = Instantiate(m_ComboPrefab, GameManager.Instance.m_GameUI.transform.parent);
+                                    RectTransform rect = comboObj.GetComponent<RectTransform>();
+                                    if (rect != null)
+                                    {
+                                        RectTransform parentRect = (RectTransform)GameManager.Instance.m_GameUI.transform.parent;
+                                        float x = (Random.Range(0.1f, 0.9f) - 0.5f) * parentRect.rect.width;
+                                        float y = (Random.Range(0.1f, 0.75f) - 0.5f) * parentRect.rect.height;
+                                        rect.anchoredPosition = new Vector2(x, y);
+                                    }
+
+                                    ComboController comboCtrl = comboObj.GetComponent<ComboController>();
+                                    if (comboCtrl != null)
+                                    {
+                                        comboCtrl.UpdateUpComingComboNumber(GameManager.Instance.p_StreakCount);
+                                    }
+                                }
                             }
                             else
                             {
