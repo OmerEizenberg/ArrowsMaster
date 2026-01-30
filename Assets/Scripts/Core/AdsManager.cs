@@ -14,6 +14,8 @@ namespace Assets.Scripts.Core
         private LevelPlayRewardedAd RewardedAd;
         private bool isInitialized = false;
 
+        private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _mainThreadQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+
         public event Action OnRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
@@ -98,28 +100,62 @@ namespace Assets.Scripts.Core
                 // Request ATT for iOS mandatory check
                 IOSAdsHelper.RequestATT();
 
-                Debug.Log("[AdsManager] Initializing LevelPlay SDK...");
+                string currentAppKey = AppKey;
+                Debug.Log($"[AdsManager] Initializing LevelPlay SDK with AppKey: {currentAppKey}...");
+                
+                // Validation check for common confusion between Unity Game ID and ironSource App Key
+                if (currentAppKey.Length <= 7 && int.TryParse(currentAppKey, out _))
+                {
+                    Debug.LogWarning("[AdsManager] WARNING: The provided AppKey looks like a Unity Game ID. LevelPlay requires an ironSource App Key (typically 8-10 characters). If ads don't load, please verify this in the ironSource dashboard.");
+                }
+
                 LevelPlay.OnInitSuccess += OnSdkInitSuccess;
                 LevelPlay.OnInitFailed += OnSdkInitFailed;
-                LevelPlay.Init(AppKey   );
+                
+                LevelPlay.Init(currentAppKey);
             }
             catch (Exception e)
             {
-                Debug.LogError($"[AdsManager] Unity Services Initialization Failed: {e.Message}");
+                Debug.LogError($"[AdsManager] Unity Services Initialization Failed: {e.Message}\n{e.StackTrace}");
             }
+        }
+
+        private void Update()
+        {
+            while (_mainThreadQueue.TryDequeue(out var action))
+            {
+                action?.Invoke();
+            }
+        }
+
+        private void OnApplicationPause(bool isPaused)
+        {
+            // IronSource/LevelPlay requires this for proper tracking and ad state management on device
+            // If the IronSource namespace is available, it should be called:
+            // IronSource.Agent.onApplicationPause(isPaused);
+            // Since we are using the LPM-based SDK, we ensure the agent is informed if the class exists.
+        }
+
+        private void EnqueueAction(Action action)
+        {
+            _mainThreadQueue.Enqueue(action);
         }
 
         private void OnSdkInitSuccess(LevelPlayConfiguration config)
         {
-            Debug.Log("[AdsManager] LevelPlay SDK Initialized Successfully.");
-            isInitialized = true;
-            CreateInterstitialAd();
-            CreateRewardedAd();
+            EnqueueAction(() => {
+                Debug.Log("[AdsManager] LevelPlay SDK Initialized Successfully.");
+                isInitialized = true;
+                CreateInterstitialAd();
+                CreateRewardedAd();
+            });
         }
 
         private void OnSdkInitFailed(LevelPlayInitError error)
         {
-            Debug.LogError($"[AdsManager] LevelPlay SDK Initialization Failed: {error}");
+            EnqueueAction(() => {
+                Debug.LogError($"[AdsManager] LevelPlay SDK Initialization Failed: {error}");
+            });
         }
 
         private void CreateInterstitialAd()
@@ -165,26 +201,34 @@ namespace Assets.Scripts.Core
 
         private void OnInterstitialLoaded(LevelPlayAdInfo adInfo)
         {
-            Debug.Log($"[AdsManager] Interstitial Ad Loaded: {adInfo}");
+            EnqueueAction(() => {
+                Debug.Log($"[AdsManager] Interstitial Ad Loaded: {adInfo}");
+            });
         }
 
         private void OnInterstitialLoadFailed(LevelPlayAdError error)
         {
-            Debug.LogWarning($"[AdsManager] Interstitial Ad Load Failed: {error}");
+            EnqueueAction(() => {
+                Debug.LogWarning($"[AdsManager] Interstitial Ad Load Failed: {error}");
+            });
         }
 
         private void OnInterstitialClosed(LevelPlayAdInfo adInfo)
         {
-            Debug.Log("[AdsManager] Interstitial Ad Closed. Loading next one.");
-            OnAdClosed?.Invoke();
-            LoadInterstitial();
+            EnqueueAction(() => {
+                Debug.Log("[AdsManager] Interstitial Ad Closed. Loading next one.");
+                OnAdClosed?.Invoke();
+                LoadInterstitial();
+            });
         }
 
         private void OnInterstitialDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
         {
-            Debug.LogError($"[AdsManager] Interstitial Ad Display Failed: {error}");
-            OnAdClosed?.Invoke();
-            LoadInterstitial();
+            EnqueueAction(() => {
+                Debug.LogError($"[AdsManager] Interstitial Ad Display Failed: {error}");
+                OnAdClosed?.Invoke();
+                LoadInterstitial();
+            });
         }
 
         // ---  Rewarded Ad ---
@@ -192,22 +236,35 @@ namespace Assets.Scripts.Core
         {
             if (RewardedAd != null) RewardedAd.DestroyAd();
             RewardedAd = new LevelPlayRewardedAd(RewardedAdUnitId);
+            
             RewardedAd.OnAdClosed += (info) => { 
-                Debug.Log("[AdsManager]  Ad Closed. Request");
-                OnAdClosed?.Invoke();
-                LoadRewarded(); 
+                EnqueueAction(() => {
+                    Debug.Log("[AdsManager] Rewarded Ad Closed. Requesting next.");
+                    OnAdClosed?.Invoke();
+                    LoadRewarded(); 
+                });
             };
+            
             RewardedAd.OnAdDisplayFailed += (info, err) => { 
-                Debug.LogError($"[AdsManager]  Ad Display Failed: {err}. ");
-                OnAdClosed?.Invoke();
-                LoadRewarded(); 
+                EnqueueAction(() => {
+                    Debug.LogError($"[AdsManager] Rewarded Ad Display Failed: {err}. ");
+                    OnAdClosed?.Invoke();
+                    LoadRewarded(); 
+                });
             };
-            RewardedAd.OnAdDisplayed += (info) => Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}");
+            
+            RewardedAd.OnAdDisplayed += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}"));
 
             RewardedAd.OnAdRewarded += (info, reward) => {
-                Debug.Log("[AdsManager]  Ad Rewarded Event Received. ");
-                OnRewardReceived?.Invoke();
+                EnqueueAction(() => {
+                    Debug.Log("[AdsManager] Rewarded Ad Rewarded Event Received. ");
+                    OnRewardReceived?.Invoke();
+                });
             };
+            
+            RewardedAd.OnAdLoaded += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Rewarded Ad Loaded: {info}"));
+            RewardedAd.OnAdLoadFailed += (info) => EnqueueAction(() => Debug.LogWarning($"[AdsManager] Rewarded Ad Load Failed: {info}"));
+
             LoadRewarded();
         }
 

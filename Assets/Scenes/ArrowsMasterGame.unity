@@ -6317,7 +6317,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 6
+  orthographic size: 8.5
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -6368,7 +6368,7 @@ MonoBehaviour:
   dragThresholdPercent: 10
   shakeDuration: 0.1
   shakeMagnitude: 0.05
-  initZoomMultiplier: 2
+  initZoomMultiplier: 8
   initZoomInDuration: 0.25
   initPaddingMultiplier: 1.1
   initExtraZoomBuffer: 0.5
