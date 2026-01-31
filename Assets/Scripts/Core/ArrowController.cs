@@ -196,16 +196,16 @@ namespace Assets.Scripts.Core
 
         private void UpdateLinePositions()
         {
-            if (lineRenderer == null || segments.Count == 0)
+            int segCount = segments.Count;
+            if (lineRenderer == null || segCount == 0)
             {
                 if (lineRenderer != null) lineRenderer.positionCount = 0;
                 return;
             }
 
             // Performance: Only update if the head has moved significantly or update is forced
-            // Using a slightly more sensitive threshold for smooth visuals
-            Vector3 currentHeadPos = segments[segments.Count - 1].transform.position;
-            if (!forceLineUpdate && (currentHeadPos - lastHeadPos).sqrMagnitude < 0.00001f)
+            Vector3 currentHeadPos = segments[segCount - 1].transform.position;
+            if (!forceLineUpdate && (currentHeadPos - lastHeadPos).sqrMagnitude < 0.000001f)
             {
                 return;
             }
@@ -213,51 +213,63 @@ namespace Assets.Scripts.Core
             forceLineUpdate = false;
 
             linePoints.Clear();
-            
-            // Junction Corners (prevent geometry gaps during turns)
-            for (int i = 0; i < segments.Count - 1; i++)
+            float snapThreshold = 0.001f;
+            float z = currentHeadPos.z;
+
+            for (int i = 0; i < segCount - 1; i++)
             {
-                // Current segment visual pos (Snapped for stability)
                 Vector3 p1 = segments[i].transform.position;
                 Vector3 p2 = segments[i+1].transform.position;
                 
-                // Snap points that are extremely close to their target grid position
-                // This prevents 'tiny diagonal' artifacts at the start/end of a move
-                Vector3 target1 = new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, p1.z);
-                Vector3 target2 = new Vector3(segments[i+1].GridPosition.x * CellSize, segments[i+1].GridPosition.y * CellSize, p2.z);
+                // Snap points to grid if they are very close
+                Vector3 target1 = new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, z);
+                Vector3 target2 = new Vector3(segments[i+1].GridPosition.x * CellSize, segments[i+1].GridPosition.y * CellSize, z);
                 
-                if (Vector3.Distance(p1, target1) < 0.001f) p1 = target1;
-                if (Vector3.Distance(p2, target2) < 0.001f) p2 = target2;
+                if (Vector3.Distance(p1, target1) < snapThreshold) p1 = target1;
+                if (Vector3.Distance(p2, target2) < snapThreshold) p2 = target2;
 
-                linePoints.Add(p1);
-
-                // Add a corner anchor ONLY if the segments are currently in a turn
-                // We use a slightly more generous threshold to avoid jittery state switching
-                if (Mathf.Abs(p1.x - p2.x) > 0.02f && Mathf.Abs(p1.y - p2.y) > 0.02f)
+                // Add p1 if it's not a duplicate of the previous point
+                if (linePoints.Count == 0 || Vector3.Distance(linePoints[linePoints.Count - 1], p1) > snapThreshold)
                 {
-                    // The junction is the grid point that acts as the "pivot" of the turn.
+                    linePoints.Add(p1);
+                }
+
+                // Inject a corner anchor if segments are in a turn (not aligned on either axis)
+                // Using a smaller threshold to avoid diagonal artifacts during animation
+                if (Mathf.Abs(p1.x - p2.x) > snapThreshold && Mathf.Abs(p1.y - p2.y) > snapThreshold)
+                {
                     Vector2Int g1 = segments[i].GridPosition;
                     Vector2Int g2 = segments[i+1].GridPosition;
                     
-                    Vector3 c1 = new Vector3(g1.x * CellSize, g1.y * CellSize, currentHeadPos.z);
-                    Vector3 c2 = new Vector3(g2.x * CellSize, g2.y * CellSize, currentHeadPos.z);
+                    Vector3 c1 = new Vector3(g1.x * CellSize, g1.y * CellSize, z);
+                    Vector3 c2 = new Vector3(g2.x * CellSize, g2.y * CellSize, z);
                     
-                    // Manhattan score logic...
-                    float s1 = Mathf.Min(Mathf.Abs(p1.x - c1.x), Mathf.Abs(p1.y - c1.y)) + 
-                               Mathf.Min(Mathf.Abs(p2.x - c1.x), Mathf.Abs(p2.y - c1.y));
-                    float s2 = Mathf.Min(Mathf.Abs(p1.x - c2.x), Mathf.Abs(p1.y - c2.y)) + 
-                               Mathf.Min(Mathf.Abs(p2.x - c2.x), Mathf.Abs(p2.y - c2.y));
+                    // Manhattan distance logic to pick the correct elbow of the turn
+                    float s1 = Mathf.Abs(p1.x - c1.x) + Mathf.Abs(p1.y - c1.y) + Mathf.Abs(p2.x - c1.x) + Mathf.Abs(p2.y - c1.y);
+                    float s2 = Mathf.Abs(p1.x - c2.x) + Mathf.Abs(p1.y - c2.y) + Mathf.Abs(p2.x - c2.x) + Mathf.Abs(p2.y - c2.y);
                     
                     Vector3 corner = (s1 <= s2) ? c1 : c2;
-                    linePoints.Add(corner);
+                    if (Vector3.Distance(linePoints[linePoints.Count - 1], corner) > snapThreshold)
+                    {
+                        linePoints.Add(corner);
+                    }
                 }
             }
             
-            // 3. Always add the final visual position of the head at the VERY end
-            // Optimization: Offset the line slightly back from the head's center to prevent overlap
-            Vector3 finalHeadPos = segments[segments.Count - 1].transform.position;
+            // Final head position with offset
             Vector3 headOffset = new Vector3(m_LookDirection.x, m_LookDirection.y, 0) * -0.2f * CellSize;
-            linePoints.Add(finalHeadPos + headOffset);
+            Vector3 finalPoint = currentHeadPos + headOffset;
+            
+            if (linePoints.Count == 0)
+            {
+                // Ensure at least two points for visibility even for 1-segment arrows
+                linePoints.Add(finalPoint - new Vector3(m_LookDirection.x, m_LookDirection.y, 0) * 0.1f);
+                linePoints.Add(finalPoint);
+            }
+            else if (Vector3.Distance(linePoints[linePoints.Count - 1], finalPoint) > snapThreshold)
+            {
+                linePoints.Add(finalPoint);
+            }
             
             if (linePointsArray == null || linePointsArray.Length != linePoints.Count)
             {
