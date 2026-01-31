@@ -27,6 +27,8 @@ namespace Assets.Scripts.Core
         private ArrowData cachedData;
         private bool hasReducedLife = false;
         private Vector2Int m_LookDirection = Vector2Int.up;
+        
+        private static Material s_SharedLineMaterial;
 
         // LineRenderer Refactor
         private LineRenderer lineRenderer;
@@ -56,7 +58,11 @@ namespace Assets.Scripts.Core
             lineRenderer.useWorldSpace = true;
             lineRenderer.numCapVertices = 5;
             lineRenderer.numCornerVertices = 5;
-            lineRenderer.material = new Material(Shader.Find("Sprites/Default")); 
+            
+            // Optimization: Share material to avoid overhead
+            if (s_SharedLineMaterial == null) s_SharedLineMaterial = new Material(Shader.Find("Sprites/Default"));
+            lineRenderer.material = s_SharedLineMaterial;
+
             lineRenderer.startColor = Color.black;
             lineRenderer.endColor = Color.black;
             lineRenderer.sortingOrder = 0; 
@@ -68,7 +74,7 @@ namespace Assets.Scripts.Core
             previewLineRenderer = previewObj.AddComponent<LineRenderer>();
             previewLineRenderer.startWidth = 0.1f;
             previewLineRenderer.endWidth = 0.1f;
-            previewLineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+            previewLineRenderer.material = s_SharedLineMaterial; // Share here too
             previewLineRenderer.startColor = new Color(0.5f, 0.5f, 0.5f, 0.5f); // Grey Transparent
             previewLineRenderer.endColor = new Color(0.5f, 0.5f, 0.5f, 0.2f); // Fading
             previewLineRenderer.useWorldSpace = true;
@@ -168,21 +174,25 @@ namespace Assets.Scripts.Core
             return segments[segments.Count - 1].transform.position;
         }
 
-        private void Update()
-        {
-            // Update logic (if any)
-        }
-
         private void UpdateVisuals()
         {
             UpdateLinePositions();
+            // We only need to update head visuals if something changed, 
+            // but for now let's just make it faster.
             UpdateHeadVisuals();
         }
 
-        private List<Vector3> linePoints = new List<Vector3>();
+        private List<Vector3> linePoints = new List<Vector3>(16);
         private Vector3[] linePointsArray;
         private Vector3 lastHeadPos;
         private bool forceLineUpdate = true;
+        private Camera m_cachedMainCam;
+        private Camera p_MainCam {
+            get {
+                if (m_cachedMainCam == null) m_cachedMainCam = Camera.main;
+                return m_cachedMainCam;
+            }
+        }
 
         private void UpdateLinePositions()
         {
@@ -297,7 +307,7 @@ namespace Assets.Scripts.Core
                                     if (rect != null)
                                     {
                                         Vector3 worldPos = clickedSegment.transform.position;
-                                        Vector3 screenPos = Camera.main.WorldToScreenPoint(worldPos);
+                                        Vector3 screenPos = p_MainCam.WorldToScreenPoint(worldPos);
 
                                         // Apply 15% screen distance offset ideally
                                         float maxOffset = Screen.width * 0.15f;
@@ -495,41 +505,18 @@ namespace Assets.Scripts.Core
             
             Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = m_LookDirection;
-            
-            Vector2 headPos = new Vector2(head.GridPosition.x, head.GridPosition.y);
-            Vector2 dirVec = new Vector2(currentDir.x, currentDir.y);
+            Vector2Int checkPos = head.GridPosition + currentDir;
 
-            foreach (var otherArrow in GridManager.Instance.GetAllArrows())
+            // PERFORMANCE: Instead of iterating all arrows, check grid occupancy along movement line
+            // This is O(GridSize) instead of O(Arrows * Segments)
+            while (!GridManager.Instance.IsOutOfBounds(checkPos))
             {
-                if (otherArrow == this || otherArrow.isMoving) continue;
-                
-                // PERFORMANCE: Broad phase check using integer grid coords
-                foreach (var seg in otherArrow.segments)
+                ArrowController occupant = GridManager.Instance.GetOccupant(checkPos);
+                if (occupant != null && occupant != this && !occupant.isMoving)
                 {
-                    Vector2Int gp = seg.GridPosition;
-                    bool potentialBlocker = false;
-                    if (currentDir.x > 0) potentialBlocker = gp.x > head.GridPosition.x && gp.y == head.GridPosition.y;
-                    else if (currentDir.x < 0) potentialBlocker = gp.x < head.GridPosition.x && gp.y == head.GridPosition.y;
-                    else if (currentDir.y > 0) potentialBlocker = gp.y > head.GridPosition.y && gp.x == head.GridPosition.x;
-                    else if (currentDir.y < 0) potentialBlocker = gp.y < head.GridPosition.y && gp.x == head.GridPosition.x;
-                    
-                    if (potentialBlocker)
-                    {
-                        // Found at least one segment in the path, now do exact checks
-                        for (int i = 0; i < otherArrow.segments.Count - 1; i++)
-                        {
-                            Vector2 p1 = new Vector2(otherArrow.segments[i].GridPosition.x, otherArrow.segments[i].GridPosition.y);
-                            Vector2 p2 = new Vector2(otherArrow.segments[i+1].GridPosition.x, otherArrow.segments[i+1].GridPosition.y);
-                            if (RayIntersectsSegment(headPos, dirVec, p1, p2)) return false;
-                        }
-                        if (otherArrow.segments.Count == 1)
-                        {
-                            Vector2 pH = new Vector2(otherArrow.segments[0].GridPosition.x, otherArrow.segments[0].GridPosition.y);
-                            if (RayIntersectsPoint(headPos, dirVec, pH)) return false;
-                        }
-                        break; 
-                    }
+                    return false; // Path is blocked by a static arrow
                 }
+                checkPos += currentDir;
             }
             
             return true;
@@ -694,35 +681,38 @@ namespace Assets.Scripts.Core
 
         private void UpdateHeadVisuals()
         {
-            if (segments.Count == 0) return;
+            int count = segments.Count;
+            if (count == 0) return;
             
-            // Ensure only Head is enabled, others disabled
-            for (int i = 0; i < segments.Count; i++)
+            for (int i = 0; i < count; i++)
             {
                 Segment seg = segments[i];
-                if (i == segments.Count - 1)
+                if (i == count - 1)
                 {
                     // HEAD
-                    seg.Renderer.enabled = true;
-                    seg.Renderer.sprite = HeadSprite;
-                    seg.Renderer.color = currentArrowColor; // Explicitly set color here
-                    seg.Renderer.sortingOrder = 10;   // Ensure head is on top
-                    if (lineRenderer != null) lineRenderer.sortingOrder = 5; // Ensure line is below head
-                    
-                    // Rotation - Use explicit look direction from level data
-                    float angle = Mathf.Atan2(m_LookDirection.y, m_LookDirection.x) * Mathf.Rad2Deg - 90f;
-                    seg.transform.rotation = Quaternion.Euler(0, 0, angle);
-#if UNITY_EDITOR
-                    // Helpful for debugging in scene view
-                    seg.name = $"Head_{ArrowId}_{cachedData?.lookDirection}";
-#endif
+                    if (seg.Renderer != null)
+                    {
+                        seg.Renderer.enabled = true;
+                        seg.Renderer.sprite = HeadSprite;
+                        seg.Renderer.color = currentArrowColor;
+                        seg.Renderer.sortingOrder = 10;
+                        
+                        float angle = Mathf.Atan2(m_LookDirection.y, m_LookDirection.x) * Mathf.Rad2Deg - 90f;
+                        seg.transform.rotation = Quaternion.Euler(0, 0, angle);
+                    }
                 }
                 else
                 {
-                    // BODY
-                    seg.Renderer.enabled = false;
+                    // BODY - Hide redundant renderers
+                    if (seg.Renderer != null && seg.Renderer.enabled)
+                    {
+                        seg.Renderer.enabled = false;
+                    }
                 }
             }
+            
+            if (lineRenderer != null && lineRenderer.sortingOrder != 5) 
+                lineRenderer.sortingOrder = 5;
         }
 
         public void ShowPreview()

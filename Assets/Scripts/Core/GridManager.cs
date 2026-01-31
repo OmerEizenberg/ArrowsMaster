@@ -100,5 +100,14 @@ namespace Assets.Scripts.Core
             ReleaseOccupancy(oldPos);
             RegisterOccupancy(newPos, arrow);
         }
+
+        public ArrowController GetOccupant(Vector2Int coord)
+        {
+            if (occupancyMap.TryGetValue(coord, out ArrowController arrow))
+            {
+                return arrow;
+            }
+            return null;
+        }
     }
 }

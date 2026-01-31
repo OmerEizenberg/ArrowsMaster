@@ -63,6 +63,11 @@ namespace Assets.Scripts.Core
 
         private void Update()
         {
+            // Update logic moved to LateUpdate for better camera smoothness
+        }
+
+        private void LateUpdate()
+        {
             // Restore position from previous frame's shake
             transform.position -= lastShakeOffset;
             lastShakeOffset = Vector3.zero;
@@ -70,10 +75,7 @@ namespace Assets.Scripts.Core
             HandleDesktopZoom();
             HandleMobileZoom();
             HandlePanning();
-        }
 
-        private void LateUpdate()
-        {
             // Apply current shake offset
             lastShakeOffset = shakeOffset;
             transform.position += lastShakeOffset;
@@ -120,17 +122,7 @@ namespace Assets.Scripts.Core
 
         public void SetBounds(Vector2Int gridSize)
         {
-            // Calculate bounds based on grid size + padding
-            // Grid 0,0 is usually at 0,0 world.
-            // Width = gridSize.x, Height = gridSize.y
-            
             float padding = 2f;
-            
-            // Min X: -1 (wall) - padding
-            // Max X: gridSize.x (wall) + padding
-            // Min Y: -1 (wall) - padding
-            // Max Y: gridSize.y (wall) + padding
-            
             float cellSize = ArrowController.CellSize;
 
             minBounds = new Vector2(-1 * cellSize - padding, -1 * cellSize - padding);
@@ -139,6 +131,8 @@ namespace Assets.Scripts.Core
             boundsSet = true;
         }
 
+        private Vector3 prevMousePos;
+
         private void HandlePanning()
         {
             if (!boundsSet) return;
@@ -146,7 +140,6 @@ namespace Assets.Scripts.Core
             // Handle Mouse/Touch Pan (Drag)
             if (Input.GetMouseButtonDown(0))
             {
-                // If we are starting with multiple fingers, ignore panning
                 if (Input.touchCount > 1)
                 {
                     isTouching = false;
@@ -155,13 +148,13 @@ namespace Assets.Scripts.Core
                 }
 
                 touchStartPosition = Input.mousePosition;
+                prevMousePos = touchStartPosition;
                 isTouching = true;
                 isPanningActive = false;
             }
 
             if (Input.GetMouseButton(0) && isTouching)
             {
-                // If a second finger is added while dragging, cancel the drag to allow zooming
                 if (Input.touchCount > 1)
                 {
                     isTouching = false;
@@ -171,35 +164,28 @@ namespace Assets.Scripts.Core
 
                 Vector3 currentPos = Input.mousePosition;
 
-                // Check if panning should be activated based on threshold
                 if (!isPanningActive)
                 {
-                    float distanceMoved = Vector3.Distance(touchStartPosition, currentPos);
+                    float distSqr = (touchStartPosition - currentPos).sqrMagnitude;
                     float threshold = Screen.width * (dragThresholdPercent / 100f);
                     
-                    if (distanceMoved >= threshold)
+                    if (distSqr >= threshold * threshold)
                     {
-                        // Activate panning and set dragOrigin to current position for smooth start
                         isPanningActive = true;
-                        dragOrigin = currentPos;
+                        prevMousePos = currentPos;
                     }
-                    else
-                    {
-                        // Don't pan yet, threshold not reached
-                        return;
-                    }
+                    else return;
                 }
 
-                // Only pan if panning is active
                 if (isPanningActive)
                 {
                     HasPannedSinceLastReset = true;
                     
-                    // Perfect Panning: Use world-space positions to calculate delta
-                    // This ensures the point under the finger stays under the finger regardless of zoom
+                    // Perfect Panning: Calculate delta in world space
+                    // We only need ScreenToWorldPoint for the delta
                     Vector3 currentWorldPos = cam.ScreenToWorldPoint(new Vector3(currentPos.x, currentPos.y, cam.nearClipPlane));
-                    Vector3 prevWorldPos = cam.ScreenToWorldPoint(new Vector3(dragOrigin.x, dragOrigin.y, cam.nearClipPlane));
-                    Vector3 worldDelta = prevWorldPos - currentWorldPos;
+                    Vector3 lastWorldPos = cam.ScreenToWorldPoint(new Vector3(prevMousePos.x, prevMousePos.y, cam.nearClipPlane));
+                    Vector3 worldDelta = lastWorldPos - currentWorldPos;
                     
                     transform.position += worldDelta;
                     
@@ -209,7 +195,7 @@ namespace Assets.Scripts.Core
                     clampedPos.y = Mathf.Clamp(clampedPos.y, minBounds.y, maxBounds.y);
                     transform.position = clampedPos;
 
-                    dragOrigin = currentPos;
+                    prevMousePos = currentPos;
                 }
             }
 
@@ -232,30 +218,23 @@ namespace Assets.Scripts.Core
 
         private void HandleMobileZoom()
         {
-            // If there are two touches on the device...
             if (Input.touchCount == 2)
             {
                 Touch touchZero = Input.GetTouch(0);
                 Touch touchOne = Input.GetTouch(1);
 
-                // If any touch just began, skip this frame to establish a clean baseline
-                // and prevent the "jump" caused by the first finger's existing deltaPosition.
-                if (touchZero.phase == TouchPhase.Began || touchOne.phase == TouchPhase.Began)
-                {
-                    return;
-                }
+                if (touchZero.phase == TouchPhase.Began || touchOne.phase == TouchPhase.Began) return;
 
-                // Find the position in the previous frame of each touch.
                 Vector2 touchZeroPrevPos = touchZero.position - touchZero.deltaPosition;
                 Vector2 touchOnePrevPos = touchOne.position - touchOne.deltaPosition;
 
-                // Find the magnitude of the vector (the distance) between the touches in each frame.
                 float prevTouchDeltaMag = (touchZeroPrevPos - touchOnePrevPos).magnitude;
                 float touchDeltaMag = (touchZero.position - touchOne.position).magnitude;
 
                 float deltaMagnitudeDiff = prevTouchDeltaMag - touchDeltaMag;
 
-                float newSize = cam.orthographicSize + deltaMagnitudeDiff * mobileZoomSpeed * Time.deltaTime; // Scaling
+                // REMOVED Time.deltaTime! Zoom should be absolute to finger move distance
+                float newSize = cam.orthographicSize + deltaMagnitudeDiff * (cam.orthographicSize / 500f) * mobileZoomSpeed; 
                 
                 cam.orthographicSize = Mathf.Clamp(newSize, minZoom, maxZoom);
             }
