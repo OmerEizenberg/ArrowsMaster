@@ -257,7 +257,8 @@ namespace Assets.Scripts.Core
             }
             
             // Final head position with offset
-            Vector3 headOffset = new Vector3(m_LookDirection.x, m_LookDirection.y, 0) * -0.2f * CellSize;
+            // Adjusted: Moved 0.08 units forward (into the head) from the previous -0.2f offset
+            Vector3 headOffset = new Vector3(m_LookDirection.x, m_LookDirection.y, 0) * -0.12f * CellSize;
             Vector3 finalPoint = currentHeadPos + headOffset;
             
             if (linePoints.Count == 0)

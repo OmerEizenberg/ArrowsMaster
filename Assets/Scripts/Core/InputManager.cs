@@ -117,8 +117,8 @@ namespace Assets.Scripts.Core
             if (IsScreenPositionBlocked(screenPos)) return;
             if (GridManager.Instance == null) return;
 
-            // Use 15% of the smaller screen dimension as the threshold
-            float screenThreshold = Mathf.Min(Screen.width, Screen.height) * 0.15f; 
+            // Use 22.5% of the smaller screen dimension as the threshold (increased by 50% from 15%)
+            float screenThreshold = Mathf.Min(Screen.width, Screen.height) * 0.225f; 
             float minDistance = screenThreshold;
             ArrowController closestArrow = null;
             Segment closestSegment = null;

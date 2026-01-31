@@ -353,6 +353,7 @@ m_GameUI.gameObject.SetActive(true);
 
         private System.Collections.IEnumerator WinSequence()
         {
+            ClearActiveCombos();
             Debug.Log("Level Complete! Waiting for win screen...");
             if(p_isLevelProgression)
             {
@@ -434,6 +435,7 @@ m_GameUI.gameObject.SetActive(true);
 
         private void HandleGameOver()
         {
+            ClearActiveCombos();
             Debug.Log("Game Over!");
             if (failureScreen != null)
             {
@@ -549,6 +551,7 @@ m_GameUI.gameObject.SetActive(true);
         
         private void HandleTimeUp()
         {
+            ClearActiveCombos();
             Debug.Log("Time's up!");
             if (failureScreen != null)
             {
@@ -570,6 +573,18 @@ m_GameUI.gameObject.SetActive(true);
         public void RegisterCombo(RectTransform rect)
         {
             if (rect != null) m_ActiveCombos.Add(rect);
+        }
+
+        public void ClearActiveCombos()
+        {
+            foreach (var combo in m_ActiveCombos)
+            {
+                if (combo != null && combo.gameObject != null)
+                {
+                    Destroy(combo.gameObject);
+                }
+            }
+            m_ActiveCombos.Clear();
         }
 
         public Vector2 GetValidComboPosition(Vector2 idealScreenPos, float minDistancePercent)
