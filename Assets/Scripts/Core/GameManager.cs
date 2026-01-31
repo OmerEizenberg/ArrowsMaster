@@ -15,6 +15,9 @@ namespace Assets.Scripts.Core
         public GameObject failureScreen;
         public GameUIContoleer m_GameUI;
         public GameObject m_LobbyUI;
+        public GameObject m_FunFact;
+        [SerializeField] private TextMeshProUGUI m_FunFactText;
+        [SerializeField] private string[] m_FunFactsDat;
 
         [Header("Settings")]
         public int maxLives = 3;
@@ -95,6 +98,10 @@ namespace Assets.Scripts.Core
                 levelManager.OnEntranceAnimationFinished += () => {
                     isEntranceFinished = true;
                     ResetHintTimer();
+                    if (m_FunFact != null && UserDataManager.Instance.CurrentLevel< m_FunFactsDat.Length && m_FunFactsDat[UserDataManager.Instance.CurrentLevel].Length>2) {
+                        m_FunFact.SetActive(true);
+                        m_FunFactText.text = m_FunFactsDat[UserDataManager.Instance.CurrentLevel];
+                    }
                 };
             }
         }
@@ -261,6 +268,7 @@ namespace Assets.Scripts.Core
             OnLevelStarted?.Invoke();
             isEntranceFinished = false;
             isWinning = false;
+            if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
 
@@ -295,6 +303,7 @@ m_GameUI.gameObject.SetActive(true);
             OnLevelStarted?.Invoke();
             isEntranceFinished = false;
             isWinning = false;
+            if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
 
