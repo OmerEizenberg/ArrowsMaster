@@ -30,6 +30,31 @@ namespace Assets.Scripts.Core
         {
             currentLevelId = levelId;
             TextAsset jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
+            if (jsonFile == null)
+            {
+                int currentIdx = ExtractNumber(levelId);
+                if (currentIdx != -1)
+                {
+                    int maxIdx = 0;
+                    TextAsset[] allLevels = Resources.LoadAll<TextAsset>("Levels");
+                    foreach (var level in allLevels)
+                    {
+                        int idx = ExtractNumber(level.name);
+                        if (idx > maxIdx) maxIdx = idx;
+                    }
+
+                    if (maxIdx > 0)
+                    {
+                        int newIdx = (currentIdx % maxIdx) + 10;
+                        string numericPart = "";
+                        
+                        levelId = "Level"+newIdx;
+                        currentLevelId = levelId;
+                        jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
+                    }
+                }
+            }
+
             if (jsonFile != null)
             {
                 ClearLevel();
@@ -40,6 +65,19 @@ namespace Assets.Scripts.Core
                 Debug.LogError($"Level with ID {levelId} not found in Resources.");
             }
         }
+
+        private int ExtractNumber(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return -1;
+            string b = "";
+            foreach (char c in input)
+            {
+                if (char.IsDigit(c)) b += c;
+            }
+            if (int.TryParse(b, out int result)) return result;
+            return -1;
+        }
+
           public void LoadChallengeLevelFromResources(string levelId)
         {
             currentLevelId = levelId;
