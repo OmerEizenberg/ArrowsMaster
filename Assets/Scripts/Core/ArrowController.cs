@@ -390,7 +390,7 @@ namespace Assets.Scripts.Core
         {
             Color successColor = new Color(0.18f, 0.8f, 0.44f); // #2ecc71
             Color startFlashColor = Color.black; // #000000
-            float duration = 0.5f;
+            float duration = 0.33f;
             float halfDuration = duration / 2f;
 
             // Flash to Green
@@ -479,7 +479,7 @@ namespace Assets.Scripts.Core
                 }
                 
                 // Animate the batch move and wait for it
-                yield return StartCoroutine(AnimateAllSegments(targets, 0.04f));
+                yield return StartCoroutine(AnimateAllSegments(targets, 0.027f));
                 
                 // Check if completely escaped (no segments left)
                 if (segments.Count == 0)
@@ -872,7 +872,7 @@ namespace Assets.Scripts.Core
             List<Vector3> targets = new List<Vector3>();
             foreach (var seg in segments) targets.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            yield return StartCoroutine(AnimateAllSegments(targets, 0.04f));
+            yield return StartCoroutine(AnimateAllSegments(targets, 0.027f));
         }
 
         private IEnumerator SimulateReverseStep()
@@ -893,7 +893,7 @@ namespace Assets.Scripts.Core
             List<Vector3> targets = new List<Vector3>();
             foreach (var seg in segments) targets.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            yield return StartCoroutine(AnimateAllSegments(targets, 0.04f));
+            yield return StartCoroutine(AnimateAllSegments(targets, 0.027f));
         }
 
         private IEnumerator BlockedArrowAnimation()
@@ -930,7 +930,7 @@ namespace Assets.Scripts.Core
             List<Vector3> impactTargets = new List<Vector3>();
             for(int i=0; i < segments.Count - 1; i++) impactTargets.Add(segments[i].transform.position);
             impactTargets.Add(impactPosition);
-            yield return StartCoroutine(AnimateAllSegments(impactTargets, 0.04f));
+            yield return StartCoroutine(AnimateAllSegments(impactTargets, 0.027f));
             
             // Phase 3: Impact feedback - play sound, vibrate, and change color to red
             SoundManager.Instance.PlayArrowBlocked();
@@ -938,7 +938,7 @@ namespace Assets.Scripts.Core
             SetArrowColor(blockedColor);
             GameManager.Instance.PlayWrongAnimation();
             // Small pause at impact for emphasis
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.07f);
             
             // Phase 4: Reverse animation - replay positions in reverse order
             for (int step = forwardPositionHistory.Count - 2; step >= 0; step--)
@@ -952,7 +952,7 @@ namespace Assets.Scripts.Core
                     targetWorldPositions.Add(new Vector3(targetPositions[i].x * CellSize, targetPositions[i].y * CellSize, 0));
                 }
                 
-                yield return StartCoroutine(AnimateAllSegments(targetWorldPositions, 0.04f));
+                yield return StartCoroutine(AnimateAllSegments(targetWorldPositions, 0.027f));
             }
             
             RestorePositions(originalPositions);

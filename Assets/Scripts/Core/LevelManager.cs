@@ -165,9 +165,9 @@ namespace Assets.Scripts.Core
             {
                 foreach (var arrow in arrows)
                 {
-                    StartCoroutine(arrow.UpdateGrowthSlide(i, 0.06f));
+                    StartCoroutine(arrow.UpdateGrowthSlide(i, 0.04f));
                 }
-                yield return new WaitForSeconds(0.06f);
+                yield return new WaitForSeconds(0.04f);
             }
 
             // 3. After arrows finish, zoom camera in to default

@@ -22,7 +22,7 @@ namespace Assets.Scripts.Core
         
         [Header("Level Initialization Animation")]
         [SerializeField] private float initZoomMultiplier = 1.3f;
-        [SerializeField] private float initZoomInDuration = 1.2f;
+        [SerializeField] private float initZoomInDuration = 0.8f;
         [SerializeField] private float initPaddingMultiplier = 1.1f; // How much extra space around level (1.0 = exact fit, 1.2 = 20% extra)
         [SerializeField] private float initExtraZoomBuffer = 0.5f; // Additional units of zoom out beyond calculated fit
 
@@ -334,7 +334,7 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator WinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
-            float duration = 0.5f;
+            float duration = 0.33f;
             float elapsed = 0f;
             
             float startZoom = cam.orthographicSize;
