@@ -303,11 +303,12 @@ m_GameUI.gameObject.SetActive(true);
             OnLevelStarted?.Invoke();
             isEntranceFinished = false;
             isWinning = false;
-            if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
 
             m_GameUI.gameObject.SetActive(true);
+            if (m_FunFact != null) m_FunFact.SetActive(false);
+
         }
 
         private void ResetLives()
