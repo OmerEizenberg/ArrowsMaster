@@ -1,0 +1,299 @@
+{
+  "format": 1,
+  "restore": {
+    "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Timeline.csproj": {}
+  },
+  "projects": {
+    "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Timeline.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Timeline.csproj",
+        "projectName": "Unity.Timeline",
+        "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Unity.Timeline.csproj",
+        "packagesPath": "/Users/omereizenberg/.nuget/packages/",
+        "outputPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Temp/obj/Debug/Unity.Timeline/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/Users/omereizenberg/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.1": {
+            "targetAlias": "netstandard2.1",
+            "projectReferences": {
+              "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.UI.csproj": {
+                "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.UI.csproj"
+              },
+              "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.UI.csproj": {
+                "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.UI.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.100"
+      },
+      "frameworks": {
+        "netstandard2.1": {
+          "targetAlias": "netstandard2.1",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.101/RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.TestRunner.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.TestRunner.csproj",
+        "projectName": "UnityEditor.TestRunner",
+        "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.TestRunner.csproj",
+        "packagesPath": "/Users/omereizenberg/.nuget/packages/",
+        "outputPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Temp/obj/Debug/UnityEditor.TestRunner/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/Users/omereizenberg/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.1": {
+            "targetAlias": "netstandard2.1",
+            "projectReferences": {
+              "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.TestRunner.csproj": {
+                "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.TestRunner.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.100"
+      },
+      "frameworks": {
+        "netstandard2.1": {
+          "targetAlias": "netstandard2.1",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.101/RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.UI.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.UI.csproj",
+        "projectName": "UnityEditor.UI",
+        "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.UI.csproj",
+        "packagesPath": "/Users/omereizenberg/.nuget/packages/",
+        "outputPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Temp/obj/Debug/UnityEditor.UI/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/Users/omereizenberg/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.1": {
+            "targetAlias": "netstandard2.1",
+            "projectReferences": {
+              "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.TestRunner.csproj": {
+                "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEditor.TestRunner.csproj"
+              },
+              "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.TestRunner.csproj": {
+                "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.TestRunner.csproj"
+              },
+              "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.UI.csproj": {
+                "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.UI.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.100"
+      },
+      "frameworks": {
+        "netstandard2.1": {
+          "targetAlias": "netstandard2.1",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.101/RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.TestRunner.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.TestRunner.csproj",
+        "projectName": "UnityEngine.TestRunner",
+        "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.TestRunner.csproj",
+        "packagesPath": "/Users/omereizenberg/.nuget/packages/",
+        "outputPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Temp/obj/Debug/UnityEngine.TestRunner/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/Users/omereizenberg/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.1": {
+            "targetAlias": "netstandard2.1",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.100"
+      },
+      "frameworks": {
+        "netstandard2.1": {
+          "targetAlias": "netstandard2.1",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.101/RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.UI.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.UI.csproj",
+        "projectName": "UnityEngine.UI",
+        "projectPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/UnityEngine.UI.csproj",
+        "packagesPath": "/Users/omereizenberg/.nuget/packages/",
+        "outputPath": "/Users/omereizenberg/Documents/ArrowsMasterGit/Temp/obj/Debug/UnityEngine.UI/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/Users/omereizenberg/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.1": {
+            "targetAlias": "netstandard2.1",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.100"
+      },
+      "frameworks": {
+        "netstandard2.1": {
+          "targetAlias": "netstandard2.1",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.101/RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

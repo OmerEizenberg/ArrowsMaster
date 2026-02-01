@@ -180,12 +180,23 @@ namespace Assets.Scripts.Core
         public void LoadInterstitial()
         {
             if (!isInitialized) return;
+            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
+            {
+                Debug.Log("[AdsManager] Skipping Interstitial Load: User has No Ads.");
+                return;
+            }
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
             interstitialAd.LoadAd();
         }
 
         public void ShowInterstitial()
         {
+            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
+            {
+                Debug.Log("[AdsManager] Skipping Interstitial Show: User has No Ads.");
+                return;
+            }
+
             if (interstitialAd != null && interstitialAd.IsAdReady())
             {
                 Debug.Log("[AdsManager] Showing Interstitial Ad.");
@@ -276,6 +287,13 @@ namespace Assets.Scripts.Core
 
         public void ShowRewarded()
         {
+            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
+            {
+                Debug.Log("[AdsManager] Auto-rewarding: User has No Ads.");
+                OnRewardReceived?.Invoke();
+                return;
+            }
+
             if (RewardedAd != null && RewardedAd.IsAdReady())
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad.");

@@ -17,6 +17,8 @@ namespace Assets.Scripts.Lobby
 
         [SerializeField] private GameObject m_CalanderLayer;
         [SerializeField] private GameObject m_SettingsLayer;
+        [SerializeField] private GameObject m_DonateLayer;
+        [SerializeField] private GameObject m_NoAdsLayer;
 
         [SerializeField] private TextMeshProUGUI m_TitleText;
         [SerializeField] private TextMeshProUGUI m_LevelText;
@@ -130,6 +132,48 @@ namespace Assets.Scripts.Lobby
                 m_CalanderLayer.SetActive(false);
             }
         }
+        public void OnDonateButtonClicked()
+        {
+            SoundManager.Instance.PlayClick();
+
+            if(m_DonateLayer.activeInHierarchy)
+            {
+                m_DonateLayer.SetActive(false);
+            }else{
+                m_SettingsLayer.SetActive(false);
+                m_CalanderLayer.SetActive(false);
+                m_DonateLayer.SetActive(true);
+            }
+        }
+
+        public void OnNoAdsButtonClicked()
+        {
+            SoundManager.Instance.PlayClick();
+
+            if(m_NoAdsLayer.activeInHierarchy)
+            {
+                m_NoAdsLayer.SetActive(false);
+            }else{
+                m_SettingsLayer.SetActive(false);
+                m_CalanderLayer.SetActive(false);
+                m_NoAdsLayer.SetActive(true);
+            }
+        }
+
+        public void OnBuyDonationButtonClicked()
+        {
+            SoundManager.Instance.PlayClick();
+            IAPManager.Instance.PurchaseNoAds(ProductTypeID.Donate199);
+            m_DonateLayer.SetActive(false);
+        }
+
+        public void OnBuyNoAdsButtonClicked()
+        {
+            SoundManager.Instance.PlayClick();
+            IAPManager.Instance.PurchaseNoAds(ProductTypeID.NoAds999);
+            m_NoAdsLayer.SetActive(false);
+        }
+
         public void OnCalanderButtonClicked()
         {
             SoundManager.Instance.PlayClick();

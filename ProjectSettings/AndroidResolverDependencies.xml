@@ -1,5 +1,6 @@
 <dependencies>
   <packages>
+    <package>com.android.billingclient:billing:6.0.1</package>
     <package>com.google.android.gms:play-services-ads-identifier:18.1.0</package>
     <package>com.unity3d.ads:unity-ads:4.16.6</package>
     <package>com.unity3d.ads-mediation:mediation-sdk:9.3.0</package>
