@@ -14,6 +14,7 @@ namespace Assets.Scripts.Core
         public Sprite HeadSprite;
         public GameObject pointEffectPrefab;
         [SerializeField] private GameObject m_ComboPrefab;
+        [SerializeField] private GameObject m_VoicePrefab;
         private List<GameObject> instantiatedEffects = new List<GameObject>();
         
         // Grid Step size (Standard 1 unit)
@@ -316,28 +317,59 @@ namespace Assets.Scripts.Core
                                 if (m_ComboPrefab != null)
                                 {
                                     GameObject comboObj = Instantiate(m_ComboPrefab, GameManager.Instance.m_GameUI.transform.parent);
-                                    RectTransform rect = comboObj.GetComponent<RectTransform>();
-                                    if (rect != null)
+                                    RectTransform comboRect = comboObj.GetComponent<RectTransform>();
+                                    // 1. Setup Combo Position
+                                    Vector3 comboWorldPos = clickedSegment.transform.position;
+                                    Vector3 comboScreenPos = p_MainCam.WorldToScreenPoint(comboWorldPos);
+                                    
+                                    if (comboRect != null)
                                     {
-                                        Vector3 worldPos = clickedSegment.transform.position;
-                                        Vector3 screenPos = p_MainCam.WorldToScreenPoint(worldPos);
-
-                                        // Apply 15% screen distance offset ideally
                                         float maxOffset = Screen.width * 0.15f;
                                         Vector2 randomOffset = UnityEngine.Random.insideUnitCircle * maxOffset;
-                                        Vector3 idealScreenPos = screenPos + (Vector3)randomOffset;
+                                        Vector3 idealScreenPos = comboScreenPos + (Vector3)randomOffset;
 
-                                        // Get valid position with 20% min distance from others
                                         Vector3 finalScreenPos = GameManager.Instance.GetValidComboPosition(idealScreenPos, 0.2f);
+                                        comboScreenPos = finalScreenPos; // Store for voice check
 
-                                        // Convert screen point to local position in parent
                                         RectTransform parentRect = (RectTransform)GameManager.Instance.m_GameUI.transform.parent;
                                         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, finalScreenPos, Camera.main, out Vector2 localPos))
                                         {
-                                            rect.anchoredPosition = localPos;
+                                            comboRect.anchoredPosition = localPos;
                                         }
-                                        
-                                        GameManager.Instance.RegisterCombo(rect);
+                                        GameManager.Instance.RegisterCombo(comboRect);
+                                    }
+
+                                    // 2. Setup Voice Position (if applicable)
+                                    if(GameManager.Instance.p_StreakCount-1 == 3 || GameManager.Instance.p_StreakCount-1 == 7 || GameManager.Instance.p_StreakCount-1 == 11)
+                                    {
+                                        GameObject voiceObj = Instantiate(m_VoicePrefab, GameManager.Instance.m_GameUI.transform.parent);
+                                        RectTransform voiceRect = voiceObj.GetComponent<RectTransform>();
+                                        if (voiceRect != null)
+                                        {
+                                            Vector3 worldPos = clickedSegment.transform.position;
+                                            Vector3 baseScreenPos = p_MainCam.WorldToScreenPoint(worldPos);
+                                            
+
+                                            
+                                            // Random direction in screen space
+                                            Vector2 randomDir = UnityEngine.Random.insideUnitCircle.normalized;
+                                            
+                                            // Random distance: Min 0.2 (to clear combo) up to 0.45 screen width
+                                            float randomDist = UnityEngine.Random.Range(Screen.width * 0.2f, Screen.width * 0.45f);
+                                            
+                                            Vector3 idealScreenPos = baseScreenPos + (Vector3)(randomDir * randomDist);
+
+                                            // Validate position to ensure it stays on screen/doesn't overlap too badly
+                                            Vector3 finalVoiceScreenPos = GameManager.Instance.GetValidComboPosition(idealScreenPos, 0.2f);
+
+                                            RectTransform parentRect = (RectTransform)GameManager.Instance.m_GameUI.transform.parent;
+                                            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, finalVoiceScreenPos, Camera.main, out Vector2 localPos))
+                                            {
+                                                voiceRect.anchoredPosition = localPos;
+                                            }
+
+                                            GameManager.Instance.RegisterCombo(voiceRect);
+                                        }
                                     }
 
                                     ComboController comboCtrl = comboObj.GetComponent<ComboController>();

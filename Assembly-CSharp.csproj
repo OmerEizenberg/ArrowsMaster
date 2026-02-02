@@ -81,6 +81,7 @@
     <Compile Include="Assets/Scripts/Lobby/MonthlyChallengeController.cs" />
     <Compile Include="Assets/Scripts/Core/InputManager.cs" />
     <Compile Include="Assets/Scripts/Core/VibrationManager.cs" />
+    <Compile Include="Assets/Scripts/GameUI/VoiceVibeController.cs" />
     <Compile Include="Assets/Scripts/Core/CameraController.cs" />
     <Compile Include="Assets/Animations/HintAnim/FunFactHider.cs" />
     <Compile Include="Assets/Scripts/GameUI/LikeBehaviour.cs" />

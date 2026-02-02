@@ -12412,6 +12412,10 @@ MonoBehaviour:
   ThumbUp: {fileID: 8300000, guid: 73c4fe6991f664f66992f4a46c105eb2, type: 3}
   HintIn: {fileID: 0}
   BackgroundMusic: {fileID: 8300000, guid: e1f3dba82fd0e40cebf5b19cc77f5759, type: 3}
+  PerfectVoice: {fileID: 8300000, guid: 67ee11764dd164fe1930973a634c7cd1, type: 3}
+  GoodVoice: {fileID: 8300000, guid: ff944cab0949f452788f846a3683862f, type: 3}
+  ExcellentVoice: {fileID: 8300000, guid: 2a00b59adc88f49e98295bd179b46b11, type: 3}
+  NiceVoice: {fileID: 8300000, guid: e9f6e3d1d66d448c194f17f6eac24ffe, type: 3}
   streakSounds:
   - {fileID: 8300000, guid: be97228d6672a467cb2437ffee048a00, type: 3}
   - {fileID: 8300000, guid: 19f0166c2ec424eed861bdd9233c237e, type: 3}
@@ -28958,7 +28962,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4823175171773133148, guid: c186afed293704484bd3837c89b24cdd, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

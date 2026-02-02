@@ -9,14 +9,25 @@
 		</type>
 		<type fullname="Assets.Scripts.Core.SettingsManager">
 			<method name="onResetClicked"/>
+			<method name="onResetClicked"/>
 			<method name="OnSoundToggleChanged"/>
+			<method name="OnSoundToggleChanged"/>
+			<method name="OnVibrationToggleChanged"/>
 			<method name="OnVibrationToggleChanged"/>
 		</type>
 		<type fullname="Assets.Scripts.Lobby.HomeContoller">
+			<method name="OnBuyNoAdsButtonClicked"/>
 			<method name="OnCalanderButtonClicked"/>
 			<method name="OnCalenderPlayButtonClicked"/>
+			<method name="OnDonateButtonClicked"/>
+			<method name="OnDonateButtonClicked"/>
+			<method name="OnDonateButtonClicked"/>
 			<method name="OnHomeButtonClicked"/>
+			<method name="OnNoAdsButtonClicked"/>
+			<method name="OnNoAdsButtonClicked"/>
 			<method name="OnPlayButtonClicked"/>
+			<method name="OnSettingsButtonClicked"/>
+			<method name="OnSettingsButtonClicked"/>
 			<method name="OnSettingsButtonClicked"/>
 			<method name="OnSettingsButtonClicked"/>
 			<method name="OnSettingsButtonClicked"/>

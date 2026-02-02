@@ -229,7 +229,7 @@ namespace Assets.Scripts.Core
         {
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.ShowInterstitial();
+                AdsManager.Instance.ShowInterstitial(true);
             }
 
             if (levelManager != null && !string.IsNullOrEmpty(levelManager.CurrentLevelId))
@@ -411,7 +411,7 @@ m_GameUI.gameObject.SetActive(true);
 
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.ShowInterstitial();
+                AdsManager.Instance.ShowInterstitial(true);
             }
 
             m_LobbyUI.SetActive(true);

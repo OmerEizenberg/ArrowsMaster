@@ -22,6 +22,10 @@ namespace Assets.Scripts.Core
         public AudioClip ThumbUp;
         public AudioClip HintIn;
         public AudioClip BackgroundMusic;
+        public AudioClip PerfectVoice;
+        public AudioClip GoodVoice;
+        public AudioClip ExcellentVoice;
+        public AudioClip NiceVoice;
         public AudioClip[] streakSounds;
 
         [SerializeField] private AudioSource musicSource;
@@ -79,7 +83,7 @@ namespace Assets.Scripts.Core
 
             PlaySound(streakSounds[index]);
         }
-        
+
         public void PlayClick()
         {
             PlaySound(ClickSound);
@@ -88,6 +92,22 @@ namespace Assets.Scripts.Core
         public void PlayHint()
         {
             PlaySound(HintIn);
+        }
+        public void PlayGood()
+        {
+            PlaySound(GoodVoice);
+        }
+        public void PlayNice()
+        {
+            PlaySound(NiceVoice);
+        }
+        public void PlayExcellent()
+        {
+            PlaySound(ExcellentVoice);
+        }
+        public void PlayPerfect()
+        {
+            PlaySound(PerfectVoice);
         }
 
         public void PlayLike()
