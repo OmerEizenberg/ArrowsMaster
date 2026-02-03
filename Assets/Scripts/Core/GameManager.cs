@@ -64,7 +64,8 @@ namespace Assets.Scripts.Core
 
         public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && !isTimeUp &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
-                                (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy);
+                                (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy) &&
+                                (m_FunFact == null || !m_FunFact.activeInHierarchy);
 
         [SerializeField] private GameObject m_WinParticles;
         [SerializeField] private TextMeshProUGUI m_WinLevelText;

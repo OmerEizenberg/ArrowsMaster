@@ -26,6 +26,7 @@ namespace Assets.Scripts.Core
         public AudioClip GoodVoice;
         public AudioClip ExcellentVoice;
         public AudioClip NiceVoice;
+        public AudioClip AmazingVoice;
         public AudioClip[] streakSounds;
 
         [SerializeField] private AudioSource musicSource;
@@ -100,6 +101,10 @@ namespace Assets.Scripts.Core
         public void PlayNice()
         {
             PlaySound(NiceVoice);
+        }
+        public void PlayAmazing()
+        {
+            PlaySound(AmazingVoice);
         }
         public void PlayExcellent()
         {
