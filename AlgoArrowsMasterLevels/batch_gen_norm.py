@@ -142,19 +142,144 @@ def generate_difficulty_3(image_path, grid_width, grid_height, config):
     for attempt in range(50):
         level_data = run_reverse_generator(image_path, grid_width, grid_height, config)
         if level_data:
-            # Check density (occupied points / total shape mask points)
-            # total_shape_points is handled inside run_reverse_generator but we can check arrow points here
+            # 1. Post-process: Remove arrows with < 2 points
+            level_data["arrows"] = [a for a in level_data["arrows"] if len(a["path"]) >= 2]
+            
+            # 2. Post-process: Fill remaining gaps with Difficulty 1 logic
+            level_data = post_process_fill_gaps(level_data, image_path, config)
+            
+            # 3. Final Verification
             occupied_points = sum(len(a["path"]) for a in level_data["arrows"])
-            # Re-calculating total shape mask here isn't efficient, so run_reverse_generator returns it
-            if level_data.get("density_success") and is_level_solvable(level_data):
-                print(f"  Level Attempt {attempt+1}: Solvability PASSED. Saving.")
-                # Duration based on final count
+            # Re-read total shape points for density calculation
+            total_shape_points = level_data.get("total_shape_points", 1)
+            final_density = occupied_points / total_shape_points
+            
+            if final_density >= config["TARGET_DENSITY"] and is_level_solvable(level_data):
+                print(f"  Level Attempt {attempt+1}: Solvability PASSED. Saving (Density: {final_density:.1%}).")
                 level_data["duration"] = occupied_points * DURATION_MULTIPLIER
                 return level_data
             else:
-                reason = "SOLVER FAILED" if level_data.get("density_success") else "DENSITY LOW"
-                print(f"  Level Attempt {attempt+1}: {reason}. Retrying...")
+                reason = "SOLVER FAILED" if final_density >= config["TARGET_DENSITY"] else "DENSITY LOW"
+                print(f"  Level Attempt {attempt+1}: {reason} ({final_density:.1%}). Retrying...")
     return None
+
+def post_process_fill_gaps(level_data, image_path, config):
+    """
+    Fills empty areas with Difficulty 1 logic (Forward growth) while maintaining solvability.
+    """
+    # Load image data again to get shape_mask and colors
+    try:
+        img = Image.open(image_path).convert('RGBA')
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        img = img.resize((level_data["gridSize"]["x"], level_data["gridSize"]["y"]), Image.NEAREST)
+        
+        gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
+        shape_mask = []
+        pixel_colors = {}
+        for y in range(gh):
+            for x in range(gw):
+                color = img.getpixel((x, y))
+                r, g, b, a = color
+                pixel_colors[(x, y)] = color
+                if a >= config["ALPHA_THRESHOLD"] and not (r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]):
+                    shape_mask.append((x, y))
+    except:
+        return level_data
+
+    # Current occupation state
+    occupied = {} # (x,y) -> arrow_id
+    for a in level_data["arrows"]:
+        for p in a["path"]:
+            occupied[(p["x"], p["y"])] = a["id"]
+    
+    free_points = [p for p in shape_mask if p not in occupied]
+    random.shuffle(free_points)
+    
+    next_id = max([a["id"] for a in level_data["arrows"]] + [0]) + 1
+    dir_map = {(1, 0): "right", (-1, 0): "left", (0, 1): "up", (0, -1): "down"}
+    
+    for start_node in free_points:
+        if start_node in occupied: continue
+        
+        # Try to grow a Difficulty 1-style arrow from this point
+        success = False
+        # Multiple tries per start node
+        for _t in range(5):
+            target_length = random.randint(2, 6) # Moderate length for fillers
+            path = [start_node]
+            temp_path_set = {start_node}
+            curr_dir = None
+            
+            for i in range(target_length - 1):
+                last_x, last_y = path[-1]
+                valid_dirs = []
+                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                    nx, ny = last_x + dx, last_y + dy
+                    if (nx, ny) in shape_mask and (nx, ny) not in occupied and (nx, ny) not in temp_path_set:
+                        valid_dirs.append((dx, dy))
+                
+                if not valid_dirs: break
+                
+                # Favor same direction, low turn probability
+                if curr_dir in valid_dirs and random.random() > 0.2:
+                    chosen_dir = curr_dir
+                else:
+                    chosen_dir = random.choice(valid_dirs)
+                
+                path.append((last_x + chosen_dir[0], last_y + chosen_dir[1]))
+                temp_path_set.add(path[-1])
+                curr_dir = chosen_dir
+            
+            if len(path) < 2: continue
+            
+            # Verify constraints
+            head = path[-1]
+            prev = path[-2]
+            look_dx, look_dy = head[0] - prev[0], head[1] - prev[1]
+            
+            # Constraint: Cant aim into own segment
+            aim_x, aim_y = head[0] + look_dx, head[1] + look_dy
+            is_self_aiming = False
+            while 0 <= aim_x < gw and 0 <= aim_y < gh:
+                if (aim_x, aim_y) in temp_path_set:
+                    is_self_aiming = True
+                    break
+                if (aim_x, aim_y) in occupied or (aim_x, aim_y) in shape_mask: # If it hits anything else, we stop checking for self-aiming
+                    # Actually, self-aiming only occurs if it passes over its own path before hitting anything else or boundary
+                    pass
+                aim_x += look_dx
+                aim_y += look_dy
+            
+            if is_self_aiming: continue
+            
+            # Solver check
+            avg_c = [sum(pixel_colors.get(p, (0,0,0,0))[c] for p in path)//len(path) for c in range(3)]
+            new_arrow = {
+                "id": next_id,
+                "color": rgb_to_hex(avg_c),
+                "path": [{"x": p[0], "y": p[1]} for p in path],
+                "lookDirection": dir_map[(look_dx, look_dy)]
+            }
+            
+            test_level = {
+                "gridSize": {"x": gw, "y": gh},
+                "arrows": level_data["arrows"] + [new_arrow]
+            }
+            
+            # Efficiently update occupation for solver
+            test_occupied = occupied.copy()
+            for p in path: test_occupied[p] = next_id
+            
+            if is_level_solvable(test_level, pre_occupied=test_occupied):
+                level_data["arrows"].append(new_arrow)
+                for p in path: occupied[p] = next_id
+                next_id += 1
+                success = True
+                break
+                
+        if success: continue
+        
+    return level_data
 
 def generate_difficulty_1(image_path, grid_width, grid_height, config):
     return run_core_generator(image_path, grid_width, grid_height, config)
