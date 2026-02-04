@@ -12416,6 +12416,7 @@ MonoBehaviour:
   GoodVoice: {fileID: 8300000, guid: ff944cab0949f452788f846a3683862f, type: 3}
   ExcellentVoice: {fileID: 8300000, guid: 2a00b59adc88f49e98295bd179b46b11, type: 3}
   NiceVoice: {fileID: 8300000, guid: e9f6e3d1d66d448c194f17f6eac24ffe, type: 3}
+  AmazingVoice: {fileID: 8300000, guid: 3f1ef49a5ea704a4c86fb833d4b4b4c2, type: 3}
   streakSounds:
   - {fileID: 8300000, guid: be97228d6672a467cb2437ffee048a00, type: 3}
   - {fileID: 8300000, guid: 19f0166c2ec424eed861bdd9233c237e, type: 3}

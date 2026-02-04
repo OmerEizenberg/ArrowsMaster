@@ -167,6 +167,7 @@ PlayerSettings:
   applicationIdentifier:
     Android: com.everybodygames.arrowsmaster
     Standalone: com.everybodygames.arrowsmaster
+    iPhone: com.everybodygames.arrowsmaster
   buildNumber:
     Standalone: 1
     VisionOS: 0
@@ -805,6 +806,7 @@ PlayerSettings:
   scriptingDefineSymbols:
     Android: LEVELPLAY_DEPENDENCIES_INSTALLED
     Standalone: LEVELPLAY_DEPENDENCIES_INSTALLED
+    iPhone: LEVELPLAY_DEPENDENCIES_INSTALLED
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
