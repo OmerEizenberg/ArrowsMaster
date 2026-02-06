@@ -475,6 +475,19 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
                     temp_path_occupied.add(path[-1])
 
                 if len(path) >= 1: # Allow length 1
+                    # Constraint: Head cannot aim into its own body (self-aiming)
+                    # Head is path[0], Looking direction is escape_dir
+                    aim_x, aim_y = path[0][0] + escape_dir[0], path[0][1] + escape_dir[1]
+                    is_self_aiming = False
+                    while 0 <= aim_x < grid_width and 0 <= aim_y < grid_height:
+                        if (aim_x, aim_y) in temp_path_occupied:
+                            is_self_aiming = True
+                            break
+                        aim_x += escape_dir[0]
+                        aim_y += escape_dir[1]
+                    
+                    if is_self_aiming:
+                        continue
                     # SOLVER-VERIFIED GATEKEEPER
                     path_rev = list(reversed(path))
                     dir_map = {(1, 0): "right", (-1, 0): "left", (0, 1): "up", (0, -1): "down"}
