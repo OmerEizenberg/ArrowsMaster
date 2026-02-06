@@ -755,25 +755,45 @@ def run_core_generator(image_path, grid_width, grid_height, config):
 
 def main():
     parser = argparse.ArgumentParser(description="Bulk generate AlgoArrows levels from a folder of images.")
-    parser.add_argument("folder", help="Path to the folder containing source images")
+    parser.add_argument("input_path", help="Path to the folder containing source images or a single image file")
     parser.add_argument("--min_width", type=int, default=20, help="Minimum grid width (default: 20)")
     parser.add_argument("--max_width", type=int, default=45, help="Maximum grid width (default: 45)")
     parser.add_argument("--difficulty", type=int, default=1, choices=[1, 2, 3], help="Level difficulty (1, 2, or 3)")
+    parser.add_argument("--time", type=str, default="true", choices=["true", "false"], help="Include duration in level data (true/false)")
     
     args = parser.parse_args()
-    source_folder = os.path.abspath(args.folder)
-    if not os.path.isdir(source_folder):
-        print(f"Error: {source_folder} is not a directory.")
-        sys.exit(1)
+    input_path = os.path.abspath(args.input_path)
+    
+    source_folder = ""
+    image_files = []
+    output_folder = ""
+
+    if os.path.isfile(input_path):
+        # Single file mode
+        source_folder = os.path.dirname(input_path)
+        image_files = [os.path.basename(input_path)]
+        # Output folder usually goes in parent of input file? Or separate?
+        # Based on previous logic: parent_dir = os.path.dirname(source_folder)
+        # If input is /a/b/img.png, source is /a/b. parent is /a. output is /a/GeneratedLevels
+        parent_dir = os.path.dirname(source_folder)
+        output_folder = os.path.join(parent_dir, "GeneratedLevels")
+    elif os.path.isdir(input_path):
+        # Batch mode
+        source_folder = input_path
+        parent_dir = os.path.dirname(source_folder)
+        output_folder = os.path.join(parent_dir, "GeneratedLevels")
         
-    parent_dir = os.path.dirname(source_folder)
-    output_folder = os.path.join(parent_dir, "GeneratedLevels")
+        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif')
+        image_files = [f for f in os.listdir(source_folder) if f.lower().endswith(valid_extensions)]
+    else:
+        print(f"Error: {input_path} is not a valid file or directory.")
+        sys.exit(1)
+
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     
-    valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif')
-    image_files = [f for f in os.listdir(source_folder) if f.lower().endswith(valid_extensions)]
     if not image_files:
+        print("No image files found.")
         sys.exit(0)
         
     for img_name in image_files:
@@ -786,6 +806,10 @@ def main():
             grid_height = max(grid_height, 5)
             level_data = generate_level_json(img_path, grid_width, grid_height, difficulty=args.difficulty)
             if level_data:
+                # Handle time option
+                if args.time.lower() == "false":
+                    level_data.pop("duration", None)
+                
                 base_name = os.path.splitext(img_name)[0]
                 output_file = os.path.join(output_folder, f"{base_name}.json")
                 with open(output_file, 'w') as f:
