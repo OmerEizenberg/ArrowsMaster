@@ -271,6 +271,10 @@ namespace Assets.Scripts.Core
             // Add the extra buffer for a bit more breathing room
             float startZoom = minZoomToFit + initExtraZoomBuffer;
 
+            // Update dynamic zoom settings
+            maxZoom = startZoom;
+            defaultZoom = Mathf.Max(startZoom / 2f, 7f);
+
             Vector3 centerPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
             
             // Immediately set to zoomed out view

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyD-8jWdd0FvQYPb_JWCF6_ydkVFzNEsnnA</string>
+	<key>GCM_SENDER_ID</key>
+	<string>430732968211</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.everybodygames.arrowsmaster</string>
+	<key>PROJECT_ID</key>
+	<string>arrowsmaster-6b84f</string>
+	<key>STORAGE_BUCKET</key>
+	<string>arrowsmaster-6b84f.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:430732968211:ios:3a14be9d6ff08e97ad5ae6</string>
+</dict>
+</plist>

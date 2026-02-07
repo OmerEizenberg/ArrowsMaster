@@ -1,0 +1,31 @@
+{
+  "project_info": {
+    "project_number": "430732968211",
+    "project_id": "arrowsmaster-6b84f",
+    "storage_bucket": "arrowsmaster-6b84f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:430732968211:ios:3a14be9d6ff08e97ad5ae6",
+        "android_client_info": {
+          "package_name": "com.everybodygames.arrowsmaster"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-8jWdd0FvQYPb_JWCF6_ydkVFzNEsnnA"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 0
+        },
+        "appinvite_service": {
+          "status": 1
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

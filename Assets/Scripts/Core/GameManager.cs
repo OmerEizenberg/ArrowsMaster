@@ -123,6 +123,7 @@ namespace Assets.Scripts.Core
             {
                 Debug.Log("[GameManager] Hint Reward Received! Triggering show hint...");
                 ShowHint();
+                p_isHintRewarded = false;
             }
             else
             {
@@ -144,6 +145,7 @@ namespace Assets.Scripts.Core
                     
                     HideFailureScreen();
                     ResetHintTimer();
+                    p_isPlayOnRewarded = false;
                 }
             }
         }

@@ -186,8 +186,8 @@ namespace Assets.Scripts.Core
         public void LoadInterstitial()
         {
             if (!isInitialized) return;
-            if (IAPManager.Instance != null )
-                Debug.Log("[AdsManager] dont find IAPManager.Instance");
+            if (IAPManager.Instance == null)
+                Debug.LogWarning("[AdsManager] IAPManager.Instance is null. Proceeding without IAP check.");
 
             if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
             {
@@ -239,8 +239,18 @@ namespace Assets.Scripts.Core
         private void OnInterstitialLoadFailed(LevelPlayAdError error)
         {
             EnqueueAction(() => {
-                Debug.LogWarning($"[AdsManager] Interstitial Ad Load Failed: {error}");
+                Debug.LogWarning($"[AdsManager] Interstitial Ad Load Failed: {error}. Retrying in 15s...");
+                _ = RetryLoadInterstitial(15000);
             });
+        }
+
+        private async Task RetryLoadInterstitial(int delayMs)
+        {
+            await Task.Delay(delayMs);
+            if (this != null && !interstitialAd.IsAdReady())
+            {
+                EnqueueAction(LoadInterstitial);
+            }
         }
 
         private void OnInterstitialClosed(LevelPlayAdInfo adInfo)
@@ -296,9 +306,23 @@ namespace Assets.Scripts.Core
             };
             
             RewardedAd.OnAdLoaded += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Rewarded Ad Loaded: {info}"));
-            RewardedAd.OnAdLoadFailed += (info) => EnqueueAction(() => Debug.LogWarning($"[AdsManager] Rewarded Ad Load Failed: {info}"));
+            RewardedAd.OnAdLoadFailed += (info) => {
+                EnqueueAction(() => {
+                     Debug.LogWarning($"[AdsManager] Rewarded Ad Load Failed: {info}. Retrying in 15s...");
+                     _ = RetryLoadRewarded(15000);
+                });
+            };
 
             LoadRewarded();
+        }
+
+        private async Task RetryLoadRewarded(int delayMs)
+        {
+            await Task.Delay(delayMs);
+            if (this != null && !RewardedAd.IsAdReady())
+            {
+                EnqueueAction(LoadRewarded);
+            }
         }
 
         public void LoadRewarded()
