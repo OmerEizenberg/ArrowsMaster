@@ -23415,8 +23415,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e402f24bc26348fd9b56725417a8d10, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveThreshold: 10
   holdThreshold: 0.5
+  clickEffectPrefab: {fileID: 4879238111588409538, guid: 9b8356a7538914f4eba6ca2330260c23, type: 3}
+  clickEffectParent: {fileID: 937078175}
 --- !u!4 &1709096511
 Transform:
   m_ObjectHideFlags: 0

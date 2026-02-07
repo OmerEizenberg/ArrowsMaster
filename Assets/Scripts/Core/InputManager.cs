@@ -8,8 +8,13 @@ namespace Assets.Scripts.Core
         private Segment pendingSegment;
         private Vector2 startTouchPos;
         private bool wasMultiTouch;
-        [SerializeField] private float moveThreshold = 20f; // Pixels
+        // Dynamic threshold: 3% of screen height, or 40 pixels, whichever is larger.
+        private float MoveThreshold => Mathf.Max(40f, Screen.height * 0.03f); 
         [SerializeField] private float holdThreshold = 0.5f;
+
+        [Header("Effects")]
+        [SerializeField] private GameObject clickEffectPrefab;
+        [SerializeField] private Transform clickEffectParent;
 
         private float mouseDownTime;
         private bool hasTriggeredHold;
@@ -34,7 +39,7 @@ namespace Assets.Scripts.Core
             if (Input.GetMouseButton(0) && pendingSegment != null && !wasMultiTouch && !hasTriggeredHold)
             {
                 float dist = Vector2.Distance(startTouchPos, (Vector2)Input.mousePosition);
-                if (dist < moveThreshold)
+                if (dist < MoveThreshold)
                 {
                     if (Time.time - mouseDownTime > holdThreshold)
                     {
@@ -68,8 +73,17 @@ namespace Assets.Scripts.Core
                 // 1. Didn't move much (panning)
                 // 2. Only used one finger (no zoom)
                 // 3. Same segment hit at start and end
-                if (dist < moveThreshold && !wasMultiTouch)
+                if (dist < MoveThreshold && !wasMultiTouch)
                 {
+                    // Spawn click effect if assigned
+                    if (clickEffectPrefab != null)
+                    {
+                        Vector3 worldPos = Camera.main.ScreenToWorldPoint(endTouchPos);
+                        worldPos.z = 0; // Ensure it spawns at z=0 (standard 2D plane)
+                        GameObject temp = Instantiate(clickEffectPrefab, worldPos, Quaternion.identity, clickEffectParent);
+                        temp.transform.localScale = Vector3.one ;
+                    }
+
                     Segment upSegment = GetHitSegment();
                     if (upSegment != null && upSegment == pendingSegment)
                     {
@@ -117,9 +131,15 @@ namespace Assets.Scripts.Core
             if (IsScreenPositionBlocked(screenPos)) return;
             if (GridManager.Instance == null) return;
 
-            // Use 22.5% of the smaller screen dimension as the threshold (increased by 50% from 15%)
-            float screenThreshold = Mathf.Min(Screen.width, Screen.height) * 0.225f; 
-            float minDistance = screenThreshold;
+            // Use fixed world distance of 1.0 (approximately 1 grid cell size)
+            // This ensures the radius "scales" with zoom (visually consistent in world space)
+            float worldThreshold = 1.0f; 
+            float minDistance = worldThreshold;
+            
+            // Convert click to world space for distance check
+            Vector3 worldClickPos = Camera.main.ScreenToWorldPoint(screenPos);
+            worldClickPos.z = 0; // Flatten z
+
             ArrowController closestArrow = null;
             Segment closestSegment = null;
 
@@ -131,9 +151,8 @@ namespace Assets.Scripts.Core
                 {
                     if (segment == null) continue;
                     
-                    // Convert segment world position to screen position
-                    Vector2 segScreenPos = Camera.main.WorldToScreenPoint(segment.transform.position);
-                    float dist = Vector2.Distance(screenPos, segScreenPos);
+                    // Calculate distance in World Space
+                    float dist = Vector2.Distance(worldClickPos, segment.transform.position);
                     
                     if (dist < minDistance)
                     {
