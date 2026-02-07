@@ -201,6 +201,15 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.unity.services.levelplay": {
+      "version": "9.3.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.services.core": "1.15.1"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.test-framework": {
       "version": "1.1.33",
       "depth": 0,

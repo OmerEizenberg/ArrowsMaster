@@ -64,22 +64,22 @@
     <Analyzer Include="/Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/Tools/Unity.SourceGenerators/Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/UnityServicesBuilder.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Initialization/UnityProjectNotLinkedException.cs" />
-    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/UnityServices.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Initialization/ServicesCreationException.cs" />
+    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Utils/UnityThreadUtils.cs" />
+    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/IUnityServices.cs" />
+    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/IService.cs" />
+    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/ServiceObserver.cs" />
+    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/UnityServicesBuilder.cs" />
+    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/UnityServices.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/DynamicDependency/PreserveDependencyAttribute.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Initialization/ServicesInitializationException.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/AssemblyInfo.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/ExternalUserIdProperty.cs" />
-    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Utils/UnityThreadUtils.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Initialization/ServicesInitializationState.cs" />
-    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/IUnityServices.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Initialization/InitializationOptions.cs" />
-    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/IService.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/CommonErrorCodes.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/RequestFailedException.cs" />
-    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/ServiceObserver.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Core/Unity.Services.Core.asmdef" />

@@ -222,6 +222,7 @@ namespace Assets.Scripts.Core
             else
             {
                 // Fallback if no AdsManager
+                Debug.Log(">>> No ad AdsManager");
                 HandleRewardReceived();
             }
         }

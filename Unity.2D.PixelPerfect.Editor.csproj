@@ -65,10 +65,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/PixelPerfectCameraEditor.cs" />
-    <Compile Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/AssemblyInfo.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/CinemachinePixelPerfectEditor.cs" />
-    <Compile Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/Converter/U2DToURPPixelPerfectConverter.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/ObjectMenuCreation/GameObjectCreation.cs" />
+    <Compile Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/AssemblyInfo.cs" />
+    <Compile Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/Converter/U2DToURPPixelPerfectConverter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Library/PackageCache/com.unity.2d.pixel-perfect@5.1.0/Editor/Unity.2D.PixelPerfect.Editor.asmdef" />

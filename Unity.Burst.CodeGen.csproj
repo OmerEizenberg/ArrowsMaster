@@ -65,12 +65,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/CecilExtensions.cs" />
-    <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/FunctionPointerInvokeTransform.cs" />
     <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/BurstILPostProcessor.cs" />
+    <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/AssemblyResolver.cs" />
+    <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/FunctionPointerInvokeTransform.cs" />
     <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/ILPostProcessing.cs" />
     <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/GenericContext.cs" />
     <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/ILPostProcessingLegacy.cs" />
-    <Compile Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/AssemblyResolver.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Library/PackageCache/com.unity.burst@1.8.21/Unity.Burst.CodeGen/Unity.Burst.Cecil.Pdb.dll" />

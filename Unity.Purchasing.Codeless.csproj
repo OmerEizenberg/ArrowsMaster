@@ -64,14 +64,14 @@
     <Analyzer Include="/Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/Tools/Unity.SourceGenerators/Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/CodelessIAPButton.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/CodelessIAPStoreListener.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/IAPButton.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/IAPListener.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/CodelessButtonType.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/AssemblyInfo.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/ComboBox.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/CodelessCatalogProvider.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/CodelessIAPButton.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/IAPButton.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/IAPListener.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Codeless/Unity.Purchasing.Codeless.asmdef" />

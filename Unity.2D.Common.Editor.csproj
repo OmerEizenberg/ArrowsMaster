@@ -65,10 +65,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/TextureGenerator/TextureGeneratorHelper.cs" />
-    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/ImagePacker/ImagePackNode.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/ImagePacker/ImagePacker.cs" />
-    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/InspectorUtils.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/AssemblyInfo.cs" />
+    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/ImagePacker/ImagePackNode.cs" />
+    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/InspectorUtils.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/ImagePacker/Jobs/FindTightRectJob.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/ImagePacker/ImagePackerDebugEditor.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Editor/VisualElementExtensions.cs" />

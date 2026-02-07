@@ -64,9 +64,9 @@
     <Analyzer Include="/Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/Tools/Unity.SourceGenerators/Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/SecurityStub/Obfuscator.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/SecurityStub/CrossPlatformValidator.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/SecurityStub/AppleValidator.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/SecurityStub/Obfuscator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/SecurityStub/Unity.Purchasing.SecurityStub.asmdef" />

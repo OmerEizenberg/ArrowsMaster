@@ -64,8 +64,8 @@
     <Analyzer Include="/Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/Tools/Unity.SourceGenerators/Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Environments/Internal/Environments.cs" />
     <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Environments/Internal/AssemblyInfo.cs" />
+    <Compile Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Environments/Internal/Environments.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Library/PackageCache/com.unity.services.core@1.16.0/Runtime/Environments/Internal/Unity.Services.Core.Environments.Internal.asmdef" />

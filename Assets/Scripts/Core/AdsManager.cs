@@ -114,7 +114,8 @@ namespace Assets.Scripts.Core
                 LevelPlay.OnInitSuccess += OnSdkInitSuccess;
                 LevelPlay.OnInitFailed += OnSdkInitFailed;
                 
-                LevelPlay.Init(currentAppKey);
+                LevelPlay.Init(currentAppKey,SystemInfo.deviceUniqueIdentifier
+);
             }
             catch (Exception e)
             {
@@ -185,9 +186,12 @@ namespace Assets.Scripts.Core
         public void LoadInterstitial()
         {
             if (!isInitialized) return;
+            if (IAPManager.Instance != null )
+                Debug.Log("[AdsManager] dont find IAPManager.Instance");
+
             if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
             {
-                Debug.Log("[AdsManager] Skipping Interstitial Load: User has No Ads.");
+                Debug.Log("[AdsManager] Skipping Interstitial Load: User has No Ads."+IAPManager.Instance.HasNoAds);
                 return;
             }
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
@@ -198,7 +202,7 @@ namespace Assets.Scripts.Core
         {
             if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
             {
-                Debug.Log("[AdsManager] Skipping Interstitial Show: User has No Ads.");
+                Debug.Log("[AdsManager] Skipping Interstitial Show: User has No Ads."+IAPManager.Instance.HasNoAds);
                 return;
             }
 
@@ -305,13 +309,6 @@ namespace Assets.Scripts.Core
 
         public void ShowRewarded()
         {
-            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
-            {
-                Debug.Log("[AdsManager] Auto-rewarding: User has No Ads.");
-                OnRewardReceived?.Invoke();
-                return;
-            }
-
             if (RewardedAd != null && RewardedAd.IsAdReady())
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad.");

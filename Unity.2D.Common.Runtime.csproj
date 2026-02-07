@@ -65,11 +65,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/UTess.cs" />
-    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/ArraySlice.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/Array.cs" />
+    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/Smoothen.cs" />
+    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/ArraySlice.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/AssemblyInfo.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/Tessellator.cs" />
-    <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/Smoothen.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/Refinery.cs" />
     <Compile Include="Library/PackageCache/com.unity.2d.common@8.1.0/Runtime/UTess2D/PlanarGraph.cs" />
   </ItemGroup>

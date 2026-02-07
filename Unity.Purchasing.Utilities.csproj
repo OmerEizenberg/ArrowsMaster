@@ -65,20 +65,20 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/MonoBehaviorUtil.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/Interfaces/IThreadUtils.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/MiniJSON.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/VersionCheck.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/UnityUtil.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/TransactionHistory/TransactionLog.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/StoreKitSelector.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/LoggerExtensions.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/AssemblyInfo.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/Interfaces/IUtil.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/Interfaces/IMonoBehaviorUtil.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/FileReference.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/UnityThreadUtils.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/Interfaces/IThreadUtils.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/MiniJSON.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/VersionCheck.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/UnityUtil.cs" />
+    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/LoggerExtensions.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/EnumerableExtensions.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/TransactionHistory/Interfaces/ITransactionLog.cs" />
-    <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/UnityThreadUtils.cs" />
     <Compile Include="Library/PackageCache/com.unity.purchasing@5.1.2/Runtime/Utilities/TaskQueue.cs" />
   </ItemGroup>
   <ItemGroup>
