@@ -27,9 +27,9 @@ namespace Assets.Scripts.Core
             get
             {
 #if UNITY_ANDROID
-                return "6027951"; // Provided Android Game ID
+                return "24f080a95"; // Correct ironSource Android App Key
 #elif UNITY_IPHONE
-                return "6027950"; // Provided Apple Game ID
+                return "252e4a28d"; // Correct ironSource iOS App Key
 #else
                 return "unexpected_platform";
 #endif
@@ -177,6 +177,15 @@ namespace Assets.Scripts.Core
             interstitialAd.OnAdDisplayed += (info) => {
                 Debug.Log($"[AdsManager] Interstitial Ad Displayed: {info}");
                 lastAdShowTime = Time.time;
+
+                // --- Analytics: ad_impression ---
+                if (FirebaseManager.Instance != null)
+                {
+                    FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, info.AdNetwork),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName));
+                }
+                // --------------------------------
             };
             interstitialAd.OnAdClicked += (info) => Debug.Log($"[AdsManager] Interstitial Ad Clicked: {info}");
 
@@ -295,7 +304,18 @@ namespace Assets.Scripts.Core
             
             RewardedAd.OnAdDisplayed += (info) => {
                 lastAdShowTime = Time.time;
-                EnqueueAction(() => Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}"));
+                EnqueueAction(() => {
+                    Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}");
+                    
+                    // --- Analytics: ad_impression ---
+                    if (FirebaseManager.Instance != null)
+                    {
+                        FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, info.AdNetwork),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName));
+                    }
+                    // --------------------------------
+                });
             };
 
             RewardedAd.OnAdRewarded += (info, reward) => {

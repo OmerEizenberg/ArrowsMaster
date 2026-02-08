@@ -6,6 +6,7 @@
   <projectSetting name="Google.IOSResolver.AllowEmptyPodfileGeneration" value="True" />
   <projectSetting name="Google.IOSResolver.AutoPodToolInstallInEditor" value="True" />
   <projectSetting name="Google.IOSResolver.CocoapodsIntegrationMethod" value="2" />
+  <projectSetting name="Google.IOSResolver.PodExecutablePath" value="/opt/homebrew/bin/pod" />
   <projectSetting name="Google.IOSResolver.PodfileAddUseFrameworks" value="True" />
   <projectSetting name="Google.IOSResolver.PodfileAllowPodsInMultipleTargets" value="True" />
   <projectSetting name="Google.IOSResolver.PodfileAlwaysAddMainTarget" value="True" />
@@ -33,7 +34,5 @@
   <projectSetting name="GooglePlayServices.UseGradleDaemon" value="False" />
   <projectSetting name="GooglePlayServices.UseJetifier" value="True" />
   <projectSetting name="GooglePlayServices.UserRejectedGradleUpgrade" value="False" />
-  <projectSetting name="Google.IOSResolver.PodExecutablePath" value="/opt/homebrew/bin/pod" />
   <projectSetting name="GooglePlayServices.VerboseLogging" value="False" />
-
 </projectSettings>

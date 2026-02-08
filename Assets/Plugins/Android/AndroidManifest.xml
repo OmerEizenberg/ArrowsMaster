@@ -11,12 +11,13 @@
     </intent>
   </queries>
   <application android:hardwareAccelerated="true" android:usesCleartextTraffic="true">
-    <activity android:name="com.unity3d.player.UnityPlayerActivity" android:theme="@style/UnityThemeSelector">
+    <activity android:name="com.google.firebase.MessagingUnityPlayerActivity" android:theme="@style/UnityThemeSelector">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
       <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
     </activity>
+    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713" />
   </application>
 </manifest>

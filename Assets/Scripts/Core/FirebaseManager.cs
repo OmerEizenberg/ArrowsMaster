@@ -13,6 +13,25 @@ public class FirebaseManager : MonoBehaviour
     public static FirebaseManager Instance { get; private set; }
     private bool isInitialized = false;
 
+    // Event Names
+    public const string EVENT_LEVEL_START = "level_start";
+    public const string EVENT_LEVEL_END = "level_end";
+    public const string EVENT_PURCHASE = "purchase";
+    public const string EVENT_AD_IMPRESSION = "ad_impression";
+    public const string EVENT_TUTORIAL_BEGIN = "tutorial_begin";
+    public const string EVENT_TUTORIAL_COMPLETE = "tutorial_complete";
+
+    // Parameter Names
+    public const string PARAM_LEVEL_ID = "level_id";
+    public const string PARAM_ATTEMPT_COUNT = "attempt_count";
+    public const string PARAM_SUCCESS = "success";
+    public const string PARAM_SCORE = "score";
+    public const string PARAM_VALUE = "value";
+    public const string PARAM_CURRENCY = "currency";
+    public const string PARAM_ITEM_ID = "item_id";
+    public const string PARAM_AD_PLATFORM = "ad_platform";
+    public const string PARAM_AD_UNIT_NAME = "ad_unit_name";
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoInitialize()
     {
@@ -57,6 +76,13 @@ public class FirebaseManager : MonoBehaviour
 
                 isInitialized = true;
                 Debug.Log("[FirebaseManager] Firebase App, Crashlytics, Analytics, and Messaging are ready.");
+
+                // Request token explicitly to ensure registration
+                FirebaseMessaging.GetTokenAsync().ContinueWithOnMainThread(tokenTask => {
+                    if (tokenTask.IsCompleted && !tokenTask.IsFaulted) {
+                        Debug.Log("[FirebaseManager] Initial Registration Token: " + tokenTask.Result);
+                    }
+                });
             }
             else
             {
@@ -131,8 +157,4 @@ public class FirebaseManager : MonoBehaviour
         FirebaseAnalytics.SetUserId(userId);
     }
     #endregion
-
-    public void ThrowTestException() {
-        throw new System.Exception("Firebase Test Crash!");
-    }
 }

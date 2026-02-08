@@ -159,9 +159,24 @@ namespace Assets.Scripts.Core
 
             if (id == ProductNoAds999 || id == ProductNoAds499 || id == ProductNoAds199)
             {
-                Debug.Log($"[IAPManager] Product purchased successfully: {id}");
+                Debug.Log($"[IAPManager] No Ads product purchased successfully: {id}");
                 SetNoAds(true);
             }
+            else
+            {
+                Debug.Log($"[IAPManager] Product purchased successfully: {id}");
+            }
+
+            // --- Analytics: purchase (Log all successful purchases) ---
+            if (FirebaseManager.Instance != null)
+            {
+                var metadata = args.purchasedProduct.metadata;
+                FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_PURCHASE,
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, (double)metadata.localizedPrice),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, metadata.isoCurrencyCode),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_ITEM_ID, id));
+            }
+            // ----------------------------------------------------------
 
             return PurchaseProcessingResult.Complete;
         }

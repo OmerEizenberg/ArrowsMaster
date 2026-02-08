@@ -59,6 +59,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# iOS Builds
+/[Ii]OSBuilds/
+
 # Large Firebase files (>100MB)
 Assets/Firebase/Plugins/x86_64/FirebaseCppApp-13_7_0.bundle
 Assets/Firebase/Plugins/x86_64/FirebaseCppApp-13_7_0.so

@@ -7,12 +7,23 @@ dependencies {
     implementation 'com.unity3d.ads-mediation:mediation-sdk:9.3.0'
 // Android Resolver Dependencies Start
     implementation 'com.android.billingclient:billing:6.0.1' // Assets/Plugins/Android/Editor/BillingDependencies.xml:4
+    implementation 'com.applovin:applovin-sdk:13.5.1' // Assets/LevelPlay/Editor/ISAppLovinAdapterDependencies.xml:9
+    implementation 'com.google.android.gms:play-services-ads:23.3.0' // Stable version compatible with modern Firebase
+    implementation 'com.google.android.gms:play-services-ads-identifier:18.1.0' // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:12
     implementation 'com.google.android.gms:play-services-base:18.10.0' // Assets/Firebase/Editor/AppDependencies.xml:20
-    implementation 'com.google.firebase:firebase-analytics:23.0.0' // Assets/Firebase/Editor/CrashlyticsDependencies.xml:18
+    implementation 'com.google.firebase:firebase-analytics:23.0.0' // Assets/Firebase/Editor/MessagingDependencies.xml:18
+    implementation 'com.google.firebase:firebase-analytics-unity:13.7.0' // Assets/Firebase/Editor/AnalyticsDependencies.xml:21
     implementation 'com.google.firebase:firebase-app-unity:13.7.0' // Assets/Firebase/Editor/AppDependencies.xml:25
     implementation 'com.google.firebase:firebase-common:22.0.1' // Assets/Firebase/Editor/AppDependencies.xml:16
     implementation 'com.google.firebase:firebase-crashlytics-ndk:20.0.4' // Assets/Firebase/Editor/CrashlyticsDependencies.xml:16
     implementation 'com.google.firebase:firebase-crashlytics-unity:13.7.0' // Assets/Firebase/Editor/CrashlyticsDependencies.xml:23
+    implementation 'com.google.firebase:firebase-iid:21.1.0' // Assets/Firebase/Editor/MessagingDependencies.xml:20
+    implementation 'com.google.firebase:firebase-messaging:25.0.1' // Assets/Firebase/Editor/MessagingDependencies.xml:16
+    implementation 'com.google.firebase:firebase-messaging-unity:13.7.0' // Assets/Firebase/Editor/MessagingDependencies.xml:27
+    implementation 'com.google.flatbuffers:flatbuffers-java:1.12.0' // Assets/Firebase/Editor/MessagingDependencies.xml:22
+    implementation 'com.unity3d.ads-mediation:admob-adapter:5.5.0' // Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml:12
+    implementation 'com.unity3d.ads-mediation:applovin-adapter:5.2.0' // Assets/LevelPlay/Editor/ISAppLovinAdapterDependencies.xml:5
+    implementation 'com.unity3d.ads-mediation:mediation-sdk:9.3.0' // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:5
 // Android Resolver Dependencies End
 **DEPS**}
 
@@ -47,6 +58,7 @@ android {
         versionCode **VERSIONCODE**
         versionName '**VERSIONNAME**'
         consumerProguardFiles 'proguard-unity.txt'**USER_PROGUARD**
+        multiDexEnabled true
     }
 
     lintOptions {

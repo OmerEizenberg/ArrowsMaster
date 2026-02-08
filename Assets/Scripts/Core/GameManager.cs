@@ -269,6 +269,26 @@ namespace Assets.Scripts.Core
             {
                 levelManager.LoadLevelFromResources(levelId);
             }
+
+            // --- Analytics: level_start ---
+            int attemptCount = PlayerPrefs.GetInt("AttemptCount_" + levelId, 0) + 1;
+            PlayerPrefs.SetInt("AttemptCount_" + levelId, attemptCount);
+            PlayerPrefs.Save();
+
+            if (FirebaseManager.Instance != null)
+            {
+                FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_LEVEL_START, 
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_LEVEL_ID, levelId),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_ATTEMPT_COUNT, attemptCount));
+
+                // FTUE: tutorial_begin
+                if (levelId == "Level1" && attemptCount == 1)
+                {
+                    FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_TUTORIAL_BEGIN);
+                }
+            }
+            // -----------------------------
+
             OnLevelStarted?.Invoke();
             isEntranceFinished = false;
             isWinning = false;
@@ -303,6 +323,19 @@ m_GameUI.gameObject.SetActive(true);
             {
                 levelManager.LoadChallengeLevelFromResources(levelId);
             }
+
+            // --- Analytics: level_start (Challenge) ---
+            int attemptCount = PlayerPrefs.GetInt("AttemptCount_Challenge_" + levelId, 0) + 1;
+            PlayerPrefs.SetInt("AttemptCount_Challenge_" + levelId, attemptCount);
+            PlayerPrefs.Save();
+
+            if (FirebaseManager.Instance != null)
+            {
+                FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_LEVEL_START, 
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_LEVEL_ID, "Challenge_" + levelId),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_ATTEMPT_COUNT, attemptCount));
+            }
+            // ----------------------------------------
 
             OnLevelStarted?.Invoke();
             isEntranceFinished = false;
@@ -377,6 +410,24 @@ m_GameUI.gameObject.SetActive(true);
             {
                 UserDataManager.Instance.SaveMonthlyChallengeProgress(currentChallengeYear, currentChallengeMonth, currentChallengeDay);
             }
+
+            // --- Analytics: level_end (Success) ---
+            if (FirebaseManager.Instance != null && levelManager != null)
+            {
+                string id = p_isLevelProgression ? levelManager.CurrentLevelId : "Challenge_" + levelManager.CurrentLevelId;
+                FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_LEVEL_END,
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_LEVEL_ID, id),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SUCCESS, 1),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SCORE, levelManager.TotalPointsInLevel));
+
+                // FTUE: tutorial_complete
+                if (levelManager.CurrentLevelId == "Level1")
+                {
+                    FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_TUTORIAL_COMPLETE);
+                }
+            }
+            // --------------------------------------
+
             yield return new WaitForSeconds(0.2f);
             levelManager.HideArrows();
 
@@ -455,6 +506,18 @@ m_GameUI.gameObject.SetActive(true);
             {
                 failureScreen.SetActive(true);
             }
+
+            // --- Analytics: level_end (Fail - Lives) ---
+            if (FirebaseManager.Instance != null && levelManager != null)
+            {
+                string id = p_isLevelProgression ? levelManager.CurrentLevelId : "Challenge_" + levelManager.CurrentLevelId;
+                FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_LEVEL_END,
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_LEVEL_ID, id),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SUCCESS, 0),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SCORE, 0));
+            }
+            // -------------------------------------------
+
             OnGameOver?.Invoke();
         }
 
@@ -571,6 +634,18 @@ m_GameUI.gameObject.SetActive(true);
             {
                 failureScreen.SetActive(true);
             }
+
+            // --- Analytics: level_end (Fail - Time) ---
+            if (FirebaseManager.Instance != null && levelManager != null)
+            {
+                string id = p_isLevelProgression ? levelManager.CurrentLevelId : "Challenge_" + levelManager.CurrentLevelId;
+                FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_LEVEL_END,
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_LEVEL_ID, id),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SUCCESS, 0),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SCORE, 0));
+            }
+            // ------------------------------------------
+
             OnGameOver?.Invoke();
         }
         
