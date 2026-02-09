@@ -3,30 +3,91 @@ using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEditor.iOS.Xcode;
 using System.IO;
+using System.Text.RegularExpressions;
+using UnityEngine;
 
+[InitializeOnLoad]
 public class IOSBuildPostProcess
 {
-    [PostProcessBuild]
+    static IOSBuildPostProcess()
+    {
+        // Set environment variables for the current process so all internal Unity calls (like EDM4U)
+        // use the correct encoding and path.
+        System.Environment.SetEnvironmentVariable("LANG", "en_US.UTF-8");
+        System.Environment.SetEnvironmentVariable("LC_ALL", "en_US.UTF-8");
+        System.Environment.SetEnvironmentVariable("LC_CTYPE", "en_US.UTF-8");
+        System.Environment.SetEnvironmentVariable("RUBYOPT", "-Eutf-8");
+        
+        string currentPath = System.Environment.GetEnvironmentVariable("PATH") ?? "";
+        string homebrewPath = "/opt/homebrew/bin:/usr/local/bin";
+        if (!currentPath.StartsWith(homebrewPath))
+        {
+            System.Environment.SetEnvironmentVariable("PATH", homebrewPath + ":" + currentPath);
+        }
+
+        // Silence EDM4U as early as possible (when script is loaded)
+        SilenceEDM4U();
+    }
+
+    // High order to ensure it runs after EDM4U and other processors
+    [PostProcessBuild(2000)]
     public static void OnPostProcessBuild(BuildTarget target, string pathToBuiltProject)
     {
         if (target != BuildTarget.iOS) return;
 
+        UpdateXcodeProject(pathToBuiltProject);
+        UpdatePodfile(pathToBuiltProject);
+    }
+
+    private static void SilenceEDM4U()
+    {
+        try
+        {
+            // We use reflection to set EDM4U settings to false to prevent it from running its own
+            // failing 'pod install' and showing the error popup.
+            foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (assembly.FullName.Contains("Google.IOSResolver"))
+                {
+                    var type = assembly.GetType("Google.IOSResolver");
+                    if (type != null)
+                    {
+                        var podfileEnabled = type.GetProperty("PodfileEnabled", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        if (podfileEnabled != null) podfileEnabled.SetValue(null, false);
+                        
+                        var autoInstall = type.GetProperty("AutoPodToolInstallInEditor", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        if (autoInstall != null) autoInstall.SetValue(null, false);
+
+                        var podToolExecutionViaShellEnabled = type.GetProperty("PodToolExecutionViaShellEnabled", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        if (podToolExecutionViaShellEnabled != null) podToolExecutionViaShellEnabled.SetValue(null, true);
+                        
+                        Debug.Log("[IOSBuildPostProcess] programmatically silenced EDM4U resolver at load time.");
+                    }
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Could not silence EDM4U via reflection: " + e.Message);
+        }
+    }
+
+    private static void UpdateXcodeProject(string pathToBuiltProject)
+    {
         string projectPath = PBXProject.GetPBXProjectPath(pathToBuiltProject);
         PBXProject project = new PBXProject();
         project.ReadFromFile(projectPath);
 
-        // Get the main target (Unity-iPhone)
-        string targetGuid = project.GetUnityMainTargetGuid();
+        string mainTargetGuid = project.GetUnityMainTargetGuid();
+        string frameworkTargetGuid = project.GetUnityFrameworkTargetGuid();
 
         // 1. Add Push Notifications Capability
-        // This will add the "aps-environment" to the entitlements file and the capability to the project
         var entitlementsPath = "Unity-iPhone/Unity-iPhone.entitlements";
         var entitlements = new ProjectCapabilityManager(projectPath, entitlementsPath, "Unity-iPhone");
-        entitlements.AddPushNotifications(true); // true = development, will be handled by provisioning profile for production
+        entitlements.AddPushNotifications(true);
         entitlements.WriteToFile();
 
         // 2. Add Background Modes (Remote Notifications)
-        // This modifies the Info.plist
         string plistPath = Path.Combine(pathToBuiltProject, "Info.plist");
         PlistDocument plist = new PlistDocument();
         plist.ReadFromFile(plistPath);
@@ -37,10 +98,105 @@ public class IOSBuildPostProcess
         
         plist.WriteToFile(plistPath);
 
-        // 3. Optional: Add any missing frameworks if needed by Firebase
-        // project.AddFrameworkToProject(targetGuid, "UserNotifications.framework", false);
+        // 3. Reliable Build Settings (Classic Must-Haves)
+        foreach (var targetGuid in new[] { mainTargetGuid, frameworkTargetGuid })
+        {
+            project.SetBuildProperty(targetGuid, "ENABLE_BITCODE", "NO");
+            project.SetBuildProperty(targetGuid, "IPHONEOS_DEPLOYMENT_TARGET", "15.0");
+            project.SetBuildProperty(targetGuid, "ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES", "YES");
+            project.AddBuildProperty(targetGuid, "OTHER_LDFLAGS", "-ObjC");
+        }
 
         project.WriteToFile(projectPath);
+        Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully.");
+    }
+
+    private static void UpdatePodfile(string pathToBuiltProject)
+    {
+        string podfilePath = Path.Combine(pathToBuiltProject, "Podfile");
+        if (!File.Exists(podfilePath))
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Podfile not found at: " + podfilePath);
+            return;
+        }
+
+        string podfileContent = File.ReadAllText(podfilePath);
+
+        // Check for our ultimate fix signature
+        if (podfileContent.Contains("FIX_FB12_S6"))
+        {
+            Debug.Log("[IOSBuildPostProcess] Podfile already contains the FB12 fixes.");
+            return;
+        }
+
+        // Refined post_install block that is extremely aggressive
+        // Using concatenation to avoid '#' at the start of lines which can confuse some C# compilers
+        string postInstallBlock = "\n# FIX_FB12_S6\n" +
+                                  "post_install do |installer|\n" +
+                                  "  installer.pods_project.targets.each do |target|\n" +
+                                  "    target.build_configurations.each do |config|\n" +
+                                  "      config.build_settings['SWIFT_VERSION'] = '5.10'\n" +
+                                  "      config.build_settings['ENABLE_BITCODE'] = 'NO'\n" +
+                                  "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'\n" +
+                                  "      config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'\n" +
+                                  "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'\n" +
+                                  "      flags = '$(inherited) -enable-experimental-feature AccessLevelOnImport -enable-experimental-feature RegionBasedIsolation -Xfrontend -enable-upcoming-feature -Xfrontend RegionBasedIsolation'\n" +
+                                  "      config.build_settings['OTHER_SWIFT_FLAGS'] = flags\n" +
+                                  "    end\n" +
+                                  "  end\n" +
+                                  "end\n";
+
+        // Append our block at the very end to ensure it takes precedence
+        podfileContent += "\n" + postInstallBlock;
+
+        File.WriteAllText(podfilePath, podfileContent);
+        Debug.Log("[IOSBuildPostProcess] Podfile updated with aggressive Firebase 12 compatibility fixes.");
+        
+        RunPodInstall(pathToBuiltProject);
+    }
+
+    private static void RunPodInstall(string pathToBuiltProject)
+    {
+        Debug.Log("[IOSBuildPostProcess] Running pod install with UTF-8 environment...");
+        
+        string[] podPaths = { "/opt/homebrew/bin/pod", "/usr/local/bin/pod", "pod" };
+        string chosenPod = "pod";
+        
+        foreach (var path in podPaths)
+        {
+            if (File.Exists(path))
+            {
+                chosenPod = path;
+                break;
+            }
+        }
+
+        System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
+        startInfo.FileName = "/bin/bash";
+        // Force absolute paths for homebrew and exports for UTF-8 and Ruby compatibility
+        startInfo.Arguments = $"-c \"export PATH=\\\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin\\\" && export LANG=en_US.UTF-8 && export LC_ALL=en_US.UTF-8 && export RUBYOPT=\\\"-Eutf-8\\\" && cd \\\"{pathToBuiltProject}\\\" && \\\"{chosenPod}\\\" install\"";
+        startInfo.UseShellExecute = false;
+        startInfo.RedirectStandardOutput = true;
+        startInfo.RedirectStandardError = true;
+        startInfo.CreateNoWindow = true;
+
+        using (System.Diagnostics.Process process = System.Diagnostics.Process.Start(startInfo))
+        {
+            string output = process.StandardOutput.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode == 0)
+            {
+                Debug.Log("[IOSBuildPostProcess] pod install finished successfully.\n" + output);
+            }
+            else
+            {
+                Debug.LogError("[IOSBuildPostProcess] pod install failed with exit code " + process.ExitCode + ".\nError: " + error + "\nOutput: " + output);
+            }
+        }
     }
 }
 #endif
+
+
