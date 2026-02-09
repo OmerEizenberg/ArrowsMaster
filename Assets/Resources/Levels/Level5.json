@@ -342,21 +342,6 @@
                 }
             ],
             "lookDirection": "right"
-        },
-        {
-            "id": 10,
-            "color": "#554f54",
-            "path": [
-                {
-                    "x": 12,
-                    "y": 4
-                },
-                {
-                    "x": 12,
-                    "y": 3
-                }
-            ],
-            "lookDirection": "down"
         }
     ]
 }
