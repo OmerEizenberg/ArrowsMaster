@@ -125,28 +125,33 @@ namespace Assets.Scripts.Core
                 ShowHint();
                 p_isHintRewarded = false;
             }
-            else
+            else if (p_isPlayOnRewarded)
             {
-                if(p_isPlayOnRewarded)
+                Debug.Log("[GameManager] PlayOn Reward Received! Refilling lives or adding time.");
+                
+                if (isTimeUp)
                 {
-                    Debug.Log("[GameManager] PlayOn Reward Received! Refilling lives and hiding failure screen.");
+                    Debug.Log("[GameManager] Time's up! Adding 60 seconds.");
+                    currentTime += 60f;
+                    isTimeUp = false;
+                    isTimerActive = true;
+                    wasTimerActiveBeforeAd = false; 
+                    UpdateTimerUI();
+                }
+                else
+                {
+                    Debug.Log("[GameManager] Out of lives! Refilling lives.");
                     ResetLives();
-                    
-                    // For time-based levels, add 60 seconds
                     if (IsTimedLevel)
                     {
-                        currentTime += 60f;
-                        isTimeUp = false;
                         isTimerActive = true;
-                        // Since we are setting isTimerActive here, we don't want HandleAdClosed to mess with it
-                        wasTimerActiveBeforeAd = false; 
-                        UpdateTimerUI();
+                        wasTimerActiveBeforeAd = false;
                     }
-                    
-                    HideFailureScreen();
-                    ResetHintTimer();
-                    p_isPlayOnRewarded = false;
                 }
+                
+                HideFailureScreen();
+                ResetHintTimer();
+                p_isPlayOnRewarded = false;
             }
         }
 
@@ -452,6 +457,7 @@ m_GameUI.gameObject.SetActive(true);
                         SoundManager.Instance.PlayBigCheer();
                     }
                 }
+                VibrationManager.VibrateSuccess();
 
                 m_WinParticles.SetActive(true);
                 m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
@@ -536,7 +542,10 @@ m_GameUI.gameObject.SetActive(true);
 
         private void Update()
         {
-            if (isEntranceFinished && !isWinning && !isHintVisible)
+            bool isFailureVisible = failureScreen != null && failureScreen.activeInHierarchy;
+            bool isLobbyVisible = m_LobbyUI != null && m_LobbyUI.activeInHierarchy;
+
+            if (isEntranceFinished && !isWinning && !isHintVisible && !isFailureVisible && !isLobbyVisible)
             {
                 hintTimer += Time.deltaTime;
                 if (hintTimer >= 5.0f)
@@ -547,7 +556,7 @@ m_GameUI.gameObject.SetActive(true);
             }
             
             // Update countdown timer
-            if (isTimerActive && isEntranceFinished && !isWinning)
+            if (isTimerActive && isEntranceFinished && !isWinning && !isFailureVisible && !isLobbyVisible)
             {
                 currentTime -= Time.deltaTime;
                 
@@ -651,12 +660,19 @@ m_GameUI.gameObject.SetActive(true);
         
         public string GetFailureTitle()
         {
-            return IsTimedLevel ? "Time's Up!" : "Out of Lives!";
+            return isTimeUp ? "Time's Up!" : "Out of Lives!";
         }
         
         public string GetFailureSubtitle()
         {
-            return IsTimedLevel ? "Watch an ad to get 60 seconds, refill livees\nand Keep Playing!" : "Watch an ad to refill livees\nand Keep Playing!";
+            if (isTimeUp)
+            {
+                return "Watch an ad to get 60 seconds\nand Keep Playing!";
+            }
+            else
+            {
+                return "Watch an ad to refill lives\nand Keep Playing!";
+            }
         }
 
         public void RegisterCombo(RectTransform rect)

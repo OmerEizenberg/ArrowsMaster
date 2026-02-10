@@ -428,6 +428,7 @@ namespace Assets.Scripts.Core
                         }
                         
                         // Start the blocked arrow animation
+                        VibrationManager.VibrateError();
                         StartCoroutine(BlockedArrowAnimationWithCleanup());
                     }
                 }

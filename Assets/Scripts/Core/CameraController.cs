@@ -187,7 +187,7 @@ namespace Assets.Scripts.Core
                     Vector3 lastWorldPos = cam.ScreenToWorldPoint(new Vector3(prevMousePos.x, prevMousePos.y, cam.nearClipPlane));
                     Vector3 worldDelta = lastWorldPos - currentWorldPos;
                     
-                    transform.position += worldDelta;
+                    transform.position += worldDelta * 1.1f;
                     
                     // Clamp
                     Vector3 clampedPos = transform.position;
