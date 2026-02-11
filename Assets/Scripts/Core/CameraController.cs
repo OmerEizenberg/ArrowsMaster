@@ -13,7 +13,6 @@ namespace Assets.Scripts.Core
         [SerializeField] private float mobileZoomSpeed = 1f;
 
         [Header("Pan Settings")]
-        [SerializeField] private float panSensitivity = 0.005f; // Adjusted for pixel delta
         [SerializeField] private float dragThresholdPercent = 3.0f; // Percentage of screen width to start panning
         
         [Header("Shake Settings")]

@@ -20,11 +20,14 @@ namespace Assets.Scripts.Core
         }
 
         public event System.Action OnLevelChanged;
+        public event System.Action<int> OnCurrencyChanged;
 
         private const string LevelKey = "CurrentLevel";
         private const string InstallDateKey = "InstallDate";
+        private const string ArrowsCurrencyKey = "ArrowsCurrency";
 
         public int CurrentLevel { get; private set; } = 1;
+        public int ArrowsCurrency { get; private set; } = 0;
         public System.DateTime InstallDate { get; private set; }
 
         private Dictionary<string, int> m_MonthlyCache = new Dictionary<string, int>();
@@ -37,6 +40,7 @@ namespace Assets.Scripts.Core
         private void LoadData()
         {
             CurrentLevel = PlayerPrefs.GetInt(LevelKey, 1);
+            ArrowsCurrency = PlayerPrefs.GetInt(ArrowsCurrencyKey, 0);
             
             string installDateStr = PlayerPrefs.GetString(InstallDateKey, string.Empty);
             if (string.IsNullOrEmpty(installDateStr))
@@ -70,9 +74,37 @@ namespace Assets.Scripts.Core
             SaveData();
         }
 
+        public void AddArrowsCurrency(int amount)
+        {
+            if (amount < 0) return; // Prevent negative addition
+            ArrowsCurrency += amount;
+            SaveCurrency();
+        }
+
+        public bool ReduceArrowsCurrency(int amount)
+        {
+            if (amount < 0) return false;
+            
+            if (ArrowsCurrency >= amount)
+            {
+                ArrowsCurrency -= amount;
+                SaveCurrency();
+                return true;
+            }
+            return false;
+        }
+
+        private void SaveCurrency()
+        {
+            PlayerPrefs.SetInt(ArrowsCurrencyKey, ArrowsCurrency);
+            PlayerPrefs.Save();
+            OnCurrencyChanged?.Invoke(ArrowsCurrency);
+        }
+
         public void ResetProgress()
         {
             CurrentLevel = 1;
+            ArrowsCurrency = 0;
             
             // Reset Monthly Challenge data
             ClearAllMonthlyProgress();
@@ -81,7 +113,8 @@ namespace Assets.Scripts.Core
             InstallDate = System.DateTime.Now;
             PlayerPrefs.SetString(InstallDateKey, InstallDate.ToBinary().ToString());
 
-            SaveData();
+            SaveData(); // Helpers call PlayerPrefs.Save() but SaveData does too
+            SaveCurrency(); 
             
             if (SoundManager.Instance != null)
             {

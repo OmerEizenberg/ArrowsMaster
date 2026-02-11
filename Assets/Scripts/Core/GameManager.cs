@@ -40,6 +40,7 @@ namespace Assets.Scripts.Core
         public event Action OnLevelWon;
         public event Action<bool> OnHintVisibilityChanged;
         public event Action<string> OnTimerUpdated; // Passes formatted time string MM:SS
+        public event Action<int> OnLevelCurrencyChanged; 
         public bool p_isLevelProgression = true;
 
         public int currentChallengeYear;
@@ -54,6 +55,7 @@ namespace Assets.Scripts.Core
         private bool isTimeUp = false;
         public float LastArrowSelectionTime { get; private set; } = -10f;
         public int p_StreakCount { get; private set; } = 0;
+        private int collectedLevelCurrency = 0; // Currency collected during the current level attempt
 
 
         public bool p_isPlayOnRewarded = false;
@@ -262,6 +264,7 @@ namespace Assets.Scripts.Core
             p_isLevelProgression = true;
             // Reset arrow count before loading new level
             activeArrowsCount = 0;
+            collectedLevelCurrency = 0; // Reset currency for new level attempt
             
             // Reset timer state
             isTimerActive = false;
@@ -295,6 +298,9 @@ namespace Assets.Scripts.Core
             // -----------------------------
 
             OnLevelStarted?.Invoke();
+            // Reset UI for level currency
+            OnLevelCurrencyChanged?.Invoke(0);
+            
             isEntranceFinished = false;
             isWinning = false;
             if (m_FunFact != null) m_FunFact.SetActive(false);
@@ -316,6 +322,7 @@ m_GameUI.gameObject.SetActive(true);
 
             // Reset arrow count before loading new level
             activeArrowsCount = 0;
+            collectedLevelCurrency = 0; // Reset currency for new level attempt
             
             // Reset timer state
             isTimerActive = false;
@@ -343,6 +350,9 @@ m_GameUI.gameObject.SetActive(true);
             // ----------------------------------------
 
             OnLevelStarted?.Invoke();
+            // Reset UI for level currency
+            OnLevelCurrencyChanged?.Invoke(0);
+
             isEntranceFinished = false;
             isWinning = false;
             ResetHintTimer();
@@ -366,6 +376,14 @@ m_GameUI.gameObject.SetActive(true);
 
         public void NotifyArrowSuccess()
         {
+            // Collect currency logic
+            int coinsEarned = Mathf.Max(1, p_StreakCount);
+            collectedLevelCurrency += coinsEarned;
+            Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
+            
+            // Notify UI
+            OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency);
+
             if (activeArrowsCount > 0)
             {
                 activeArrowsCount--;
@@ -407,6 +425,14 @@ m_GameUI.gameObject.SetActive(true);
         {
             ClearActiveCombos();
             Debug.Log("Level Complete! Waiting for win screen...");
+            
+            // Award Collected Currency
+            if (collectedLevelCurrency > 0)
+            {
+                UserDataManager.Instance.AddArrowsCurrency(collectedLevelCurrency);
+                Debug.Log($"[GameManager] Level Won! Awarded {collectedLevelCurrency} ArrowsCurrency.");
+            }
+
             if(p_isLevelProgression)
             {
                 UserDataManager.Instance.IncrementLevel();
