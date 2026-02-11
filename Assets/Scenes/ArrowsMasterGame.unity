@@ -6294,8 +6294,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 100, y: -96}
-  m_SizeDelta: {x: 160, y: 160}
+  m_AnchoredPosition: {x: 75, y: -70}
+  m_SizeDelta: {x: 120, y: 120}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &368736395
 MonoBehaviour:
@@ -9079,8 +9079,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 350, y: -96}
-  m_SizeDelta: {x: 260, y: 145}
+  m_AnchoredPosition: {x: 295, y: -70}
+  m_SizeDelta: {x: 260, y: 120}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &617787523
 MonoBehaviour:
@@ -9129,8 +9129,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 100
-  m_fontSizeBase: 100
+  m_fontSize: 80
+  m_fontSizeBase: 80
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -17971,7 +17971,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 275, y: 160}
-  m_SizeDelta: {x: 500, y: 192}
+  m_SizeDelta: {x: 440, y: 140}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1384595038
 MonoBehaviour:
@@ -17992,7 +17992,7 @@ MonoBehaviour:
   m_FloatDuration: 1
   m_FloatDistance: 50
   m_SpawnOffsetRange: {x: -100, y: 100}
-  m_SpawnOffsetYRangePercentage: 0.2
+  m_SpawnOffsetYRange: 150
 --- !u!114 &1384595039
 MonoBehaviour:
   m_ObjectHideFlags: 0

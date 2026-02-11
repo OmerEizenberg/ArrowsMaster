@@ -16,8 +16,7 @@ namespace Assets.Scripts.GameUI
         [SerializeField] private float m_FloatDuration = 1.0f;
         [SerializeField] private float m_FloatDistance = 50f;
         [SerializeField] private Vector2 m_SpawnOffsetRange = new Vector2(-20f, 20f);
-        [SerializeField] private float m_SpawnOffsetYRangePercentage = 0.1f;
-         private float m_SpawnOffsetYRange = 200f;
+        [SerializeField] private float m_SpawnOffsetYRange = 200f;
 
         private int m_CurrentAmount = 0;
         private Coroutine m_PunchCoroutine;
@@ -95,7 +94,6 @@ namespace Assets.Scripts.GameUI
                     // Position relative to the main currency text:
                     // Start at CurrencyText's position + upward offset + random X
                     Vector2 basePos = m_CurrencyText.rectTransform.anchoredPosition;
-                    m_SpawnOffsetYRange = Screen.height * m_SpawnOffsetYRangePercentage;
                     
                     // We can assume a standard vertical offset (e.g., 50 units above the center of the text)
                     rect.anchoredPosition = basePos + new Vector2(xOffset, m_CurrencyText.rectTransform.rect.height + m_SpawnOffsetYRange); 
