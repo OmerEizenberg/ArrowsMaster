@@ -50,6 +50,11 @@ namespace Assets.Scripts.Lobby
 
         public void RefreshLobbyUI()
         {
+            // Ensure GameUI is hidden when refreshing lobby (returning to lobby)
+            if (m_GameUI != null) m_GameUI.SetActive(false);
+            else if (GameManager.Instance != null && GameManager.Instance.m_GameUI != null)
+                GameManager.Instance.m_GameUI.gameObject.SetActive(false);
+
             m_TitleText.text = "Arrows Master";
             
             string levelId;
