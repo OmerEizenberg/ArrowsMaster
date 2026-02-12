@@ -19,6 +19,10 @@ namespace Assets.Scripts.Core
         [SerializeField] private TextMeshProUGUI m_FunFactText;
         [SerializeField] private string[] m_FunFactsDat;
 
+        [Header("Shop UI")]
+        [SerializeField] private TextMeshProUGUI m_PlayOnPriceText;
+        [SerializeField] private TextMeshProUGUI m_UserBalanceText;
+
         [Header("Settings")]
         public int maxLives = 3;
 
@@ -129,30 +133,8 @@ namespace Assets.Scripts.Core
             }
             else if (p_isPlayOnRewarded)
             {
-                Debug.Log("[GameManager] PlayOn Reward Received! Refilling lives or adding time.");
-                
-                if (isTimeUp)
-                {
-                    Debug.Log("[GameManager] Time's up! Adding 60 seconds.");
-                    currentTime += 60f;
-                    isTimeUp = false;
-                    isTimerActive = true;
-                    wasTimerActiveBeforeAd = false; 
-                    UpdateTimerUI();
-                }
-                else
-                {
-                    Debug.Log("[GameManager] Out of lives! Refilling lives.");
-                    ResetLives();
-                    if (IsTimedLevel)
-                    {
-                        isTimerActive = true;
-                        wasTimerActiveBeforeAd = false;
-                    }
-                }
-                
-                HideFailureScreen();
-                ResetHintTimer();
+                Debug.Log("[GameManager] PlayOn Reward Received (Ad)!");
+                ExecutePlayOn();
                 p_isPlayOnRewarded = false;
             }
         }
@@ -236,6 +218,58 @@ namespace Assets.Scripts.Core
             }
         }
 
+        private int playOnPurchaseCount = 0;
+
+        public int GetPlayOnCost()
+        {
+            if (playOnPurchaseCount == 0) return 1600;
+            if (playOnPurchaseCount == 1) return 3200;
+            return 4200;
+        }
+
+        public void BuyPlayOn()
+        {
+            int cost = GetPlayOnCost();
+            if (UserDataManager.Instance.ReduceArrowsCurrency(cost))
+            {
+                Debug.Log($"[GameManager] Bought PlayOn for {cost}.");
+                playOnPurchaseCount++;
+                ExecutePlayOn();
+            }
+            else
+            {
+                Debug.Log("Open Shop");
+            }
+        }
+
+        private void ExecutePlayOn()
+        {
+             Debug.Log("[GameManager] PlayOn Executing! Refilling lives or adding time.");
+                
+            if (isTimeUp)
+            {
+               Debug.Log("[GameManager] Time's up! Adding 60 seconds.");
+               currentTime += 60f;
+               isTimeUp = false;
+               isTimerActive = true;
+               wasTimerActiveBeforeAd = false; 
+               UpdateTimerUI();
+            }
+            else
+            {
+               Debug.Log("[GameManager] Out of lives! Refilling lives.");
+               ResetLives();
+               if (IsTimedLevel)
+               {
+                   isTimerActive = true;
+                   wasTimerActiveBeforeAd = false;
+               }
+            }
+            
+            HideFailureScreen();
+            ResetHintTimer();
+        }
+
         public void RestartCurrentLevel()
         {
             if (AdsManager.Instance != null)
@@ -272,6 +306,7 @@ namespace Assets.Scripts.Core
             currentTime = 0f;
             lastDisplayedSecond = -1;
             levelDuration = 0;
+            playOnPurchaseCount = 0;
 
             if (levelManager != null)
             {
@@ -330,6 +365,7 @@ m_GameUI.gameObject.SetActive(true);
             currentTime = 0f;
             lastDisplayedSecond = -1;
             levelDuration = 0;
+            playOnPurchaseCount = 0;
 
             if (levelManager != null)
             {
@@ -534,6 +570,18 @@ m_GameUI.gameObject.SetActive(true);
         {
             ClearActiveCombos();
             Debug.Log("Game Over!");
+
+            if (m_PlayOnPriceText != null)
+            {
+                m_PlayOnPriceText.text = GetPlayOnCost().ToString();
+            }
+
+            if (m_UserBalanceText != null)
+            {
+                Debug.Log("User Balance: " + UserDataManager.Instance.ArrowsCurrency);
+                m_UserBalanceText.text = UserDataManager.Instance.ArrowsCurrency.ToString();
+            }
+
             if (failureScreen != null)
             {
                 failureScreen.SetActive(true);

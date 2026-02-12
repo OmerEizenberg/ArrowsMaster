@@ -26,34 +26,84 @@ namespace Assets.Scripts.Core
 
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
-        public void LoadLevelFromResources(string levelId)
+        private int m_MaxLevelIndex = -1;
+
+        private void Awake()
         {
-            currentLevelId = levelId;
+            InitializeLevelCount();
+        }
+
+        public void InitializeLevelCount()
+        {
+            // Only initialize if not already done
+            if (m_MaxLevelIndex != -1) return;
+
+            int i = 1;
+            while (true)
+            {
+                // lightly check if file exists by trying to load it
+                // We stop when we don't find the next level
+                string levelName = $"Levels/Level{i}";
+                TextAsset levelAsset = Resources.Load<TextAsset>(levelName);
+                if (levelAsset == null)
+                {
+                    m_MaxLevelIndex = i - 1;
+                    break;
+                }
+                // Unload immediately to save memory during check if needed, 
+                // though Resources.Load caches it anyway. 
+                // Resources.UnloadAsset(levelAsset); 
+                i++;
+            }
+            Debug.Log($"[LevelManager] Max Level Index initialized to: {m_MaxLevelIndex}");
+        }
+
+        public TextAsset GetLevelTextAsset(string levelId)
+        {
+            if (m_MaxLevelIndex == -1) InitializeLevelCount();
+
             TextAsset jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
             if (jsonFile == null)
             {
                 int currentIdx = ExtractNumber(levelId);
-                if (currentIdx != -1)
+                if (currentIdx != -1 && m_MaxLevelIndex > 0)
                 {
-                    int maxIdx = 0;
-                    TextAsset[] allLevels = Resources.LoadAll<TextAsset>("Levels");
-                    foreach (var level in allLevels)
-                    {
-                        int idx = ExtractNumber(level.name);
-                        if (idx > maxIdx) maxIdx = idx;
-                    }
+                    // Loop Logic:
+                    // We assume levels 1-10 are tutorials/intro and we want to loop from Level 11 to Max.
+                    // If Max is small (<11), we loop from 1.
+                    
+                    int startLoopIdx = 11;
+                    if (m_MaxLevelIndex < startLoopIdx) startLoopIdx = 1;
 
-                    if (maxIdx > 0)
+                    // Standard 0-indexed modulo arithmetic mapped to our range [startLoopIdx, m_MaxLevelIndex]
+                    // Range size
+                    int range = m_MaxLevelIndex - startLoopIdx + 1;
+
+                    // Avoid division by zero
+                    if (range > 0)
                     {
-                        int newIdx = (currentIdx % maxIdx) + 10;
-                        string numericPart = "";
+                        // We offset currentIdx so that startLoopIdx corresponds to 0 in modulo space
+                        // But we must handle that currentIdx > m_MaxLevelIndex.
+                        // Actually, just mapping (currentIdx - startLoopIdx) % range + startLoopIdx 
+                        // works for any currentIdx >= startLoopIdx.
                         
-                        levelId = "Level"+newIdx;
-                        currentLevelId = levelId;
-                        jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
+                        int tempIdx = currentIdx - startLoopIdx;
+                        // Handle potential negative result if currentIdx < startLoopIdx (unlikely since file missing means > max)
+                        // but strictly speaking modulo in C# retains sign.
+                         int newIdx = (tempIdx % range) + startLoopIdx;
+                         
+                        string newLevelId = "Level" + newIdx;
+                        jsonFile = Resources.Load<TextAsset>($"Levels/{newLevelId}");
                     }
                 }
             }
+            return jsonFile;
+        }
+
+        public void LoadLevelFromResources(string levelId)
+        {
+            currentLevelId = levelId;
+            TextAsset jsonFile = GetLevelTextAsset(levelId);
 
             if (jsonFile != null)
             {
@@ -62,7 +112,7 @@ namespace Assets.Scripts.Core
             }
             else
             {
-                Debug.LogError($"Level with ID {levelId} not found in Resources.");
+                Debug.LogError($"Level with ID {levelId} not found in Resources (Max Level: {m_MaxLevelIndex}).");
             }
         }
 

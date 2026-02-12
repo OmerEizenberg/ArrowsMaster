@@ -76,7 +76,18 @@ namespace Assets.Scripts.Lobby
                 folder = "Levels";
             }
 
-            TextAsset jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId}");
+            TextAsset jsonFile = null;
+            
+            if (folder == "Levels" && GameManager.Instance != null && GameManager.Instance.levelManager != null)
+            {
+                // Use the LevelManager to get the correct level file, handling looping if max level is reached
+                jsonFile = GameManager.Instance.levelManager.GetLevelTextAsset(levelId);
+            }
+            else
+            {
+                // Fallback for Challenge levels or if LevelManager is not available
+                jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId}");
+            }
             
             if (jsonFile != null)
             {
