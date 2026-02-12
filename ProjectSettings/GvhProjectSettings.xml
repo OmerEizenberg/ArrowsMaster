@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <projectSettings>
   <projectSetting name="Google.IOSResolver.PodToolExecutionViaShellEnabled" value="True" />
+  <projectSetting name="GooglePlayServices.UseJetifier" value="True" />
 </projectSettings>
