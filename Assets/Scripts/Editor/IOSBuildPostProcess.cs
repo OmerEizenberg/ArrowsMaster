@@ -37,6 +37,7 @@ public class IOSBuildPostProcess
 
         UpdateXcodeProject(pathToBuiltProject);
         UpdatePodfile(pathToBuiltProject);
+        FixFBLPromisesPrivacyBundle(pathToBuiltProject);
     }
 
     private static void SilenceEDM4U()
@@ -194,6 +195,92 @@ public class IOSBuildPostProcess
             {
                 Debug.LogError("[IOSBuildPostProcess] pod install failed with exit code " + process.ExitCode + ".\nError: " + error + "\nOutput: " + output);
             }
+        }
+    }
+
+    private static void FixFBLPromisesPrivacyBundle(string pathToBuiltProject)
+    {
+        // Common locations for this bundle in Unity iOS builds
+        string[] relativePaths = {
+            "UnityFramework/FBLPromises_Privacy.bundle/Info.plist",
+            "Pods/FBLPromises/Sources/FBLPromises/Resources/FBLPromises_Privacy.bundle/Info.plist",
+            "Frameworks/FBLPromises_Privacy.bundle/Info.plist"
+        };
+
+        bool found = false;
+        foreach (var relPath in relativePaths)
+        {
+            string fullPath = Path.Combine(pathToBuiltProject, relPath);
+            if (File.Exists(fullPath))
+            {
+                PatchPlist(fullPath);
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            // Search recursively if not found in common spots
+            try
+            {
+                string[] files = Directory.GetFiles(pathToBuiltProject, "Info.plist", SearchOption.AllDirectories);
+                foreach (var file in files)
+                {
+                    if (file.Contains("FBLPromises_Privacy.bundle"))
+                    {
+                        PatchPlist(file);
+                        found = true;
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("[IOSBuildPostProcess] Error searching for FBLPromises_Privacy.bundle: " + e.Message);
+            }
+        }
+
+        if (!found)
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] FBLPromises_Privacy.bundle/Info.plist not found in " + pathToBuiltProject);
+        }
+    }
+
+    private static void PatchPlist(string plistPath)
+    {
+        try
+        {
+            PlistDocument plist = new PlistDocument();
+            plist.ReadFromFile(plistPath);
+            
+            bool modified = false;
+            if (plist.root.values.ContainsKey("CFBundleExecutable"))
+            {
+                plist.root.values.Remove("CFBundleExecutable");
+                modified = true;
+                Debug.Log("[IOSBuildPostProcess] Removed CFBundleExecutable from " + plistPath);
+            }
+            
+            string currentType = "";
+            if (plist.root.values.ContainsKey("CFBundlePackageType"))
+            {
+                currentType = plist.root.values["CFBundlePackageType"].AsString();
+            }
+
+            if (currentType != "BNDL")
+            {
+                plist.root.SetString("CFBundlePackageType", "BNDL");
+                modified = true;
+                Debug.Log("[IOSBuildPostProcess] Set CFBundlePackageType to BNDL in " + plistPath);
+            }
+            
+            if (modified)
+            {
+                plist.WriteToFile(plistPath);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[IOSBuildPostProcess] Failed to patch plist at " + plistPath + ": " + e.Message);
         }
     }
 }
