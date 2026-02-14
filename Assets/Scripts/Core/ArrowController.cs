@@ -700,6 +700,8 @@ namespace Assets.Scripts.Core
             return true;
         }
 
+        private int animationFrameCounter = 0;
+        
         private IEnumerator AnimateAllSegments(List<Vector3> targets, float duration)
         {
             int count = segments.Count;
@@ -707,6 +709,12 @@ namespace Assets.Scripts.Core
 
             Vector3[] starts = new Vector3[count];
             for (int i = 0; i < count; i++) starts[i] = segments[i].transform.position;
+
+            // OPTIMIZED: Determine update frequency based on animation type
+            // Growth animation (slow): update every 3 frames
+            // Movement animation (fast): update every 2 frames
+            int updateFrequency = (duration > 0.03f) ? 3 : 2;
+            animationFrameCounter = 0;
 
             float elapsed = 0;
             while (elapsed < duration)
@@ -716,7 +724,15 @@ namespace Assets.Scripts.Core
                 {
                     segments[i].transform.position = Vector3.Lerp(starts[i], targets[i], t);
                 }
-                UpdateVisuals(); // Update visuals during animation for smoothness
+                
+                // OPTIMIZED: Only update visuals every N frames during animation
+                animationFrameCounter++;
+                if (animationFrameCounter >= updateFrequency)
+                {
+                    UpdateVisuals();
+                    animationFrameCounter = 0;
+                }
+                
                 elapsed += Time.deltaTime;
                 yield return null;
             }

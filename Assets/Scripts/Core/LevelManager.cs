@@ -293,7 +293,8 @@ namespace Assets.Scripts.Core
                         currentLevelObjects.Add(circleObj);
 
                         spawnCount++;
-                        if (spawnCount % 50 == 0) yield return null; // Prevent massive hitch
+                        // OPTIMIZED: Yield every 12 circles instead of 50 for smoother initialization
+                        if (spawnCount % 12 == 0) yield return null;
                     }
                 }
             }

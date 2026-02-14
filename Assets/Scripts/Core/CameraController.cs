@@ -131,6 +131,7 @@ namespace Assets.Scripts.Core
         }
 
         private Vector3 prevMousePos;
+        private Vector3 cachedPosition; // Reusable for clamping
 
         private void HandlePanning()
         {
@@ -180,20 +181,36 @@ namespace Assets.Scripts.Core
                 {
                     HasPannedSinceLastReset = true;
                     
-                    // Perfect Panning: Calculate delta in world space
-                    // We only need ScreenToWorldPoint for the delta
-                    Vector3 currentWorldPos = cam.ScreenToWorldPoint(new Vector3(currentPos.x, currentPos.y, cam.nearClipPlane));
-                    Vector3 lastWorldPos = cam.ScreenToWorldPoint(new Vector3(prevMousePos.x, prevMousePos.y, cam.nearClipPlane));
-                    Vector3 worldDelta = lastWorldPos - currentWorldPos;
+                    // OPTIMIZED: Calculate screen delta and convert to world space directly
+                    // This eliminates 2 ScreenToWorldPoint calls per frame
+                    float deltaX = currentPos.x - prevMousePos.x;
+                    float deltaY = currentPos.y - prevMousePos.y;
                     
-                    transform.position += worldDelta * 1.1f;
+                    // Convert screen delta to world delta using orthographic size
+                    // For orthographic camera: worldHeight = orthographicSize * 2
+                    // worldWidth = worldHeight * aspect
+                    float worldHeight = cam.orthographicSize * 2f;
+                    float worldWidth = worldHeight * cam.aspect;
                     
-                    // Clamp
-                    Vector3 clampedPos = transform.position;
-                    clampedPos.x = Mathf.Clamp(clampedPos.x, minBounds.x, maxBounds.x);
-                    clampedPos.y = Mathf.Clamp(clampedPos.y, minBounds.y, maxBounds.y);
-                    transform.position = clampedPos;
-
+                    float worldDeltaX = -(deltaX / Screen.width) * worldWidth;
+                    float worldDeltaY = -(deltaY / Screen.height) * worldHeight;
+                    
+                    // Apply pan with sensitivity multiplier
+                    cachedPosition = transform.position;
+                    cachedPosition.x += worldDeltaX * 1.1f;
+                    cachedPosition.y += worldDeltaY * 1.1f;
+                    
+                    // Conditional clamping - only clamp if out of bounds
+                    if (cachedPosition.x < minBounds.x || cachedPosition.x > maxBounds.x)
+                    {
+                        cachedPosition.x = Mathf.Clamp(cachedPosition.x, minBounds.x, maxBounds.x);
+                    }
+                    if (cachedPosition.y < minBounds.y || cachedPosition.y > maxBounds.y)
+                    {
+                        cachedPosition.y = Mathf.Clamp(cachedPosition.y, minBounds.y, maxBounds.y);
+                    }
+                    
+                    transform.position = cachedPosition;
                     prevMousePos = currentPos;
                 }
             }
@@ -271,9 +288,9 @@ namespace Assets.Scripts.Core
             float startZoom = minZoomToFit + initExtraZoomBuffer;
 
             // Update dynamic zoom settings
-            maxZoom = startZoom;
+            maxZoom =  Mathf.Min(24f, startZoom); ;
             defaultZoom = Mathf.Max(startZoom / 2f, 7f);
-
+            defaultZoom = Mathf.Min(defaultZoom, maxZoom); ;
             Vector3 centerPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
             
             // Immediately set to zoomed out view
