@@ -166,11 +166,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 71c1514a6bd24e1e882cebbe1904ce04, type: 3}
-  m_Name: Coins_Style
+  m_Name: CoinsStyle
   m_EditorClassIdentifier: 
-  hashCode: -566256560
+  hashCode: 1627207775
   material: {fileID: -7160074886386671674}
-  materialHashCode: 856135280
+  materialHashCode: -1240349921
   m_Version: 1.1.0
   m_SourceFontFileGUID: f6c1864f75bda4eeaa8e150169d212fc
   m_SourceFontFile_EditorRef: {fileID: 12800000, guid: f6c1864f75bda4eeaa8e150169d212fc, type: 3}
@@ -1054,21 +1054,6 @@ MonoBehaviour:
     m_Scale: 1
     m_AtlasIndex: 0
     m_ClassDefinitionType: 0
-  - m_Index: 1780
-    m_Metrics:
-      m_Width: 16.203125
-      m_Height: 26.546875
-      m_HorizontalBearingX: 4.40625
-      m_HorizontalBearingY: 15.03125
-      m_HorizontalAdvance: 25.5625
-    m_GlyphRect:
-      m_X: 205
-      m_Y: 416
-      m_Width: 17
-      m_Height: 28
-    m_Scale: 1
-    m_AtlasIndex: 0
-    m_ClassDefinitionType: 0
   - m_Index: 1781
     m_Metrics:
       m_Width: 15.65625
@@ -1204,6 +1189,21 @@ MonoBehaviour:
     m_Scale: 1
     m_AtlasIndex: 0
     m_ClassDefinitionType: 0
+  - m_Index: 1780
+    m_Metrics:
+      m_Width: 16.203125
+      m_Height: 26.546875
+      m_HorizontalBearingX: 4.40625
+      m_HorizontalBearingY: 15.03125
+      m_HorizontalAdvance: 25.5625
+    m_GlyphRect:
+      m_X: 205
+      m_Y: 416
+      m_Width: 17
+      m_Height: 28
+    m_Scale: 1
+    m_AtlasIndex: 0
+    m_ClassDefinitionType: 0
   m_CharacterTable:
   - m_ElementType: 1
     m_Unicode: 32
@@ -1224,10 +1224,6 @@ MonoBehaviour:
   - m_ElementType: 1
     m_Unicode: 39
     m_GlyphIndex: 1848
-    m_Scale: 1
-  - m_ElementType: 1
-    m_Unicode: 44
-    m_GlyphIndex: 1780
     m_Scale: 1
   - m_ElementType: 1
     m_Unicode: 46
@@ -1472,6 +1468,10 @@ MonoBehaviour:
   - m_ElementType: 1
     m_Unicode: 8230
     m_GlyphIndex: 1783
+    m_Scale: 1
+  - m_ElementType: 1
+    m_Unicode: 44
+    m_GlyphIndex: 1780
     m_Scale: 1
   m_AtlasTextures:
   - {fileID: -1579443269163446814}
@@ -2030,7 +2030,7 @@ MonoBehaviour:
     italicTypeface: {fileID: 0}
   - regularTypeface: {fileID: 0}
     italicTypeface: {fileID: 0}
-  - regularTypeface: {fileID: 11400000, guid: 04d5e1a31ff9f4616bc8eaabe38bc512, type: 2}
+  - regularTypeface: {fileID: 0}
     italicTypeface: {fileID: 0}
   - regularTypeface: {fileID: 0}
     italicTypeface: {fileID: 0}
