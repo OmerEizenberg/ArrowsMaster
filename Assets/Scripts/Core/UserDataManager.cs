@@ -104,7 +104,6 @@ namespace Assets.Scripts.Core
         public void ResetProgress()
         {
             CurrentLevel = 1;
-            ArrowsCurrency = 0;
             
             // Reset Monthly Challenge data
             ClearAllMonthlyProgress();
@@ -114,7 +113,6 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetString(InstallDateKey, InstallDate.ToBinary().ToString());
 
             SaveData(); // Helpers call PlayerPrefs.Save() but SaveData does too
-            SaveCurrency(); 
             
             if (SoundManager.Instance != null)
             {

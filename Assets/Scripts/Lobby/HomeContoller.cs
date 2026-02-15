@@ -248,6 +248,18 @@ namespace Assets.Scripts.Lobby
             m_ShopLayer.SetActive(false);
         }
 
+        public void OnWatchAdForCoinsButtonClicked()
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowRewardedForCoins();
+            }
+            else
+            {
+                Debug.LogError("[HomeContoller] AdsManager.Instance is null!");
+            }
+        }
+
         public void OnPlayButtonClicked()
         {
             if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();

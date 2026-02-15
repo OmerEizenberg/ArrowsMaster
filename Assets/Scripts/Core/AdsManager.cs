@@ -12,6 +12,7 @@ namespace Assets.Scripts.Core
 
         private LevelPlayInterstitialAd interstitialAd;
         private LevelPlayRewardedAd RewardedAd;
+        private LevelPlayRewardedAd coinsRewardedAd;
         private bool isInitialized = false;
         private float lastAdShowTime = -60f;
         private const float AD_COOLDOWN = 60f;
@@ -61,6 +62,14 @@ namespace Assets.Scripts.Core
 #else
                 return "unexpected_platform";
 #endif
+            }
+        }
+
+        private string CoinsRewardedAdUnitId
+        {
+            get
+            {
+                return "ncnu1ipmqxwjbszr";
             }
         }
 
@@ -151,6 +160,7 @@ namespace Assets.Scripts.Core
                 isInitialized = true;
                 CreateInterstitialAd();
                 CreateRewardedAd();
+                CreateCoinsRewardedAd();
             });
         }
 
@@ -366,10 +376,108 @@ namespace Assets.Scripts.Core
             }
         }
 
+        // --- Coins Rewarded Ad ---
+        private void CreateCoinsRewardedAd()
+        {
+            if (coinsRewardedAd != null) coinsRewardedAd.DestroyAd();
+            coinsRewardedAd = new LevelPlayRewardedAd(CoinsRewardedAdUnitId);
+
+            coinsRewardedAd.OnAdClosed += (info) => {
+                EnqueueAction(() => {
+                    Debug.Log("[AdsManager] Coins Rewarded Ad Closed. Requesting next.");
+                    OnAdClosed?.Invoke();
+                    LoadCoinsRewarded();
+                });
+            };
+
+            coinsRewardedAd.OnAdDisplayFailed += (info, err) => {
+                EnqueueAction(() => {
+                    Debug.LogError($"[AdsManager] Coins Rewarded Ad Display Failed: {err}. ");
+                    OnAdClosed?.Invoke();
+                    LoadCoinsRewarded();
+                });
+            };
+
+            coinsRewardedAd.OnAdDisplayed += (info) => {
+                lastAdShowTime = Time.time;
+                EnqueueAction(() => {
+                    Debug.Log($"[AdsManager] Coins Rewarded Ad Displayed: {info}");
+
+                    // --- Analytics: ad_impression ---
+                    if (FirebaseManager.Instance != null)
+                    {
+                        FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, info.AdNetwork),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName));
+                    }
+                    // --------------------------------
+                });
+            };
+
+            coinsRewardedAd.OnAdRewarded += (info, reward) => {
+                EnqueueAction(() => {
+                    Debug.Log("[AdsManager] Coins Rewarded Ad Rewarded Event Received. Granting 2000 coins.");
+                    if (UserDataManager.Instance != null)
+                    {
+                        UserDataManager.Instance.AddArrowsCurrency(2000);
+                    }
+                    OnRewardReceived?.Invoke();
+                    
+                    // --- Analytics: ad_reward_coins ---
+                    if (FirebaseManager.Instance != null)
+                    {
+                        FirebaseManager.Instance.LogEvent("ad_reward_coins", 
+                            new Firebase.Analytics.Parameter("reward_amount", 2000));
+                    }
+                });
+            };
+
+            coinsRewardedAd.OnAdLoaded += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Coins Rewarded Ad Loaded: {info}"));
+            coinsRewardedAd.OnAdLoadFailed += (info) => {
+                EnqueueAction(() => {
+                    Debug.LogWarning($"[AdsManager] Coins Rewarded Ad Load Failed: {info}. Retrying in 15s...");
+                    _ = RetryLoadCoinsRewarded(15000);
+                });
+            };
+
+            LoadCoinsRewarded();
+        }
+
+        private async Task RetryLoadCoinsRewarded(int delayMs)
+        {
+            await Task.Delay(delayMs);
+            if (this != null && coinsRewardedAd != null && !coinsRewardedAd.IsAdReady())
+            {
+                EnqueueAction(LoadCoinsRewarded);
+            }
+        }
+
+        public void LoadCoinsRewarded()
+        {
+            if (!isInitialized || coinsRewardedAd == null) return;
+            coinsRewardedAd.LoadAd();
+        }
+
+        public void ShowRewardedForCoins()
+        {
+            if (coinsRewardedAd != null && coinsRewardedAd.IsAdReady())
+            {
+                Debug.Log("[AdsManager] Showing Coins Rewarded Ad.");
+                OnAdOpened?.Invoke();
+                coinsRewardedAd.ShowAd();
+            }
+            else
+            {
+                Debug.LogWarning($"[AdsManager] Coins Rewarded Ad is not ready. Initialized: {isInitialized}");
+                LoadCoinsRewarded();
+            }
+        }
+
         private void OnDestroy()
         {
             if (interstitialAd != null) interstitialAd.DestroyAd();
             if (RewardedAd != null) RewardedAd.DestroyAd();
+            if (coinsRewardedAd != null) coinsRewardedAd.DestroyAd();
         }
     }
 }
