@@ -74,8 +74,22 @@ public class FirebaseManager : MonoBehaviour
                 FirebaseMessaging.TokenReceived += OnTokenReceived;
                 FirebaseMessaging.MessageReceived += OnMessageReceived;
 
+                // Request permission for push notifications (required for iOS and Android 13+)
+                FirebaseMessaging.RequestPermissionAsync().ContinueWithOnMainThread(task => {
+                    if (task.IsCompleted && !task.IsFaulted) {
+                        Debug.Log("[FirebaseManager] Messaging permission request completed.");
+                    } else {
+                        Debug.LogError("[FirebaseManager] Messaging permission request failed: " + task.Exception);
+                    }
+                });
+
                 isInitialized = true;
                 Debug.Log("[FirebaseManager] Firebase App, Crashlytics, Analytics, and Messaging are ready.");
+
+                // Request notification permission for Android 13+
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                RequestNotificationPermission();
+                #endif
 
                 // Request token explicitly to ensure registration
                 FirebaseMessaging.GetTokenAsync().ContinueWithOnMainThread(tokenTask => {
@@ -113,6 +127,32 @@ public class FirebaseManager : MonoBehaviour
             }
         }
     }
+    
+    #if UNITY_ANDROID && !UNITY_EDITOR
+    private void RequestNotificationPermission()
+    {
+        try
+        {
+            // Check if we are on Android 13 (API 33) or higher
+            using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
+            {
+                int sdkInt = version.GetStatic<int>("SDK_INT");
+                if (sdkInt >= 33)
+                {
+                    if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission("android.permission.POST_NOTIFICATIONS"))
+                    {
+                        Debug.Log("[FirebaseManager] Requesting POST_NOTIFICATIONS permission.");
+                        UnityEngine.Android.Permission.RequestUserPermission("android.permission.POST_NOTIFICATIONS");
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("[FirebaseManager] Error requesting notification permission: " + e.Message);
+        }
+    }
+    #endif
 
     #region Analytics Helpers
     public void LogEvent(string eventName)
