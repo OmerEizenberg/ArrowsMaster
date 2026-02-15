@@ -248,6 +248,19 @@ namespace Assets.Scripts.Lobby
             m_ShopLayer.SetActive(false);
         }
 
+        public void OnBuyProductButtonClicked(string productId)
+        {
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+            if (IAPManager.Instance != null)
+            {
+                IAPManager.Instance.BuyProduct(productId);
+            }
+            else
+            {
+                Debug.LogError("[HomeContoller] IAPManager.Instance is null!");
+            }
+        }
+
         public void OnWatchAdForCoinsButtonClicked()
         {
             if (AdsManager.Instance != null)

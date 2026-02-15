@@ -528,7 +528,7 @@ Transform:
   m_GameObject: {fileID: 24807327}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 47.25, y: 85.21875, z: 0}
+  m_LocalPosition: {x: 47.25, y: 125.5, z: 0}
   m_LocalScale: {x: 1.6875, y: 1.6875, z: 1.6875}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -3979,9 +3979,9 @@ RectTransform:
   - {fileID: 1386089964}
   m_Father: {fileID: 1567918588}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 540, y: -1200}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 1080, y: 480}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &143157007
@@ -4203,8 +4203,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Next Time
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
-  m_sharedMaterial: {fileID: -7160074886386671674, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4228,7 +4228,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 51.8
+  m_fontSize: 55.2
   m_fontSizeBase: 24
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -7884,9 +7884,9 @@ RectTransform:
   - {fileID: 633974119}
   m_Father: {fileID: 1579696541}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 900, y: -240}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 325, y: 462}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &426014735
@@ -7932,7 +7932,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 426014736}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnBuyProductButtonClicked
+        m_Mode: 5
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: com.everybodygames.arrowsmaster.coins_999
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &426014736
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11602,9 +11614,9 @@ RectTransform:
   - {fileID: 1048619271}
   m_Father: {fileID: 1465056813}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 180, y: -240}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 325, y: 462}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &727383319
@@ -15834,9 +15846,9 @@ RectTransform:
   - {fileID: 1883139135}
   m_Father: {fileID: 1579696541}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 180, y: -240}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 325, y: 462}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1069332931
@@ -15882,7 +15894,31 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1069332932}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnBuyProductButtonClicked
+        m_Mode: 5
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: com.everybodygames.arrowsmaster.coins_199
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 11500000, guid: 31f74bfaefcb84c8b8fe7b724b673a24, type: 3}
+        m_TargetAssemblyTypeName: UnityEngine.Object, UnityEngine
+        m_MethodName: set_name
+        m_Mode: 5
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1069332932
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15980,8 +16016,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: BUY 9.99$
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
-  m_sharedMaterial: {fileID: -7160074886386671674, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -16340,7 +16376,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1094050212
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18545,9 +18581,9 @@ RectTransform:
   - {fileID: 272907776}
   m_Father: {fileID: 1579696541}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 540, y: -240}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 325, y: 462}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1229602987
@@ -18593,7 +18629,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1229602988}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnBuyProductButtonClicked
+        m_Mode: 5
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: com.everybodygames.arrowsmaster.coins_499
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1229602988
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -19482,7 +19530,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 64}
+  m_AnchoredPosition: {x: 0, y: 164}
   m_SizeDelta: {x: 1152, y: 384}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1286752288
@@ -19507,8 +19555,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: NO MORE ADS!
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
-  m_sharedMaterial: {fileID: -7160074886386671674, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -19532,7 +19580,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 157.05
+  m_fontSize: 169.35
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -21388,7 +21436,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1386089966}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnBuyProductButtonClicked
+        m_Mode: 5
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: com.everybodygames.arrowsmaster.noadscoins_999
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1386089966
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23264,9 +23324,9 @@ RectTransform:
   - {fileID: 1555524570}
   m_Father: {fileID: 1567918588}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 540, y: -720}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 1080, y: 480}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1465056814
@@ -25330,9 +25390,9 @@ RectTransform:
   - {fileID: 899638320}
   m_Father: {fileID: 1465056813}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 900, y: -240}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 325, y: 462}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1555524571
@@ -25378,7 +25438,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1555524572}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnBuyProductButtonClicked
+        m_Mode: 5
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: com.everybodygames.arrowsmaster.coins_4999
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1555524572
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -26007,9 +26079,9 @@ RectTransform:
   - {fileID: 426014734}
   m_Father: {fileID: 1567918588}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 540, y: -240}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 1080, y: 480}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1579696542
@@ -33064,9 +33136,9 @@ RectTransform:
   - {fileID: 1661289912}
   m_Father: {fileID: 1465056813}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 540, y: -240}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 325, y: 462}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1971829258
@@ -33112,7 +33184,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1971829259}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnBuyProductButtonClicked
+        m_Mode: 5
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: com.everybodygames.arrowsmaster.coins_1999
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1971829259
 MonoBehaviour:
   m_ObjectHideFlags: 0

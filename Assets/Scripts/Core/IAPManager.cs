@@ -29,6 +29,14 @@ namespace Assets.Scripts.Core
         public const string ProductNoAds199 = "com.everybodygames.arrowsmaster.no_ads_199";
         public const string ProductDonate199 = "com.everybodygames.arrowsmaster.donate_199";
 
+        // New Product IDs
+        public const string ProductCoins199 = "com.everybodygames.arrowsmaster.coins_199";
+        public const string ProductCoins499 = "com.everybodygames.arrowsmaster.coins_499";
+        public const string ProductCoins999 = "com.everybodygames.arrowsmaster.coins_999";
+        public const string ProductCoins1999 = "com.everybodygames.arrowsmaster.coins_1999";
+        public const string ProductCoins4999 = "com.everybodygames.arrowsmaster.coins_4999";
+        public const string ProductNoAdsCoins999 = "com.everybodygames.arrowsmaster.noadscoins_999";
+
         private const string NoAdsPrefKey = "UserHasNoAds";
 
         public bool HasNoAds => PlayerPrefs.GetInt(NoAdsPrefKey, 0) == 1;
@@ -89,6 +97,16 @@ namespace Assets.Scripts.Core
             builder.AddProduct(ProductNoAds199, UnityEngine.Purchasing.ProductType.NonConsumable);
             builder.AddProduct(ProductDonate199, UnityEngine.Purchasing.ProductType.NonConsumable);
 
+            // New Coin Products (Consumable)
+            builder.AddProduct(ProductCoins199, UnityEngine.Purchasing.ProductType.Consumable);
+            builder.AddProduct(ProductCoins499, UnityEngine.Purchasing.ProductType.Consumable);
+            builder.AddProduct(ProductCoins999, UnityEngine.Purchasing.ProductType.Consumable);
+            builder.AddProduct(ProductCoins1999, UnityEngine.Purchasing.ProductType.Consumable);
+            builder.AddProduct(ProductCoins4999, UnityEngine.Purchasing.ProductType.Consumable);
+
+            // No Ads + Coins bundle (Non-Consumable)
+            builder.AddProduct(ProductNoAdsCoins999, UnityEngine.Purchasing.ProductType.NonConsumable);
+
             UnityPurchasing.Initialize(this, builder);
         }
 
@@ -97,7 +115,7 @@ namespace Assets.Scripts.Core
             return m_StoreController != null && m_StoreExtensionProvider != null;
         }
 
-        public void PurchaseNoAds(ProductTypeID type)
+        public void BuyProduct(string productId)
         {
             if (!IsInitialized())
             {
@@ -105,6 +123,12 @@ namespace Assets.Scripts.Core
                 return;
             }
 
+            Debug.Log($"[IAPManager] Initiating purchase for: {productId}");
+            m_StoreController.InitiatePurchase(productId);
+        }
+
+        public void PurchaseNoAds(ProductTypeID type)
+        {
             string productId = type switch
             {
                 ProductTypeID.NoAds999 => ProductNoAds999,
@@ -114,8 +138,7 @@ namespace Assets.Scripts.Core
                 _ => ProductNoAds999
             };
 
-            Debug.Log($"[IAPManager] Initiating purchase for: {productId}");
-            m_StoreController.InitiatePurchase(productId);
+            BuyProduct(productId);
         }
 
         // --- IStoreListener Implementation ---
@@ -136,6 +159,7 @@ namespace Assets.Scripts.Core
             if (m_StoreController.products.WithID(ProductNoAds999).hasReceipt) alreadyOwned = true;
             else if (m_StoreController.products.WithID(ProductNoAds499).hasReceipt) alreadyOwned = true;
             else if (m_StoreController.products.WithID(ProductNoAds199).hasReceipt) alreadyOwned = true;
+            else if (m_StoreController.products.WithID(ProductNoAdsCoins999).hasReceipt) alreadyOwned = true;
 
             if (alreadyOwned && !HasNoAds)
             {
@@ -157,14 +181,54 @@ namespace Assets.Scripts.Core
         {
             string id = args.purchasedProduct.definition.id;
 
-            if (id == ProductNoAds999 || id == ProductNoAds499 || id == ProductNoAds199)
+            // Handle compensation based on product ID
+            switch (id)
             {
-                Debug.Log($"[IAPManager] No Ads product purchased successfully: {id}");
-                SetNoAds(true);
-            }
-            else
-            {
-                Debug.Log($"[IAPManager] Product purchased successfully: {id}");
+                case ProductNoAds999:
+                    Debug.Log($"[IAPManager] No Ads purchased successfully: {id}");
+                    SetNoAds(true);
+
+                    break;
+                case ProductNoAds499:
+                case ProductNoAds199:
+                    Debug.Log($"[IAPManager] No Ads purchased successfully: {id}");
+                    SetNoAds(true);
+                    break;
+
+                case ProductNoAdsCoins999:
+                    Debug.Log($"[IAPManager] No Ads + Coins purchased successfully: {id}");
+                    SetNoAds(true);
+                    UserDataManager.Instance.AddArrowsCurrency(25000); // 25000 coins placeholder as requested
+                    break;
+
+                case ProductCoins199:
+                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
+                    UserDataManager.Instance.AddArrowsCurrency(4500); // 4500 coins placeholder as requested
+                    break;
+                case ProductCoins499:
+                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
+                    UserDataManager.Instance.AddArrowsCurrency(12000); // 12000 coins placeholder as requested
+                    break;
+                case ProductCoins999:
+                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
+                    UserDataManager.Instance.AddArrowsCurrency(25000); // 25000 coins placeholder as requested
+                    break;
+                case ProductCoins1999:
+                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
+                    UserDataManager.Instance.AddArrowsCurrency(60000); // 60000 coins placeholder as requested
+                    break;
+                case ProductCoins4999:
+                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
+                    UserDataManager.Instance.AddArrowsCurrency(150000); // 150000 coins placeholder as requested
+                    break;
+
+                case ProductDonate199:
+                    Debug.Log($"[IAPManager] Donation purchased successfully: {id}");
+                    break;
+
+                default:
+                    Debug.LogWarning($"[IAPManager] ProcessPurchase: Unknown product ID {id}");
+                    break;
             }
 
             // --- Analytics: purchase (Log all successful purchases) ---
