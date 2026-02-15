@@ -20,6 +20,8 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private GameObject m_DonateLayer;
         [SerializeField] private GameObject m_NoAdsLayer;
         [SerializeField] private GameObject m_ShopLayer;
+        [SerializeField] private GameObject m_NoAdsCoinsBundleButton;
+        [SerializeField] private GameObject m_NoAdsBadge;
 
         [SerializeField] private TextMeshProUGUI m_TitleText;
         [SerializeField] private TextMeshProUGUI m_LevelText;
@@ -36,8 +38,15 @@ namespace Assets.Scripts.Lobby
 
         private void OnEnable()
         {
+            PlayerPrefs.DeleteAll();
             RefreshLobbyUI();
             UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
+            
+            if (IAPManager.Instance != null)
+            {
+                IAPManager.Instance.OnNoAdsStatusChanged += HandleNoAdsStatusChanged;
+            }
+
             if(GameManager.Instance != null && !GameManager.Instance.p_isLevelProgression)
             {
                 OnCalanderButtonClicked();
@@ -47,6 +56,20 @@ namespace Assets.Scripts.Lobby
         private void OnDisable()
         {
             UserDataManager.Instance.OnLevelChanged -= RefreshLobbyUI;
+
+            if (IAPManager.Instance != null)
+            {
+                IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
+            }
+        }
+
+        private void HandleNoAdsStatusChanged(bool hasNoAds)
+        {
+            if (hasNoAds)
+            {
+                if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+            }
+            RefreshLobbyUI();
         }
 
         public void RefreshLobbyUI()
@@ -135,6 +158,13 @@ namespace Assets.Scripts.Lobby
             }
 
             m_LevelText.color = m_LevelColor;
+
+            // Hide the No Ads + Coins bundle button if the user already has No Ads
+            if (m_NoAdsCoinsBundleButton != null && IAPManager.Instance != null)
+            {
+                m_NoAdsCoinsBundleButton.SetActive(!IAPManager.Instance.HasNoAds);
+                m_NoAdsBadge.SetActive(!IAPManager.Instance.HasNoAds);
+            }
         }
         
         public void OnSettingsButtonClicked()
