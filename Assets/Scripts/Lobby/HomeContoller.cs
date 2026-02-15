@@ -19,6 +19,7 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private GameObject m_SettingsLayer;
         [SerializeField] private GameObject m_DonateLayer;
         [SerializeField] private GameObject m_NoAdsLayer;
+        [SerializeField] private GameObject m_ShopLayer;
 
         [SerializeField] private TextMeshProUGUI m_TitleText;
         [SerializeField] private TextMeshProUGUI m_LevelText;
@@ -146,6 +147,7 @@ namespace Assets.Scripts.Lobby
             }else{
                 m_SettingsLayer.SetActive(true);
                 m_CalanderLayer.SetActive(false);
+                m_ShopLayer.SetActive(false);
             }
         }
         public void OnDonateButtonClicked()
@@ -158,6 +160,7 @@ namespace Assets.Scripts.Lobby
             }else{
                 m_SettingsLayer.SetActive(false);
                 m_CalanderLayer.SetActive(false);
+                m_ShopLayer.SetActive(false);
                 m_DonateLayer.SetActive(true);
             }
         }
@@ -172,6 +175,7 @@ namespace Assets.Scripts.Lobby
             }else{
                 m_SettingsLayer.SetActive(false);
                 m_CalanderLayer.SetActive(false);
+                m_ShopLayer.SetActive(false);
                 m_NoAdsLayer.SetActive(true);
             }
         }
@@ -201,6 +205,7 @@ namespace Assets.Scripts.Lobby
             }else{
                 m_SettingsLayer.SetActive(false);
                 m_CalanderLayer.SetActive(true);
+                m_ShopLayer.SetActive(false);
                 if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = false;
             }
             RefreshLobbyUI();
@@ -211,22 +216,36 @@ namespace Assets.Scripts.Lobby
 
             m_SettingsLayer.SetActive(false);
             m_CalanderLayer.SetActive(false);
+            m_ShopLayer.SetActive(false);
             if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
             RefreshLobbyUI();
         }
 
         public void OnShopButtonClicked()
         {
-            SoundManager.Instance.PlayClick();
-           
-            if(m_CalanderLayer.activeInHierarchy)
-            { //TODO change to shop
-                m_CalanderLayer.SetActive(false);
-            }else{
-                m_SettingsLayer.SetActive(false);
-                m_CalanderLayer.SetActive(false);
-                //TODO Add shop layer
+            if (m_ShopLayer.activeInHierarchy)
+            {
+                HideShop();
             }
+            else
+            {
+                ShowShop();
+            }
+        }
+
+        public void ShowShop()
+        {
+            SoundManager.Instance.PlayShop();
+            m_SettingsLayer.SetActive(false);
+            m_DonateLayer.SetActive(false);
+            m_NoAdsLayer.SetActive(false);
+            m_ShopLayer.SetActive(true);
+        }
+
+        public void HideShop()
+        {
+            SoundManager.Instance.PlayClick();
+            m_ShopLayer.SetActive(false);
         }
 
         public void OnPlayButtonClicked()

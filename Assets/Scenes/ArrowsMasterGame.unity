@@ -843,6 +843,7 @@ MonoBehaviour:
   m_SettingsLayer: {fileID: 85598449}
   m_DonateLayer: {fileID: 362803316}
   m_NoAdsLayer: {fileID: 2124440285}
+  m_ShopLayer: {fileID: 1094050211}
   m_TitleText: {fileID: 745029450}
   m_LevelText: {fileID: 563255410}
   m_DifficultyText: {fileID: 4259226}
@@ -4336,7 +4337,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: RESET PROGRESS
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: e69cd353079ba4832813149989e615f1, type: 2}
   m_sharedMaterial: {fileID: -7160074886386671674, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -4400,7 +4401,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
+  m_hasFontAssetChanged: 1
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &197498395
@@ -4575,7 +4576,7 @@ GameObject:
   - component: {fileID: 231658978}
   - component: {fileID: 231658981}
   m_Layer: 5
-  m_Name: SpecialOffer
+  m_Name: Shop
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4645,7 +4646,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 231658979}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnShopButtonClicked
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &231658979
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5207,10 +5220,10 @@ RectTransform:
   - {fileID: 1615519663}
   m_Father: {fileID: 937078175}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 1440, y: 2560}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &252125570
 MonoBehaviour:
@@ -5391,10 +5404,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1615519663}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 2}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: -150}
+  m_SizeDelta: {x: 1440, y: 2}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &278343487
 MonoBehaviour:
@@ -8877,10 +8890,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1615519663}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 2}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 150}
+  m_SizeDelta: {x: 1440, y: 2}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &511421531
 MonoBehaviour:
@@ -9882,7 +9895,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 576, y: -83.92671}
+  m_AnchoredPosition: {x: 576, y: -83.9267}
   m_SizeDelta: {x: 800, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &603927629
@@ -10651,10 +10664,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 252125569}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 2, y: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -720, y: 0}
+  m_SizeDelta: {x: 2, y: 2560}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &650120356
 MonoBehaviour:
@@ -14401,6 +14414,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 98903be5b4b7e4b3fac9407a20b109be, type: 3}
   - {fileID: 8300000, guid: 3ee59d2f3b806411e8603bf46ddf0c94, type: 3}
   - {fileID: 8300000, guid: a6212c03d85514f46ada012ca4d563e1, type: 3}
+  ShopSound: {fileID: 8300000, guid: 98d10627ccbf24ec4890968b75f979f1, type: 3}
   musicSource: {fileID: 0}
 --- !u!1 &985538275
 GameObject:
@@ -16615,7 +16629,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1105798839}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 28547073}
+        m_TargetAssemblyTypeName: Assets.Scripts.Lobby.HomeContoller, Assembly-CSharp
+        m_MethodName: OnShopButtonClicked
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1105798839
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22144,8 +22170,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 01:30
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
-  m_sharedMaterial: {fileID: -7160074886386671674, guid: 74e196a4ee32e4924b1d089c33808f75, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -22169,7 +22195,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 63.85
+  m_fontSize: 71.6
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -26453,7 +26479,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Special Offer
+  m_text: Shop
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: e69cd353079ba4832813149989e615f1, type: 2}
   m_sharedMaterial: {fileID: -6779341448956739584, guid: e69cd353079ba4832813149989e615f1, type: 2}
@@ -26480,7 +26506,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 40.3
+  m_fontSize: 47.9
   m_fontSizeBase: 44.19
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -26565,10 +26591,10 @@ RectTransform:
   - {fileID: 1921973089}
   m_Father: {fileID: 252125569}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.425}
-  m_AnchorMax: {x: 1, y: 0.575}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 1440, y: 300}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1615519664
 MonoBehaviour:
@@ -28109,10 +28135,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 252125569}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 2, y: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 720, y: 0}
+  m_SizeDelta: {x: 2, y: 2560}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1696230718
 MonoBehaviour:
@@ -31663,10 +31689,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1615519663}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.1, y: 0.125}
-  m_AnchorMax: {x: 0.9, y: 0.875}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 1152, y: 288}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1921973090
 MonoBehaviour:
@@ -31690,8 +31716,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Be proud! You passed a level where 40% of players use a hint.
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: b7efd276eecc3462c88e7d29c10f61da, type: 2}
-  m_sharedMaterial: {fileID: 7858722150324227649, guid: b7efd276eecc3462c88e7d29c10f61da, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 29d4c15ec796e468db50d7ed526cbc9f, type: 2}
+  m_sharedMaterial: {fileID: 8208944082690114780, guid: 29d4c15ec796e468db50d7ed526cbc9f, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -31715,7 +31741,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 76.7
+  m_fontSize: 70
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1

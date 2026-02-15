@@ -28,6 +28,7 @@ namespace Assets.Scripts.Core
         public AudioClip NiceVoice;
         public AudioClip AmazingVoice;
         public AudioClip[] streakSounds;
+        public AudioClip ShopSound;
 
         [SerializeField] private AudioSource musicSource;
 
@@ -138,6 +139,11 @@ namespace Assets.Scripts.Core
         public void PlayWin()
         {
             PlaySound(WinSound);
+        }
+
+        public void PlayShop()
+        {
+            PlaySound(ShopSound);
         }
 
         public void PlaySmallCheer()
