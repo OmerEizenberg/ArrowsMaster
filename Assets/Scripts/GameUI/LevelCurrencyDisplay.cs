@@ -68,7 +68,7 @@ namespace Assets.Scripts.GameUI
             
             if (m_CurrencyText != null)
             {
-                m_CurrencyText.text = m_CurrentAmount.ToString();
+                m_CurrencyText.text = m_CurrentAmount.ToString("N0");
             }
         }
 
@@ -83,7 +83,7 @@ namespace Assets.Scripts.GameUI
             
             if (floatingText != null)
             {
-                floatingText.text = "+" + amount;
+                floatingText.text = "+" + amount.ToString("N0");
                 
                 RectTransform rect = floatingObj.GetComponent<RectTransform>();
                 if (rect != null)

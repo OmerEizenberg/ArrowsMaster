@@ -26,6 +26,7 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private TextMeshProUGUI m_TitleText;
         [SerializeField] private TextMeshProUGUI m_LevelText;
         [SerializeField] private TextMeshProUGUI m_DifficultyText;
+        [SerializeField] private TextMeshProUGUI m_CurrencyText;
 
         [SerializeField] private Color m_CircleColor;
         [SerializeField] private Color m_SuperHardColor;
@@ -40,11 +41,14 @@ namespace Assets.Scripts.Lobby
         {
             PlayerPrefs.DeleteAll();
             RefreshLobbyUI();
+            UpdateCurrencyUI(UserDataManager.Instance.ArrowsCurrency);
             UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
+            UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
             
             if (IAPManager.Instance != null)
             {
                 IAPManager.Instance.OnNoAdsStatusChanged += HandleNoAdsStatusChanged;
+                IAPManager.Instance.OnPurchaseSuccess += HandlePurchaseSuccess;
             }
 
             if(GameManager.Instance != null && !GameManager.Instance.p_isLevelProgression)
@@ -56,11 +60,26 @@ namespace Assets.Scripts.Lobby
         private void OnDisable()
         {
             UserDataManager.Instance.OnLevelChanged -= RefreshLobbyUI;
+            UserDataManager.Instance.OnCurrencyChanged -= UpdateCurrencyUI;
 
             if (IAPManager.Instance != null)
             {
                 IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
+                IAPManager.Instance.OnPurchaseSuccess -= HandlePurchaseSuccess;
             }
+        }
+
+        private void UpdateCurrencyUI(int amount)
+        {
+            if (m_CurrencyText != null)
+            {
+                m_CurrencyText.text = amount.ToString("N0");
+            }
+        }
+
+        private void HandlePurchaseSuccess(string productId)
+        {
+            HideShop();
         }
 
         private void HandleNoAdsStatusChanged(bool hasNoAds)

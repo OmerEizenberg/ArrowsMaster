@@ -573,13 +573,13 @@ m_GameUI.gameObject.SetActive(true);
 
             if (m_PlayOnPriceText != null)
             {
-                m_PlayOnPriceText.text = GetPlayOnCost().ToString();
+                m_PlayOnPriceText.text = GetPlayOnCost().ToString("N0");
             }
 
             if (m_UserBalanceText != null)
             {
                 Debug.Log("User Balance: " + UserDataManager.Instance.ArrowsCurrency);
-                m_UserBalanceText.text = UserDataManager.Instance.ArrowsCurrency.ToString();
+                m_UserBalanceText.text = UserDataManager.Instance.ArrowsCurrency.ToString("N0");
             }
 
             if (failureScreen != null)

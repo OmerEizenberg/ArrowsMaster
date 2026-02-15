@@ -42,6 +42,7 @@ namespace Assets.Scripts.Core
         public bool HasNoAds => PlayerPrefs.GetInt(NoAdsPrefKey, 0) == 1;
 
         public event Action<bool> OnNoAdsStatusChanged;
+        public event Action<string> OnPurchaseSuccess;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoInitialize()
@@ -241,6 +242,8 @@ namespace Assets.Scripts.Core
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_ITEM_ID, id));
             }
             // ----------------------------------------------------------
+
+            OnPurchaseSuccess?.Invoke(id);
 
             return PurchaseProcessingResult.Complete;
         }
