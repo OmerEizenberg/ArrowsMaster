@@ -244,8 +244,24 @@ namespace Assets.Scripts.Core
             // ----------------------------------------------------------
 
             OnPurchaseSuccess?.Invoke(id);
+            SpawnCoinsExplosion();
 
             return PurchaseProcessingResult.Complete;
+        }
+
+        private void SpawnCoinsExplosion()
+        {
+            GameObject prefab = Resources.Load<GameObject>("CoinsExplosion");
+            if (prefab != null)
+            {
+                Vector3 spawnPos = new Vector3(-0.5f, 2.4f, 60.2f);
+                GameObject explosion = Instantiate(prefab, spawnPos, Quaternion.identity);
+                Destroy(explosion, 7f);
+            }
+            else
+            {
+                Debug.LogWarning("[IAPManager] CoinsExplosion prefab not found in Resources.");
+            }
         }
 
         public void OnPurchaseFailed(Product product, PurchaseFailureReason reason)

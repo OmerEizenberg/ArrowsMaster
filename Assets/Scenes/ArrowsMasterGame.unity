@@ -9065,6 +9065,8 @@ MonoBehaviour:
   initPaddingMultiplier: 1.1
   initExtraZoomBuffer: 0.5
   winZoomMultiplier: 1.5
+  zoomReturnDuration: 0.3
+  returnStartDelay: 0.15
 --- !u!1 &539683537
 GameObject:
   m_ObjectHideFlags: 0
@@ -13941,50 +13943,55 @@ MonoBehaviour:
   - Hitting an arrow reduces life
   - Drag To Move
   - 
-  - 
+  - Sharpen your senses. Level up your mind
   - 
   - Pinch to zoom in or out
   - 
   - If you dont find the arrow use the Hint button
   - 
+  - Only 13% pass on without losing lives
   - 
+  - 
+  - Enter the Zen zone. Focus is your greatest tool
   - 
   - 
   - Only 26% pass on the first try
   - 
   - 
+  - Breathe in, think out. Let the puzzle unfold
+  - 
+  - 
+  - 
+  - A puzzle a day keeps the brain fog away
+  - 
+  - 
+  - 
+  - 
+  - Clear your thoughts. The solution is already within you
+  - 
+  - 
+  - 
+  - 
+  - Think smarter, not harder. Challenge your logic
+  - 
+  - 
+  - 
+  - 
+  - Your brain is a muscle. Let's give it a workout
   - 
   - 
   - 
   - 
   - 
   - 
+  - Unlock your cognitive potential, one move at a time
   - 
   - 
   - 
   - 
   - 
   - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - Find your flow. One piece at a time
   m_PlayOnPriceText: {fileID: 456046973}
   m_UserBalanceText: {fileID: 1621138959}
   maxLives: 3

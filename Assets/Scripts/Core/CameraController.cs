@@ -31,6 +31,13 @@ namespace Assets.Scripts.Core
 
         private Camera cam;
         private float defaultZoom;
+        private float absoluteMaxZoom;
+        private bool isZoomingInteraction = false;
+        private bool isInternalAnimation = false;
+        private bool isLevelStarted = false;
+        private float lastInteractionTime;
+        [SerializeField] private float zoomReturnDuration = 0.3f;
+        [SerializeField] private float returnStartDelay = 0.15f;
 
         private Vector3 dragOrigin;
         private Vector3 touchStartPosition;
@@ -55,6 +62,7 @@ namespace Assets.Scripts.Core
 
             cam = GetComponent<Camera>();
             defaultZoom = cam.orthographicSize;
+            absoluteMaxZoom = maxZoom;
         }
 
         private Vector3 shakeOffset;
@@ -71,9 +79,29 @@ namespace Assets.Scripts.Core
             transform.position -= lastShakeOffset;
             lastShakeOffset = Vector3.zero;
 
+            isZoomingInteraction = false;
             HandleDesktopZoom();
             HandleMobileZoom();
             HandlePanning();
+
+            // Handle smooth return to maxZoom if over-zoomed and not interacting
+            // Only return if the level has officially started and transition animations are over
+            bool isInteracting = isZoomingInteraction || isTouching || Input.touchCount > 0 || Input.GetMouseButton(0);
+            
+            if (isInteracting)
+            {
+                lastInteractionTime = Time.time;
+            }
+
+            if (isLevelStarted && !isInternalAnimation && !isInteracting && cam.orthographicSize > maxZoom)
+            {
+                if (Time.time - lastInteractionTime >= returnStartDelay)
+                {
+                    float overZoomRange = Mathf.Max(0.1f, absoluteMaxZoom - maxZoom);
+                    float returnSpeed = overZoomRange / zoomReturnDuration;
+                    cam.orthographicSize = Mathf.MoveTowards(cam.orthographicSize, maxZoom, returnSpeed * Time.deltaTime);
+                }
+            }
 
             // Apply current shake offset
             lastShakeOffset = shakeOffset;
@@ -227,8 +255,9 @@ namespace Assets.Scripts.Core
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (scroll != 0.0f)
             {
+                isZoomingInteraction = true;
                 float newSize = cam.orthographicSize - scroll * zoomSpeed;
-                cam.orthographicSize = Mathf.Clamp(newSize, minZoom, maxZoom);
+                cam.orthographicSize = Mathf.Clamp(newSize, minZoom, absoluteMaxZoom);
             }
         }
 
@@ -236,6 +265,7 @@ namespace Assets.Scripts.Core
         {
             if (Input.touchCount == 2)
             {
+                isZoomingInteraction = true;
                 Touch touchZero = Input.GetTouch(0);
                 Touch touchOne = Input.GetTouch(1);
 
@@ -252,7 +282,7 @@ namespace Assets.Scripts.Core
                 // REMOVED Time.deltaTime! Zoom should be absolute to finger move distance
                 float newSize = cam.orthographicSize + deltaMagnitudeDiff * (cam.orthographicSize / 500f) * mobileZoomSpeed; 
                 
-                cam.orthographicSize = Mathf.Clamp(newSize, minZoom, maxZoom);
+                cam.orthographicSize = Mathf.Clamp(newSize, minZoom, absoluteMaxZoom);
             }
         }
 
@@ -268,6 +298,7 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator InitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
+            isInternalAnimation = true;
             float cellSize = ArrowController.CellSize;
             float aspectRatio = cam.aspect;
 
@@ -288,9 +319,10 @@ namespace Assets.Scripts.Core
             float startZoom = minZoomToFit + initExtraZoomBuffer;
 
             // Update dynamic zoom settings
-            maxZoom =  Mathf.Min(24f, startZoom); ;
+            maxZoom = Mathf.Min(24f, startZoom);
+            absoluteMaxZoom = Mathf.Max(24f, startZoom);
             defaultZoom = Mathf.Max(startZoom / 2f, 7f);
-            defaultZoom = Mathf.Min(defaultZoom, maxZoom); ;
+            defaultZoom = Mathf.Min(defaultZoom, maxZoom);
             Vector3 centerPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
             
             // Immediately set to zoomed out view
@@ -300,10 +332,13 @@ namespace Assets.Scripts.Core
             // This coroutine will be yielded by LevelManager, so we just hold the zoomed out state
             // The zoom-in will happen AFTER arrows finish animating
             yield return null;
+            isInternalAnimation = false;
+            isLevelStarted = false;
         }
         
         public IEnumerator ZoomInToDefault(Vector3 focusPosition)
         {
+            isInternalAnimation = true;
             float duration = initZoomInDuration;
             float startZoom = cam.orthographicSize;
             float targetZoom = defaultZoom;
@@ -324,6 +359,8 @@ namespace Assets.Scripts.Core
             
             cam.orthographicSize = targetZoom;
             transform.position = targetPos;
+            isInternalAnimation = false;
+            isLevelStarted = true;
         }
 
         public void PlayWinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
@@ -333,6 +370,7 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator WinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
+            isInternalAnimation = true;
             float duration = 0.33f;
             float elapsed = 0f;
             
@@ -372,6 +410,7 @@ namespace Assets.Scripts.Core
 
             cam.orthographicSize = targetZoom;
             transform.position = targetPos;
+            isInternalAnimation = false;
         }
 
         public void FocusOn(Vector3 worldPosition, float duration)
@@ -381,6 +420,7 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator FocusCoroutine(Vector3 worldPosition, float duration)
         {
+            isInternalAnimation = true;
             float elapsed = 0f;
             Vector3 startPos = transform.position;
             Vector3 targetPos = new Vector3(worldPosition.x, worldPosition.y, transform.position.z);
@@ -396,6 +436,7 @@ namespace Assets.Scripts.Core
             }
 
             transform.position = targetPos;
+            isInternalAnimation = false;
         }
     }
 }
