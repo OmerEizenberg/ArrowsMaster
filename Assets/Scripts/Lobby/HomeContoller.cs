@@ -39,7 +39,7 @@ namespace Assets.Scripts.Lobby
 
         private void OnEnable()
         {
-            PlayerPrefs.DeleteAll();
+            //PlayerPrefs.DeleteAll();
             RefreshLobbyUI();
             UpdateCurrencyUI(UserDataManager.Instance.ArrowsCurrency);
             UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;

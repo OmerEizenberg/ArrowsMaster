@@ -14,8 +14,8 @@ namespace Assets.Scripts.Core
         private LevelPlayRewardedAd RewardedAd;
         private LevelPlayRewardedAd coinsRewardedAd;
         private bool isInitialized = false;
-        private float lastAdShowTime = -60f;
-        private const float AD_COOLDOWN = 60f;
+        private float lastAdShowTime = -30f;
+        private const float AD_COOLDOWN = 30f;
 
         private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _mainThreadQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
 
@@ -186,7 +186,6 @@ namespace Assets.Scripts.Core
             interstitialAd.OnAdDisplayFailed += OnInterstitialDisplayFailed;
             interstitialAd.OnAdDisplayed += (info) => {
                 Debug.Log($"[AdsManager] Interstitial Ad Displayed: {info}");
-                lastAdShowTime = Time.time;
 
                 // --- Analytics: ad_impression ---
                 if (FirebaseManager.Instance != null)
@@ -225,14 +224,11 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            if (isAuto)
+            float timeSinceLastAd = Time.time - lastAdShowTime;
+            if (timeSinceLastAd < AD_COOLDOWN)
             {
-                float timeSinceLastAd = Time.time - lastAdShowTime;
-                if (timeSinceLastAd < AD_COOLDOWN)
-                {
-                    Debug.Log($"[AdsManager] Skipping Auto Interstitial due to cooldown. Last ad was {timeSinceLastAd:F1}s ago.");
-                    return;
-                }
+                Debug.Log($"[AdsManager] Skipping Interstitial due to cooldown. Last ad was {timeSinceLastAd:F1}s ago.");
+                return;
             }
 
             if (interstitialAd != null && interstitialAd.IsAdReady())
@@ -276,6 +272,7 @@ namespace Assets.Scripts.Core
         {
             EnqueueAction(() => {
                 Debug.Log("[AdsManager] Interstitial Ad Closed. Loading next one.");
+                lastAdShowTime = Time.time;
                 OnAdClosed?.Invoke();
                 LoadInterstitial();
             });
@@ -299,6 +296,7 @@ namespace Assets.Scripts.Core
             RewardedAd.OnAdClosed += (info) => { 
                 EnqueueAction(() => {
                     Debug.Log("[AdsManager] Rewarded Ad Closed. Requesting next.");
+                    lastAdShowTime = Time.time;
                     OnAdClosed?.Invoke();
                     LoadRewarded(); 
                 });
@@ -313,7 +311,6 @@ namespace Assets.Scripts.Core
             };
             
             RewardedAd.OnAdDisplayed += (info) => {
-                lastAdShowTime = Time.time;
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}");
                     
@@ -385,6 +382,7 @@ namespace Assets.Scripts.Core
             coinsRewardedAd.OnAdClosed += (info) => {
                 EnqueueAction(() => {
                     Debug.Log("[AdsManager] Coins Rewarded Ad Closed. Requesting next.");
+                    lastAdShowTime = Time.time;
                     OnAdClosed?.Invoke();
                     LoadCoinsRewarded();
                 });
@@ -399,7 +397,6 @@ namespace Assets.Scripts.Core
             };
 
             coinsRewardedAd.OnAdDisplayed += (info) => {
-                lastAdShowTime = Time.time;
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Coins Rewarded Ad Displayed: {info}");
 
