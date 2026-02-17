@@ -12,6 +12,7 @@ namespace Assets.Scripts.Core
         
         [Header("Visuals")]
         public Sprite HeadSprite;
+        public Vector3 HeadScale = new Vector3(1.4f, 1.4f, 1.4f);
         public GameObject pointEffectPrefab;
         [SerializeField] private GameObject m_ComboPrefab;
         [SerializeField] private GameObject m_VoicePrefab;
@@ -771,6 +772,7 @@ namespace Assets.Scripts.Core
                         seg.Renderer.sprite = HeadSprite;
                         seg.Renderer.color = currentArrowColor;
                         seg.Renderer.sortingOrder = 10;
+                        seg.transform.localScale = HeadScale;
                         
                         float angle = Mathf.Atan2(m_CurrentVisualDirection.y, m_CurrentVisualDirection.x) * Mathf.Rad2Deg - 90f;
                         seg.transform.rotation = Quaternion.Euler(0, 0, angle);

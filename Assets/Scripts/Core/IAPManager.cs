@@ -255,7 +255,7 @@ namespace Assets.Scripts.Core
             if (prefab != null)
             {
                 Vector3 spawnPos = new Vector3(-0.5f, 2.4f, 60.2f);
-                GameObject explosion = Instantiate(prefab, spawnPos, Quaternion.identity);
+                GameObject explosion = Instantiate(prefab, spawnPos, prefab.transform.rotation);
                 Destroy(explosion, 7f);
             }
             else
