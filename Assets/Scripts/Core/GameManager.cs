@@ -105,7 +105,11 @@ namespace Assets.Scripts.Core
                 levelManager.OnEntranceAnimationFinished += () => {
                     isEntranceFinished = true;
                     ResetHintTimer();
-                    if (m_FunFact != null && UserDataManager.Instance.CurrentLevel< m_FunFactsDat.Length && m_FunFactsDat[UserDataManager.Instance.CurrentLevel].Length>2) {
+                };
+
+                // Move Fun Fact trigger to happen earlier (1 second before entrance finished)
+                levelManager.OnEntranceAnimationStarted += () => {
+                    if (m_FunFact != null && UserDataManager.Instance.CurrentLevel < m_FunFactsDat.Length && m_FunFactsDat[UserDataManager.Instance.CurrentLevel].Length > 2) {
                         m_FunFact.SetActive(true);
                         m_FunFactText.text = m_FunFactsDat[UserDataManager.Instance.CurrentLevel];
                     }

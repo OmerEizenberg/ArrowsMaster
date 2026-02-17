@@ -133,7 +133,7 @@ namespace Assets.Scripts.Core
 
             // Use fixed world distance of 1.0 (approximately 1 grid cell size)
             // This ensures the radius "scales" with zoom (visually consistent in world space)
-            float worldThreshold = 1.0f; 
+            float worldThreshold = 0.75f; 
             float minDistance = worldThreshold;
             
             // Convert click to world space for distance check

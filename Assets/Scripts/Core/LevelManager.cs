@@ -15,6 +15,7 @@ namespace Assets.Scripts.Core
         private List<GameObject> currentLevelObjects = new List<GameObject>();
         private List<SpriteRenderer> m_BackgroundCircles = new List<SpriteRenderer>();
         public event System.Action OnEntranceAnimationFinished;
+        public event System.Action OnEntranceAnimationStarted;
         public string CurrentLevelId => currentLevelId;
         private string currentLevelId;
         private HashSet<Vector2Int> m_SpawnedCirclePositions = new HashSet<Vector2Int>();
@@ -261,6 +262,7 @@ namespace Assets.Scripts.Core
             // 3. After arrows finish, zoom camera in to default
             if (CameraController.Instance != null)
             {
+                OnEntranceAnimationStarted?.Invoke();
                 yield return StartCoroutine(CameraController.Instance.ZoomInToDefault(levelCenter));
             }
 
