@@ -31,9 +31,9 @@ namespace Assets.Scripts.Core
         
         private static Material s_SharedLineMaterial;
 
-        // LineRenderer Refactor
         private LineRenderer lineRenderer;
         private LineRenderer previewLineRenderer;
+        private Vector2Int m_CurrentVisualDirection = Vector2Int.up;
 
         public void Initialize(ArrowData data)
         {
@@ -102,6 +102,7 @@ namespace Assets.Scripts.Core
                 m_LookDirection = data.path[data.path.Count - 1].ToVector2Int() - data.path[data.path.Count - 2].ToVector2Int();
             }
             
+            m_CurrentVisualDirection = m_LookDirection;
             GameManager.Instance.RegisterArrow();
         }
 
@@ -142,6 +143,16 @@ namespace Assets.Scripts.Core
                 if (instant) segments[i].transform.position = targetWorldPos;
 
                 GridManager.Instance.RegisterOccupancy(pos, this);
+            }
+
+            // Update visual direction based on the current head movement
+            if (step > 0 && step < cachedData.path.Count)
+            {
+                m_CurrentVisualDirection = cachedData.path[step].ToVector2Int() - cachedData.path[step - 1].ToVector2Int();
+            }
+            else
+            {
+                m_CurrentVisualDirection = m_LookDirection;
             }
 
             forceLineUpdate = true;
@@ -259,7 +270,7 @@ namespace Assets.Scripts.Core
             
             // Final head position with offset
             // Adjusted: Moved 0.08 units forward (into the head) from the previous -0.2f offset
-            Vector3 headOffset = new Vector3(m_LookDirection.x, m_LookDirection.y, 0) * -0.12f * CellSize;
+            Vector3 headOffset = new Vector3(m_CurrentVisualDirection.x, m_CurrentVisualDirection.y, 0) * -0.12f * CellSize;
             Vector3 finalPoint = currentHeadPos + headOffset;
             
             if (linePoints.Count == 0)
@@ -665,6 +676,7 @@ namespace Assets.Scripts.Core
             
             Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = m_LookDirection;
+            m_CurrentVisualDirection = currentDir;
             Vector2Int targetPos = head.GridPosition + currentDir;
             bool isEscaping = GridManager.Instance.IsOutOfBounds(targetPos);
 
@@ -713,7 +725,8 @@ namespace Assets.Scripts.Core
             // OPTIMIZED: Determine update frequency based on animation type
             // Growth animation (slow): update every 3 frames
             // Movement animation (fast): update every 2 frames
-            int updateFrequency = (duration > 0.03f) ? 3 : 2;
+            // VERY SHORT (entrance): update every frame
+            int updateFrequency = (duration > 0.05f) ? 3 : (duration > 0.03f ? 1 : 2);
             animationFrameCounter = 0;
 
             float elapsed = 0;
@@ -759,7 +772,7 @@ namespace Assets.Scripts.Core
                         seg.Renderer.color = currentArrowColor;
                         seg.Renderer.sortingOrder = 10;
                         
-                        float angle = Mathf.Atan2(m_LookDirection.y, m_LookDirection.x) * Mathf.Rad2Deg - 90f;
+                        float angle = Mathf.Atan2(m_CurrentVisualDirection.y, m_CurrentVisualDirection.x) * Mathf.Rad2Deg - 90f;
                         seg.transform.rotation = Quaternion.Euler(0, 0, angle);
                     }
                 }
