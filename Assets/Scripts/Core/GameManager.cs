@@ -22,6 +22,7 @@ namespace Assets.Scripts.Core
         [Header("Shop UI")]
         [SerializeField] private TextMeshProUGUI m_PlayOnPriceText;
         [SerializeField] private TextMeshProUGUI m_UserBalanceText;
+        [SerializeField] private GameObject m_ShopLayer;
 
         [Header("Settings")]
         public int maxLives = 3;
@@ -100,6 +101,11 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnAdClosed += HandleAdClosed;
             }
 
+            if (UserDataManager.Instance != null)
+            {
+                UserDataManager.Instance.OnCurrencyChanged += UpdateUserBalanceUI;
+            }
+
             if (levelManager != null)
             {
                 levelManager.OnEntranceAnimationFinished += () => {
@@ -124,6 +130,19 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnRewardReceived -= HandleRewardReceived;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
                 AdsManager.Instance.OnAdClosed -= HandleAdClosed;
+            }
+
+            if (UserDataManager.Instance != null)
+            {
+                UserDataManager.Instance.OnCurrencyChanged -= UpdateUserBalanceUI;
+            }
+        }
+
+        private void UpdateUserBalanceUI(int amount)
+        {
+            if (m_UserBalanceText != null)
+            {
+                m_UserBalanceText.text = amount.ToString("N0");
             }
         }
 
@@ -243,6 +262,14 @@ namespace Assets.Scripts.Core
             else
             {
                 Debug.Log("Open Shop");
+                if (m_ShopLayer != null)
+                {
+                    m_ShopLayer.SetActive(true);
+                    if (SoundManager.Instance != null)
+                    {
+                        SoundManager.Instance.PlayShop();
+                    }
+                }
             }
         }
 
