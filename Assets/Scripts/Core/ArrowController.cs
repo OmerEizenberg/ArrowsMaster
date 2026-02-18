@@ -807,7 +807,7 @@ namespace Assets.Scripts.Core
             Vector2Int currentDir = m_LookDirection;
 
             Vector3 startPos = head.transform.position;
-            Vector3 endPos = startPos + new Vector3(currentDir.x, currentDir.y, 0) * 20f * CellSize;
+            Vector3 endPos = startPos + new Vector3(currentDir.x, currentDir.y, 0) * 60f * CellSize;
 
             previewLineRenderer.positionCount = 2;
             previewLineRenderer.SetPosition(0, startPos);
