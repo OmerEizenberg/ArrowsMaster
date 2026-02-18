@@ -90,7 +90,7 @@ def is_level_solvable(level_data, pre_occupied=None):
         dx, dy = dir_vecs[a["lookDirection"]]
         cx, cy = h["x"] + dx, h["y"] + dy
         while 0 <= cx < gw and 0 <= cy < gh:
-            if (cx, cy) in occupied and occupied[(cx, cy)] != aid:
+            if (cx, cy) in occupied:
                 return False
             cx += dx
             cy += dy
@@ -244,9 +244,8 @@ def post_process_fill_gaps(level_data, image_path, config):
                 if (aim_x, aim_y) in temp_path_set:
                     is_self_aiming = True
                     break
-                if (aim_x, aim_y) in occupied or (aim_x, aim_y) in shape_mask: # If it hits anything else, we stop checking for self-aiming
-                    # Actually, self-aiming only occurs if it passes over its own path before hitting anything else or boundary
-                    pass
+                # Even if it hits another arrow, we keep checking to see if it eventually hits its own segment.
+                # However, in the game, it would be blocked. But for safety, we reject if ANY part of the trajectory hits itself.
                 aim_x += look_dx
                 aim_y += look_dy
             

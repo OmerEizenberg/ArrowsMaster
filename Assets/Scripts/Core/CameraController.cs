@@ -392,6 +392,7 @@ namespace Assets.Scripts.Core
 
         private IEnumerator WinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
+            isLevelStarted = false; // Disable zoom-back mechanic immediately
             isInternalAnimation = true;
             float duration = 0.33f;
             float elapsed  = 0f;
@@ -405,7 +406,10 @@ namespace Assets.Scripts.Core
 
             float fitVertical   = (gridSize.y * cellSize + padding * 2) / 2f;
             float fitHorizontal = (gridSize.x * cellSize + padding * 2) / (2f * aspectRatio);
+            
+            // Only zoom out: targetZoom must be at least startZoom
             float targetZoom    = Mathf.Max(fitVertical, fitHorizontal) * winZoomMultiplier;
+            targetZoom = Mathf.Max(targetZoom, startZoom);
                 
             Vector3 gridCenter = new Vector3((gridSize.x - 1) * cellSize / 2f, (gridSize.y - 1) * cellSize / 2f, transform.position.z);
             Vector3 targetPos  = gridCenter;
