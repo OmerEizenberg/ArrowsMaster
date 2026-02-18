@@ -25,6 +25,9 @@ namespace Assets.Scripts.Core
         private int m_TotalPointsInLevel;
         public int TotalPointsInLevel => m_TotalPointsInLevel;
 
+        // Cached yield instructions — avoids per-frame allocation
+        private static readonly WaitForSeconds s_GrowthWait = new WaitForSeconds(0.04f);
+
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
         private int m_MaxLevelIndex = -1;
@@ -256,7 +259,7 @@ namespace Assets.Scripts.Core
                 {
                     StartCoroutine(arrow.UpdateGrowthSlide(i, 0.04f));
                 }
-                yield return new WaitForSeconds(0.04f);
+                yield return s_GrowthWait;
             }
 
             // 3. After arrows finish, zoom camera in to default

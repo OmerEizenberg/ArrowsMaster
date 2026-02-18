@@ -9,6 +9,8 @@ namespace Assets.Scripts.Core
 
         private Dictionary<Vector2Int, ArrowController> occupancyMap = new Dictionary<Vector2Int, ArrowController>();
         private List<ArrowController> allArrows = new List<ArrowController>();
+        // HashSet for O(1) Contains checks — List kept for ordered iteration
+        private HashSet<ArrowController> allArrowsSet = new HashSet<ArrowController>();
         private Vector2Int gridSize;
 
         private void Awake()
@@ -26,6 +28,7 @@ namespace Assets.Scripts.Core
             gridSize = size;
             occupancyMap.Clear();
             allArrows.Clear();
+            allArrowsSet.Clear();
         }
 
         public bool IsOutOfBounds(Vector2Int coord)
@@ -40,17 +43,19 @@ namespace Assets.Scripts.Core
 
         public void RegisterArrow(ArrowController arrow)
         {
-            if (!allArrows.Contains(arrow))
+            if (!allArrowsSet.Contains(arrow))
             {
                 allArrows.Add(arrow);
+                allArrowsSet.Add(arrow);
             }
         }
 
         public void UnregisterArrow(ArrowController arrow)
         {
-            if (allArrows.Contains(arrow))
+            if (allArrowsSet.Contains(arrow))
             {
                 allArrows.Remove(arrow);
+                allArrowsSet.Remove(arrow);
             }
             
             // Also clear its occupancy

@@ -20,10 +20,10 @@ namespace Assets.Scripts.Core
         [SerializeField] private float shakeMagnitude = 0.1f;
         
         [Header("Level Initialization Animation")]
-        [SerializeField] private float initZoomMultiplier = 1.3f;
-        [SerializeField] private float initZoomInDuration = 0.8f;
-        [SerializeField] private float initPaddingMultiplier = 1.1f; // How much extra space around level (1.0 = exact fit, 1.2 = 20% extra)
-        [SerializeField] private float initExtraZoomBuffer = 0.5f; // Additional units of zoom out beyond calculated fit
+        [SerializeField] private float initZoomInDuration = 0.5f;
+        [SerializeField] private float initZoomOutDuration = 0.4f;
+        [SerializeField] private float initPaddingMultiplier = 1.2f; // 20% extra space around level
+        [SerializeField] private float initExtraZoomBuffer = 0.5f;   // Additional units beyond calculated fit
 
         [SerializeField] private float winZoomMultiplier = 3.0f;
 
@@ -50,6 +50,11 @@ namespace Assets.Scripts.Core
         private bool boundsSet = false;
         public bool HasPannedSinceLastReset { get; private set; }
 
+        // ── Cached screen/camera values (refreshed in OnEnable) ──────────────
+        private float cachedScreenWidth;
+        private float cachedScreenHeight;
+        private float cachedAspect;
+        private float cachedDragThreshold; // pixels
 
         private void Awake()
         {
@@ -63,6 +68,23 @@ namespace Assets.Scripts.Core
             cam = GetComponent<Camera>();
             defaultZoom = cam.orthographicSize;
             absoluteMaxZoom = maxZoom;
+
+            // Target 60 FPS on mobile
+            Application.targetFrameRate = 60;
+        }
+
+        private void OnEnable()
+        {
+            RefreshCachedScreenValues();
+        }
+
+        /// <summary>Call whenever screen resolution or orientation may have changed.</summary>
+        private void RefreshCachedScreenValues()
+        {
+            cachedScreenWidth    = Screen.width;
+            cachedScreenHeight   = Screen.height;
+            cachedAspect         = cam != null ? cam.aspect : (float)Screen.width / Screen.height;
+            cachedDragThreshold  = cachedScreenWidth * (dragThresholdPercent / 100f);
         }
 
         private Vector3 shakeOffset;
@@ -80,13 +102,16 @@ namespace Assets.Scripts.Core
             lastShakeOffset = Vector3.zero;
 
             isZoomingInteraction = false;
+
+            // Read touchCount once per frame
+            int touchCount = Input.touchCount;
+
             HandleDesktopZoom();
-            HandleMobileZoom();
-            HandlePanning();
+            HandleMobileZoom(touchCount);
+            HandlePanning(touchCount);
 
             // Handle smooth return to maxZoom if over-zoomed and not interacting
-            // Only return if the level has officially started and transition animations are over
-            bool isInteracting = isZoomingInteraction || isTouching || Input.touchCount > 0 || Input.GetMouseButton(0);
+            bool isInteracting = isZoomingInteraction || isTouching || touchCount > 0 || Input.GetMouseButton(0);
             
             if (isInteracting)
             {
@@ -127,7 +152,6 @@ namespace Assets.Scripts.Core
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                // Scale magnitude by current zoom level so it feels consistent
                 float scaledMagnitude = magnitude * (cam.orthographicSize / defaultZoom);
                 shakeOffset = new Vector3(
                     Random.Range(-1f, 1f) * scaledMagnitude,
@@ -146,7 +170,6 @@ namespace Assets.Scripts.Core
             HasPannedSinceLastReset = false;
         }
 
-
         public void SetBounds(Vector2Int gridSize)
         {
             float padding = 2f;
@@ -161,14 +184,13 @@ namespace Assets.Scripts.Core
         private Vector3 prevMousePos;
         private Vector3 cachedPosition; // Reusable for clamping
 
-        private void HandlePanning()
+        private void HandlePanning(int touchCount)
         {
             if (!boundsSet) return;
 
-            // Handle Mouse/Touch Pan (Drag)
             if (Input.GetMouseButtonDown(0))
             {
-                if (Input.touchCount > 1)
+                if (touchCount > 1)
                 {
                     isTouching = false;
                     isPanningActive = false;
@@ -183,7 +205,7 @@ namespace Assets.Scripts.Core
 
             if (Input.GetMouseButton(0) && isTouching)
             {
-                if (Input.touchCount > 1)
+                if (touchCount > 1)
                 {
                     isTouching = false;
                     isPanningActive = false;
@@ -195,9 +217,7 @@ namespace Assets.Scripts.Core
                 if (!isPanningActive)
                 {
                     float distSqr = (touchStartPosition - currentPos).sqrMagnitude;
-                    float threshold = Screen.width * (dragThresholdPercent / 100f);
-                    
-                    if (distSqr >= threshold * threshold)
+                    if (distSqr >= cachedDragThreshold * cachedDragThreshold)
                     {
                         isPanningActive = true;
                         prevMousePos = currentPos;
@@ -209,34 +229,24 @@ namespace Assets.Scripts.Core
                 {
                     HasPannedSinceLastReset = true;
                     
-                    // OPTIMIZED: Calculate screen delta and convert to world space directly
-                    // This eliminates 2 ScreenToWorldPoint calls per frame
                     float deltaX = currentPos.x - prevMousePos.x;
                     float deltaY = currentPos.y - prevMousePos.y;
                     
-                    // Convert screen delta to world delta using orthographic size
-                    // For orthographic camera: worldHeight = orthographicSize * 2
-                    // worldWidth = worldHeight * aspect
+                    // Use cached screen/aspect values — no native calls per frame
                     float worldHeight = cam.orthographicSize * 2f;
-                    float worldWidth = worldHeight * cam.aspect;
+                    float worldWidth  = worldHeight * cachedAspect;
                     
-                    float worldDeltaX = -(deltaX / Screen.width) * worldWidth;
-                    float worldDeltaY = -(deltaY / Screen.height) * worldHeight;
+                    float worldDeltaX = -(deltaX / cachedScreenWidth)  * worldWidth;
+                    float worldDeltaY = -(deltaY / cachedScreenHeight) * worldHeight;
                     
-                    // Apply pan with sensitivity multiplier
                     cachedPosition = transform.position;
                     cachedPosition.x += worldDeltaX * 1.1f;
                     cachedPosition.y += worldDeltaY * 1.1f;
                     
-                    // Conditional clamping - only clamp if out of bounds
                     if (cachedPosition.x < minBounds.x || cachedPosition.x > maxBounds.x)
-                    {
                         cachedPosition.x = Mathf.Clamp(cachedPosition.x, minBounds.x, maxBounds.x);
-                    }
                     if (cachedPosition.y < minBounds.y || cachedPosition.y > maxBounds.y)
-                    {
                         cachedPosition.y = Mathf.Clamp(cachedPosition.y, minBounds.y, maxBounds.y);
-                    }
                     
                     transform.position = cachedPosition;
                     prevMousePos = currentPos;
@@ -261,27 +271,25 @@ namespace Assets.Scripts.Core
             }
         }
 
-        private void HandleMobileZoom()
+        private void HandleMobileZoom(int touchCount)
         {
-            if (Input.touchCount == 2)
+            if (touchCount == 2)
             {
                 isZoomingInteraction = true;
                 Touch touchZero = Input.GetTouch(0);
-                Touch touchOne = Input.GetTouch(1);
+                Touch touchOne  = Input.GetTouch(1);
 
                 if (touchZero.phase == TouchPhase.Began || touchOne.phase == TouchPhase.Began) return;
 
                 Vector2 touchZeroPrevPos = touchZero.position - touchZero.deltaPosition;
-                Vector2 touchOnePrevPos = touchOne.position - touchOne.deltaPosition;
+                Vector2 touchOnePrevPos  = touchOne.position  - touchOne.deltaPosition;
 
                 float prevTouchDeltaMag = (touchZeroPrevPos - touchOnePrevPos).magnitude;
-                float touchDeltaMag = (touchZero.position - touchOne.position).magnitude;
+                float touchDeltaMag     = (touchZero.position - touchOne.position).magnitude;
 
                 float deltaMagnitudeDiff = prevTouchDeltaMag - touchDeltaMag;
 
-                // REMOVED Time.deltaTime! Zoom should be absolute to finger move distance
-                float newSize = cam.orthographicSize + deltaMagnitudeDiff * (cam.orthographicSize / 500f) * mobileZoomSpeed; 
-                
+                float newSize = cam.orthographicSize + deltaMagnitudeDiff * (cam.orthographicSize / 500f) * mobileZoomSpeed;
                 cam.orthographicSize = Mathf.Clamp(newSize, minZoom, absoluteMaxZoom);
             }
         }
@@ -291,76 +299,90 @@ namespace Assets.Scripts.Core
             cam.orthographicSize = defaultZoom;
         }
 
+        // ── Entrance Animation ────────────────────────────────────────────────
+        // Phase 1: Zoom out to show full grid + 20% padding (instant)
+        // Phase 2: Arrows grow (handled by LevelManager)
+        // Phase 3: Zoom IN to 80% of grid visible (smooth, initZoomInDuration)
+        // Phase 4: Zoom OUT to exact fit / maxZoom cap (smooth, initZoomOutDuration)
+
+        /// <summary>
+        /// Phase 1: Instantly positions camera zoomed out to show the full grid + 20%.
+        /// Returns the calculated "fit" zoom so LevelManager can pass it to ZoomInThenOut.
+        /// </summary>
         public IEnumerator PlayInitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
             yield return StartCoroutine(InitializationZoomAnimation(gridSize, focusPosition));
         }
 
-        private System.Collections.IEnumerator InitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
+        private IEnumerator InitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
             isInternalAnimation = true;
-            float cellSize = ArrowController.CellSize;
-            float aspectRatio = cam.aspect;
+            float cellSize  = ArrowController.CellSize;
+            float aspect    = cachedAspect;
 
-            // Calculate the actual level bounds (from 0,0 to gridSize)
-            float levelWidth = gridSize.x * cellSize;
+            float levelWidth  = gridSize.x * cellSize;
             float levelHeight = gridSize.y * cellSize;
 
-            // Calculate minimum zoom to fit level with padding multiplier
-            // For vertical fit: we need to show levelHeight, so orthographicSize = (levelHeight * paddingMultiplier) / 2
-            // For horizontal fit: we need to show levelWidth, accounting for aspect ratio
-            float fitVertical = (levelHeight * initPaddingMultiplier) / 2f;
-            float fitHorizontal = (levelWidth * initPaddingMultiplier) / (2f * aspectRatio);
-            
-            // Take the larger of the two to ensure entire level fits
-            float minZoomToFit = Mathf.Max(fitVertical, fitHorizontal);
-            
-            // Add the extra buffer for a bit more breathing room
-            float startZoom = minZoomToFit + initExtraZoomBuffer;
+            // Fit zoom = smallest orthographic size that shows the full grid
+            float fitVertical   = (levelHeight * initPaddingMultiplier) / 2f;
+            float fitHorizontal = (levelWidth  * initPaddingMultiplier) / (2f * aspect);
+            float fitZoom       = Mathf.Max(fitVertical, fitHorizontal);
 
-            // Update dynamic zoom settings
-            maxZoom = Mathf.Min(24f, startZoom);
-            absoluteMaxZoom = Mathf.Max(24f, startZoom);
-            defaultZoom = Mathf.Max(startZoom / 2f, 7f);
-            defaultZoom = Mathf.Min(defaultZoom, maxZoom);
+            // Phase 1 start zoom: full grid + 20% extra buffer
+            float startZoom = fitZoom + initExtraZoomBuffer;
+
+            // Compute the final "gameplay" zoom (what the player sees after animation)
+            float finalZoom = Mathf.Min(25f, fitZoom);
+            finalZoom       = Mathf.Max(finalZoom, minZoom);
+
+            // Store zoom limits for gameplay
+            maxZoom         = finalZoom;
+            absoluteMaxZoom = Mathf.Max(25f, startZoom);
+            defaultZoom     = finalZoom;
+
             Vector3 centerPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
-            
-            // Immediately set to zoomed out view
+
+            // Instantly snap to zoomed-out view
             cam.orthographicSize = startZoom;
-            transform.position = centerPos;
-            
-            // This coroutine will be yielded by LevelManager, so we just hold the zoomed out state
-            // The zoom-in will happen AFTER arrows finish animating
+            transform.position   = centerPos;
+
             yield return null;
             isInternalAnimation = false;
-            isLevelStarted = false;
+            isLevelStarted      = false;
         }
-        
+
+        /// <summary>
+        /// After arrows finish growing, smoothly zoom in from the zoomed-out position
+        /// directly to the final fit zoom (min of grid-fit and maxZoom cap).
+        /// </summary>
         public IEnumerator ZoomInToDefault(Vector3 focusPosition)
         {
             isInternalAnimation = true;
-            float duration = initZoomInDuration;
-            float startZoom = cam.orthographicSize;
-            float targetZoom = defaultZoom;
-            Vector3 startPos = transform.position;
+
+            float startZoom  = cam.orthographicSize;
+            float targetZoom = defaultZoom; // final gameplay zoom (already clamped to maxZoom)
+
+            Vector3 startPos  = transform.position;
             Vector3 targetPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
-            
-            float elapsed = 0f;
+
+            float elapsed  = 0f;
+            float duration = initZoomInDuration;
+
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.SmoothStep(0, 1, elapsed / duration);
-                
-                cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, t);
-                transform.position = Vector3.Lerp(startPos, targetPos, t);
-                
+                float smoothT = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+
+                cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, smoothT);
+                transform.position   = Vector3.Lerp(startPos, targetPos, smoothT);
+
                 yield return null;
             }
-            
+
             cam.orthographicSize = targetZoom;
-            transform.position = targetPos;
-            isInternalAnimation = false;
-            isLevelStarted = true;
+            transform.position   = targetPos;
+            isInternalAnimation  = false;
+            isLevelStarted       = true;
         }
 
         public void PlayWinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
@@ -368,49 +390,40 @@ namespace Assets.Scripts.Core
             StartCoroutine(WinZoomAnimation(gridSize, focusPosition));
         }
 
-        private System.Collections.IEnumerator WinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
+        private IEnumerator WinZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
             isInternalAnimation = true;
             float duration = 0.33f;
-            float elapsed = 0f;
+            float elapsed  = 0f;
             
             float startZoom = cam.orthographicSize;
             Vector3 startPos = transform.position;
             
-            float padding = 2f;
-            float cellSize = ArrowController.CellSize;
-            float aspectRatio = cam.aspect;
+            float padding    = 2f;
+            float cellSize   = ArrowController.CellSize;
+            float aspectRatio = cachedAspect;
 
-            // Calculate target zoom to fit grid
-            float fitVertical = (gridSize.y * cellSize + padding * 2) / 2f;
+            float fitVertical   = (gridSize.y * cellSize + padding * 2) / 2f;
             float fitHorizontal = (gridSize.x * cellSize + padding * 2) / (2f * aspectRatio);
-            
-            // Use a multiplier to ensure we see the whole level and a bit more for the "wow" factor
-            // The user mentioned portrait mode needs extra zoom out. 
-            // Max(fitVertical, fitHorizontal) already accounts for aspect ratio.
-            float targetZoom = Mathf.Max(fitVertical, fitHorizontal) * winZoomMultiplier; 
+            float targetZoom    = Mathf.Max(fitVertical, fitHorizontal) * winZoomMultiplier;
                 
-            // Calculate Grid Center to ensure the whole level is visible
             Vector3 gridCenter = new Vector3((gridSize.x - 1) * cellSize / 2f, (gridSize.y - 1) * cellSize / 2f, transform.position.z);
-            Vector3 targetPos = gridCenter;
+            Vector3 targetPos  = gridCenter;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                
-                // Use SmoothStep for a nice feel
-                float smoothT = Mathf.SmoothStep(0, 1, t);
+                float smoothT = Mathf.SmoothStep(0f, 1f, elapsed / duration);
                 
                 cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, smoothT);
-                transform.position = Vector3.Lerp(startPos, targetPos, smoothT);
+                transform.position   = Vector3.Lerp(startPos, targetPos, smoothT);
                 
                 yield return null;
             }
 
             cam.orthographicSize = targetZoom;
-            transform.position = targetPos;
-            isInternalAnimation = false;
+            transform.position   = targetPos;
+            isInternalAnimation  = false;
         }
 
         public void FocusOn(Vector3 worldPosition, float duration)
@@ -418,24 +431,23 @@ namespace Assets.Scripts.Core
             StartCoroutine(FocusCoroutine(worldPosition, duration));
         }
 
-        private System.Collections.IEnumerator FocusCoroutine(Vector3 worldPosition, float duration)
+        private IEnumerator FocusCoroutine(Vector3 worldPosition, float duration)
         {
             isInternalAnimation = true;
-            float elapsed = 0f;
-            Vector3 startPos = transform.position;
+            float elapsed  = 0f;
+            Vector3 startPos  = transform.position;
             Vector3 targetPos = new Vector3(worldPosition.x, worldPosition.y, transform.position.z);
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                float smoothT = Mathf.SmoothStep(0, 1, t);
+                float smoothT = Mathf.SmoothStep(0f, 1f, elapsed / duration);
                 
                 transform.position = Vector3.Lerp(startPos, targetPos, smoothT);
                 yield return null;
             }
 
-            transform.position = targetPos;
+            transform.position  = targetPos;
             isInternalAnimation = false;
         }
     }

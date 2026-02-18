@@ -36,6 +36,15 @@ namespace Assets.Scripts.Core
         private LineRenderer previewLineRenderer;
         private Vector2Int m_CurrentVisualDirection = Vector2Int.up;
 
+        // ── Reusable allocation-free buffers ─────────────────────────────────
+        // One shared list per arrow instance — cleared and reused each step
+        private readonly List<Vector2Int> _newPositions       = new List<Vector2Int>(16);
+        private readonly List<Vector3>    _targetWorldPos     = new List<Vector3>(16);
+        private readonly List<Vector3>    _impactTargets      = new List<Vector3>(16);
+        private readonly List<Vector2Int> _savedPositions     = new List<Vector2Int>(16);
+        // Cached WaitForSeconds to avoid per-frame allocation in blocked animation
+        private static readonly WaitForSeconds s_BlockedPause = new WaitForSeconds(0.07f);
+
         public void Initialize(ArrowData data)
         {
             PrepareIncrementalInit(data);
@@ -168,17 +177,16 @@ namespace Assets.Scripts.Core
         {
             if (cachedData == null || step >= cachedData.path.Count) yield break;
 
-            // Use the synch helper to setup data, but don't place instantly
             SpawnSegmentStep(step, false);
 
-            // Calculate targets again for the animation (or we could pass them out)
-            List<Vector3> targets = new List<Vector3>();
+            // Reuse shared buffer — no allocation
+            _targetWorldPos.Clear();
             for (int i = 0; i < segments.Count; i++)
             {
-                targets.Add(new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, 0));
+                _targetWorldPos.Add(new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, 0));
             }
 
-            yield return StartCoroutine(AnimateAllSegments(targets, duration));
+            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, duration));
         }
 
         public Vector3 GetHeadPosition()
@@ -684,12 +692,13 @@ namespace Assets.Scripts.Core
             Vector2Int oldTailPos = segments[0].GridPosition;
             GridManager.Instance.ReleaseOccupancy(oldTailPos);
 
-            List<Vector2Int> newPositions = new List<Vector2Int>();
+            // Reuse shared buffer — no per-step allocation
+            _newPositions.Clear();
             for (int i = 0; i < segments.Count - 1; i++)
             {
-                newPositions.Add(segments[i+1].GridPosition); 
+                _newPositions.Add(segments[i+1].GridPosition); 
             }
-            newPositions.Add(targetPos);
+            _newPositions.Add(targetPos);
             
             if (!isEscaping)
             {
@@ -698,17 +707,18 @@ namespace Assets.Scripts.Core
 
             for (int i = 0; i < segments.Count; i++)
             {
-                segments[i].GridPosition = newPositions[i];
+                segments[i].GridPosition = _newPositions[i];
             }
             
             forceLineUpdate = true;
 
-            // Prepare target world positions for batch animation
-            targetWorldPositions = new List<Vector3>();
-            foreach (var pos in newPositions)
+            // Reuse shared target buffer
+            _targetWorldPos.Clear();
+            foreach (var pos in _newPositions)
             {
-                targetWorldPositions.Add(new Vector3(pos.x * CellSize, pos.y * CellSize, 0));
+                _targetWorldPos.Add(new Vector3(pos.x * CellSize, pos.y * CellSize, 0));
             }
+            targetWorldPositions = _targetWorldPos;
             
             return true;
         }
@@ -723,11 +733,9 @@ namespace Assets.Scripts.Core
             Vector3[] starts = new Vector3[count];
             for (int i = 0; i < count; i++) starts[i] = segments[i].transform.position;
 
-            // OPTIMIZED: Determine update frequency based on animation type
-            // Growth animation (slow): update every 3 frames
-            // Movement animation (fast): update every 2 frames
-            // VERY SHORT (entrance): update every frame
-            int updateFrequency = (duration > 0.05f) ? 3 : (duration > 0.03f ? 1 : 2);
+            // Slow animations (entrance, ~0.04s): update every frame for smoothness
+            // Fast movement (~0.027s): update every 2 frames (barely noticeable, saves CPU)
+            int updateFrequency = (duration > 0.035f) ? 1 : 2;
             animationFrameCounter = 0;
 
             float elapsed = 0;
@@ -739,7 +747,6 @@ namespace Assets.Scripts.Core
                     segments[i].transform.position = Vector3.Lerp(starts[i], targets[i], t);
                 }
                 
-                // OPTIMIZED: Only update visuals every N frames during animation
                 animationFrameCounter++;
                 if (animationFrameCounter >= updateFrequency)
                 {
@@ -936,10 +943,12 @@ namespace Assets.Scripts.Core
             }
             segments[segments.Count - 1].GridPosition = targetPos;
             
-            List<Vector3> targets = new List<Vector3>();
-            foreach (var seg in segments) targets.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
+            // Reuse shared buffer
+            _targetWorldPos.Clear();
+            foreach (var seg in segments)
+                _targetWorldPos.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            yield return StartCoroutine(AnimateAllSegments(targets, 0.027f));
+            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, 0.027f));
         }
 
         private IEnumerator SimulateReverseStep()
@@ -949,18 +958,18 @@ namespace Assets.Scripts.Core
             Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = m_LookDirection;
             
-            // Reconstruct historical positions by moving in reverse from current Dir;
-            
             for (int i = segments.Count - 1; i > 0; i--)
             {
                 segments[i].GridPosition = segments[i - 1].GridPosition;
             }
-            segments[0].GridPosition = head.GridPosition - currentDir; // The new tail position is one step back from the original head
+            segments[0].GridPosition = head.GridPosition - currentDir;
             
-            List<Vector3> targets = new List<Vector3>();
-            foreach (var seg in segments) targets.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
+            // Reuse shared buffer
+            _targetWorldPos.Clear();
+            foreach (var seg in segments)
+                _targetWorldPos.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            yield return StartCoroutine(AnimateAllSegments(targets, 0.027f));
+            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, 0.027f));
         }
 
         private IEnumerator BlockedArrowAnimation()
@@ -985,41 +994,40 @@ namespace Assets.Scripts.Core
             }
             
             // Phase 2: Half-step impact toward the blocker
-            // Move the head (and only the head) 0.5 units toward the blocking segment
             Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = m_LookDirection;
             
             Vector3 currentHeadWorldPos = head.transform.position;
-            Vector3 impactOffset = new Vector3(currentDir.x * 0.5f * CellSize, currentDir.y * 0.5f * CellSize, 0);
+            Vector3 impactOffset   = new Vector3(currentDir.x * 0.5f * CellSize, currentDir.y * 0.5f * CellSize, 0);
             Vector3 impactPosition = currentHeadWorldPos + impactOffset;
             
-            // Animate head to impact position - using centralized animator for consistency
-            List<Vector3> impactTargets = new List<Vector3>();
-            for(int i=0; i < segments.Count - 1; i++) impactTargets.Add(segments[i].transform.position);
-            impactTargets.Add(impactPosition);
-            yield return StartCoroutine(AnimateAllSegments(impactTargets, 0.027f));
+            // Reuse shared impact buffer
+            _impactTargets.Clear();
+            for (int i = 0; i < segments.Count - 1; i++) _impactTargets.Add(segments[i].transform.position);
+            _impactTargets.Add(impactPosition);
+            yield return StartCoroutine(AnimateAllSegments(_impactTargets, 0.027f));
             
-            // Phase 3: Impact feedback - play sound, vibrate, and change color to red
+            // Phase 3: Impact feedback
             SoundManager.Instance.PlayArrowBlocked();
             VibrationManager.VibrateSelection();
             SetArrowColor(blockedColor);
             GameManager.Instance.PlayWrongAnimation();
-            // Small pause at impact for emphasis
-            yield return new WaitForSeconds(0.07f);
+            yield return s_BlockedPause;
             
             // Phase 4: Reverse animation - replay positions in reverse order
             for (int step = forwardPositionHistory.Count - 2; step >= 0; step--)
             {
                 List<Vector2Int> targetPositions = forwardPositionHistory[step];
-                List<Vector3> targetWorldPositions = new List<Vector3>();
+                // Reuse shared buffer
+                _targetWorldPos.Clear();
                 
                 for (int i = 0; i < segments.Count && i < targetPositions.Count; i++)
                 {
                     segments[i].GridPosition = targetPositions[i];
-                    targetWorldPositions.Add(new Vector3(targetPositions[i].x * CellSize, targetPositions[i].y * CellSize, 0));
+                    _targetWorldPos.Add(new Vector3(targetPositions[i].x * CellSize, targetPositions[i].y * CellSize, 0));
                 }
                 
-                yield return StartCoroutine(AnimateAllSegments(targetWorldPositions, 0.027f));
+                yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, 0.027f));
             }
             
             RestorePositions(originalPositions);

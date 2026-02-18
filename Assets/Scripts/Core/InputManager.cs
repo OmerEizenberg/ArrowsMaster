@@ -8,8 +8,8 @@ namespace Assets.Scripts.Core
         private Segment pendingSegment;
         private Vector2 startTouchPos;
         private bool wasMultiTouch;
-        // Dynamic threshold: 3% of screen height, or 40 pixels, whichever is larger.
-        private float MoveThreshold => Mathf.Max(40f, Screen.height * 0.03f); 
+        // Cached at startup — screen size doesn't change mid-session
+        private float m_MoveThreshold;
         [SerializeField] private float holdThreshold = 0.5f;
 
         [Header("Effects")]
@@ -19,6 +19,15 @@ namespace Assets.Scripts.Core
         private float mouseDownTime;
         private bool hasTriggeredHold;
         private ArrowController activePreviewArrow;
+
+        // Cached camera reference — avoids FindObjectOfType on every call
+        private Camera m_Camera;
+
+        private void Awake()
+        {
+            m_Camera = Camera.main;
+            m_MoveThreshold = Mathf.Max(40f, Screen.height * 0.03f);
+        }
 
         void Update()
         {
@@ -39,7 +48,7 @@ namespace Assets.Scripts.Core
             if (Input.GetMouseButton(0) && pendingSegment != null && !wasMultiTouch && !hasTriggeredHold)
             {
                 float dist = Vector2.Distance(startTouchPos, (Vector2)Input.mousePosition);
-                if (dist < MoveThreshold)
+                if (dist < m_MoveThreshold)
                 {
                     if (Time.time - mouseDownTime > holdThreshold)
                     {
@@ -73,15 +82,15 @@ namespace Assets.Scripts.Core
                 // 1. Didn't move much (panning)
                 // 2. Only used one finger (no zoom)
                 // 3. Same segment hit at start and end
-                if (dist < MoveThreshold && !wasMultiTouch)
+                if (dist < m_MoveThreshold && !wasMultiTouch)
                 {
                     // Spawn click effect if assigned
                     if (clickEffectPrefab != null)
                     {
-                        Vector3 worldPos = Camera.main.ScreenToWorldPoint(endTouchPos);
+                        Vector3 worldPos = m_Camera.ScreenToWorldPoint(endTouchPos);
                         worldPos.z = 0; // Ensure it spawns at z=0 (standard 2D plane)
                         GameObject temp = Instantiate(clickEffectPrefab, worldPos, Quaternion.identity, clickEffectParent);
-                        temp.transform.localScale = Vector3.one ;
+                        temp.transform.localScale = Vector3.one;
                     }
 
                     Segment upSegment = GetHitSegment();
@@ -116,7 +125,7 @@ namespace Assets.Scripts.Core
         {
             if (IsScreenPositionBlocked(Input.mousePosition)) return null;
 
-            Vector2 worldPoint = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            Vector2 worldPoint = m_Camera.ScreenToWorldPoint(Input.mousePosition);
             RaycastHit2D hit = Physics2D.Raycast(worldPoint, Vector2.zero);
 
             if (hit.collider != null)
@@ -137,7 +146,7 @@ namespace Assets.Scripts.Core
             float minDistance = worldThreshold;
             
             // Convert click to world space for distance check
-            Vector3 worldClickPos = Camera.main.ScreenToWorldPoint(screenPos);
+            Vector3 worldClickPos = m_Camera.ScreenToWorldPoint(screenPos);
             worldClickPos.z = 0; // Flatten z
 
             ArrowController closestArrow = null;
@@ -165,7 +174,6 @@ namespace Assets.Scripts.Core
 
             if (closestArrow != null)
             {
-                Debug.Log($"[InputManager] Selection Guard: Selecting closest arrow {closestArrow.ArrowId} at distance {minDistance}");
                 
                 // Start timer on first touch (if it's a timed level)
                 if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
