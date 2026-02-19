@@ -8,12 +8,12 @@ namespace Assets.Scripts.Core
     {
         [Header("Zoom Settings")]
         [SerializeField] private float zoomSpeed = 3f;
-        [SerializeField] private float minZoom = 2f;
+        [SerializeField] private float minZoom = 9.5f;
         [SerializeField] private float maxZoom = 50f;
         [SerializeField] private float mobileZoomSpeed = 1f;
 
         [Header("Pan Settings")]
-        [SerializeField] private float dragThresholdPercent = 3.0f; // Percentage of screen width to start panning
+        [SerializeField] private float dragThresholdPercent = 2.0f; // Percentage of screen width to start panning
         
         [Header("Shake Settings")]
         [SerializeField] private float shakeDuration = 0.1f;
@@ -70,7 +70,7 @@ namespace Assets.Scripts.Core
             absoluteMaxZoom = maxZoom;
 
             // Target 60 FPS on mobile
-            Application.targetFrameRate = 60;
+            Application.targetFrameRate = 120;
         }
 
         private void OnEnable()

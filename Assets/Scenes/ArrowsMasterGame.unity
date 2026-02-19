@@ -9054,7 +9054,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   zoomSpeed: 2
-  minZoom: 6
+  minZoom: 9.5
   maxZoom: 22
   mobileZoomSpeed: 0.5
   dragThresholdPercent: 10
