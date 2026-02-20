@@ -23,6 +23,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private TextMeshProUGUI m_PlayOnPriceText;
         [SerializeField] private TextMeshProUGUI m_UserBalanceText;
         [SerializeField] private GameObject m_ShopLayer;
+        [SerializeField] private GameObject m_LevelCurrencyContainer;
 
         [Header("Settings")]
         public int maxLives = 3;
@@ -104,6 +105,12 @@ namespace Assets.Scripts.Core
             if (UserDataManager.Instance != null)
             {
                 UserDataManager.Instance.OnCurrencyChanged += UpdateUserBalanceUI;
+            }
+
+            if (m_LevelCurrencyContainer == null && m_GameUI != null)
+            {
+                var display = m_GameUI.GetComponentInChildren<Assets.Scripts.GameUI.LevelCurrencyDisplay>(true);
+                if (display != null) m_LevelCurrencyContainer = display.gameObject;
             }
 
             if (levelManager != null)
@@ -373,7 +380,8 @@ namespace Assets.Scripts.Core
             ResetHintTimer();
             ResetSelectionStates();
 
-m_GameUI.gameObject.SetActive(true);
+            m_GameUI.gameObject.SetActive(true);
+            UpdateUIVisibility();
         }
 
         public void StartChallengeLevel(string levelId, int year, int month, int day)
@@ -427,7 +435,7 @@ m_GameUI.gameObject.SetActive(true);
 
             m_GameUI.gameObject.SetActive(true);
             if (m_FunFact != null) m_FunFact.SetActive(false);
-
+            UpdateUIVisibility();
         }
 
         private void ResetLives()
@@ -443,13 +451,16 @@ m_GameUI.gameObject.SetActive(true);
 
         public void NotifyArrowSuccess()
         {
-            // Collect currency logic
-            int coinsEarned = Mathf.Max(1, p_StreakCount);
-            collectedLevelCurrency += coinsEarned;
-            Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
-            
-            // Notify UI
-            OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency);
+            if (UserDataManager.Instance.CurrentLevel >= 5)
+            {
+                // Collect currency logic
+                int coinsEarned = Mathf.Max(1, p_StreakCount);
+                collectedLevelCurrency += coinsEarned;
+                Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
+                
+                // Notify UI
+                OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency);
+            }
 
             if (activeArrowsCount > 0)
             {
@@ -470,6 +481,7 @@ m_GameUI.gameObject.SetActive(true);
 
         public void IncrementStreak()
         {
+            if (UserDataManager.Instance.CurrentLevel < 6) return;
             p_StreakCount++;
             m_GameUI.PlayStreakAnimation();
         }
@@ -477,6 +489,7 @@ m_GameUI.gameObject.SetActive(true);
         public void ResetStreak()
         {
             p_StreakCount = 0;
+            ClearActiveCombos();
         }
 
         public void ResetSelectionStates()
@@ -566,6 +579,7 @@ m_GameUI.gameObject.SetActive(true);
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.ShowInterstitial(true);
+                AdsManager.Instance.SpawnCoinsSmallExplosion();
             }
 
             m_LobbyUI.SetActive(true);
@@ -694,6 +708,14 @@ m_GameUI.gameObject.SetActive(true);
             yield return new WaitForSeconds(delay);
             if (arrow != null) arrow.HidePreview();
             isHintActive = false;
+        }
+
+        private void UpdateUIVisibility()
+        {
+            if (m_LevelCurrencyContainer != null)
+            {
+                m_LevelCurrencyContainer.SetActive(UserDataManager.Instance.CurrentLevel >= 5);
+            }
         }
         
         // Timer-related methods

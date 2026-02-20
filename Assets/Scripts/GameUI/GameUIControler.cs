@@ -176,9 +176,9 @@ public class GameUIContoleer : MonoBehaviour
     {
         if (AdsManager.Instance != null)
         {
-            AdsManager.Instance.ShowRewarded();
             GameManager.Instance.p_isHintRewarded = true;
             GameManager.Instance.p_isPlayOnRewarded = false;
+            AdsManager.Instance.ShowRewarded();
         }
     }
 }

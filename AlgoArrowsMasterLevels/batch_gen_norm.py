@@ -323,11 +323,7 @@ def merge_stuck_arrows(level_data, shape_mask=None):
             # Case 1: No gap
             tx, ty = head["x"] + dx, head["y"] + dy
             
-            # Case 2: 1-point gap
-            gx, gy = tx, ty # gap point
-            tx2, ty2 = gx + dx, gy + dy # second target
-            
-            # Try Case 1 first
+            # Try Case 1
             if (tx, ty) in point_to_arrow_idx:
                 target_idx = point_to_arrow_idx[(tx, ty)]
                 if target_idx != i and target_idx not in to_remove:
@@ -341,24 +337,6 @@ def merge_stuck_arrows(level_data, shape_mask=None):
                         merged_any = True
                         changed = True
                         break # Start over to re-map points
-            
-            # Try Case 2 if Case 1 failed
-            elif 0 <= gx < gw and 0 <= gy < gh and (gx, gy) not in point_to_arrow_idx:
-                # Gap point is empty. Check if it's in shape_mask and if there's an arrow after it.
-                if shape_mask is None or (gx, gy) in shape_mask:
-                    if (tx2, ty2) in point_to_arrow_idx:
-                        target_idx = point_to_arrow_idx[(tx2, ty2)]
-                        if target_idx != i and target_idx not in to_remove:
-                            b = arrows[target_idx]
-                            tail_b = b["path"][0]
-                            if tail_b["x"] == tx2 and tail_b["y"] == ty2 and len(b["path"]) < 4:
-                                print(f"  [MERGE] Merging arrow {a['id']} (len {len(a['path'])}) into arrow {b['id']} (len {len(b['path'])}) [1-Point Gap at ({gx},{gy})]")
-                                # Merge paths with gap point
-                                b["path"] = a["path"] + [{"x": gx, "y": gy}] + b["path"]
-                                to_remove.add(i)
-                                merged_any = True
-                                changed = True
-                                break # Start over to re-map points
         
         if merged_any:
             arrows = [a for idx, a in enumerate(arrows) if idx not in to_remove]

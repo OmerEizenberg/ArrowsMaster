@@ -17,6 +17,10 @@ namespace Assets.Scripts.Core
         private float lastAdShowTime = -30f;
         private const float AD_COOLDOWN = 30f;
 
+        // Track which rewarded ad type is currently being shown
+        private enum RewardAdType { None, GameReward, CoinsReward }
+        private RewardAdType pendingRewardType = RewardAdType.None;
+
         private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _mainThreadQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
 
         public event Action OnRewardReceived;
@@ -316,6 +320,7 @@ namespace Assets.Scripts.Core
             RewardedAd.OnAdDisplayFailed += (info, err) => { 
                 EnqueueAction(() => {
                     Debug.LogError($"[AdsManager] Rewarded Ad Display Failed: {err}. ");
+                    pendingRewardType = RewardAdType.None;
                     OnAdClosed?.Invoke();
                     LoadRewarded(); 
                 });
@@ -338,8 +343,8 @@ namespace Assets.Scripts.Core
 
             RewardedAd.OnAdRewarded += (info, reward) => {
                 EnqueueAction(() => {
-                    Debug.Log("[AdsManager] Rewarded Ad Rewarded Event Received. ");
-                    OnRewardReceived?.Invoke();
+                    Debug.Log("[AdsManager] Rewarded Ad Rewarded Event Received.");
+                    ProcessPendingReward();
                 });
             };
             
@@ -373,7 +378,8 @@ namespace Assets.Scripts.Core
         {
             if (RewardedAd != null && RewardedAd.IsAdReady())
             {
-                Debug.Log("[AdsManager] Showing Rewarded Ad.");
+                Debug.Log("[AdsManager] Showing Rewarded Ad (GameReward).");
+                pendingRewardType = RewardAdType.GameReward;
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
@@ -381,6 +387,46 @@ namespace Assets.Scripts.Core
             {
                 Debug.LogWarning($"[AdsManager] Rewarded Ad is not ready. Initialized: {isInitialized}");
                 LoadRewarded();
+            }
+        }
+
+        /// <summary>
+        /// Central reward processor. Captures and resets pendingRewardType atomically,
+        /// then dispatches the correct reward. Safe if called multiple times — second call is a no-op.
+        /// </summary>
+        private void ProcessPendingReward()
+        {
+            // Capture and immediately reset so duplicate callbacks are no-ops
+            RewardAdType rewardType = pendingRewardType;
+            pendingRewardType = RewardAdType.None;
+
+            switch (rewardType)
+            {
+                case RewardAdType.GameReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: GameReward → firing OnRewardReceived.");
+                    OnRewardReceived?.Invoke();
+                    break;
+
+                case RewardAdType.CoinsReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: CoinsReward → granting 2000 coins.");
+                    if (UserDataManager.Instance != null)
+                    {
+                        UserDataManager.Instance.AddArrowsCurrency(2000);
+                    }
+                    OnCoinsRewardReceived?.Invoke();
+                    SpawnCoinsSmallExplosion();
+
+                    // --- Analytics: ad_reward_coins ---
+                    if (FirebaseManager.Instance != null)
+                    {
+                        FirebaseManager.Instance.LogEvent("ad_reward_coins",
+                            new Firebase.Analytics.Parameter("reward_amount", 2000));
+                    }
+                    break;
+
+                default:
+                    Debug.Log("[AdsManager] ProcessPendingReward: No pending reward (None). Ignoring.");
+                    break;
             }
         }
 
@@ -402,6 +448,7 @@ namespace Assets.Scripts.Core
             coinsRewardedAd.OnAdDisplayFailed += (info, err) => {
                 EnqueueAction(() => {
                     Debug.LogError($"[AdsManager] Coins Rewarded Ad Display Failed: {err}. ");
+                    pendingRewardType = RewardAdType.None;
                     OnAdClosed?.Invoke();
                     LoadCoinsRewarded();
                 });
@@ -424,21 +471,8 @@ namespace Assets.Scripts.Core
 
             coinsRewardedAd.OnAdRewarded += (info, reward) => {
                 EnqueueAction(() => {
-                    Debug.Log("[AdsManager] Coins Rewarded Ad Rewarded Event Received. Granting 2000 coins.");
-                    if (UserDataManager.Instance != null)
-                    {
-                        UserDataManager.Instance.AddArrowsCurrency(2000);
-                    }
-                    OnRewardReceived?.Invoke();
-                    OnCoinsRewardReceived?.Invoke();
-                    SpawnCoinsAdExplosion();
-                    
-                    // --- Analytics: ad_reward_coins ---
-                    if (FirebaseManager.Instance != null)
-                    {
-                        FirebaseManager.Instance.LogEvent("ad_reward_coins", 
-                            new Firebase.Analytics.Parameter("reward_amount", 2000));
-                    }
+                    Debug.Log("[AdsManager] Coins Rewarded Ad Rewarded Event Received.");
+                    ProcessPendingReward();
                 });
             };
 
@@ -472,7 +506,8 @@ namespace Assets.Scripts.Core
         {
             if (coinsRewardedAd != null && coinsRewardedAd.IsAdReady())
             {
-                Debug.Log("[AdsManager] Showing Coins Rewarded Ad.");
+                Debug.Log("[AdsManager] Showing Coins Rewarded Ad (CoinsReward).");
+                pendingRewardType = RewardAdType.CoinsReward;
                 OnAdOpened?.Invoke();
                 coinsRewardedAd.ShowAd();
             }
@@ -483,7 +518,7 @@ namespace Assets.Scripts.Core
             }
         }
 
-        private void SpawnCoinsAdExplosion()
+        public void SpawnCoinsSmallExplosion()
         {
             GameObject prefab = Resources.Load<GameObject>("CoinsSmallExplosion");
             if (prefab != null)

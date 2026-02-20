@@ -7,7 +7,7 @@ def run_tests(module):
     test_basic_merge(merge_stuck_arrows)
     test_too_long_no_merge(merge_stuck_arrows)
     test_gap_no_merge(merge_stuck_arrows)
-    test_gap_1_point_merge(merge_stuck_arrows)
+    test_gap_1_point_no_merge(merge_stuck_arrows)
     test_wrong_direction_no_merge(merge_stuck_arrows)
 
 def test_basic_merge(merge_stuck_arrows):
@@ -90,7 +90,7 @@ def test_gap_no_merge(merge_stuck_arrows):
     assert len(arrows) == 2
     print("Test Gap No Merge Passed!")
 
-def test_gap_1_point_merge(merge_stuck_arrows):
+def test_gap_1_point_no_merge(merge_stuck_arrows):
     level_data = {
         "gridSize": {"x": 10, "y": 10},
         "arrows": [
@@ -109,33 +109,21 @@ def test_gap_1_point_merge(merge_stuck_arrows):
         ]
     }
     
-    # Test with no shape mask (should merge by default)
+    # Test with no shape mask (should NOT merge anymore)
     merged_data = merge_stuck_arrows(level_data)
     arrows = merged_data["arrows"]
-    print(f"Test 1-Point Gap Merge (No Mask): {len(arrows)} arrows remaining")
-    assert len(arrows) == 1
-    assert len(arrows[0]["path"]) == 5 # 2 + 1 (gap) + 2
-    assert {"x": 2, "y": 0} in arrows[0]["path"]
+    print(f"Test 1-Point Gap No Merge: {len(arrows)} arrows remaining")
+    assert len(arrows) == 2
     
-    # Test with shape mask containing the gap
+    # Test with shape mask containing the gap (should STILL NOT merge)
     shape_mask = {(0,0), (1,0), (2,0), (3,0), (4,0)}
     level_data["arrows"] = [
         {"id": 1, "lookDirection": "right", "path": [{"x": 0, "y": 0}, {"x": 1, "y": 0}], "color": "#ff0000"},
         {"id": 2, "lookDirection": "right", "path": [{"x": 3, "y": 0}, {"x": 4, "y": 0}], "color": "#00ff00"}
     ]
     merged_data = merge_stuck_arrows(level_data, shape_mask=shape_mask)
-    assert len(merged_data["arrows"]) == 1
-    print("Test 1-Point Gap Merge (With Mask) Passed!")
-
-    # Test with shape mask EXCLUDING the gap
-    shape_mask = {(0,0), (1,0), (3,0), (4,0)} # (2,0) missing
-    level_data["arrows"] = [
-        {"id": 1, "lookDirection": "right", "path": [{"x": 0, "y": 0}, {"x": 1, "y": 0}], "color": "#ff0000"},
-        {"id": 2, "lookDirection": "right", "path": [{"x": 3, "y": 0}, {"x": 4, "y": 0}], "color": "#00ff00"}
-    ]
-    merged_data = merge_stuck_arrows(level_data, shape_mask=shape_mask)
     assert len(merged_data["arrows"]) == 2
-    print("Test 1-Point Gap Merge (Mask mismatch) Passed!")
+    print("Test 1-Point Gap No Merge Passed!")
 
 def test_wrong_direction_no_merge(merge_stuck_arrows):
     level_data = {

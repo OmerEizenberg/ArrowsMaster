@@ -358,10 +358,11 @@ namespace Assets.Scripts.Core
                         {
                             bool timeCondition = (Time.time - GameManager.Instance.LastArrowSelectionTime) <= 0.9f;
                             //bool panCondition = !CameraController.Instance.HasPannedSinceLastReset;
-                            if (timeCondition )//&& panCondition)
+                            if (timeCondition && UserDataManager.Instance.CurrentLevel >= 6)
                             {
                                 GameManager.Instance.IncrementStreak();
                                 SoundManager.Instance.PlayStreak(GameManager.Instance.p_StreakCount - 1);
+                                GameManager.Instance.ClearActiveCombos();
 
                                 // Instantiate Combo Feedback
                                 if (m_ComboPrefab != null)
