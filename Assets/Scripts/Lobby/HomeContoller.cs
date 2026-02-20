@@ -52,6 +52,11 @@ namespace Assets.Scripts.Lobby
                 IAPManager.Instance.OnPurchaseSuccess += HandlePurchaseSuccess;
             }
 
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.OnCoinsRewardReceived += HandleCoinsRewardReceived;
+            }
+
             if(GameManager.Instance != null && !GameManager.Instance.p_isLevelProgression)
             {
                 OnCalanderButtonClicked();
@@ -67,6 +72,11 @@ namespace Assets.Scripts.Lobby
             {
                 IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
                 IAPManager.Instance.OnPurchaseSuccess -= HandlePurchaseSuccess;
+            }
+
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.OnCoinsRewardReceived -= HandleCoinsRewardReceived;
             }
         }
 
@@ -84,6 +94,11 @@ namespace Assets.Scripts.Lobby
         }
 
         private void HandlePurchaseSuccess(string productId)
+        {
+            HideShop();
+        }
+
+        private void HandleCoinsRewardReceived()
         {
             HideShop();
         }

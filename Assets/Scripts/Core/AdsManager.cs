@@ -421,6 +421,7 @@ namespace Assets.Scripts.Core
                     }
                     OnRewardReceived?.Invoke();
                     OnCoinsRewardReceived?.Invoke();
+                    SpawnCoinsAdExplosion();
                     
                     // --- Analytics: ad_reward_coins ---
                     if (FirebaseManager.Instance != null)
@@ -469,6 +470,21 @@ namespace Assets.Scripts.Core
             {
                 Debug.LogWarning($"[AdsManager] Coins Rewarded Ad is not ready. Initialized: {isInitialized}");
                 LoadCoinsRewarded();
+            }
+        }
+
+        private void SpawnCoinsAdExplosion()
+        {
+            GameObject prefab = Resources.Load<GameObject>("CoinsSmallExplosion");
+            if (prefab != null)
+            {
+                Vector3 spawnPos = new Vector3(-0.5f, 2.4f, 60.2f);
+                GameObject explosion = Instantiate(prefab, spawnPos, prefab.transform.rotation);
+                Destroy(explosion, 3.0f);
+            }
+            else
+            {
+                Debug.LogWarning("[AdsManager] CoinsSmallExplosion prefab not found in Resources.");
             }
         }
 
