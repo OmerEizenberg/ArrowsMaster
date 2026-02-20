@@ -205,9 +205,9 @@ namespace Assets.Scripts.Core
         public void LoadInterstitial()
         {
             if (!isInitialized) return;
-            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 5)
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 6)
             {
-                Debug.Log($"[AdsManager] Skipping Interstitial Load: User Level {UserDataManager.Instance.CurrentLevel} < 5.");
+                Debug.Log($"[AdsManager] Skipping Interstitial Load: User Level {UserDataManager.Instance.CurrentLevel} < 6.");
                 return;
             }
             if (IAPManager.Instance == null)
