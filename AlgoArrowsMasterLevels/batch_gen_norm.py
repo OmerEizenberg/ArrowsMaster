@@ -286,19 +286,123 @@ def generate_difficulty_1(image_path, grid_width, grid_height, config):
 def generate_difficulty_2(image_path, grid_width, grid_height, config):
     return run_core_generator(image_path, grid_width, grid_height, config)
 
+def merge_stuck_arrows(level_data, shape_mask=None):
+    """
+    Merges arrows that are stuck head-to-tail with no gap OR a 1-point empty gap,
+    provided both are < 4 points and the gap (if any) is within the shape_mask.
+    """
+    arrows = level_data.get("arrows", [])
+    if not isinstance(arrows, list):
+        return level_data
+    
+    dir_vecs = {"up": (0, 1), "down": (0, -1), "left": (-1, 0), "right": (1, 0)}
+    gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
+    
+    changed = True
+    while changed:
+        changed = False
+        # Re-build point map every time because paths change
+        point_to_arrow_idx = {}
+        for idx, a in enumerate(arrows):
+            for p in a["path"]:
+                point_to_arrow_idx[(p["x"], p["y"])] = idx
+        
+        merged_any = False
+        to_remove = set()
+        
+        for i in range(len(arrows)):
+            if i in to_remove: continue
+            
+            a = arrows[i]
+            if len(a["path"]) >= 4: continue
+            
+            head = a["path"][-1]
+            ldir = a["lookDirection"]
+            dx, dy = dir_vecs[ldir]
+            
+            # Case 1: No gap
+            tx, ty = head["x"] + dx, head["y"] + dy
+            
+            # Case 2: 1-point gap
+            gx, gy = tx, ty # gap point
+            tx2, ty2 = gx + dx, gy + dy # second target
+            
+            # Try Case 1 first
+            if (tx, ty) in point_to_arrow_idx:
+                target_idx = point_to_arrow_idx[(tx, ty)]
+                if target_idx != i and target_idx not in to_remove:
+                    b = arrows[target_idx]
+                    tail_b = b["path"][0]
+                    if tail_b["x"] == tx and tail_b["y"] == ty and len(b["path"]) < 4:
+                        print(f"  [MERGE] Merging arrow {a['id']} (len {len(a['path'])}) into arrow {b['id']} (len {len(b['path'])}) [No Gap]")
+                        # Merge paths
+                        b["path"] = a["path"] + b["path"]
+                        to_remove.add(i)
+                        merged_any = True
+                        changed = True
+                        break # Start over to re-map points
+            
+            # Try Case 2 if Case 1 failed
+            elif 0 <= gx < gw and 0 <= gy < gh and (gx, gy) not in point_to_arrow_idx:
+                # Gap point is empty. Check if it's in shape_mask and if there's an arrow after it.
+                if shape_mask is None or (gx, gy) in shape_mask:
+                    if (tx2, ty2) in point_to_arrow_idx:
+                        target_idx = point_to_arrow_idx[(tx2, ty2)]
+                        if target_idx != i and target_idx not in to_remove:
+                            b = arrows[target_idx]
+                            tail_b = b["path"][0]
+                            if tail_b["x"] == tx2 and tail_b["y"] == ty2 and len(b["path"]) < 4:
+                                print(f"  [MERGE] Merging arrow {a['id']} (len {len(a['path'])}) into arrow {b['id']} (len {len(b['path'])}) [1-Point Gap at ({gx},{gy})]")
+                                # Merge paths with gap point
+                                b["path"] = a["path"] + [{"x": gx, "y": gy}] + b["path"]
+                                to_remove.add(i)
+                                merged_any = True
+                                changed = True
+                                break # Start over to re-map points
+        
+        if merged_any:
+            arrows = [a for idx, a in enumerate(arrows) if idx not in to_remove]
+            level_data["arrows"] = arrows
+            
+    return level_data
+
 def generate_level_json(image_path, grid_width, grid_height, difficulty=1):
     config = COMMON_CONFIG.copy()
     diff_config = DIFFICULTY_CONFIGS.get(difficulty, DIFFICULTY_CONFIGS[1])
     config.update(diff_config)
     
+    # Pre-extract shape mask for merge logic
+    shape_mask = set()
+    try:
+        img = Image.open(image_path).convert('RGBA')
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        img = img.resize((grid_width, grid_height), Image.NEAREST)
+        for y in range(grid_height):
+            for x in range(grid_width):
+                color = img.getpixel((x, y))
+                r, g, b, a = color
+                if a >= config["ALPHA_THRESHOLD"] and not (r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]):
+                    shape_mask.add((x, y))
+    except:
+        shape_mask = None
+
     if difficulty == 1:
-        return generate_difficulty_1(image_path, grid_width, grid_height, config)
+        level_data = generate_difficulty_1(image_path, grid_width, grid_height, config)
     elif difficulty == 2:
-        return generate_difficulty_2(image_path, grid_width, grid_height, config)
+        level_data = generate_difficulty_2(image_path, grid_width, grid_height, config)
     elif difficulty == 3:
-        return generate_difficulty_3(image_path, grid_width, grid_height, config)
+        level_data = generate_difficulty_3(image_path, grid_width, grid_height, config)
     else:
-        return generate_difficulty_1(image_path, grid_width, grid_height, config)
+        level_data = generate_difficulty_1(image_path, grid_width, grid_height, config)
+        
+    if level_data:
+        level_data = merge_stuck_arrows(level_data, shape_mask=shape_mask)
+        # Re-calculate duration if it was present
+        if "duration" in level_data:
+            occupied_points = sum(len(a["path"]) for a in level_data["arrows"])
+            level_data["duration"] = occupied_points * DURATION_MULTIPLIER
+            
+    return level_data
 
 def run_reverse_generator(image_path, grid_width, grid_height, config):
     try:
@@ -800,9 +904,20 @@ def main():
         try:
             with Image.open(img_path) as img:
                 orig_w, orig_h = img.size
-            grid_width = random.randint(args.min_width, args.max_width)
-            grid_height = int(grid_width * (orig_h / orig_w))
+            target_val = random.randint(args.min_width, args.max_width)
+            
+            if orig_w >= orig_h:
+                grid_width = target_val
+                grid_height = int(grid_width * (orig_h / orig_w))
+            else:
+                grid_height = target_val
+                grid_width = int(grid_height * (orig_w / orig_h))
+            
+            grid_width = max(grid_width, 5)
             grid_height = max(grid_height, 5)
+            
+            print(f"Processing {img_name}: Grid {grid_width}x{grid_height} (Target {target_val} from Range {args.min_width}-{args.max_width})")
+            
             level_data = generate_level_json(img_path, grid_width, grid_height, difficulty=args.difficulty)
             if level_data:
                 # Handle time option
