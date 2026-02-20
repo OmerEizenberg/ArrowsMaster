@@ -305,6 +305,35 @@ namespace Assets.Scripts.Core
 
         [SerializeField] private Color blockedColor = new Color(0.906f, 0.298f, 0.235f); // #e74c3c
         private Color currentArrowColor = Color.black;
+        private Coroutine highlightCoroutine;
+
+        public void SetPressedStyle()
+        {
+            if (isMoving) return;
+            if (highlightCoroutine != null) StopCoroutine(highlightCoroutine);
+            SetArrowColor(new Color(0.169f, 0.667f, 0.384f)); // #27ae60
+        }
+
+        public void ResetPressedStyle()
+        {
+            if (isMoving) return;
+            if (highlightCoroutine != null) StopCoroutine(highlightCoroutine);
+            highlightCoroutine = StartCoroutine(AnimateColorReset(Color.black, 0.12f));
+        }
+
+        private IEnumerator AnimateColorReset(Color targetColor, float duration)
+        {
+            Color startColor = currentArrowColor;
+            float elapsed = 0;
+            while (elapsed < duration)
+            {
+                SetArrowColor(Color.Lerp(startColor, targetColor, elapsed / duration));
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            SetArrowColor(targetColor);
+            highlightCoroutine = null;
+        }
 
         public void OnArrowClicked(Segment clickedSegment)
         {
@@ -318,6 +347,7 @@ namespace Assets.Scripts.Core
 
                 if (!isMoving)
                 {
+                    if (highlightCoroutine != null) StopCoroutine(highlightCoroutine);
                     // Check if path is clear BEFORE starting
                     if (CanMoveForward())
                     {

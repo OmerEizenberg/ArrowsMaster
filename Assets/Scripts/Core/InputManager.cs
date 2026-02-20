@@ -22,6 +22,7 @@ namespace Assets.Scripts.Core
 
         // Cached camera reference — avoids FindObjectOfType on every call
         private Camera m_Camera;
+        private ArrowController highlightedArrow;
 
         private void Awake()
         {
@@ -43,6 +44,22 @@ namespace Assets.Scripts.Core
                 mouseDownTime = Time.time;
                 hasTriggeredHold = false;
                 activePreviewArrow = null;
+
+                // Provide immediate feedback on what is being pressed
+                if (pendingSegment != null)
+                {
+                    highlightedArrow = pendingSegment.GetComponentInParent<ArrowController>();
+                }
+                else 
+                {
+                    Segment closest;
+                    highlightedArrow = GetClosestArrow(startTouchPos, out closest);
+                }
+
+                if (highlightedArrow != null)
+                {
+                    highlightedArrow.SetPressedStyle();
+                }
             }
 
             if (Input.GetMouseButton(0) && pendingSegment != null && !wasMultiTouch && !hasTriggeredHold)
@@ -62,13 +79,25 @@ namespace Assets.Scripts.Core
                 }
                 else
                 {
-                    // If panned too far, cancel potential hold
+                    // If panned too far, cancel potential hold and highlight
+                    if (highlightedArrow != null)
+                    {
+                        highlightedArrow.ResetPressedStyle();
+                        highlightedArrow = null;
+                    }
                     pendingSegment = null;
                 }
             }
 
             if (Input.GetMouseButtonUp(0))
             {
+                // Always clear highlight on release
+                if (highlightedArrow != null)
+                {
+                    highlightedArrow.ResetPressedStyle();
+                    highlightedArrow = null;
+                }
+
                 // Always hide preview if one was active
                 if (activePreviewArrow != null)
                 {
@@ -137,8 +166,26 @@ namespace Assets.Scripts.Core
 
         private void TrySelectClosestArrow(Vector2 screenPos)
         {
-            if (IsScreenPositionBlocked(screenPos)) return;
-            if (GridManager.Instance == null) return;
+            Segment closestSegment;
+            ArrowController closestArrow = GetClosestArrow(screenPos, out closestSegment);
+
+            if (closestArrow != null)
+            {
+                // Start timer on first touch (if it's a timed level)
+                if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
+                {
+                    GameManager.Instance.StartTimer();
+                }
+                
+                closestArrow.OnArrowClicked(closestSegment);
+            }
+        }
+
+        private ArrowController GetClosestArrow(Vector2 screenPos, out Segment closestSegment)
+        {
+            closestSegment = null;
+            if (IsScreenPositionBlocked(screenPos)) return null;
+            if (GridManager.Instance == null) return null;
 
             // Use fixed world distance of 1.0 (approximately 1 grid cell size)
             // This ensures the radius "scales" with zoom (visually consistent in world space)
@@ -150,7 +197,6 @@ namespace Assets.Scripts.Core
             worldClickPos.z = 0; // Flatten z
 
             ArrowController closestArrow = null;
-            Segment closestSegment = null;
 
             List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
             foreach (var arrow in allArrows)
@@ -171,18 +217,7 @@ namespace Assets.Scripts.Core
                     }
                 }
             }
-
-            if (closestArrow != null)
-            {
-                
-                // Start timer on first touch (if it's a timed level)
-                if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
-                {
-                    GameManager.Instance.StartTimer();
-                }
-                
-                closestArrow.OnArrowClicked(closestSegment);
-            }
+            return closestArrow;
         }
 
         private bool IsScreenPositionBlocked(Vector2 screenPos)
