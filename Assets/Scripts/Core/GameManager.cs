@@ -803,49 +803,101 @@ m_GameUI.gameObject.SetActive(true);
             m_ActiveCombos.RemoveAll(c => c == null || !c.gameObject.activeInHierarchy);
 
             float minDistancePx = Screen.width * minDistancePercent;
-            float sqrMinDistance = minDistancePx * minDistancePx;
+            float arrowAvoidanceDistPx = Screen.width * 0.12f;
 
-            // Define bounds
-            float minX = Screen.width * 0.15f;
-            float maxX = Screen.width * 0.85f;
-            float minY = Screen.height * 0.1f;
-            float maxY = Screen.height * 0.75f;
+            // Define bounds (UI Safety Zones)
+            float minX = Screen.width * 0.12f;
+            float maxX = Screen.width * 0.88f;
+            float minY = Screen.height * 0.18f;
+            float maxY = Screen.height * 0.82f;
 
-            Vector2 bestPos = idealScreenPos;
-            bestPos.x = Mathf.Clamp(bestPos.x, minX, maxX);
-            bestPos.y = Mathf.Clamp(bestPos.y, minY, maxY);
+            Camera cam = Camera.main;
+            if (cam == null) return idealScreenPos;
 
-            // Attempt to find a non-overlapping position
-            // We use a small spiral or random trials to avoid overlap
-            const int maxTrials = 12;
-            bool foundValid = true;
+            // 2. Identify the grid cell of the click (3x3 grid)
+            float safeWidth = maxX - minX;
+            float safeHeight = maxY - minY;
+            int clickCellX = Mathf.FloorToInt((idealScreenPos.x - minX) / (safeWidth / 3f));
+            int clickCellY = Mathf.FloorToInt((idealScreenPos.y - minY) / (safeHeight / 3f));
+            clickCellX = Mathf.Clamp(clickCellX, 0, 2);
+            clickCellY = Mathf.Clamp(clickCellY, 0, 2);
 
-            for (int trial = 0; trial < maxTrials; trial++)
+            // 3. Collect Obstacles
+            List<Vector2> comboObstacles = new List<Vector2>();
+            foreach (var combo in m_ActiveCombos) comboObstacles.Add(combo.position);
+
+            List<Vector2> arrowObstacles = new List<Vector2>();
+            if (GridManager.Instance != null)
             {
-                foundValid = true;
-                Vector2 currentPos = (trial == 0) ? bestPos : bestPos + UnityEngine.Random.insideUnitCircle * (minDistancePx * 1.5f);
-                
-                // Keep within screen bounds
-                currentPos.x = Mathf.Clamp(currentPos.x, minX, maxX);
-                currentPos.y = Mathf.Clamp(currentPos.y, minY, maxY);
-
-                foreach (var combo in m_ActiveCombos)
+                foreach (var arrow in GridManager.Instance.GetAllArrows())
                 {
-                    if (combo == null) continue;
-                    // Note: combo.position is screen space usually for UI if Canvas is ScreenSpaceOverlay
-                    // If it's Camera space, we might need a different check, but usually anchoredPosition
-                    // is relative to parent. However, since we are siblings, screen space is safer for comparison.
-                    if (Vector2.SqrMagnitude((Vector2)combo.position - currentPos) < sqrMinDistance)
-                    {
-                        foundValid = false;
-                        break;
-                    }
+                    if (arrow == null || arrow.segments.Count == 0) continue;
+                    arrowObstacles.Add(cam.WorldToScreenPoint(arrow.segments[0].transform.position));
+                    if (arrow.segments.Count > 1)
+                        arrowObstacles.Add(cam.WorldToScreenPoint(arrow.segments[arrow.segments.Count - 1].transform.position));
                 }
-
-                if (foundValid) return currentPos;
             }
 
-            return bestPos; // Return best even if overlapping if no valid found
+            Vector2 bestPos = idealScreenPos;
+            float bestScore = -100000f;
+
+            // 4. Sample candidates across ALL cells, with a bonus for NOT being in the click cell
+            int gridSamples = 6; // 6x6 samples across the whole safe area
+            for (int ix = 0; ix < gridSamples; ix++)
+            {
+                for (int iy = 0; iy < gridSamples; iy++)
+                {
+                    // Calculate candidate position centrally in a 6x6 sampling grid
+                    Vector2 candidate = new Vector2(
+                        minX + (safeWidth / gridSamples) * (ix + 0.5f),
+                        minY + (safeHeight / gridSamples) * (iy + 0.5f)
+                    );
+
+                    // Determine which of the 3x3 cells this candidate belongs to
+                    int cellX = Mathf.FloorToInt((candidate.x - minX) / (safeWidth / 3f));
+                    int cellY = Mathf.FloorToInt((candidate.y - minY) / (safeHeight / 3f));
+                    
+                    bool isOtherCell = (cellX != clickCellX || cellY != clickCellY);
+
+                    // Score candidate
+                    float score = CalculatePositionScore(candidate, idealScreenPos, comboObstacles, arrowObstacles, minDistancePx, arrowAvoidanceDistPx);
+                    
+                    // Variety Bonus: Prefer other cells strongly
+                    if (isOtherCell) score += 500f; 
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestPos = candidate;
+                    }
+                }
+            }
+
+            return bestPos;
+        }
+
+        private float CalculatePositionScore(Vector2 pos, Vector2 ideal, List<Vector2> combos, List<Vector2> arrows, float minDistPx, float arrowAvoidPx)
+        {
+            float score = 1000f;
+
+            // Penalty for distance from ideal (prefer closer to click)
+            score -= Vector2.Distance(pos, ideal) * 0.5f;
+
+            // Hard penalty for combo overlaps
+            foreach (var c in combos)
+            {
+                float dist = Vector2.Distance(pos, c);
+                if (dist < minDistPx) score -= (minDistPx - dist) * 10f;
+            }
+
+            // Penalty for arrow proximity
+            foreach (var a in arrows)
+            {
+                float dist = Vector2.Distance(pos, a);
+                if (dist < arrowAvoidPx) score -= (arrowAvoidPx - dist) * 5f;
+            }
+
+            return score;
         }
     }
 }
