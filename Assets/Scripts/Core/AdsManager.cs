@@ -205,6 +205,11 @@ namespace Assets.Scripts.Core
         public void LoadInterstitial()
         {
             if (!isInitialized) return;
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 5)
+            {
+                Debug.Log($"[AdsManager] Skipping Interstitial Load: User Level {UserDataManager.Instance.CurrentLevel} < 5.");
+                return;
+            }
             if (IAPManager.Instance == null)
                 Debug.LogWarning("[AdsManager] IAPManager.Instance is null. Proceeding without IAP check.");
 
@@ -219,6 +224,11 @@ namespace Assets.Scripts.Core
 
         public void ShowInterstitial(bool isAuto = false)
         {
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 5)
+            {
+                Debug.Log($"[AdsManager] Skipping Interstitial Show: User Level {UserDataManager.Instance.CurrentLevel} < 5.");
+                return;
+            }
             if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
             {
                 Debug.Log("[AdsManager] Skipping Interstitial Show: User has No Ads."+IAPManager.Instance.HasNoAds);
