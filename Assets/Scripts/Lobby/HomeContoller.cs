@@ -27,7 +27,8 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private TextMeshProUGUI m_TitleText;
         [SerializeField] private TextMeshProUGUI m_LevelText;
         [SerializeField] private TextMeshProUGUI m_DifficultyText;
-        [SerializeField] private TextMeshProUGUI m_CurrencyText;
+        [SerializeField] private TextMeshProUGUI m_LobbyCurrencyText;
+        [SerializeField] private TextMeshProUGUI m_ShopCurrencyText;
 
         [SerializeField] private Color m_CircleColor;
         [SerializeField] private Color m_SuperHardColor;
@@ -87,9 +88,14 @@ namespace Assets.Scripts.Lobby
 
         private void UpdateCurrencyUI(int amount)
         {
-            if (m_CurrencyText != null)
+            string formatted = amount.ToString("N0");
+            if (m_LobbyCurrencyText != null)
             {
-                m_CurrencyText.text = amount.ToString("N0");
+                m_LobbyCurrencyText.text = formatted;
+            }
+            if (m_ShopCurrencyText != null)
+            {
+                m_ShopCurrencyText.text = formatted;
             }
         }
 
