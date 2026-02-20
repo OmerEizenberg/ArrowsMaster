@@ -20,6 +20,7 @@ namespace Assets.Scripts.Core
         private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _mainThreadQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
 
         public event Action OnRewardReceived;
+        public event Action OnCoinsRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
 
@@ -419,6 +420,7 @@ namespace Assets.Scripts.Core
                         UserDataManager.Instance.AddArrowsCurrency(2000);
                     }
                     OnRewardReceived?.Invoke();
+                    OnCoinsRewardReceived?.Invoke();
                     
                     // --- Analytics: ad_reward_coins ---
                     if (FirebaseManager.Instance != null)
