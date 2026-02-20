@@ -39,11 +39,40 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private Color m_LevelColor;
         [SerializeField] private MonthlyChallengeController m_MonthlyChallengeController;
 
+        // Currency animation
+        [SerializeField] private float m_CoinAnimDuration = 1.5f;
+        [SerializeField] private float m_CoinScalePunch = 2.25f;
+        // Static so the last displayed value is remembered across OnDisable/OnEnable cycles
+        private static int s_LastDisplayedCurrencyValue = -1;
+        private Coroutine m_CoinCountCoroutine;
+        private Coroutine m_LobbyScaleCoroutine;
+        private Coroutine m_ShopScaleCoroutine;
+
         private void OnEnable()
         {
             //PlayerPrefs.DeleteAll();
             RefreshLobbyUI();
-            UpdateCurrencyUI(UserDataManager.Instance.ArrowsCurrency);
+
+            int currentCoins = UserDataManager.Instance.ArrowsCurrency;
+
+            if (s_LastDisplayedCurrencyValue < 0)
+            {
+                // Very first time ever — set immediately, no animation
+                s_LastDisplayedCurrencyValue = currentCoins;
+                SetCurrencyTextImmediate(currentCoins);
+            }
+            else if (s_LastDisplayedCurrencyValue != currentCoins)
+            {
+                // Coins changed while we were away — animate from last known to current
+                SetCurrencyTextImmediate(s_LastDisplayedCurrencyValue);
+                UpdateCurrencyUI(currentCoins);
+            }
+            else
+            {
+                // No change — just display current value instantly
+                SetCurrencyTextImmediate(currentCoins);
+            }
+
             UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
             UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
             
@@ -79,6 +108,11 @@ namespace Assets.Scripts.Lobby
             {
                 AdsManager.Instance.OnCoinsRewardReceived -= HandleCoinsRewardReceived;
             }
+
+            // Stop any running animation coroutines
+            if (m_CoinCountCoroutine != null) StopCoroutine(m_CoinCountCoroutine);
+            if (m_LobbyScaleCoroutine != null) StopCoroutine(m_LobbyScaleCoroutine);
+            if (m_ShopScaleCoroutine != null) StopCoroutine(m_ShopScaleCoroutine);
         }
 
         private void Update()
@@ -86,17 +120,81 @@ namespace Assets.Scripts.Lobby
             UpdateLobbyAdReadyImage();
         }
 
-        private void UpdateCurrencyUI(int amount)
+        private void SetCurrencyTextImmediate(int amount)
         {
             string formatted = amount.ToString("N0");
+            if (m_LobbyCurrencyText != null) m_LobbyCurrencyText.text = formatted;
+            if (m_ShopCurrencyText != null) m_ShopCurrencyText.text = formatted;
+        }
+
+        private void UpdateCurrencyUI(int newAmount)
+        {
+            if (m_CoinCountCoroutine != null) StopCoroutine(m_CoinCountCoroutine);
+            m_CoinCountCoroutine = StartCoroutine(AnimateCurrencyText(s_LastDisplayedCurrencyValue, newAmount));
+
+            // Scale punch on both texts
             if (m_LobbyCurrencyText != null)
             {
-                m_LobbyCurrencyText.text = formatted;
+                if (m_LobbyScaleCoroutine != null) StopCoroutine(m_LobbyScaleCoroutine);
+                m_LobbyScaleCoroutine = StartCoroutine(ScalePunch(m_LobbyCurrencyText.transform));
             }
             if (m_ShopCurrencyText != null)
             {
-                m_ShopCurrencyText.text = formatted;
+                if (m_ShopScaleCoroutine != null) StopCoroutine(m_ShopScaleCoroutine);
+                m_ShopScaleCoroutine = StartCoroutine(ScalePunch(m_ShopCurrencyText.transform));
             }
+        }
+
+        private IEnumerator AnimateCurrencyText(int fromValue, int toValue)
+        {
+            float elapsed = 0f;
+            float duration = m_CoinAnimDuration;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                // Ease out for a satisfying deceleration
+                float easedT = 1f - (1f - t) * (1f - t);
+                int current = (int)Mathf.Lerp(fromValue, toValue, easedT);
+                s_LastDisplayedCurrencyValue = current;
+                SetCurrencyTextImmediate(current);
+                yield return null;
+            }
+
+            // Ensure final value is exact
+            s_LastDisplayedCurrencyValue = toValue;
+            SetCurrencyTextImmediate(toValue);
+            m_CoinCountCoroutine = null;
+        }
+
+        private IEnumerator ScalePunch(Transform target)
+        {
+            Vector3 originalScale = Vector3.one;
+            Vector3 punchScale = originalScale * m_CoinScalePunch;
+            float halfDuration = m_CoinAnimDuration * 0.35f;
+
+            // Scale up
+            float elapsed = 0f;
+            while (elapsed < halfDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / halfDuration);
+                target.localScale = Vector3.Lerp(originalScale, punchScale, t);
+                yield return null;
+            }
+
+            // Scale back down
+            elapsed = 0f;
+            while (elapsed < halfDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / halfDuration);
+                target.localScale = Vector3.Lerp(punchScale, originalScale, t);
+                yield return null;
+            }
+
+            target.localScale = originalScale;
         }
 
         private void HandlePurchaseSuccess(string productId)
