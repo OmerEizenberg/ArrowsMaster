@@ -22,6 +22,7 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private GameObject m_ShopLayer;
         [SerializeField] private GameObject m_NoAdsCoinsBundleButton;
         [SerializeField] private GameObject m_NoAdsBadge;
+        [SerializeField] private GameObject m_LobbyAdReadyImage;
 
         [SerializeField] private TextMeshProUGUI m_TitleText;
         [SerializeField] private TextMeshProUGUI m_LevelText;
@@ -67,6 +68,11 @@ namespace Assets.Scripts.Lobby
                 IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
                 IAPManager.Instance.OnPurchaseSuccess -= HandlePurchaseSuccess;
             }
+        }
+
+        private void Update()
+        {
+            UpdateLobbyAdReadyImage();
         }
 
         private void UpdateCurrencyUI(int amount)
@@ -184,6 +190,31 @@ namespace Assets.Scripts.Lobby
                 m_NoAdsCoinsBundleButton.SetActive(!IAPManager.Instance.HasNoAds);
                 m_NoAdsBadge.SetActive(!IAPManager.Instance.HasNoAds);
             }
+
+            UpdateLobbyAdReadyImage();
+        }
+
+        private void UpdateLobbyAdReadyImage()
+        {
+            if (m_LobbyAdReadyImage == null) return;
+
+            bool isCooldownActive = false;
+            string cooldownEndKey = "ShopAdCooldownEnd";
+
+            if (PlayerPrefs.HasKey(cooldownEndKey))
+            {
+                string storedValue = PlayerPrefs.GetString(cooldownEndKey);
+                if (long.TryParse(storedValue, out long binaryTime))
+                {
+                    System.DateTime cooldownEndTime = System.DateTime.FromBinary(binaryTime);
+                    if (System.DateTime.Now < cooldownEndTime)
+                    {
+                        isCooldownActive = true;
+                    }
+                }
+            }
+
+            m_LobbyAdReadyImage.SetActive(!isCooldownActive);
         }
         
         public void OnSettingsButtonClicked()
