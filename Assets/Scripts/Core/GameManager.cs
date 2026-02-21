@@ -490,6 +490,7 @@ namespace Assets.Scripts.Core
         {
             p_StreakCount = 0;
             ClearActiveCombos();
+            if (m_GameUI != null) m_GameUI.ResetComboIndication();
         }
 
         public void ResetSelectionStates()
@@ -503,6 +504,7 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator WinSequence()
         {
+            if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
             Debug.Log("Level Complete! Waiting for win screen...");
             
@@ -613,6 +615,7 @@ namespace Assets.Scripts.Core
 
         private void HandleGameOver()
         {
+            if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
             Debug.Log("Game Over!");
 
@@ -764,6 +767,7 @@ namespace Assets.Scripts.Core
         
         private void HandleTimeUp()
         {
+            if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
             Debug.Log("Time's up!");
             if (failureScreen != null)

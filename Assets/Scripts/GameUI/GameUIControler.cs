@@ -29,6 +29,15 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private Color m_wrongColor;
     [SerializeField] private Image m_ColorIndication;
 
+    [Header("Combo Timer Indication")]
+    [SerializeField] private GameObject m_ComboTimerContainer;
+    [SerializeField] private Image m_ComboTimerImage;
+    [SerializeField] private TextMeshProUGUI m_StreakText;
+
+    // Must match the time condition used in ArrowController.OnArrowClicked (0.9f)
+    private const float StreakTimeThreshold = 1.0f;
+    private Coroutine m_ComboTimerCoroutine;
+
     private void Start()
     {
         if (GameManager.Instance != null)
@@ -71,13 +80,104 @@ public class GameUIContoleer : MonoBehaviour
     {
         m_ColorIndication.color = m_wrongColor;
         m_XIndicatAnim.SetTrigger("Wrong");
+        ResetComboIndication();
     }
 
     public void PlayStreakAnimation()
     {
-        Debug.Log(">>>>STREAK INDEX:"+GameManager.Instance.p_StreakCount%m_streakColors.Length);
-        m_ColorIndication.color = m_streakColors[GameManager.Instance.p_StreakCount%m_streakColors.Length];
+        int streakIndex = GameManager.Instance.p_StreakCount % m_streakColors.Length;
+        Color streakColor = m_streakColors[streakIndex];
+        
+        Debug.Log(">>>>STREAK INDEX:" + streakIndex);
+        m_ColorIndication.color = streakColor;
         m_XIndicatAnim.SetTrigger("Wrong");
+
+        // Combo Timer Indication
+        if (m_ComboTimerContainer != null && m_ComboTimerImage != null)
+        {
+            m_ComboTimerImage.color = streakColor;
+            m_ComboTimerImage.fillAmount = 1f;
+            
+            if (m_ComboTimerCoroutine != null) StopCoroutine(m_ComboTimerCoroutine);
+            m_ComboTimerCoroutine = StartCoroutine(ComboTimerRoutine());
+        }
+
+        if (m_StreakText != null)
+        {
+            m_StreakText.text = "X" + GameManager.Instance.p_StreakCount;
+            StartCoroutine(PunchScaleRoutine(m_StreakText.rectTransform, 1.4f, 0.08f, 0.05f));
+        }
+    }
+
+    private IEnumerator PunchScaleRoutine(RectTransform target, float punchScale, float upDuration, float downDuration)
+    {
+        if (target == null) yield break;
+
+        Vector3 originalScale = Vector3.one;
+        Vector3 peakScale = originalScale * punchScale;
+
+        // Scale Up
+        float elapsed = 0f;
+        while (elapsed < upDuration)
+        {
+            target.localScale = Vector3.Lerp(originalScale, peakScale, elapsed / upDuration);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        target.localScale = peakScale;
+
+        // Scale Down
+        elapsed = 0f;
+        while (elapsed < downDuration)
+        {
+            target.localScale = Vector3.Lerp(peakScale, originalScale, elapsed / downDuration);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        target.localScale = originalScale;
+    }
+
+    private IEnumerator ComboTimerRoutine()
+    {
+        if (m_ComboTimerContainer != null)
+        {
+            Debug.Log("[GameUIContoleer] Setting ComboTimerContainer ACTIVE");
+            m_ComboTimerContainer.SetActive(true);
+        }
+        
+        float elapsed = 0f;
+        while (elapsed < StreakTimeThreshold)
+        {
+            elapsed += Time.deltaTime;
+            if (m_ComboTimerImage != null)
+            {
+                m_ComboTimerImage.fillAmount = 1f - (elapsed / StreakTimeThreshold);
+            }
+            yield return new WaitForEndOfFrame();
+        }
+
+        if (m_ComboTimerImage != null) m_ComboTimerImage.fillAmount = 0f;
+        if (m_ComboTimerContainer != null)
+        {
+            Debug.Log("[GameUIContoleer] Setting ComboTimerContainer INACTIVE (Routine finished)");
+            m_ComboTimerContainer.SetActive(false);
+        }
+        m_ComboTimerCoroutine = null;
+    }
+
+    public void ResetComboIndication()
+    {
+        if (m_ComboTimerCoroutine != null)
+        {
+            StopCoroutine(m_ComboTimerCoroutine);
+            m_ComboTimerCoroutine = null;
+        }
+
+        if (m_ComboTimerContainer != null)
+        {
+            Debug.Log("[GameUIContoleer] Setting ComboTimerContainer INACTIVE (Reset called)");
+            m_ComboTimerContainer.SetActive(false);
+        }
     }
 
     public void UpdateTimerUI(string timeString)
@@ -109,7 +209,7 @@ public class GameUIContoleer : MonoBehaviour
         int minutes = Mathf.FloorToInt(GameManager.Instance.CurrentTime / 60f);
         int seconds = Mathf.FloorToInt(GameManager.Instance.CurrentTime % 60f);
         string timeString = string.Format("{0:00}:{1:00}", minutes, seconds);
-        Debug.Log(">>>>Time String: " + timeString);
+    
         UpdateTimerUI(timeString);
 
         // Reset timer color to default when level starts
@@ -117,6 +217,8 @@ public class GameUIContoleer : MonoBehaviour
         {
             m_TimerText.color = m_TimerDefaultColor;
         }
+
+        ResetComboIndication();
     }
     
     private void OnGameOver()
