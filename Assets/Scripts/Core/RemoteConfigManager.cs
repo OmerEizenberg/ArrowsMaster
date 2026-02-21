@@ -14,6 +14,11 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_FORCE_UPDATE_VERSION_IOS = "ForceUpdateVersioniOS";
     public const string KEY_SOFT_UPDATE_VERSION_ANDROID = "SoftUpdateVersionAndroid";
     public const string KEY_SOFT_UPDATE_VERSION_IOS = "SoftUpdateVersioniOS";
+    public const string KEY_FIRST_PLAY_ON = "FirstPlayOn";
+    public const string KEY_SEC_PLAY_ON = "SecPlayOn";
+    public const string KEY_THIRD_PLAY_ON = "ThirdPlayOn";
+    public const string KEY_COINS_REWARDED_AD = "CoinsRewardedAd";
+    public const string KEY_REWARDED_AD_COINS_COOLDOWN = "RewardedAdCoinsCooldown";
 
     private bool isConfigReady = false;
     public bool IsConfigReady => isConfigReady;
@@ -51,7 +56,12 @@ public class RemoteConfigManager : MonoBehaviour
             { KEY_FORCE_UPDATE_VERSION_ANDROID, "1.0.0" },
             { KEY_FORCE_UPDATE_VERSION_IOS, "1.0.0" },
             { KEY_SOFT_UPDATE_VERSION_ANDROID, "1.0.0" },
-            { KEY_SOFT_UPDATE_VERSION_IOS, "1.0.0" }
+            { KEY_SOFT_UPDATE_VERSION_IOS, "1.0.0" },
+            { KEY_FIRST_PLAY_ON, 1600 },
+            { KEY_SEC_PLAY_ON, 3200 },
+            { KEY_THIRD_PLAY_ON, 4200 },
+            { KEY_COINS_REWARDED_AD, 2000 },
+            { KEY_REWARDED_AD_COINS_COOLDOWN, 240 }
         };
 
         FirebaseRemoteConfig.DefaultInstance.SetDefaultsAsync(defaults).ContinueWithOnMainThread(task =>
@@ -112,6 +122,17 @@ public class RemoteConfigManager : MonoBehaviour
     public string ForceUpdateVersionIOS => GetString(KEY_FORCE_UPDATE_VERSION_IOS);
     public string SoftUpdateVersionAndroid => GetString(KEY_SOFT_UPDATE_VERSION_ANDROID);
     public string SoftUpdateVersionIOS => GetString(KEY_SOFT_UPDATE_VERSION_IOS);
+
+    public long GetLong(string key)
+    {
+        return FirebaseRemoteConfig.DefaultInstance.GetValue(key).LongValue;
+    }
+
+    public int FirstPlayOn => (int)GetLong(KEY_FIRST_PLAY_ON);
+    public int SecPlayOn => (int)GetLong(KEY_SEC_PLAY_ON);
+    public int ThirdPlayOn => (int)GetLong(KEY_THIRD_PLAY_ON);
+    public int CoinsRewardedAd => (int)GetLong(KEY_COINS_REWARDED_AD);
+    public int RewardedAdCoinsCooldown => (int)GetLong(KEY_REWARDED_AD_COINS_COOLDOWN);
 
     #endregion
 

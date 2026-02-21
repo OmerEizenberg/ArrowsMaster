@@ -18,10 +18,13 @@ namespace Assets.Scripts.Core
         public GameObject m_FunFact;
         [SerializeField] private TextMeshProUGUI m_FunFactText;
         [SerializeField] private string[] m_FunFactsDat;
+        [SerializeField] private GameObject[] m_LevelUIElements;
+        private GameObject m_currentLevelUIElement;
 
         [Header("Shop UI")]
         [SerializeField] private TextMeshProUGUI m_PlayOnPriceText;
         [SerializeField] private TextMeshProUGUI m_UserBalanceText;
+        [SerializeField] private TextMeshProUGUI m_RewardedAdAmountText;
         [SerializeField] private GameObject m_ShopLayer;
         [SerializeField] private GameObject m_LevelCurrencyContainer;
 
@@ -125,6 +128,18 @@ namespace Assets.Scripts.Core
                     if (m_FunFact != null && UserDataManager.Instance.CurrentLevel < m_FunFactsDat.Length && m_FunFactsDat[UserDataManager.Instance.CurrentLevel].Length > 2) {
                         m_FunFact.SetActive(true);
                         m_FunFactText.text = m_FunFactsDat[UserDataManager.Instance.CurrentLevel];
+                    }
+
+                    int currentLevel = UserDataManager.Instance.CurrentLevel;
+                    if (m_LevelUIElements != null && currentLevel < m_LevelUIElements.Length)
+                    {
+                        GameObject prefab = m_LevelUIElements[currentLevel];
+                        if (prefab != null)
+                        {
+                            if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
+                            m_currentLevelUIElement = Instantiate(prefab, m_GameUI.GameUIParent);
+                            Destroy(m_currentLevelUIElement , 5.0f);
+                        }
                     }
                 };
             }
@@ -252,6 +267,13 @@ namespace Assets.Scripts.Core
 
         public int GetPlayOnCost()
         {
+            if (RemoteConfigManager.Instance != null)
+            {
+                if (playOnPurchaseCount == 0) return RemoteConfigManager.Instance.FirstPlayOn;
+                if (playOnPurchaseCount == 1) return RemoteConfigManager.Instance.SecPlayOn;
+                return RemoteConfigManager.Instance.ThirdPlayOn;
+            }
+
             if (playOnPurchaseCount == 0) return 1600;
             if (playOnPurchaseCount == 1) return 3200;
             return 4200;
@@ -315,6 +337,11 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.ShowInterstitial(true);
             }
 
+            if (p_isLevelProgression && (failureScreen == null || !failureScreen.activeInHierarchy))
+            {
+                UserDataManager.Instance.IncrementCurrentLevelAttempts();
+            }
+
             if (levelManager != null && !string.IsNullOrEmpty(levelManager.CurrentLevelId))
             {
                 if (p_isLevelProgression)
@@ -330,8 +357,14 @@ namespace Assets.Scripts.Core
 
         public void StartLevel(string levelId)
         {
+            if (UserDataManager.Instance.LastAttemptLevelId != levelId)
+            {
+                UserDataManager.Instance.ResetCurrentLevelAttempts(levelId);
+            }
+
             ResetLives();
             HideScreens();
+            if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
             
             p_isLevelProgression = true;
             // Reset arrow count before loading new level
@@ -388,6 +421,7 @@ namespace Assets.Scripts.Core
         {
             ResetLives();
             HideScreens();
+            if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
             
             p_isLevelProgression = false;
             currentChallengeYear = year;
@@ -630,9 +664,24 @@ namespace Assets.Scripts.Core
                 m_UserBalanceText.text = UserDataManager.Instance.ArrowsCurrency.ToString("N0");
             }
 
+            if (m_RewardedAdAmountText != null)
+            {
+                int amount = 2000;
+                if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
+                {
+                    amount = RemoteConfigManager.Instance.CoinsRewardedAd;
+                }
+                m_RewardedAdAmountText.text = amount.ToString("N0");
+            }
+
             if (failureScreen != null)
             {
                 failureScreen.SetActive(true);
+            }
+
+            if (p_isLevelProgression)
+            {
+                UserDataManager.Instance.IncrementCurrentLevelAttempts();
             }
 
             // --- Analytics: level_end (Fail - Lives) ---
@@ -773,6 +822,11 @@ namespace Assets.Scripts.Core
             if (failureScreen != null)
             {
                 failureScreen.SetActive(true);
+            }
+
+            if (p_isLevelProgression)
+            {
+                UserDataManager.Instance.IncrementCurrentLevelAttempts();
             }
 
             // --- Analytics: level_end (Fail - Time) ---

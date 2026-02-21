@@ -29,6 +29,7 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private TextMeshProUGUI m_DifficultyText;
         [SerializeField] private TextMeshProUGUI m_LobbyCurrencyText;
         [SerializeField] private TextMeshProUGUI m_ShopCurrencyText;
+        [SerializeField] private TextMeshProUGUI m_RewardedAdAmountText;
 
         [SerializeField] private Color m_CircleColor;
         [SerializeField] private Color m_SuperHardColor;
@@ -97,10 +98,12 @@ namespace Assets.Scripts.Lobby
                 if (RemoteConfigManager.Instance.IsConfigReady)
                 {
                     CheckForUpdates();
+                    UpdateRewardedAdAmount();
                 }
                 else
                 {
                     RemoteConfigManager.Instance.OnConfigInitialized += CheckForUpdates;
+                    RemoteConfigManager.Instance.OnConfigInitialized += UpdateRewardedAdAmount;
                 }
             }
         }
@@ -124,6 +127,7 @@ namespace Assets.Scripts.Lobby
             if (RemoteConfigManager.Instance != null)
             {
                 RemoteConfigManager.Instance.OnConfigInitialized -= CheckForUpdates;
+                RemoteConfigManager.Instance.OnConfigInitialized -= UpdateRewardedAdAmount;
             }
 
             // Stop any running animation coroutines
@@ -135,6 +139,19 @@ namespace Assets.Scripts.Lobby
         private void Update()
         {
             UpdateLobbyAdReadyImage();
+        }
+
+        private void UpdateRewardedAdAmount()
+        {
+            if (m_RewardedAdAmountText == null) return;
+
+            int amount = 2000;
+            if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
+            {
+                amount = RemoteConfigManager.Instance.CoinsRewardedAd;
+            }
+
+            m_RewardedAdAmountText.text = amount.ToString("N0");
         }
 
         private void SetCurrencyTextImmediate(int amount)

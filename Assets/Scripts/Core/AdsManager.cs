@@ -408,10 +408,15 @@ namespace Assets.Scripts.Core
                     break;
 
                 case RewardAdType.CoinsReward:
-                    Debug.Log("[AdsManager] ProcessPendingReward: CoinsReward → granting 2000 coins.");
+                    int rewardAmount = 2000;
+                    if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
+                    {
+                        rewardAmount = RemoteConfigManager.Instance.CoinsRewardedAd;
+                    }
+                    Debug.Log($"[AdsManager] ProcessPendingReward: CoinsReward → granting {rewardAmount} coins.");
                     if (UserDataManager.Instance != null)
                     {
-                        UserDataManager.Instance.AddArrowsCurrency(2000);
+                        UserDataManager.Instance.AddArrowsCurrency(rewardAmount);
                     }
                     OnCoinsRewardReceived?.Invoke();
                     SpawnCoinsSmallExplosion();
@@ -420,7 +425,7 @@ namespace Assets.Scripts.Core
                     if (FirebaseManager.Instance != null)
                     {
                         FirebaseManager.Instance.LogEvent("ad_reward_coins",
-                            new Firebase.Analytics.Parameter("reward_amount", 2000));
+                            new Firebase.Analytics.Parameter("reward_amount", rewardAmount));
                     }
                     break;
 

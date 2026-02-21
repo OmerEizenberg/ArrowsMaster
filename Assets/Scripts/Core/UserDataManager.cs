@@ -25,9 +25,13 @@ namespace Assets.Scripts.Core
         private const string LevelKey = "CurrentLevel";
         private const string InstallDateKey = "InstallDate";
         private const string ArrowsCurrencyKey = "ArrowsCurrency";
+        private const string CurrentLevelAttemptsKey = "CurrentLevelAttempts";
+        private const string LastAttemptLevelIdKey = "LastAttemptLevelId";
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
+        public int CurrentLevelAttempts { get; private set; } = 1;
+        public string LastAttemptLevelId { get; private set; } = string.Empty;
         public System.DateTime InstallDate { get; private set; }
 
         private Dictionary<string, int> m_MonthlyCache = new Dictionary<string, int>();
@@ -41,6 +45,8 @@ namespace Assets.Scripts.Core
         {
             CurrentLevel = PlayerPrefs.GetInt(LevelKey, 1);
             ArrowsCurrency = PlayerPrefs.GetInt(ArrowsCurrencyKey, 0);
+            CurrentLevelAttempts = PlayerPrefs.GetInt(CurrentLevelAttemptsKey, 1);
+            LastAttemptLevelId = PlayerPrefs.GetString(LastAttemptLevelIdKey, string.Empty);
             
             string installDateStr = PlayerPrefs.GetString(InstallDateKey, string.Empty);
             if (string.IsNullOrEmpty(installDateStr))
@@ -143,8 +149,28 @@ namespace Assets.Scripts.Core
         private void SaveData()
         {
             PlayerPrefs.SetInt(LevelKey, CurrentLevel);
+            PlayerPrefs.SetInt(CurrentLevelAttemptsKey, CurrentLevelAttempts);
+            PlayerPrefs.SetString(LastAttemptLevelIdKey, LastAttemptLevelId);
             PlayerPrefs.Save();
             OnLevelChanged?.Invoke();
+        }
+
+        public void IncrementCurrentLevelAttempts()
+        {
+            CurrentLevelAttempts++;
+            PlayerPrefs.SetInt(CurrentLevelAttemptsKey, CurrentLevelAttempts);
+            PlayerPrefs.Save();
+            Debug.Log($"[UserDataManager] Incremented attempts to: {CurrentLevelAttempts}");
+        }
+
+        public void ResetCurrentLevelAttempts(string levelId)
+        {
+            CurrentLevelAttempts = 1;
+            LastAttemptLevelId = levelId;
+            PlayerPrefs.SetInt(CurrentLevelAttemptsKey, CurrentLevelAttempts);
+            PlayerPrefs.SetString(LastAttemptLevelIdKey, LastAttemptLevelId);
+            PlayerPrefs.Save();
+            Debug.Log($"[UserDataManager] Reset attempts to 1 for level: {levelId}");
         }
 
         private string GetMonthlyKey(int year, int month)

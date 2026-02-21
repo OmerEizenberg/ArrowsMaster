@@ -9,6 +9,7 @@ public class GameUIContoleer : MonoBehaviour
 {
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
+    public Transform GameUIParent => m_GameUI != null ? m_GameUI.transform : transform;
     [SerializeField] private LevelManager m_LevelManager;
     [SerializeField] private Animator m_XIndicatAnim;
     [SerializeField] private Image[] m_Hearts;

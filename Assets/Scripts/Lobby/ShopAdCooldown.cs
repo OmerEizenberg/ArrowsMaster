@@ -61,7 +61,13 @@ namespace Assets.Scripts.Lobby
 
         private void StartCooldown()
         {
-            m_CooldownEndTime = DateTime.Now.AddSeconds(m_CooldownDurationSeconds);
+            float duration = m_CooldownDurationSeconds;
+            if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
+            {
+                duration = RemoteConfigManager.Instance.RewardedAdCoinsCooldown;
+            }
+
+            m_CooldownEndTime = DateTime.Now.AddSeconds(duration);
             // Save as binary string for cross-session persistence
             PlayerPrefs.SetString(m_CooldownEndKey, m_CooldownEndTime.ToBinary().ToString());
             PlayerPrefs.Save();
