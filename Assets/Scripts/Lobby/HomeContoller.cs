@@ -91,6 +91,18 @@ namespace Assets.Scripts.Lobby
             {
                 OnCalanderButtonClicked();
             }
+
+            if (RemoteConfigManager.Instance != null)
+            {
+                if (RemoteConfigManager.Instance.IsConfigReady)
+                {
+                    CheckForUpdates();
+                }
+                else
+                {
+                    RemoteConfigManager.Instance.OnConfigInitialized += CheckForUpdates;
+                }
+            }
         }
 
         private void OnDisable()
@@ -107,6 +119,11 @@ namespace Assets.Scripts.Lobby
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnCoinsRewardReceived -= HandleCoinsRewardReceived;
+            }
+
+            if (RemoteConfigManager.Instance != null)
+            {
+                RemoteConfigManager.Instance.OnConfigInitialized -= CheckForUpdates;
             }
 
             // Stop any running animation coroutines
@@ -540,6 +557,107 @@ namespace Assets.Scripts.Lobby
             {
                 Debug.LogWarning("[HomeContoller] Could not find Game UI reference to show!");
             }
+        }
+
+        private void CheckForUpdates()
+        {
+            if (RemoteConfigManager.Instance != null)
+            {
+                RemoteConfigManager.Instance.OnConfigInitialized -= CheckForUpdates;
+            }
+
+            string currentVersion = Application.version;
+            bool isForce = false;
+            bool isSoft = false;
+
+            #if UNITY_ANDROID
+            string forceVersion = RemoteConfigManager.Instance.ForceUpdateVersionAndroid;
+            string softVersion = RemoteConfigManager.Instance.SoftUpdateVersionAndroid;
+
+            if (CompareVersions(forceVersion, currentVersion) > 0)
+            {
+                Debug.Log("[CheckForUpdates] Android Force detected");
+                isForce = true;
+            }
+            else if (CompareVersions(softVersion, currentVersion) > 0)
+            {
+                Debug.Log("[CheckForUpdates] Android Soft detected");
+                isSoft = true;
+            }
+            #elif UNITY_IOS
+            string forceVersion = RemoteConfigManager.Instance.ForceUpdateVersionIOS;
+            string softVersion = RemoteConfigManager.Instance.SoftUpdateVersionIOS;
+
+            if (CompareVersions(forceVersion, currentVersion) > 0)
+            {
+                Debug.Log("[CheckForUpdates] iOS Force detected");
+                isForce = true;
+            }
+            else if (CompareVersions(softVersion, currentVersion) > 0)
+            {
+                Debug.Log("[CheckForUpdates] iOS Soft detected");
+                isSoft = true;
+            }
+            #endif
+
+            if (isForce || isSoft)
+            {
+                GameObject popupPrefab = Resources.Load<GameObject>("SoftForcePopup");
+                if (popupPrefab != null)
+                {
+                    // Use m_LobbyUI's parent to ensure it's on the Canvas level
+                    Transform parent = m_LobbyUI != null ? m_LobbyUI.transform.parent : transform;
+                    GameObject popupInstance = Instantiate(popupPrefab, parent, false);
+                    
+                    popupInstance.SetActive(true);
+                    popupInstance.transform.SetAsLastSibling();
+
+                    RectTransform rect = popupInstance.GetComponent<RectTransform>();
+                    if (rect != null)
+                    {
+                        rect.localPosition = Vector3.zero;
+                        rect.localScale = Vector3.one;
+                    }
+
+                    SoftForceUpdateView view = popupInstance.GetComponent<SoftForceUpdateView>();
+                    if (view != null)
+                    {
+                        view.Setup(isForce);
+                        Debug.Log("[CheckForUpdates] Popup initialized successfully.");
+                    }
+                    else
+                    {
+                        Debug.LogError("[CheckForUpdates] SoftForceUpdateView component missing on prefab!");
+                    }
+                }
+                else
+                {
+                    Debug.LogError("[CheckForUpdates] SoftForcePopup prefab not found in Resources!");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Compares two version strings (format: XX.KK.PP).
+        /// Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
+        /// </summary>
+        private int CompareVersions(string v1, string v2)
+        {
+            if (string.IsNullOrEmpty(v1) || string.IsNullOrEmpty(v2)) return 0;
+
+            string[] parts1 = v1.Split('.');
+            string[] parts2 = v2.Split('.');
+
+            for (int i = 0; i < Mathf.Max(parts1.Length, parts2.Length); i++)
+            {
+                int num1 = i < parts1.Length ? (int.TryParse(parts1[i], out int n1) ? n1 : 0) : 0;
+                int num2 = i < parts2.Length ? (int.TryParse(parts2[i], out int n2) ? n2 : 0) : 0;
+
+                if (num1 > num2) return 1;
+                if (num1 < num2) return -1;
+            }
+
+            return 0;
         }
     }
 }

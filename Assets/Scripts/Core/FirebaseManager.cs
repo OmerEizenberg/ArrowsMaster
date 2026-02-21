@@ -2,6 +2,7 @@ using Firebase;
 using Firebase.Crashlytics;
 using Firebase.Analytics;
 using Firebase.Messaging;
+using Firebase.RemoteConfig;
 using Firebase.Extensions;
 using System.Collections;
 using System.Collections.Generic;
@@ -85,6 +86,9 @@ public class FirebaseManager : MonoBehaviour
 
                 isInitialized = true;
                 Debug.Log("[FirebaseManager] Firebase App, Crashlytics, Analytics, and Messaging are ready.");
+
+                // Initialize Remote Config
+                RemoteConfigManager.Instance.Initialize();
 
                 // Request notification permission for Android 13+
                 #if UNITY_ANDROID && !UNITY_EDITOR
