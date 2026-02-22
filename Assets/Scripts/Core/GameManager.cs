@@ -860,6 +860,18 @@ namespace Assets.Scripts.Core
             }
         }
 
+        public string GetFailureDescription()
+        {
+            if (isTimeUp)
+            {
+                return "Time's up! get more 60 seconds with coins or by watching a short ad.";
+            }
+            else
+            {
+                return "Refill lives with coins or by watching a short ad.";
+            }
+        }
+
         public void RegisterCombo(RectTransform rect)
         {
             if (rect != null) m_ActiveCombos.Add(rect);

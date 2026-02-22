@@ -18,6 +18,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_TimerText; // Timer display (MM:SS)
     [SerializeField] private TextMeshProUGUI m_FailureTitle; // "Out of Lives!" or "Time's Up!"
     [SerializeField] private TextMeshProUGUI m_FailureSubtitle; // Subtitle text
+    [SerializeField] private TextMeshProUGUI m_FailureDescription; // Description text
     
     [Header("Timer Colors")]
     [SerializeField] private Color m_TimerDefaultColor = Color.white; // Default timer color
@@ -239,6 +240,11 @@ public class GameUIContoleer : MonoBehaviour
             if (m_FailureSubtitle != null)
             {
                 m_FailureSubtitle.text = GameManager.Instance.GetFailureSubtitle();
+            }
+
+            if (m_FailureDescription != null)
+            {
+                m_FailureDescription.text = GameManager.Instance.GetFailureDescription();
             }
         }
     }
