@@ -7,6 +7,8 @@ using TMPro;
 using Assets.Scripts.Core;
 using Assets.Scripts.Data;
 
+using Assets.Scripts.Utils;
+
 namespace Assets.Scripts.Lobby
 {
     public class HomeContoller : MonoBehaviour
@@ -504,6 +506,23 @@ namespace Assets.Scripts.Lobby
             {
                 Debug.LogError("[HomeContoller] AdsManager.Instance is null!");
             }
+        }
+
+        public void OnShareButtonClicked()
+        {
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+
+            string text = "Check out Arrows Legend! Can you beat my level?";
+            string url = "";
+
+            #if UNITY_ANDROID
+            url = "https://play.google.com/store/apps/details?id=" + Application.identifier;
+            #elif UNITY_IOS
+            // User should replace YOUR_APP_ID with their actual App Store ID
+            url = "https://apps.apple.com/app/idYOUR_APP_ID"; 
+            #endif
+
+            NativeShare.Share(text, url, "Arrows Legend");
         }
 
         public void OnPlayButtonClicked()
