@@ -295,29 +295,21 @@ namespace Assets.Scripts.Lobby
             
             if (jsonFile != null)
             {
-                LevelData data = JsonUtility.FromJson<LevelData>(jsonFile.text);
-                int totalPoints = 0;
-                if (data != null && data.arrows != null)
-                {
-                    foreach (var arrow in data.arrows)
-                    {
-                        if (arrow.path != null) totalPoints += arrow.path.Count;
-                    }
-                }
-
-                if (totalPoints < 120)
+                int lastDifit = int.Parse(levelId.Substring(levelId.Length - 1));
+                
+                if (lastDifit == 4 || lastDifit == 9 || UserDataManager.Instance.CurrentLevel < 7)
                 {
                     m_DifficultyText.text = "Easy Level";
                     Color c = m_EasyColor; c.a = 1f;
                     m_DifficultyText.color = c;
                 }
-                else if (totalPoints < 400)
+                else if (lastDifit == 1 || lastDifit == 2 || lastDifit == 5 || lastDifit == 7 || lastDifit == 0)
                 {
                     m_DifficultyText.text = "Hard Level";
                     Color c = m_HardColor; c.a = 1f;
                     m_DifficultyText.color = c;
                 }
-                else if (totalPoints < 900)
+                else if (lastDifit == 3 || lastDifit == 6)
                 {
                     m_DifficultyText.text = "Super Hard Level";
                     Color c = m_SuperHardColor; c.a = 1f;

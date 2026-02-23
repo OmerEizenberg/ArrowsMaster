@@ -190,6 +190,7 @@ namespace Assets.Scripts.Core
             // Use fixed world distance of 1.0 (approximately 1 grid cell size)
             // This ensures the radius "scales" with zoom (visually consistent in world space)
             float worldThreshold = 0.9f; 
+            float wrongArrowThreshold = 0.1f; 
             float minDistance = worldThreshold;
             
             // Convert click to world space for distance check
@@ -209,7 +210,7 @@ namespace Assets.Scripts.Core
                     // Calculate distance in World Space
                     float dist = Vector2.Distance(worldClickPos, segment.transform.position);
                     
-                    if (dist < minDistance)
+                    if (dist < minDistance && (arrow.CanMoveForward() || dist < wrongArrowThreshold))
                     {
                         minDistance = dist;
                         closestArrow = arrow;

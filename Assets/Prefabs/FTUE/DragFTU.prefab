@@ -162,6 +162,7 @@ GameObject:
   - component: {fileID: 1197705846550433116}
   - component: {fileID: 4108215083017636655}
   - component: {fileID: 3753558881564103794}
+  - component: {fileID: -1819380713311902852}
   m_Layer: 5
   m_Name: DragFTU
   m_TagString: Untagged
@@ -250,6 +251,18 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &-1819380713311902852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7570702124109651582}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e3fbddc0e05c4cc79b11f2d74367da7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &9210570449189524117
 GameObject:
   m_ObjectHideFlags: 0
