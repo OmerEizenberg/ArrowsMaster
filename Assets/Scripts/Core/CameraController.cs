@@ -332,7 +332,7 @@ namespace Assets.Scripts.Core
             float startZoom = fitZoom + initExtraZoomBuffer;
 
             // Compute the final "gameplay" zoom (what the player sees after animation)
-            float finalZoom = Mathf.Min(25f, fitZoom);
+            float finalZoom = fitZoom;//Mathf.Min(25f, fitZoom);
             finalZoom       = Mathf.Max(finalZoom, minZoom);
 
             // Store zoom limits for gameplay

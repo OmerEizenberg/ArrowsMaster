@@ -108,7 +108,7 @@ COMMON_CONFIG = {
     "ALPHA_THRESHOLD": 128
 }
 
-DURATION_MULTIPLIER = 0.121
+DURATION_MULTIPLIER = 0.2
 
 def rgb_to_hex(rgb):
     return '#{:02x}{:02x}{:02x}'.format(rgb[0], rgb[1], rgb[2])
@@ -215,7 +215,7 @@ def generate_difficulty_3(image_path, grid_width, grid_height, config):
             
             if final_density >= config["TARGET_DENSITY"] and is_level_solvable(level_data):
                 print(f"  Level Attempt {attempt+1}: Solvability PASSED. Saving (Density: {final_density:.1%}).")
-                level_data["duration"] = occupied_points * DURATION_MULTIPLIER
+                level_data["duration"] = max(30, occupied_points * DURATION_MULTIPLIER)
                 return level_data
             else:
                 reason = "SOLVER FAILED" if final_density >= config["TARGET_DENSITY"] else "DENSITY LOW"

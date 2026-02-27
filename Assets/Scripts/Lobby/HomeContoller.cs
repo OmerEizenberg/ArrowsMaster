@@ -522,14 +522,13 @@ namespace Assets.Scripts.Lobby
             if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
 
             string text = "Check out Arrows Legend! Can you beat my level?";
-            string url = "";
+            string url = "https://play.google.com/store/apps/details?id=" + Application.identifier;
 
-            #if UNITY_ANDROID
-            url = "https://play.google.com/store/apps/details?id=" + Application.identifier;
-            #elif UNITY_IOS
-            // User should replace YOUR_APP_ID with their actual App Store ID
-            url = "https://apps.apple.com/app/idYOUR_APP_ID"; 
-            #endif
+            if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
+            {
+                text = RemoteConfigManager.Instance.ShareText;
+                url = RemoteConfigManager.Instance.ShareUrl;
+            }
 
             NativeShare.Share(text, url, "Arrows Legend");
         }
@@ -563,7 +562,7 @@ namespace Assets.Scripts.Lobby
             int day = m_MonthlyChallengeController.p_CurrentDay;
             int year = m_MonthlyChallengeController.p_CurrentYear;
 
-            string levelName = $"level{month + day + (year % 10)}";
+            string levelName = $"level{165-(month + day + (year % 10))}";
             Debug.Log($"[HomeContoller] Calendar Play clicked. Starting Challenge: {levelName}");
 
             SwitchToGameUI();

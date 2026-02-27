@@ -83,7 +83,8 @@ public class MonthlyChallengeController : MonoBehaviour
     {
         // 1. Get the first day of the month
         DateTime firstDayOfMonth = new DateTime(year, month, 1);
-        m_challengeMonthTitle.text = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month) + " "+year;
+        m_challengeMonthTitle.isRightToLeftText = CultureInfo.CurrentCulture.TextInfo.IsRightToLeft;
+        m_challengeMonthTitle.text = firstDayOfMonth.ToString("Y", CultureInfo.CurrentCulture);
         p_CurrentYear = year;
         p_CurrentMonth = month;
         // 2. Calculate the starting offset
