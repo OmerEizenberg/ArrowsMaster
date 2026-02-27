@@ -851,6 +851,7 @@ MonoBehaviour:
   m_ShopLayer: {fileID: 1094050211}
   m_NoAdsCoinsBundleButton: {fileID: 143157005}
   m_NoAdsBadge: {fileID: 1817199417}
+  m_ShareBadge: {fileID: 472639712}
   m_LobbyAdReadyImage: {fileID: 543592233}
   m_TitleText: {fileID: 745029450}
   m_LevelText: {fileID: 563255410}
@@ -20982,7 +20983,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -165.5, y: -449.9}
+  m_AnchoredPosition: {x: -165.5, y: -449.90002}
   m_SizeDelta: {x: 340, y: 500}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1298691194

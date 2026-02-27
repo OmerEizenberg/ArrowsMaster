@@ -349,7 +349,10 @@ namespace Assets.Scripts.Lobby
             if (m_NoAdsCoinsBundleButton != null && IAPManager.Instance != null)
             {
                 m_NoAdsCoinsBundleButton.SetActive(!IAPManager.Instance.HasNoAds);
-                m_NoAdsBadge.SetActive(!IAPManager.Instance.HasNoAds);
+                if(UserDataManager.Instance.CurrentLevel >= 6)
+                {
+                    m_NoAdsBadge.SetActive(!IAPManager.Instance.HasNoAds);
+                }
             }
 
             UpdateLobbyAdReadyImage();
