@@ -525,6 +525,8 @@ namespace Assets.Scripts.Core
 
         public void SpawnCoinsSmallExplosion()
         {
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 6) return;
+
             GameObject prefab = Resources.Load<GameObject>("CoinsSmallExplosion");
             if (prefab != null)
             {

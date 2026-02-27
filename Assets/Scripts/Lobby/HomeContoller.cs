@@ -24,6 +24,7 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private GameObject m_ShopLayer;
         [SerializeField] private GameObject m_NoAdsCoinsBundleButton;
         [SerializeField] private GameObject m_NoAdsBadge;
+        [SerializeField] private GameObject m_ShareBadge;
         [SerializeField] private GameObject m_LobbyAdReadyImage;
 
         [SerializeField] private TextMeshProUGUI m_TitleText;
@@ -53,6 +54,19 @@ namespace Assets.Scripts.Lobby
 
         private void OnEnable()
         {
+            if (UserDataManager.Instance.CurrentLevel < 6)
+            {
+                m_LobbyCurrencyText.transform.parent.gameObject.SetActive(false);
+                m_NoAdsBadge.SetActive(false);
+                m_ShareBadge.SetActive(false);
+            }
+            else
+            {
+                m_LobbyCurrencyText.transform.parent.gameObject.SetActive(true);
+                m_NoAdsBadge.SetActive(true);
+                m_ShareBadge.SetActive(true);
+            }
+
             //PlayerPrefs.DeleteAll();
             RefreshLobbyUI();
 
