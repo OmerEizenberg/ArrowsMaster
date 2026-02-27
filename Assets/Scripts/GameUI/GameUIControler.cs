@@ -37,7 +37,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_StreakText;
 
     // Must match the time condition used in ArrowController.OnArrowClicked (0.9f)
-    private const float StreakTimeThreshold = 1.0f;
+    public const float StreakTimeThreshold = 1.0f;
     private Coroutine m_ComboTimerCoroutine;
 
     private void Start()

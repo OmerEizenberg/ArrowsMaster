@@ -187,38 +187,79 @@ namespace Assets.Scripts.Core
             if (IsScreenPositionBlocked(screenPos)) return null;
             if (GridManager.Instance == null) return null;
 
-            // Use fixed world distance of 1.0 (approximately 1 grid cell size)
-            // This ensures the radius "scales" with zoom (visually consistent in world space)
+            // Rule 2: 0.9f threshold for movable arrows
             float worldThreshold = 0.9f; 
-            float wrongArrowThreshold = 0.1f; 
-            float minDistance = worldThreshold;
+            // Rule 3: 0.2f threshold for blocked arrows
+            float wrongArrowThreshold = 0.15f; 
+            // Rule 4: 2.5f threshold for "all movable" logic
+            float worldAnyArrowThreshold = 2.5f; 
             
+            ArrowController directSelectionArrow = null;
+            Segment directSelectionSegment = null;
+            float minDistanceDirect = float.MaxValue;
+
+            bool blockedArrowInRange25 = false;
+            bool anyArrowInRange25 = false;
+            ArrowController fallbackSelectionArrow = null;
+            Segment fallbackSelectionSegment = null;
+            float minDistanceFallback = float.MaxValue;
+
             // Convert click to world space for distance check
             Vector3 worldClickPos = m_Camera.ScreenToWorldPoint(screenPos);
-            worldClickPos.z = 0; // Flatten z
-
-            ArrowController closestArrow = null;
+            worldClickPos.z = 0;
 
             List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
             foreach (var arrow in allArrows)
             {
                 if (arrow == null || arrow.segments == null) continue;
+                bool canMove = arrow.CanMoveForward();
+
                 foreach (var segment in arrow.segments)
                 {
                     if (segment == null) continue;
-                    
-                    // Calculate distance in World Space
                     float dist = Vector2.Distance(worldClickPos, segment.transform.position);
                     
-                    if (dist < minDistance && (arrow.CanMoveForward() || dist < wrongArrowThreshold))
+                    // --- Direct Rules (2 & 3) ---
+                    bool isEligibleDirect = (canMove && dist < worldThreshold) || (!canMove && dist < wrongArrowThreshold);
+                    if (isEligibleDirect && dist < minDistanceDirect)
                     {
-                        minDistance = dist;
-                        closestArrow = arrow;
-                        closestSegment = segment;
+                        minDistanceDirect = dist;
+                        directSelectionArrow = arrow;
+                        directSelectionSegment = segment;
+                    }
+
+                    // --- Fallback Rule (4) ---
+                    if (dist < worldAnyArrowThreshold)
+                    {
+                        anyArrowInRange25 = true;
+                        if (!canMove) blockedArrowInRange25 = true;
+
+                        if (dist < minDistanceFallback)
+                        {
+                            minDistanceFallback = dist;
+                            fallbackSelectionArrow = arrow;
+                            fallbackSelectionSegment = segment;
+                        }
                     }
                 }
             }
-            return closestArrow;
+
+            // Priority 1: Rules 2 and 3 (Closest arrow that is either movable and near, or blocked and very near)
+            if (directSelectionArrow != null)
+            {
+                closestSegment = directSelectionSegment;
+                return directSelectionArrow;
+            }
+
+            // Priority 2: Rule 4 (If no blocked arrows within 2.5f, select the closest arrow in that radius)
+            if (anyArrowInRange25 && !blockedArrowInRange25 && fallbackSelectionArrow != null)
+            {
+                Debug.Log(">>>>allCanMove (Rule 4 Triggered)");
+                closestSegment = fallbackSelectionSegment;
+                return fallbackSelectionArrow;
+            }
+
+            return null;
         }
 
         private bool IsScreenPositionBlocked(Vector2 screenPos)
