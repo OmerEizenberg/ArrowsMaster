@@ -73,6 +73,9 @@ namespace Assets.Scripts.Core
         private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
         private bool wasTimerActiveBeforeAd = false;
 
+        private Vector2 m_ScreenCenter;
+        private Vector2[] m_QuarterCenters = new Vector2[4];
+
         public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && !isTimeUp &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
                                 (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy) &&
@@ -93,6 +96,21 @@ namespace Assets.Scripts.Core
             DontDestroyOnLoad(gameObject);
 
             if (failureScreen != null) failureScreen.SetActive(false);
+
+            InitializeScreenPositions();
+        }
+
+        private void InitializeScreenPositions()
+        {
+            float w = Screen.width;
+            float h = Screen.height;
+            m_ScreenCenter = new Vector2(w * 0.5f, h * 0.4f);
+            
+            // 4 quarters (Pizza style - center of each quadrant)
+            m_QuarterCenters[0] = new Vector2(w * 0.3f, h * 0.7f); // Top Left
+            m_QuarterCenters[1] = new Vector2(w * 0.7f, h * 0.7f); // Top Right
+            m_QuarterCenters[2] = new Vector2(w * 0.3f, h * 0.2f); // Bottom Left
+            m_QuarterCenters[3] = new Vector2(w * 0.7f, h * 0.2f); // Bottom Right
         }
 
         private void Start()
@@ -889,107 +907,17 @@ namespace Assets.Scripts.Core
             m_ActiveCombos.Clear();
         }
 
-        public Vector2 GetValidComboPosition(Vector2 idealScreenPos, float minDistancePercent)
+        public Vector2 GetValidComboPosition(bool isVoice = false)
         {
-            // 1. Clean list (Remove nulls or inactive objects)
-            m_ActiveCombos.RemoveAll(c => c == null || !c.gameObject.activeInHierarchy);
-
-            float minDistancePx = Screen.width * minDistancePercent;
-            float arrowAvoidanceDistPx = Screen.width * 0.12f;
-
-            // Define bounds (UI Safety Zones)
-            float minX = Screen.width * 0.12f;
-            float maxX = Screen.width * 0.88f;
-            float minY = Screen.height * 0.18f;
-            float maxY = Screen.height * 0.82f;
-
-            Camera cam = Camera.main;
-            if (cam == null) return idealScreenPos;
-
-            // 2. Identify the grid cell of the click (3x3 grid)
-            float safeWidth = maxX - minX;
-            float safeHeight = maxY - minY;
-            int clickCellX = Mathf.FloorToInt((idealScreenPos.x - minX) / (safeWidth / 3f));
-            int clickCellY = Mathf.FloorToInt((idealScreenPos.y - minY) / (safeHeight / 3f));
-            clickCellX = Mathf.Clamp(clickCellX, 0, 2);
-            clickCellY = Mathf.Clamp(clickCellY, 0, 2);
-
-            // 3. Collect Obstacles
-            List<Vector2> comboObstacles = new List<Vector2>();
-            foreach (var combo in m_ActiveCombos) comboObstacles.Add(combo.position);
-
-            List<Vector2> arrowObstacles = new List<Vector2>();
-            if (GridManager.Instance != null)
+            if (isVoice)
             {
-                foreach (var arrow in GridManager.Instance.GetAllArrows())
-                {
-                    if (arrow == null || arrow.segments.Count == 0) continue;
-                    arrowObstacles.Add(cam.WorldToScreenPoint(arrow.segments[0].transform.position));
-                    if (arrow.segments.Count > 1)
-                        arrowObstacles.Add(cam.WorldToScreenPoint(arrow.segments[arrow.segments.Count - 1].transform.position));
-                }
+                return m_ScreenCenter;
             }
 
-            Vector2 bestPos = idealScreenPos;
-            float bestScore = -100000f;
-
-            // 4. Sample candidates across ALL cells, with a bonus for NOT being in the click cell
-            int gridSamples = 6; // 6x6 samples across the whole safe area
-            for (int ix = 0; ix < gridSamples; ix++)
-            {
-                for (int iy = 0; iy < gridSamples; iy++)
-                {
-                    // Calculate candidate position centrally in a 6x6 sampling grid
-                    Vector2 candidate = new Vector2(
-                        minX + (safeWidth / gridSamples) * (ix + 0.5f),
-                        minY + (safeHeight / gridSamples) * (iy + 0.5f)
-                    );
-
-                    // Determine which of the 3x3 cells this candidate belongs to
-                    int cellX = Mathf.FloorToInt((candidate.x - minX) / (safeWidth / 3f));
-                    int cellY = Mathf.FloorToInt((candidate.y - minY) / (safeHeight / 3f));
-                    
-                    bool isOtherCell = (cellX != clickCellX || cellY != clickCellY);
-
-                    // Score candidate
-                    float score = CalculatePositionScore(candidate, idealScreenPos, comboObstacles, arrowObstacles, minDistancePx, arrowAvoidanceDistPx);
-                    
-                    // Variety Bonus: Prefer other cells strongly
-                    if (isOtherCell) score += 500f; 
-
-                    if (score > bestScore)
-                    {
-                        bestScore = score;
-                        bestPos = candidate;
-                    }
-                }
-            }
-
-            return bestPos;
+            // Return center of a random quarter for combo feedback
+            return m_QuarterCenters[UnityEngine.Random.Range(0, 4)];
         }
 
-        private float CalculatePositionScore(Vector2 pos, Vector2 ideal, List<Vector2> combos, List<Vector2> arrows, float minDistPx, float arrowAvoidPx)
-        {
-            float score = 1000f;
-
-            // Penalty for distance from ideal (prefer closer to click)
-            score -= Vector2.Distance(pos, ideal) * 0.5f;
-
-            // Hard penalty for combo overlaps
-            foreach (var c in combos)
-            {
-                float dist = Vector2.Distance(pos, c);
-                if (dist < minDistPx) score -= (minDistPx - dist) * 10f;
-            }
-
-            // Penalty for arrow proximity
-            foreach (var a in arrows)
-            {
-                float dist = Vector2.Distance(pos, a);
-                if (dist < arrowAvoidPx) score -= (arrowAvoidPx - dist) * 5f;
-            }
-
-            return score;
-        }
+        
     }
 }
