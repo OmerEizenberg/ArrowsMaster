@@ -13,6 +13,7 @@ namespace Assets.Scripts.Core
         private LevelPlayInterstitialAd interstitialAd;
         private LevelPlayRewardedAd RewardedAd;
         private LevelPlayRewardedAd coinsRewardedAd;
+        private LevelPlayBannerAd settingsBannerAd;
         private bool isInitialized = false;
         private float lastAdShowTime = -30f;
         private const float AD_COOLDOWN = 30f;
@@ -75,6 +76,14 @@ namespace Assets.Scripts.Core
             get
             {
                 return "ncnu1ipmqxwjbszr";
+            }
+        }
+
+        private string SettingsBannerAdUnitId
+        {
+            get
+            {
+                return "rd82j6gdgow61x63";
             }
         }
 
@@ -166,6 +175,7 @@ namespace Assets.Scripts.Core
                 CreateInterstitialAd();
                 CreateRewardedAd();
                 CreateCoinsRewardedAd();
+                CreateSettingsBannerAd();
             });
         }
 
@@ -540,11 +550,55 @@ namespace Assets.Scripts.Core
             }
         }
 
+        // --- Banner Ad ---
+        private void CreateSettingsBannerAd()
+        {
+            if (settingsBannerAd != null) settingsBannerAd.DestroyAd();
+            settingsBannerAd = new LevelPlayBannerAd(SettingsBannerAdUnitId);
+            
+            settingsBannerAd.OnAdLoaded += (info) => Debug.Log($"[AdsManager] Settings Banner Loaded: {info}");
+            settingsBannerAd.OnAdLoadFailed += (error) => Debug.LogError($"[AdsManager] Settings Banner Load Failed: {error}");
+            settingsBannerAd.OnAdDisplayed += (info) => Debug.Log($"[AdsManager] Settings Banner Displayed: {info}");
+        }
+
+        public void ShowSettingsBanner()
+        {
+            if (!isInitialized)
+            {
+                Debug.LogWarning("[AdsManager] Cannot show banner: SDK not initialized.");
+                return;
+            }
+
+            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
+            {
+                Debug.Log("[AdsManager] Skipping Banner Show: User has No Ads.");
+                return;
+            }
+
+            if (settingsBannerAd == null)
+            {
+                CreateSettingsBannerAd();
+            }
+
+            Debug.Log("[AdsManager] Showing/Loading Settings Banner Ad.");
+            settingsBannerAd.LoadAd();
+        }
+
+        public void HideSettingsBanner()
+        {
+            if (settingsBannerAd != null)
+            {
+                Debug.Log("[AdsManager] Hiding Settings Banner Ad.");
+                settingsBannerAd.HideAd();
+            }
+        }
+
         private void OnDestroy()
         {
             if (interstitialAd != null) interstitialAd.DestroyAd();
             if (RewardedAd != null) RewardedAd.DestroyAd();
             if (coinsRewardedAd != null) coinsRewardedAd.DestroyAd();
+            if (settingsBannerAd != null) settingsBannerAd.DestroyAd();
         }
     }
 }

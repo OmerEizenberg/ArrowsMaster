@@ -36,6 +36,18 @@ namespace Assets.Scripts.Core
         private void OnEnable()
         {
             SyncToggles();
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowSettingsBanner();
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.HideSettingsBanner();
+            }
         }
 
         private void SyncToggles()
