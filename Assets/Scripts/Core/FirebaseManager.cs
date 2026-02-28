@@ -31,7 +31,9 @@ public class FirebaseManager : MonoBehaviour
     public const string PARAM_CURRENCY = "currency";
     public const string PARAM_ITEM_ID = "item_id";
     public const string PARAM_AD_PLATFORM = "ad_platform";
+    public const string PARAM_AD_SOURCE = "ad_source";
     public const string PARAM_AD_UNIT_NAME = "ad_unit_name";
+    public const string PARAM_AD_FORMAT = "ad_format";
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoInitialize()

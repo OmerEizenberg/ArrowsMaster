@@ -202,12 +202,16 @@ namespace Assets.Scripts.Core
             interstitialAd.OnAdDisplayed += (info) => {
                 Debug.Log($"[AdsManager] Interstitial Ad Displayed: {info}");
 
-                // --- Analytics: ad_impression ---
+                // --- Analytics: ad_impression (ILRD) ---
                 if (FirebaseManager.Instance != null)
                 {
                     FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, info.AdNetwork),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName));
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "interstitial"),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD")); // Revenue is in USD
                 }
                 // --------------------------------
             };
@@ -340,12 +344,16 @@ namespace Assets.Scripts.Core
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}");
                     
-                    // --- Analytics: ad_impression ---
+                    // --- Analytics: ad_impression (ILRD) ---
                     if (FirebaseManager.Instance != null)
                     {
                         FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, info.AdNetwork),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName));
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "rewarded"),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
                     }
                     // --------------------------------
                 });
@@ -473,12 +481,16 @@ namespace Assets.Scripts.Core
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Coins Rewarded Ad Displayed: {info}");
 
-                    // --- Analytics: ad_impression ---
+                    // --- Analytics: ad_impression (ILRD) ---
                     if (FirebaseManager.Instance != null)
                     {
                         FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, info.AdNetwork),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName));
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "rewarded_coins"),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
                     }
                     // --------------------------------
                 });
@@ -558,7 +570,22 @@ namespace Assets.Scripts.Core
             
             settingsBannerAd.OnAdLoaded += (info) => Debug.Log($"[AdsManager] Settings Banner Loaded: {info}");
             settingsBannerAd.OnAdLoadFailed += (error) => Debug.LogError($"[AdsManager] Settings Banner Load Failed: {error}");
-            settingsBannerAd.OnAdDisplayed += (info) => Debug.Log($"[AdsManager] Settings Banner Displayed: {info}");
+            settingsBannerAd.OnAdDisplayed += (info) => {
+                Debug.Log($"[AdsManager] Settings Banner Displayed: {info}");
+
+                // --- Analytics: ad_impression (ILRD) ---
+                if (FirebaseManager.Instance != null)
+                {
+                    FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "banner"),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
+                }
+                // --------------------------------
+            };
         }
 
         public void ShowSettingsBanner()
