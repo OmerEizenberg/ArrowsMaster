@@ -1,5 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
+#if UNITY_IOS
+using Firebase.Messaging;
+using Firebase.Extensions;
+#endif
 
 namespace Assets.Scripts.Core
 {
@@ -10,6 +14,7 @@ namespace Assets.Scripts.Core
         [Header("UI Toggles")]
         [SerializeField] private Toggle soundToggle;
         [SerializeField] private Toggle vibrationToggle;
+        [SerializeField] private GameObject pushNotificationToggle;
 
         private const string SoundKey = "SoundEnabled";
         private const string VibrationKey = "VibrationEnabled";
@@ -25,6 +30,7 @@ namespace Assets.Scripts.Core
             DontDestroyOnLoad(gameObject);
 
             LoadSettings();
+            CheckPushNotificationPermission();
         }
 
         private void Start()
@@ -102,6 +108,93 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(VibrationKey, enabled ? 1 : 0);
             PlayerPrefs.Save();
             ApplySettings();
+        }
+
+        public void PushNotificationClicked()
+        {
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayClick();
+            }
+
+#if UNITY_ANDROID
+            try
+            {
+                using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
+                {
+                    int sdkInt = version.GetStatic<int>("SDK_INT");
+                    if (sdkInt >= 33)
+                    {
+                        // Trigger native Android permission request flow
+                        UnityEngine.Android.Permission.RequestUserPermission("android.permission.POST_NOTIFICATIONS");
+                        // We hide the button for this session to let the system handle the flow
+                        if (pushNotificationToggle != null) pushNotificationToggle.SetActive(false);
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[SettingsManager] Error requesting Android notification permission: " + e.Message);
+            }
+#elif UNITY_IOS
+            FirebaseMessaging.RequestPermissionAsync().ContinueWithOnMainThread(task => {
+                if (task.IsCompleted && !task.IsFaulted) {
+                    // Check if permission was granted
+                    bool isGranted = (task.Result == NotificationSetting.Enabled);
+                    if (isGranted && pushNotificationToggle != null) 
+                    {
+                        pushNotificationToggle.SetActive(false);
+                    }
+                }
+            });
+#endif
+        }
+
+
+        private void CheckPushNotificationPermission()
+        {
+            if (pushNotificationToggle == null) return;
+
+#if UNITY_EDITOR
+            pushNotificationToggle.SetActive(false);
+#elif UNITY_ANDROID
+            try
+            {
+                using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
+                {
+                    int sdkInt = version.GetStatic<int>("SDK_INT");
+                    // On Android 13 (API 33) and above, we need to check POST_NOTIFICATIONS permission
+                    if (sdkInt >= 33)
+                    {
+                        bool hasPermission = UnityEngine.Android.Permission.HasUserAuthorizedPermission("android.permission.POST_NOTIFICATIONS");
+                        pushNotificationToggle.SetActive(!hasPermission);
+                    }
+                    else
+                    {
+                        // On older Android versions, permission is granted on install
+                        pushNotificationToggle.SetActive(false);
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[SettingsManager] Error checking Android notification permission: " + e.Message);
+                pushNotificationToggle.SetActive(false);
+            }
+#elif UNITY_IOS
+            FirebaseMessaging.RequestPermissionAsync().ContinueWithOnMainThread(task => {
+                if (task.IsCompleted && !task.IsFaulted) {
+                    // If permission is not enabled, show the toggle to encourage user to enable it
+                    bool granted = (task.Result == NotificationSetting.Enabled);
+                    pushNotificationToggle.SetActive(!granted);
+                } else {
+                    // If check fails, show it anyway so the user can try to enable it
+                    pushNotificationToggle.SetActive(true);
+                }
+            });
+#else
+            pushNotificationToggle.SetActive(false);
+#endif
         }
 
         private void ApplySettings()
