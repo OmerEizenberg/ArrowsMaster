@@ -72,6 +72,11 @@ namespace Assets.Scripts.GameUI
         {
             UpdateDisplay(newRecord);
 
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayNewRecord();
+            }
+
             if (m_AnimationCoroutine != null)
             {
                 StopCoroutine(m_AnimationCoroutine);

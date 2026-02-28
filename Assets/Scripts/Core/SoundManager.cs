@@ -29,6 +29,9 @@ namespace Assets.Scripts.Core
         public AudioClip AmazingVoice;
         public AudioClip[] streakSounds;
         public AudioClip ShopSound;
+        public AudioClip NewRecordSound;
+
+        private float m_LastNewRecordSoundTime = -30f;
 
         [SerializeField] private AudioSource musicSource;
 
@@ -144,6 +147,15 @@ namespace Assets.Scripts.Core
         public void PlayShop()
         {
             PlaySound(ShopSound);
+        }
+
+        public void PlayNewRecord()
+        {
+            if (Time.time - m_LastNewRecordSoundTime >= 30f)
+            {
+                PlaySound(NewRecordSound);
+                m_LastNewRecordSoundTime = Time.time;
+            }
         }
 
         public void PlaySmallCheer()

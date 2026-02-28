@@ -16623,7 +16623,7 @@ MonoBehaviour:
   MediumCheer: {fileID: 8300000, guid: 93c69b7afbc1646bc82d3f1800a7ab05, type: 3}
   BigCheer: {fileID: 8300000, guid: d0f8f29d5ad7a4992b6bff45c8de84f0, type: 3}
   ThumbUp: {fileID: 8300000, guid: 73c4fe6991f664f66992f4a46c105eb2, type: 3}
-  HintIn: {fileID: 0}
+  HintIn: {fileID: 8300000, guid: 68076867632034dbbb4768cf8ba7e053, type: 3}
   BackgroundMusic: {fileID: 8300000, guid: e1f3dba82fd0e40cebf5b19cc77f5759, type: 3}
   PerfectVoice: {fileID: 8300000, guid: 67ee11764dd164fe1930973a634c7cd1, type: 3}
   GoodVoice: {fileID: 8300000, guid: ff944cab0949f452788f846a3683862f, type: 3}
@@ -16642,6 +16642,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 3ee59d2f3b806411e8603bf46ddf0c94, type: 3}
   - {fileID: 8300000, guid: a6212c03d85514f46ada012ca4d563e1, type: 3}
   ShopSound: {fileID: 8300000, guid: 98d10627ccbf24ec4890968b75f979f1, type: 3}
+  NewRecordSound: {fileID: 8300000, guid: 9d01a7c18cb0d4c0dbf84aea0bb30805, type: 3}
   musicSource: {fileID: 0}
 --- !u!1 &985538275
 GameObject:
