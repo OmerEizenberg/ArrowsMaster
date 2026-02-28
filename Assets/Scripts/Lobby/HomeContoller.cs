@@ -26,6 +26,11 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private GameObject m_NoAdsBadge;
         [SerializeField] private GameObject m_ShareBadge;
         [SerializeField] private GameObject m_LobbyAdReadyImage;
+        [SerializeField] private Button m_ChallengeButton;
+        [SerializeField] private GameObject m_LockedButton;
+        [SerializeField] private GameObject m_LockedChallengeTooltip;
+        [SerializeField] private Image m_ChallengeIcon;
+        [SerializeField] private TextMeshProUGUI m_ChallengeText;
 
         [SerializeField] private TextMeshProUGUI m_TitleText;
         [SerializeField] private TextMeshProUGUI m_LevelText;
@@ -51,6 +56,7 @@ namespace Assets.Scripts.Lobby
         private Coroutine m_CoinCountCoroutine;
         private Coroutine m_LobbyScaleCoroutine;
         private Coroutine m_ShopScaleCoroutine;
+        private Coroutine m_TooltipCoroutine;
 
         private void OnEnable()
         {
@@ -349,13 +355,47 @@ namespace Assets.Scripts.Lobby
             if (m_NoAdsCoinsBundleButton != null && IAPManager.Instance != null)
             {
                 m_NoAdsCoinsBundleButton.SetActive(!IAPManager.Instance.HasNoAds);
-                if(UserDataManager.Instance.CurrentLevel >= 6)
+                if (UserDataManager.Instance.CurrentLevel >= 6)
                 {
                     m_NoAdsBadge.SetActive(!IAPManager.Instance.HasNoAds);
                 }
             }
 
             UpdateLobbyAdReadyImage();
+            UpdateChallengeLock();
+        }
+
+        private void UpdateChallengeLock()
+        {
+            if (UserDataManager.Instance == null) return;
+
+            bool isLocked = UserDataManager.Instance.CurrentLevel < 12;
+
+            if (m_ChallengeButton != null)
+            {
+                m_ChallengeButton.interactable = !isLocked;
+            }
+
+            if (m_LockedButton != null)
+            {
+                m_LockedButton.SetActive(isLocked);
+            }
+
+            float alpha = isLocked ? 0.5f : 1.0f;
+
+            if (m_ChallengeIcon != null)
+            {
+                Color color = m_ChallengeIcon.color;
+                color.a = alpha;
+                m_ChallengeIcon.color = color;
+            }
+
+            if (m_ChallengeText != null)
+            {
+                Color color = m_ChallengeText.color;
+                color.a = alpha;
+                m_ChallengeText.color = color;
+            }
         }
 
         private void UpdateLobbyAdReadyImage()
@@ -702,6 +742,22 @@ namespace Assets.Scripts.Lobby
             }
 
             return 0;
+        }
+
+        public void OnLockedChallengeButtonClicked()
+        {
+            if (m_LockedChallengeTooltip == null) return;
+
+            if (m_TooltipCoroutine != null) StopCoroutine(m_TooltipCoroutine);
+            m_TooltipCoroutine = StartCoroutine(ShowTooltipCoroutine());
+        }
+
+        private IEnumerator ShowTooltipCoroutine()
+        {
+            m_LockedChallengeTooltip.SetActive(true);
+            yield return new WaitForSeconds(3f);
+            m_LockedChallengeTooltip.SetActive(false);
+            m_TooltipCoroutine = null;
         }
     }
 }
