@@ -27,6 +27,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private TextMeshProUGUI m_RewardedAdAmountText;
         [SerializeField] private GameObject m_ShopLayer;
         [SerializeField] private GameObject m_LevelCurrencyContainer;
+        [SerializeField] private GameObject m_StreakRecordContainer;
 
         [Header("Settings")]
         public int maxLives = 3;
@@ -50,6 +51,7 @@ namespace Assets.Scripts.Core
         public event Action<bool> OnHintVisibilityChanged;
         public event Action<string> OnTimerUpdated; // Passes formatted time string MM:SS
         public event Action<int> OnLevelCurrencyChanged; 
+        public event Action<int> OnMaxStreakBroken;
         public bool p_isLevelProgression = true;
 
         public int currentChallengeYear;
@@ -536,6 +538,12 @@ namespace Assets.Scripts.Core
             if (UserDataManager.Instance.CurrentLevel < 6) return;
             p_StreakCount++;
             m_GameUI.PlayStreakAnimation();
+
+            if (p_StreakCount > UserDataManager.Instance.MaxStreak)
+            {
+                UserDataManager.Instance.UpdateMaxStreak(p_StreakCount);
+                OnMaxStreakBroken?.Invoke(p_StreakCount);
+            }
         }
 
         public void ResetStreak()
@@ -785,6 +793,11 @@ namespace Assets.Scripts.Core
             if (m_LevelCurrencyContainer != null)
             {
                 m_LevelCurrencyContainer.SetActive(UserDataManager.Instance.CurrentLevel >= 5);
+            }
+
+            if (m_StreakRecordContainer != null)
+            {
+                m_StreakRecordContainer.SetActive(UserDataManager.Instance.CurrentLevel >= 6);
             }
         }
         

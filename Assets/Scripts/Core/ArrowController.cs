@@ -356,63 +356,60 @@ namespace Assets.Scripts.Core
 
                         if (CameraController.Instance != null && GameManager.Instance != null)
                         {
-                            bool timeCondition = (Time.time - GameManager.Instance.LastArrowSelectionTime) <= GameUIContoleer.StreakTimeThreshold;
+                            var gameManager = GameManager.Instance;
+                            bool timeCondition = (Time.time - gameManager.LastArrowSelectionTime) <= GameUIContoleer.StreakTimeThreshold;
                             //bool panCondition = !CameraController.Instance.HasPannedSinceLastReset;
                             if (timeCondition && UserDataManager.Instance.CurrentLevel >= 6)
                             {
-                                GameManager.Instance.IncrementStreak();
-                                SoundManager.Instance.PlayStreak(GameManager.Instance.p_StreakCount - 1);
-                                GameManager.Instance.ClearActiveCombos();
+                                gameManager.IncrementStreak();
+                                SoundManager.Instance.PlayStreak(gameManager.p_StreakCount - 1);
+                                gameManager.ClearActiveCombos();
 
                                 // Instantiate Combo Feedback
                                 if (m_ComboPrefab != null)
                                 {
-                                    GameObject comboObj = Instantiate(m_ComboPrefab, GameManager.Instance.m_GameUI.transform.parent);
+                                    Transform uiParent = gameManager.m_GameUI.transform.parent;
+                                    GameObject comboObj = Instantiate(m_ComboPrefab, uiParent);
                                     RectTransform comboRect = comboObj.GetComponent<RectTransform>();
                                     // 1. Setup Combo Position
                                     if (comboRect != null)
                                     {
-                                        Vector3 finalScreenPos = GameManager.Instance.GetValidComboPosition(false);
-                                        RectTransform parentRect = (RectTransform)GameManager.Instance.m_GameUI.transform.parent;
+                                        Vector3 finalScreenPos = gameManager.GetValidComboPosition(false);
+                                        RectTransform parentRect = (RectTransform)uiParent;
                                         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, finalScreenPos, Camera.main, out Vector2 localPos))
                                         {
                                             comboRect.anchoredPosition = localPos;
                                         }
-                                        GameManager.Instance.RegisterCombo(comboRect);
+                                        gameManager.RegisterCombo(comboRect);
                                     }
 
                                     // 2. Setup Voice Position (if applicable)
-                                    if(GameManager.Instance.p_StreakCount-1 == 3 || GameManager.Instance.p_StreakCount-1 == 7 || GameManager.Instance.p_StreakCount-1 == 11)
+                                    if(gameManager.p_StreakCount-1 == 3 || gameManager.p_StreakCount-1 == 7 || gameManager.p_StreakCount-1 == 11)
                                     {
-                                        GameObject voiceObj = Instantiate(m_VoicePrefab, GameManager.Instance.m_GameUI.transform.parent);
+                                        GameObject voiceObj = Instantiate(m_VoicePrefab, uiParent);
                                         RectTransform voiceRect = voiceObj.GetComponent<RectTransform>();
                                         if (voiceRect != null)
                                         {
-                                            Vector3 finalVoiceScreenPos = GameManager.Instance.GetValidComboPosition(true);
-                                            RectTransform parentRect = (RectTransform)GameManager.Instance.m_GameUI.transform.parent;
-                                            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, finalVoiceScreenPos, Camera.main, out Vector2 localPos))
-                                            {
-                                                voiceRect.anchoredPosition = localPos;
-                                            }
-                                            GameManager.Instance.RegisterCombo(voiceRect);
+                                            voiceRect.anchoredPosition = Vector2.zero;
+                                            gameManager.RegisterCombo(voiceRect);
                                         }
                                     }
 
                                     ComboController comboCtrl = comboObj.GetComponent<ComboController>();
                                     if (comboCtrl != null)
                                     {
-                                        comboCtrl.UpdateUpComingComboNumber(GameManager.Instance.p_StreakCount-1);
+                                        comboCtrl.UpdateUpComingComboNumber(gameManager.p_StreakCount-1);
                                         comboCtrl.UpdateComboNumber();
-                                        comboCtrl.UpdateUpComingComboNumber(GameManager.Instance.p_StreakCount);
+                                        comboCtrl.UpdateUpComingComboNumber(gameManager.p_StreakCount);
                                     }
                                 }
                             }
                             else
                             {
-                                GameManager.Instance.ResetStreak();
+                                gameManager.ResetStreak();
                             }
                             // Update state for next pick
-                            GameManager.Instance.NotifyArrowSelection();
+                            gameManager.NotifyArrowSelection();
                             CameraController.Instance.ResetPanState();
                         }
                         float tempProbLike = Random.Range(0f,1f);

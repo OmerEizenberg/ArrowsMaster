@@ -139,9 +139,8 @@ namespace Assets.Scripts.Core
 #elif UNITY_IOS
             FirebaseMessaging.RequestPermissionAsync().ContinueWithOnMainThread(task => {
                 if (task.IsCompleted && !task.IsFaulted) {
-                    // Check if permission was granted
-                    bool isGranted = (task.Result == NotificationSetting.Enabled);
-                    if (isGranted && pushNotificationToggle != null) 
+                    // Hide the toggle once requested successfully
+                    if (pushNotificationToggle != null) 
                     {
                         pushNotificationToggle.SetActive(false);
                     }
@@ -184,12 +183,18 @@ namespace Assets.Scripts.Core
 #elif UNITY_IOS
             FirebaseMessaging.RequestPermissionAsync().ContinueWithOnMainThread(task => {
                 if (task.IsCompleted && !task.IsFaulted) {
-                    // If permission is not enabled, show the toggle to encourage user to enable it
-                    bool granted = (task.Result == NotificationSetting.Enabled);
-                    pushNotificationToggle.SetActive(!granted);
+                    // On iOS, if we can't check the exact status without native plugins, 
+                    // we'll hide the toggle if the request completes immediately, 
+                    // which often indicates it's already been handled.
+                    if (pushNotificationToggle != null)
+                    {
+                        pushNotificationToggle.SetActive(false);
+                    }
                 } else {
-                    // If check fails, show it anyway so the user can try to enable it
-                    pushNotificationToggle.SetActive(true);
+                    if (pushNotificationToggle != null)
+                    {
+                        pushNotificationToggle.SetActive(true);
+                    }
                 }
             });
 #else

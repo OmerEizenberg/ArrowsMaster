@@ -27,11 +27,13 @@ namespace Assets.Scripts.Core
         private const string ArrowsCurrencyKey = "ArrowsCurrency";
         private const string CurrentLevelAttemptsKey = "CurrentLevelAttempts";
         private const string LastAttemptLevelIdKey = "LastAttemptLevelId";
+        private const string MaxStreakKey = "MaxStreakRecord";
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
         public int CurrentLevelAttempts { get; private set; } = 1;
         public string LastAttemptLevelId { get; private set; } = string.Empty;
+        public int MaxStreak { get; private set; } = 0;
         public System.DateTime InstallDate { get; private set; }
 
         private Dictionary<string, int> m_MonthlyCache = new Dictionary<string, int>();
@@ -47,6 +49,7 @@ namespace Assets.Scripts.Core
             ArrowsCurrency = PlayerPrefs.GetInt(ArrowsCurrencyKey, 0);
             CurrentLevelAttempts = PlayerPrefs.GetInt(CurrentLevelAttemptsKey, 1);
             LastAttemptLevelId = PlayerPrefs.GetString(LastAttemptLevelIdKey, string.Empty);
+            MaxStreak = PlayerPrefs.GetInt(MaxStreakKey, 0);
             
             string installDateStr = PlayerPrefs.GetString(InstallDateKey, string.Empty);
             if (string.IsNullOrEmpty(installDateStr))
@@ -171,6 +174,17 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetString(LastAttemptLevelIdKey, LastAttemptLevelId);
             PlayerPrefs.Save();
             Debug.Log($"[UserDataManager] Reset attempts to 1 for level: {levelId}");
+        }
+
+        public void UpdateMaxStreak(int streak)
+        {
+            if (streak > MaxStreak)
+            {
+                MaxStreak = streak;
+                PlayerPrefs.SetInt(MaxStreakKey, MaxStreak);
+                PlayerPrefs.Save();
+                Debug.Log($"[UserDataManager] New Max Streak Record: {MaxStreak}");
+            }
         }
 
         private string GetMonthlyKey(int year, int month)
