@@ -116,7 +116,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 831680c361a99437dbfa56898c6b8345, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_DescriptionText: {fileID: 0}
+  m_DescriptionText: {fileID: 5517204294404672898}
   m_ActionButton: {fileID: 546079601755271172}
   m_SkipButton: {fileID: 7703983838448738736}
 --- !u!1 &704363685193084815
@@ -499,8 +499,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Update
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: e69cd353079ba4832813149989e615f1, type: 2}
-  m_sharedMaterial: {fileID: -6779341448956739584, guid: e69cd353079ba4832813149989e615f1, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
+  m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -524,7 +524,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 55.9
+  m_fontSize: 61.2
   m_fontSizeBase: 24
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -766,8 +766,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Update Available
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: e69cd353079ba4832813149989e615f1, type: 2}
-  m_sharedMaterial: {fileID: -6779341448956739584, guid: e69cd353079ba4832813149989e615f1, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
+  m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
