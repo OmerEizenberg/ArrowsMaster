@@ -59,45 +59,45 @@ FIXED_LEVEL_VALUES = {
     # Block 5 (E:33, SH:46, Spread:13)
     41: (38, 38), 42: (38, 38), 43: (42, 42), 44: (33, 33), 45: (38, 38), 46: (42, 42), 47: (38, 38), 48: (46, 46), 49: (33, 33), 50: (38, 38),
     # Block 6 (E:34, SH:49, Spread:15)
-    51: (40, 40), 52: (40, 40), 53: (45, 45), 54: (34, 34), 55: (40, 40), 56: (45, 45), 57: (40, 40), 58: (49, 49), 59: (34, 34), 60: (40, 40),
+    51: (39, 40), 52: (40, 40), 53: (45, 45), 54: (34, 34), 55: (40, 40), 56: (45, 45), 57: (40, 40), 58: (49, 49), 59: (34, 34), 60: (40, 40),
     # Block 7 (E:36, SH:52, Spread:16)
-    61: (42, 42), 62: (42, 42), 63: (47, 47), 64: (36, 36), 65: (42, 42), 66: (47, 47), 67: (42, 42), 68: (52, 52), 69: (36, 36), 70: (42, 42),
+    61: (40, 42), 62: (42, 42), 63: (47, 47), 64: (36, 36), 65: (42, 42), 66: (45, 47), 67: (42, 42), 68: (52, 52), 69: (36, 36), 70: (42, 42),
     # Block 8 (E:37, SH:55, Spread:18)
-    71: (44, 44), 72: (44, 44), 73: (50, 50), 74: (37, 37), 75: (44, 44), 76: (50, 50), 77: (44, 44), 78: (55, 55), 79: (37, 37), 80: (44, 44),
+    71: (41, 44), 72: (44, 44), 73: (50, 50), 74: (37, 37), 75: (44, 44), 76: (49, 50), 77: (43, 44), 78: (55, 55), 79: (37, 37), 80: (44, 44),
     # Block 9 (E:38, SH:57, Spread:19)
-    81: (46, 46), 82: (46, 46), 83: (51, 51), 84: (38, 38), 85: (46, 46), 86: (51, 51), 87: (46, 46), 88: (57, 57), 89: (38, 38), 90: (46, 46),
+    81: (42, 46), 82: (46, 46), 83: (51, 51), 84: (38, 38), 85: (46, 46), 86: (50, 51), 87: (44, 46), 88: (57, 57), 89: (38, 38), 90: (46, 46),
     # Block 10 (E:40, SH:60, Spread:20)
-    91: (48, 48), 92: (48, 48), 93: (54, 54), 94: (40, 40), 95: (48, 48), 96: (54, 54), 97: (48, 48), 98: (60, 60), 99: (40, 40), 100: (48, 48),
+    91: (43, 48), 92: (48, 48), 93: (54, 54), 94: (40, 40), 95: (48, 48), 96: (51, 54), 97: (45, 48), 98: (60, 60), 99: (40, 40), 100: (48, 48),
     # Block 11 (E:41, SH:63, Spread:22)
-    101: (50, 50), 102: (50, 50), 103: (56, 56), 104: (41, 41), 105: (50, 50), 106: (56, 56), 107: (50, 50), 108: (63, 63), 109: (41, 41), 110: (50, 50),
+    101: (45, 50), 102: (50, 50), 103: (56, 56), 104: (41, 41), 105: (50, 50), 106: (54, 56), 107: (47, 50), 108: (62, 63), 109: (41, 41), 110: (50, 50),
     # Block 12 (E:42, SH:66, Spread:24)
-    111: (52, 52), 112: (52, 52), 113: (59, 59), 114: (42, 42), 115: (52, 52), 116: (59, 59), 117: (52, 52), 118: (66, 66), 119: (42, 42), 120: (52, 52),
+    111: (46, 52), 112: (52, 52), 113: (59, 59), 114: (42, 42), 115: (52, 52), 116: (56, 59), 117: (49, 52), 118: (62, 66), 119: (42, 42), 120: (52, 52),
     # Block 13 (E:44, SH:69, Spread:25)
-    121: (54, 54), 122: (54, 54), 123: (62, 62), 124: (44, 44), 125: (54, 54), 126: (62, 62), 127: (54, 54), 128: (69, 69), 129: (44, 44), 130: (54, 54),
+    121: (47, 54), 122: (54, 54), 123: (62, 62), 124: (44, 44), 125: (54, 54), 126: (59, 62), 127: (50, 54), 128: (63, 69), 129: (44, 44), 130: (54, 54),
     # Block 14 (E:45, SH:72, Spread:27)
-    131: (56, 56), 132: (56, 56), 133: (64, 64), 134: (45, 45), 135: (56, 56), 136: (64, 64), 137: (56, 56), 138: (72, 72), 139: (45, 45), 140: (56, 56),
+    131: (48, 56), 132: (56, 56), 133: (64, 64), 134: (45, 45), 135: (56, 56), 136: (62, 64), 137: (51, 56), 138: (63, 72), 139: (45, 45), 140: (54, 56),
     # Block 15 (E:46, SH:74, Spread:28)
-    141: (57, 57), 142: (57, 57), 143: (66, 66), 144: (46, 46), 145: (57, 57), 146: (66, 66), 147: (57, 57), 148: (74, 74), 149: (46, 46), 150: (57, 57),
+    141: (49, 57), 142: (57, 57), 143: (66, 66), 144: (46, 46), 145: (57, 57), 146: (64, 66), 147: (52, 57), 148: (64, 74), 149: (46, 46), 150: (55, 57),
     # Block 16 (E:48, SH:77, Spread:29)
-    151: (60, 60), 152: (60, 60), 153: (68, 68), 154: (48, 48), 155: (60, 60), 156: (68, 68), 157: (60, 60), 158: (77, 77), 159: (48, 48), 160: (60, 60),
+    151: (51, 60), 152: (60, 60), 153: (68, 68), 154: (48, 48), 155: (60, 60), 156: (66, 68), 157: (54, 60), 158: (65, 77), 159: (48, 48), 160: (56, 60),
     # Block 17 (E:49, SH:80, Spread:31)
-    161: (61, 61), 162: (61, 61), 163: (71, 71), 164: (49, 49), 165: (61, 61), 166: (71, 71), 167: (61, 61), 168: (80, 80), 169: (49, 49), 170: (61, 61),
+    161: (52, 61), 162: (61, 61), 163: (71, 71), 164: (49, 49), 165: (61, 61), 166: (68, 71), 167: (55, 61), 168: (66, 80), 169: (49, 49), 170: (57, 61),
     # Block 18 (E:50, SH:83, Spread:33)
-    171: (63, 63), 172: (63, 63), 173: (73, 73), 174: (50, 50), 175: (63, 63), 176: (73, 73), 177: (63, 63), 178: (83, 83), 179: (50, 50), 180: (63, 63),
+    171: (53, 63), 172: (63, 63), 173: (73, 73), 174: (50, 50), 175: (63, 63), 176: (71, 73), 177: (58, 63), 178: (67, 83), 179: (50, 50), 180: (58, 63),
     # Block 19 (E:52, SH:86, Spread:34)
-    181: (66, 66), 182: (66, 66), 183: (76, 76), 184: (52, 52), 185: (66, 66), 186: (76, 76), 187: (66, 66), 188: (86, 86), 189: (52, 52), 190: (66, 66),
+    181: (54, 66), 182: (66, 66), 183: (76, 76), 184: (52, 52), 185: (66, 66), 186: (73, 76), 187: (60, 66), 188: (70, 86), 189: (52, 52), 190: (59, 66),
     # Block 20 (E:53, SH:88, Spread:35)
-    191: (67, 67), 192: (67, 67), 193: (78, 78), 194: (53, 53), 195: (67, 67), 196: (78, 78), 197: (67, 67), 198: (88, 88), 199: (53, 53), 200: (67, 67),
+    191: (55, 67), 192: (67, 67), 193: (78, 78), 194: (53, 53), 195: (67, 67), 196: (76, 78), 197: (62, 67), 198: (70, 88), 199: (53, 53), 200: (60, 67),
     # Block 21 (E:54, SH:91, Spread:37)
-    201: (69, 69), 202: (69, 69), 203: (80, 80), 204: (54, 54), 205: (69, 69), 206: (80, 80), 207: (69, 69), 208: (91, 91), 209: (54, 54), 210: (69, 69),
+    201: (61, 69), 202: (69, 69), 203: (80, 80), 204: (54, 54), 205: (69, 69), 206: (80, 80), 207: (65, 69), 208: (72, 91), 209: (54, 54), 210: (61, 69),
     # Block 22 (E:56, SH:94, Spread:38)
-    211: (71, 71), 212: (71, 71), 213: (83, 83), 214: (56, 56), 215: (71, 71), 216: (83, 83), 217: (71, 71), 218: (94, 94), 219: (56, 56), 220: (71, 71),
+    211: (62, 71), 212: (71, 71), 213: (83, 83), 214: (56, 56), 215: (71, 71), 216: (80, 83), 217: (65, 71), 218: (75, 93), 219: (56, 56), 220: (65, 71),
     # Block 23 (E:57, SH:96, Spread:39)
-    221: (73, 73), 222: (73, 73), 223: (84, 84), 224: (57, 57), 225: (73, 73), 226: (84, 84), 227: (73, 73), 228: (96, 96), 229: (57, 57), 230: (73, 73),
+    221: (63, 73), 222: (73, 73), 223: (84, 84), 224: (57, 57), 225: (73, 73), 226: (81, 84), 227: (65, 73), 228: (75, 94), 229: (57, 57), 230: (67, 73),
     # Block 24 (E:58, SH:98, Spread:40)
-    231: (74, 74), 232: (74, 74), 233: (86, 86), 234: (58, 58), 235: (74, 74), 236: (86, 86), 237: (74, 74), 238: (98, 98), 239: (58, 58), 240: (74, 74),
+    231: (63, 74), 232: (74, 74), 233: (86, 86), 234: (58, 58), 235: (74, 74), 236: (82, 86), 237: (74, 74), 238: (75, 95), 239: (58, 58), 240: (69, 74),
     # Block 25 (E:60, SH:100, Spread:40)
-    241: (76, 76), 242: (76, 76), 243: (88, 88), 244: (60, 60), 245: (76, 76), 246: (88, 88), 247: (60, 60), 248: (100, 100), 249: (60, 60), 250: (76, 76),
+    241: (63, 76), 242: (76, 76), 243: (88, 88), 244: (60, 60), 245: (76, 76), 246: (88, 88), 247: (60, 60), 248: (75, 88), 249: (60, 60), 250: (70, 76),
 }
 
 # Default range if level number is not found in FIXED_LEVEL_VALUES
@@ -105,13 +105,70 @@ DEFAULT_WIDTH_RANGE = (20, 45)
 
 COMMON_CONFIG = {
     "WHITE_THRESHOLD": 245,
-    "ALPHA_THRESHOLD": 128
+    "ALPHA_THRESHOLD": 128,
+    "BG_DISTANCE_THRESHOLD": 30
 }
 
 DURATION_MULTIPLIER = 0.28
 
 def rgb_to_hex(rgb):
     return '#{:02x}{:02x}{:02x}'.format(rgb[0], rgb[1], rgb[2])
+
+def get_image_data(img, config):
+    """
+    Analyzes the image to detect the shape mask and background color based on edge sampling.
+    Returns (shape_mask_set, pixel_colors_dict).
+    """
+    gw, gh = img.size
+    shape_mask = set()
+    pixel_colors = {}
+    
+    # 1. Sample edge pixels to identify potential background colors
+    edge_pixels = []
+    for x in range(gw):
+        edge_pixels.append(img.getpixel((x, 0)))
+        edge_pixels.append(img.getpixel((x, gh - 1)))
+    for y in range(gh):
+        edge_pixels.append(img.getpixel((0, y)))
+        edge_pixels.append(img.getpixel((gw - 1, y)))
+    
+    # Identify the most common opaque color on the edges
+    opaque_edge_colors = [p[:3] for p in edge_pixels if p[3] >= config["ALPHA_THRESHOLD"]]
+    main_bg_color = None
+    if opaque_edge_colors:
+        main_bg_color = collections.Counter(opaque_edge_colors).most_common(1)[0][0]
+    
+    bg_dist = config.get("BG_DISTANCE_THRESHOLD", 30)
+    main_bg_is_white = False
+    if main_bg_color:
+        main_bg_is_white = all(c > config["WHITE_THRESHOLD"] for c in main_bg_color)
+    
+    for y in range(gh):
+        for x in range(gw):
+            color = img.getpixel((x, y))
+            r, g, b, a = color
+            pixel_colors[(x, y)] = color
+            
+            # Rule 1: Transparency is always background
+            if a < config["ALPHA_THRESHOLD"]:
+                continue
+                
+            is_bg = False
+            # Rule 2: Most common edge color is background
+            if main_bg_color:
+                dist = sum(abs(color[i] - main_bg_color[i]) for i in range(3))
+                if dist < bg_dist:
+                    is_bg = True
+            
+            # Rule 3: Fallback to white check (legacy) if no main_bg found or if main_bg IS white
+            if not is_bg and (not main_bg_color or main_bg_is_white):
+                if r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]:
+                    is_bg = True
+            
+            if not is_bg:
+                shape_mask.add((x, y))
+                
+    return shape_mask, pixel_colors
 
 def is_reachable(adj, start_node, target_nodes):
     if not target_nodes: return False
@@ -233,15 +290,7 @@ def post_process_fill_gaps(level_data, image_path, config):
         img = img.resize((level_data["gridSize"]["x"], level_data["gridSize"]["y"]), Image.NEAREST)
         
         gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
-        shape_mask = []
-        pixel_colors = {}
-        for y in range(gh):
-            for x in range(gw):
-                color = img.getpixel((x, y))
-                r, g, b, a = color
-                pixel_colors[(x, y)] = color
-                if a >= config["ALPHA_THRESHOLD"] and not (r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]):
-                    shape_mask.append((x, y))
+        shape_mask, pixel_colors = get_image_data(img, config)
     except:
         return level_data
 
@@ -412,12 +461,7 @@ def generate_level_json(image_path, grid_width, grid_height, difficulty=1):
         img = Image.open(image_path).convert('RGBA')
         img = img.transpose(Image.FLIP_TOP_BOTTOM)
         img = img.resize((grid_width, grid_height), Image.NEAREST)
-        for y in range(grid_height):
-            for x in range(grid_width):
-                color = img.getpixel((x, y))
-                r, g, b, a = color
-                if a >= config["ALPHA_THRESHOLD"] and not (r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]):
-                    shape_mask.add((x, y))
+        shape_mask, _ = get_image_data(img, config)
     except:
         shape_mask = None
 
@@ -448,18 +492,7 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
         return None
 
     img = img.resize((grid_width, grid_height), Image.NEAREST)
-    
-    shape_mask = set()
-    pixel_colors = {}
-    for y in range(grid_height):
-        for x in range(grid_width):
-            color = img.getpixel((x, y))
-            r, g, b, a = color
-            pixel_colors[(x, y)] = color
-            is_transparent = a < config["ALPHA_THRESHOLD"]
-            is_white = r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]
-            if not is_transparent and not is_white:
-                shape_mask.add((x, y))
+    shape_mask, pixel_colors = get_image_data(img, config)
 
     if not shape_mask:
         return None
@@ -685,18 +718,8 @@ def run_core_generator(image_path, grid_width, grid_height, config):
 
     img = img.resize((grid_width, grid_height), Image.NEAREST)
     
-    shape_mask = []
-    pixel_colors = {}
-    
-    for y in range(grid_height):
-        for x in range(grid_width):
-            color = img.getpixel((x, y))
-            r, g, b, a = color
-            pixel_colors[(x, y)] = color
-            is_transparent = a < config["ALPHA_THRESHOLD"]
-            is_white = r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]
-            if not is_transparent and not is_white:
-                shape_mask.append((x, y))
+    shape_mask_set, pixel_colors = get_image_data(img, config)
+    shape_mask = list(shape_mask_set) # Convert to list for sampling logic below
 
     if not shape_mask:
         return None
