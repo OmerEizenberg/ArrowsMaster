@@ -28,6 +28,8 @@ namespace Assets.Scripts.Core
         [SerializeField] private GameObject m_ShopLayer;
         [SerializeField] private GameObject m_LevelCurrencyContainer;
         [SerializeField] private GameObject m_StreakRecordContainer;
+        [SerializeField] private TextMeshProUGUI m_ArrowsLeftText;
+        [SerializeField] private RectTransform m_ArrowsLeftHolder;
 
         [Header("Settings")]
         public int maxLives = 3;
@@ -389,6 +391,7 @@ namespace Assets.Scripts.Core
             p_isLevelProgression = true;
             // Reset arrow count before loading new level
             activeArrowsCount = 0;
+            UpdateArrowsLeftUI(false);
             collectedLevelCurrency = 0; // Reset currency for new level attempt
             
             // Reset timer state
@@ -450,6 +453,7 @@ namespace Assets.Scripts.Core
 
             // Reset arrow count before loading new level
             activeArrowsCount = 0;
+            UpdateArrowsLeftUI(false);
             collectedLevelCurrency = 0; // Reset currency for new level attempt
             
             // Reset timer state
@@ -501,6 +505,7 @@ namespace Assets.Scripts.Core
         public void RegisterArrow()
         {
             activeArrowsCount++;
+            UpdateArrowsLeftUI(false);
         }
 
         public void NotifyArrowSuccess()
@@ -519,6 +524,7 @@ namespace Assets.Scripts.Core
             if (activeArrowsCount > 0)
             {
                 activeArrowsCount--;
+                UpdateArrowsLeftUI(true);
                 if (activeArrowsCount == 0)
                 {
                     isWinning = true;
@@ -526,6 +532,54 @@ namespace Assets.Scripts.Core
                     StartCoroutine(WinSequence());
                 }
             }
+        }
+
+        private void UpdateArrowsLeftUI(bool animate)
+        {
+            if (m_ArrowsLeftText != null)
+            {
+                m_ArrowsLeftText.text = activeArrowsCount.ToString();
+            }
+
+            if (animate && m_ArrowsLeftHolder != null)
+            {
+                if (m_ArrowsLeftPunchCoroutine != null) StopCoroutine(m_ArrowsLeftPunchCoroutine);
+                m_ArrowsLeftPunchCoroutine = StartCoroutine(ArrowsLeftPunchAnimation());
+            }
+        }
+
+        private Coroutine m_ArrowsLeftPunchCoroutine;
+        private System.Collections.IEnumerator ArrowsLeftPunchAnimation()
+        {
+            if (m_ArrowsLeftHolder == null) yield break;
+
+            float upDuration = 0.08f;
+            float downDuration = 0.05f;
+            float punchScale = 1.3f;
+            
+            Vector3 originalScale = Vector3.one;
+            Vector3 peakScale = originalScale * punchScale;
+
+            // Scale Up
+            float elapsed = 0f;
+            while (elapsed < upDuration)
+            {
+                m_ArrowsLeftHolder.localScale = Vector3.Lerp(originalScale, peakScale, elapsed / upDuration);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            m_ArrowsLeftHolder.localScale = peakScale;
+
+            // Scale Down
+            elapsed = 0f;
+            while (elapsed < downDuration)
+            {
+                m_ArrowsLeftHolder.localScale = Vector3.Lerp(peakScale, originalScale, elapsed / downDuration);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            m_ArrowsLeftHolder.localScale = originalScale;
+            m_ArrowsLeftPunchCoroutine = null;
         }
 
         public void NotifyArrowSelection()
