@@ -31,7 +31,16 @@ namespace Assets.Scripts.Core
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
-        public int CurrentLevelAttempts { get; private set; } = 1;
+        private int _currentLevelAttempts = 0;
+        public int CurrentLevelAttempts 
+        { 
+            get => _currentLevelAttempts; 
+            private set 
+            {
+                _currentLevelAttempts = value;
+                Debug.Log($"[UserDataManager] CurrentLevelAttempts changed to: {_currentLevelAttempts}");
+            }
+        }
         public string LastAttemptLevelId { get; private set; } = string.Empty;
         public int MaxStreak { get; private set; } = 0;
         public System.DateTime InstallDate { get; private set; }
@@ -47,7 +56,7 @@ namespace Assets.Scripts.Core
         {
             CurrentLevel = PlayerPrefs.GetInt(LevelKey, 1);
             ArrowsCurrency = PlayerPrefs.GetInt(ArrowsCurrencyKey, 0);
-            CurrentLevelAttempts = PlayerPrefs.GetInt(CurrentLevelAttemptsKey, 1);
+            CurrentLevelAttempts = PlayerPrefs.GetInt(CurrentLevelAttemptsKey, 0);
             LastAttemptLevelId = PlayerPrefs.GetString(LastAttemptLevelIdKey, string.Empty);
             MaxStreak = PlayerPrefs.GetInt(MaxStreakKey, 0);
             
@@ -163,7 +172,6 @@ namespace Assets.Scripts.Core
             CurrentLevelAttempts++;
             PlayerPrefs.SetInt(CurrentLevelAttemptsKey, CurrentLevelAttempts);
             PlayerPrefs.Save();
-            Debug.Log($"[UserDataManager] Incremented attempts to: {CurrentLevelAttempts}");
         }
 
         public void ResetCurrentLevelAttempts(string levelId)
@@ -173,7 +181,13 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(CurrentLevelAttemptsKey, CurrentLevelAttempts);
             PlayerPrefs.SetString(LastAttemptLevelIdKey, LastAttemptLevelId);
             PlayerPrefs.Save();
-            Debug.Log($"[UserDataManager] Reset attempts to 1 for level: {levelId}");
+        }
+
+        public void ClearCurrentLevelAttempts()
+        {
+            CurrentLevelAttempts = 0;
+            PlayerPrefs.SetInt(CurrentLevelAttemptsKey, CurrentLevelAttempts);
+            PlayerPrefs.Save();
         }
 
         public void UpdateMaxStreak(int streak)

@@ -377,7 +377,7 @@ namespace Assets.Scripts.Core
 
         public void StartLevel(string levelId)
         {
-            if (UserDataManager.Instance.LastAttemptLevelId != levelId)
+            if (UserDataManager.Instance.LastAttemptLevelId != levelId || UserDataManager.Instance.CurrentLevelAttempts == 0)
             {
                 UserDataManager.Instance.ResetCurrentLevelAttempts(levelId);
             }
@@ -578,6 +578,7 @@ namespace Assets.Scripts.Core
             if(p_isLevelProgression)
             {
                 UserDataManager.Instance.IncrementLevel();
+                UserDataManager.Instance.ClearCurrentLevelAttempts();
             }
             else
             {
