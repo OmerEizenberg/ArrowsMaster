@@ -13,7 +13,8 @@ namespace Assets.Scripts.Core
         NoAds999,
         NoAds499,
         NoAds199,
-        Donate199
+        Donate199,
+        NoAdsCoins999
     }
 
     public class IAPManager : MonoBehaviour, IDetailedStoreListener
@@ -136,6 +137,7 @@ namespace Assets.Scripts.Core
                 ProductTypeID.NoAds499 => ProductNoAds499,
                 ProductTypeID.NoAds199 => ProductNoAds199,
                 ProductTypeID.Donate199 => ProductDonate199,
+                ProductTypeID.NoAdsCoins999 => ProductNoAdsCoins999,
                 _ => ProductNoAds999
             };
 
@@ -156,7 +158,10 @@ namespace Assets.Scripts.Core
 
         private void CheckAlreadyOwnedProducts()
         {
+            // Specifically check for non-consumable "No Ads" products
+            // This is crucial for iOS restoration requirements
             bool alreadyOwned = false;
+            
             if (m_StoreController.products.WithID(ProductNoAds999).hasReceipt) alreadyOwned = true;
             else if (m_StoreController.products.WithID(ProductNoAds499).hasReceipt) alreadyOwned = true;
             else if (m_StoreController.products.WithID(ProductNoAds199).hasReceipt) alreadyOwned = true;
@@ -164,6 +169,7 @@ namespace Assets.Scripts.Core
 
             if (alreadyOwned && !HasNoAds)
             {
+                Debug.Log("[IAPManager] Restored 'No Ads' status from existing receipt.");
                 SetNoAds(true);
             }
         }
