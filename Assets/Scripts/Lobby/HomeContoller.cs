@@ -369,7 +369,7 @@ namespace Assets.Scripts.Lobby
         {
             if (UserDataManager.Instance == null) return;
 
-            bool isLocked = UserDataManager.Instance.CurrentLevel < 12;
+            bool isLocked = UserDataManager.Instance.CurrentLevel < 20;
 
             if (m_ChallengeButton != null)
             {
@@ -531,7 +531,7 @@ namespace Assets.Scripts.Lobby
             SoundManager.Instance.PlayClick();
             m_ShopLayer.SetActive(false);
         }
-
+       
         public void OnBuyProductButtonClicked(string productId)
         {
             if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
