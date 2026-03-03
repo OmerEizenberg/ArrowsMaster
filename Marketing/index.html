@@ -342,6 +342,7 @@
             font-weight: 800;
             color: #f39c12;
             opacity: 0;
+            transform: translate(-50%, -50%);
             transition: opacity 0.2s;
             text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
@@ -639,31 +640,35 @@
                 for (let k in occupancy) delete occupancy[k];
                 gridSize = LEVEL_DATA.gridSize;
                 arrowList = LEVEL_DATA.arrows.map(d => new Arrow(d));
-                activeArrowsCount = arrowList.length; lives = 3; isTimerActive = false;
+                activeArrowsCount = arrowList.length; lives = 3;
+
+                currentTime = LEVEL_DATA.duration || 0;
+                isTimerActive = currentTime > 0;
+
                 if (timerInterval) clearInterval(timerInterval);
+                document.getElementById('timer-container').classList.toggle('visible', isTimerActive);
+                updateTimerDisplay();
 
-                // Start camera zoomed OUT
-                camera.zoom = 0.05;
-                recalcLayout();
-
-                // Initial target zoom for "fit" (viewing everything)
-                const gameplayZoom = targetCam.zoom;
-                targetCam.zoom = gameplayZoom * 0.6; // Scale out even more
-                camera.x = targetCam.x;
-                camera.y = targetCam.y;
-
-                updateLivesUI(); updateArrowsLeftUI(activeArrowsCount);
                 document.getElementById('failure-screen').classList.remove('visible');
                 document.getElementById('win-screen').classList.remove('visible');
 
                 SFX.playLevelInit();
+
+                // Camera Init
+                camera.zoom = 0.05;
+                recalcLayout();
+                const gameplayZoom = targetCam.zoom;
+                targetCam.zoom = gameplayZoom * 0.6;
+                camera.x = targetCam.x;
+                camera.y = targetCam.y;
+
+                updateLivesUI(); updateArrowsLeftUI(activeArrowsCount);
+
                 await entranceAnim();
 
-                // Zoom back in to gameplay view
                 targetCam.zoom = gameplayZoom;
-
                 isEntranceFinished = true; canInteract = true;
-                isTimerActive = true; timerInterval = setInterval(tickTimer, 100);
+                if (isTimerActive) timerInterval = setInterval(tickTimer, 100);
                 document.getElementById('canvas-wrap').classList.add('ready');
             } catch (e) { console.error("Load failed:", e); }
         }
@@ -766,7 +771,13 @@
                 }
 
                 activeArrowsCount--; updateArrowsLeftUI(activeArrowsCount);
-                if (activeArrowsCount <= 0) setTimeout(() => { isWinning = true; canInteract = false; SFX.playWin(); document.getElementById('win-screen').classList.add('visible'); }, 400);
+                if (activeArrowsCount <= 0) setTimeout(() => {
+                    isWinning = true;
+                    isTimerActive = false;
+                    canInteract = false;
+                    SFX.playWin();
+                    document.getElementById('win-screen').classList.add('visible');
+                }, 400);
                 (function step() { if (a.gone) return; if (!a.tryStep()) { a.isMoving = false; return; } setTimeout(step, 27); })();
             } else {
                 SFX.playMistake();
