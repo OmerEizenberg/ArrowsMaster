@@ -445,6 +445,7 @@
         let camera = { x: 0, y: 0, zoom: 0.1 }, targetCam = { x: 0, y: 0, zoom: 1.0 }, CAM_LERP = 0.08;
         let canInteract = false, timerInterval = null, currentTime = 60, isTimerActive = false;
         let comboCount = 0, lastSuccessTime = 0, vibeTimer = null, comboTimer = null;
+        let isWinning = false, isEntranceFinished = false;
 
         const DIR_MAP = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
         const canvas = document.getElementById('gameCanvas'), ctx2d = canvas.getContext('2d'), headImg = new Image(); headImg.src = 'resources/sprites/Head.png';
@@ -462,15 +463,13 @@
                 this.lookDir = DIR_MAP[d.lookDirection.toLowerCase()] || [0, 1];
                 this.color = '#000000'; // All arrows solid black
                 this.segments = []; // Current spawned segments on grid
-                this.visibleCount = 0; // For entrance animation
                 this.isMoving = false;
                 this.gone = false;
-                this.moveT = 1.0;
-                this.isShowingHint = false;
-                this.drawColor = this.color;
                 this.hasReducedLife = false; // Each arrow can reduce life only once
                 this.bounceT = 1.0;
-                this.bounceDur = 0.18;
+                this.bounceDur = 0.45;
+                this.growthT = 1.0;
+                this.isGrowing = false;
             }
 
             get head() { return this.segments[this.segments.length - 1]; }
@@ -530,8 +529,11 @@
 
             update(dt) {
                 if (this.gone) return;
-                if (this.moveT < 1) this.moveT = Math.min(1, this.moveT + dt / 0.027);
+                if (this.moveT < 1) this.moveT = Math.min(1, this.moveT + dt / 0.035);
                 if (this.bounceT < 1) this.bounceT = Math.min(1, this.bounceT + dt / this.bounceDur);
+                if (this.isGrowing) {
+                    // Logic handled in entranceAnim tick for synchronization
+                }
                 if (this.colorAnim) {
                     this.colorAnim.t = Math.min(1, this.colorAnim.t + dt / this.colorAnim.dur);
                     this.drawColor = lerpColor(this.colorAnim.from, this.colorAnim.to, this.colorAnim.t);
@@ -588,30 +590,54 @@
             }
 
             getVisualPositions() {
+                if (this.isGrowing && this.growthT < 1) {
+                    const total = this.pathData.length;
+                    const progress = this.growthT * total;
+                    const count = Math.ceil(progress);
+                    if (count === 0) return [];
+                    const base = this.pathData.slice(0, count).map(p => gridToScreen(p.x, p.y));
+                    if (base.length > 1) {
+                        const last = base[base.length - 1];
+                        const prev = base[base.length - 2];
+                        const partial = progress % 1 || 1;
+                        base[base.length - 1] = { x: prev.x + (last.x - prev.x) * partial, y: prev.y + (last.y - prev.y) * partial };
+                    }
+                    return base;
+                }
+
                 const base = this.segments.map(s => gridToScreen(s.x, s.y));
                 if (this.moveT < 1 && this.moveSources && this.moveTargets) {
-                    const t = 1 - Math.pow(1 - this.moveT, 3);
+                    const t = 1 - Math.pow(1 - this.moveT, 2.5);
                     return this.moveSources.map((src, i) => {
                         const tgt = this.moveTargets[i];
                         return tgt ? { x: src.x + (tgt.x - src.x) * t, y: src.y + (tgt.y - src.y) * t } : src;
                     });
                 }
                 if (this.bounceT < 1) {
-                    const damp = Math.sin(this.bounceT * Math.PI);
-                    const nudge = cellSize * camera.zoom * 0.22 * damp;
-                    return base.map(p => ({ x: p.x + this.lookDir[0] * nudge, y: p.y - this.lookDir[1] * nudge }));
+                    const totalCycle = 1.35;
+                    const propagationT = this.bounceT * totalCycle;
+                    return base.map((p, i) => {
+                        const segDelay = (this.segments.length - 1 - i) * 0.035;
+                        const localT = Math.min(1, Math.max(0, (propagationT - segDelay) * 3.0));
+                        const nudge = cellSize * camera.zoom * 0.45 * Math.sin(localT * Math.PI);
+                        return { x: p.x + this.lookDir[0] * nudge, y: p.y - this.lookDir[1] * nudge };
+                    });
                 }
                 return base;
             }
 
             startSuccessAnim() {
                 this.lastAnimTarget = this.color;
-                this.colorAnim = { from: this.drawColor, to: '#27ae60', t: 0, dur: 0.16, next: this.color };
+                // Start fade from green to black immediately
+                this.colorAnim = { from: '#27ae60', to: this.color, t: 0, dur: 0.35, next: null };
             }
-            startBounceAnim() { this.bounceT = 0; }
+            startBounceAnim() {
+                this.bounceT = 0;
+                this.bounceDur = 0.3; // Longer for more visibility
+            }
             startBlockedAnim() {
-                this.lastAnimTarget = '#e74c3c';
-                this.colorAnim = { from: this.drawColor, to: '#e74c3c', t: 0, dur: 0.07, next: null };
+                this.lastAnimTarget = this.color; // Back to black after flash
+                this.colorAnim = { from: '#27ae60', to: '#e74c3c', t: 0, dur: 0.08, next: this.color };
             }
         }
 
@@ -625,14 +651,25 @@
             lastPanPos = { x: e.clientX, y: e.clientY }; isPanning = true; panAccum = 0;
             let bestArrow = null, bestDist = cellSize * 0.9 * camera.zoom;
             arrowList.forEach(a => { if (a.gone) return; a.getVisualPositions().forEach(pos => { const d = Math.hypot(pos.x - sx, pos.y - sy); if (d < bestDist) { bestDist = d; bestArrow = a; } }); });
-            if (bestArrow) { pressTargetArrow = bestArrow; pressTimer = setTimeout(() => { if (pressTargetArrow) pressTargetArrow.isShowingHint = true; pressTimer = null; }, 500); }
+            if (bestArrow) {
+                pressTargetArrow = bestArrow;
+                pressTargetArrow.drawColor = '#27ae60'; // Highlight Green
+                pressTimer = setTimeout(() => { if (pressTargetArrow) pressTargetArrow.isShowingHint = true; pressTimer = null; }, 500);
+            }
         });
         canvas.addEventListener('pointermove', e => {
             if (!isPanning) return;
             const dx = (e.clientX - lastPanPos.x) / camera.zoom, dy = (e.clientY - lastPanPos.y) / camera.zoom;
             camera.x -= dx; camera.y += dy; targetCam.x = camera.x; targetCam.y = camera.y;
             lastPanPos = { x: e.clientX, y: e.clientY }; panAccum += Math.hypot(dx, dy);
-            if (panAccum > 5 && pressTimer) { clearTimeout(pressTimer); pressTimer = null; pressTargetArrow = null; }
+            if (panAccum > 5) {
+                if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+                if (pressTargetArrow) {
+                    pressTargetArrow.drawColor = pressTargetArrow.color; // Reset color
+                    pressTargetArrow.isShowingHint = false;
+                    pressTargetArrow = null;
+                }
+            }
         });
         canvas.addEventListener('pointerup', e => {
             isPanning = false; if (!pressTargetArrow) return;
@@ -654,6 +691,7 @@
 
                 currentTime = LEVEL_DATA.duration || 0;
                 isTimerActive = currentTime > 0;
+                isWinning = false; isEntranceFinished = false;
 
                 if (timerInterval) clearInterval(timerInterval);
                 document.getElementById('timer-container').classList.toggle('visible', isTimerActive);
@@ -664,40 +702,50 @@
 
                 SFX.playLevelInit();
 
-                // Camera Init
-                camera.zoom = 0.05;
+                // 1. Determine level framing
                 recalcLayout();
                 const gameplayZoom = targetCam.zoom;
-                targetCam.zoom = gameplayZoom * 0.6;
-                camera.x = targetCam.x;
-                camera.y = targetCam.y;
 
                 updateLivesUI(); updateArrowsLeftUI(activeArrowsCount);
 
+                // 2. Set initial camera for build phase
+                camera.x = targetCam.x; camera.y = targetCam.y;
+                camera.zoom = gameplayZoom * 0.6;
+                targetCam.zoom = camera.zoom; // Hold zoom during build
+
+                document.getElementById('canvas-wrap').classList.add('ready');
+
                 await entranceAnim();
 
+                // 3. Glide zoom into gameplay framing
                 targetCam.zoom = gameplayZoom;
                 isEntranceFinished = true; canInteract = true;
                 if (isTimerActive) timerInterval = setInterval(tickTimer, 100);
-                document.getElementById('canvas-wrap').classList.add('ready');
             } catch (e) { console.error("Load failed:", e); }
         }
 
         async function entranceAnim() {
-            const maxPath = Math.max(...arrowList.map(a => a.pathData.length), 0);
-            for (let step = 0; step < maxPath; step++) {
-                arrowList.forEach(a => {
-                    if (step < a.pathData.length) {
-                        a.visibleCount = step + 1;
-                        // Growth logic: arrow starts as head at path[0] and grows
-                        // segments[i] corresponds to path[i] during growth
-                        a.segments = a.pathData.slice(0, step + 1);
+            return new Promise(resolve => {
+                let start = Date.now();
+                const totalDur = 1600; // 1.6s for full growth
+                arrowList.forEach(a => { a.isGrowing = true; a.growthT = 0; a.segments = []; });
+                function tick() {
+                    let elapsed = Date.now() - start;
+                    let t = Math.min(1, elapsed / totalDur);
+                    arrowList.forEach(a => { a.growthT = t; });
+                    if (t < 1) requestAnimationFrame(tick);
+                    else {
+                        arrowList.forEach(a => {
+                            a.isGrowing = false;
+                            a.growthT = 1;
+                            a.segments = [...a.pathData];
+                            a.segments.forEach(s => registerOcc(s.x, s.y, a.id));
+                        });
+                        resolve();
                     }
-                });
-                await new Promise(r => setTimeout(r, 40));
-            }
-            // Register occupancy once fully grown
-            arrowList.forEach(a => { a.segments.forEach(s => registerOcc(s.x, s.y, a.id)); });
+                }
+                requestAnimationFrame(tick);
+            });
         }
 
         function recalcLayout() {
@@ -834,7 +882,13 @@
 
         window.addEventListener('resize', () => { canvas.width = document.getElementById('canvas-wrap').clientWidth; canvas.height = document.getElementById('canvas-wrap').clientHeight; recalcLayout(); });
         window.dispatchEvent(new Event('resize'));
-        (async () => { await new Promise(r => setTimeout(r, 400)); document.getElementById('loading').classList.add('hidden'); await loadLevel(); requestAnimationFrame(gameLoop); })();
+        (async () => {
+            const buildPromise = loadLevel();
+            document.activeElement?.blur();
+            document.getElementById('loading').classList.add('hidden');
+            requestAnimationFrame(ts => { lastTime = ts; gameLoop(ts); });
+            await buildPromise;
+        })();
     </script>
 </body>
 
