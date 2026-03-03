@@ -22,12 +22,10 @@ public class SoftForceUpdateView : MonoBehaviour
 
     public void OnActionButtonClicked()
     {
-        // Typically opens App Store or Play Store
         #if UNITY_ANDROID
-        Application.OpenURL("market://details?id=" + Application.identifier);
+        Application.OpenURL("https://play.google.com/store/apps/details?id=com.everybodygames.arrowsmaster" );
         #elif UNITY_IOS
-        // You would replace this with your actual app id
-        // Application.OpenURL("itms-apps://itunes.apple.com/app/idYOUR_APP_ID");
+        // Application.OpenURL("https://apps.apple.com/us/app/arrowsmaster/id6758734966");
         #endif
     }
 

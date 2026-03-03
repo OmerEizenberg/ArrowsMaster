@@ -89,9 +89,6 @@ namespace Assets.Scripts.Core
         {
             get
             {
-               
-                            get
-            {
                 #if UNITY_ANDROID || UNITY_EDITOR
                  return "rd82j6gdgow61x63"; // Android ad_rewarded
 #elif UNITY_IPHONE
@@ -99,7 +96,6 @@ namespace Assets.Scripts.Core
 #else
                 return "unexpected_platform";
 #endif
-            }
             }
         }
 
