@@ -467,7 +467,7 @@
                 this.gone = false;
                 this.hasReducedLife = false; // Each arrow can reduce life only once
                 this.bounceT = 1.0;
-                this.bounceDur = 0.45;
+                this.bounceDur = 0.22;
                 this.growthT = 1.0;
                 this.isGrowing = false;
             }
@@ -529,7 +529,7 @@
 
             update(dt) {
                 if (this.gone) return;
-                if (this.moveT < 1) this.moveT = Math.min(1, this.moveT + dt / 0.035);
+                if (this.moveT < 1) this.moveT = Math.min(1, this.moveT + dt / 0.017);
                 if (this.bounceT < 1) this.bounceT = Math.min(1, this.bounceT + dt / this.bounceDur);
                 if (this.isGrowing) {
                     // Logic handled in entranceAnim tick for synchronization
@@ -629,15 +629,15 @@
             startSuccessAnim() {
                 this.lastAnimTarget = this.color;
                 // Start fade from green to black immediately
-                this.colorAnim = { from: '#27ae60', to: this.color, t: 0, dur: 0.35, next: null };
+                this.colorAnim = { from: '#27ae60', to: this.color, t: 0, dur: 0.17, next: null };
             }
             startBounceAnim() {
                 this.bounceT = 0;
-                this.bounceDur = 0.3; // Longer for more visibility
+                this.bounceDur = 0.15; // Faster bounce
             }
             startBlockedAnim() {
                 this.lastAnimTarget = this.color; // Back to black after flash
-                this.colorAnim = { from: '#27ae60', to: '#e74c3c', t: 0, dur: 0.08, next: this.color };
+                this.colorAnim = { from: '#27ae60', to: '#e74c3c', t: 0, dur: 0.04, next: this.color };
             }
         }
 
@@ -727,7 +727,7 @@
         async function entranceAnim() {
             return new Promise(resolve => {
                 let start = Date.now();
-                const totalDur = 1600; // 1.6s for full growth
+                const totalDur = 800; // 0.8s for full growth
                 arrowList.forEach(a => { a.isGrowing = true; a.growthT = 0; a.segments = []; });
                 function tick() {
                     let elapsed = Date.now() - start;

@@ -50,7 +50,7 @@ namespace Assets.Scripts.Core
 #if UNITY_ANDROID
                 return "dctkavzgndg9gm8m"; // back_to_lobby_interstital
 #elif UNITY_IPHONE
-                return "dctkavzgndg9gm8m"; // back_to_lobby_interstital
+                return "88alfrvdudilhun7"; // back_to_lobby_interstital
 #else
                 return "unexpected_platform";
 #endif
@@ -64,7 +64,7 @@ namespace Assets.Scripts.Core
 #if UNITY_ANDROID || UNITY_EDITOR
                 return "if9z8hp6gm6ukwvh"; // Android ad_rewarded
 #elif UNITY_IPHONE
-                return "if9z8hp6gm6ukwvh"; // iOS ad_rewarded
+                return "lmgxqjtfhmyikgzm"; // iOS ad_rewarded
 #else
                 return "unexpected_platform";
 #endif
@@ -75,7 +75,13 @@ namespace Assets.Scripts.Core
         {
             get
             {
-                return "ncnu1ipmqxwjbszr";
+                #if UNITY_ANDROID || UNITY_EDITOR
+                return "if9z8hp6gm6ukwvh"; // Android ad_rewarded
+#elif UNITY_IPHONE
+                return "ncnu1ipmqxwjbszr"; // iOS ad_rewarded
+#else
+                return "unexpected_platform";
+#endif
             }
         }
 
@@ -83,7 +89,17 @@ namespace Assets.Scripts.Core
         {
             get
             {
-                return "rd82j6gdgow61x63";
+               
+                            get
+            {
+                #if UNITY_ANDROID || UNITY_EDITOR
+                 return "rd82j6gdgow61x63"; // Android ad_rewarded
+#elif UNITY_IPHONE
+                return "jbr5jpvpbixrle5a"; // iOS ad_rewarded
+#else
+                return "unexpected_platform";
+#endif
+            }
             }
         }
 
