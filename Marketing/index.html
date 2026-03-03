@@ -469,6 +469,8 @@
                 this.isShowingHint = false;
                 this.drawColor = this.color;
                 this.hasReducedLife = false; // Each arrow can reduce life only once
+                this.bounceT = 1.0;
+                this.bounceDur = 0.18;
             }
 
             get head() { return this.segments[this.segments.length - 1]; }
@@ -529,6 +531,7 @@
             update(dt) {
                 if (this.gone) return;
                 if (this.moveT < 1) this.moveT = Math.min(1, this.moveT + dt / 0.027);
+                if (this.bounceT < 1) this.bounceT = Math.min(1, this.bounceT + dt / this.bounceDur);
                 if (this.colorAnim) {
                     this.colorAnim.t = Math.min(1, this.colorAnim.t + dt / this.colorAnim.dur);
                     this.drawColor = lerpColor(this.colorAnim.from, this.colorAnim.to, this.colorAnim.t);
@@ -585,6 +588,7 @@
             }
 
             getVisualPositions() {
+                const base = this.segments.map(s => gridToScreen(s.x, s.y));
                 if (this.moveT < 1 && this.moveSources && this.moveTargets) {
                     const t = 1 - Math.pow(1 - this.moveT, 3);
                     return this.moveSources.map((src, i) => {
@@ -592,13 +596,19 @@
                         return tgt ? { x: src.x + (tgt.x - src.x) * t, y: src.y + (tgt.y - src.y) * t } : src;
                     });
                 }
-                return this.segments.map(s => gridToScreen(s.x, s.y));
+                if (this.bounceT < 1) {
+                    const damp = Math.sin(this.bounceT * Math.PI);
+                    const nudge = cellSize * camera.zoom * 0.22 * damp;
+                    return base.map(p => ({ x: p.x + this.lookDir[0] * nudge, y: p.y - this.lookDir[1] * nudge }));
+                }
+                return base;
             }
 
             startSuccessAnim() {
                 this.lastAnimTarget = this.color;
                 this.colorAnim = { from: this.drawColor, to: '#27ae60', t: 0, dur: 0.16, next: this.color };
             }
+            startBounceAnim() { this.bounceT = 0; }
             startBlockedAnim() {
                 this.lastAnimTarget = '#e74c3c';
                 this.colorAnim = { from: this.drawColor, to: '#e74c3c', t: 0, dur: 0.07, next: null };
@@ -783,6 +793,7 @@
                 SFX.playMistake();
                 flashWrong();
                 a.startBlockedAnim();
+                a.startBounceAnim();
 
                 if (!a.hasReducedLife) {
                     a.hasReducedLife = true;
