@@ -122,22 +122,40 @@
             color: #111;
         }
 
-        @keyframes punch {
+        @keyframes punchFeedback {
             0% {
-                transform: scale(1)
+                transform: translate(-50%, -50%) scale(0.6);
             }
 
             50% {
-                transform: scale(1.4)
+                transform: translate(-50%, -50%) scale(1.35);
             }
 
             100% {
-                transform: scale(1)
+                transform: translate(-50%, -50%) scale(1);
             }
         }
 
         .punch {
-            animation: punch .14s;
+            animation: punchFeedback 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        @keyframes punchSimple {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.4);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .punch-simple {
+            animation: punchSimple .14s;
         }
 
         #streak-bar {
@@ -295,46 +313,41 @@
         /* ─── Feedback (Vibe/Combo) ─────────────────────────────────── */
         #feedback-container {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            inset: 0;
             pointer-events: none;
             z-index: 400;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
         }
 
         .feedback-text {
-            font-size: clamp(32px, 8vw, 56px);
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: clamp(34px, 9vw, 62px);
             font-weight: 900;
             color: #111;
             text-transform: uppercase;
-            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             opacity: 0;
-            transform: scale(0.5);
-            transition: opacity 0.2s, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: opacity 0.2s;
         }
 
         .feedback-text.show {
             opacity: 1;
-            transform: scale(1);
         }
 
         .combo-text {
-            font-size: clamp(20px, 5vw, 32px);
+            position: fixed;
+            font-size: clamp(22px, 6vw, 36px);
             font-weight: 800;
             color: #f39c12;
-            margin-top: -10px;
             opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.2s, transform 0.2s;
+            transition: opacity 0.2s;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .combo-text.show {
             opacity: 1;
-            transform: translateY(0);
         }
     </style>
 </head>
@@ -399,6 +412,7 @@
                 excellent: mk('resources/sounds/Excellent.mp3'),
                 amazing: mk('resources/sounds/Amazing.mp3'),
                 perfect: mk('resources/sounds/Perfect.mp3'),
+                like: mk('resources/sounds/LikeSound.wav'),
                 streaks: Array.from({ length: 10 }, (_, i) => mk(`resources/sounds/streak_${String(i + 1).padStart(2, '0')}.ogg`))
             };
             function play(a, v = 1) { if (!a) return; try { const c = a.cloneNode(); c.volume = Math.min(1, v); c.play().catch(() => { }); } catch (e) { } }
@@ -418,6 +432,7 @@
                     const idx = Math.min(n - 1, 9);
                     play(snd.streaks[idx], 1);
                 },
+                playLike: () => play(snd.like, 1),
                 resume: () => { }
             };
         })();
@@ -428,7 +443,7 @@
         let lives = 3, arrowList = [], activeArrowsCount = 0, gridSize = { x: 33, y: 32 }, cellSize = 40;
         let camera = { x: 0, y: 0, zoom: 0.1 }, targetCam = { x: 0, y: 0, zoom: 1.0 }, CAM_LERP = 0.08;
         let canInteract = false, timerInterval = null, currentTime = 60, isTimerActive = false;
-        let comboCount = 0, lastSuccessTime = 0, feedbackTimer = null;
+        let comboCount = 0, lastSuccessTime = 0, vibeTimer = null, comboTimer = null;
 
         const DIR_MAP = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
         const canvas = document.getElementById('gameCanvas'), ctx2d = canvas.getContext('2d'), headImg = new Image(); headImg.src = 'resources/sprites/Head.png';
@@ -682,24 +697,41 @@
             return { x: canvas.width * 0.5 + (gx * cellSize + cellSize * 0.5 - camera.x) * camera.zoom, y: canvas.height * 0.5 - (gy * cellSize + cellSize * 0.5 - camera.y) * camera.zoom };
         }
 
-        function showFeedback(text, combo) {
-            const vibeEl = document.getElementById('vibe-text');
-            const comboEl = document.getElementById('combo-text');
-            vibeEl.textContent = text;
-            comboEl.textContent = `Combo ${combo}`;
+        function showVibe() {
+            const vibes = [
+                { t: 'GOOD!', s: 'good' },
+                { t: 'NICE!', s: 'nice' },
+                { t: 'PERFECT!', s: 'perfect' },
+                { t: 'EXCELLENT!', s: 'excellent' },
+                { t: 'AMAZING!', s: 'amazing' }
+            ];
+            const v = vibes[Math.floor(Math.random() * vibes.length)];
+            const el = document.getElementById('vibe-text');
+            el.textContent = v.t;
+            SFX.playVibe(v.s);
+            el.classList.remove('show', 'punch');
+            void el.offsetWidth;
+            el.classList.add('show', 'punch');
+            if (vibeTimer) clearTimeout(vibeTimer);
+            vibeTimer = setTimeout(() => el.classList.remove('show'), 1200);
+        }
 
-            vibeEl.classList.remove('show');
-            comboEl.classList.remove('show');
-            void vibeEl.offsetWidth; // Trigger reflow
-
-            vibeEl.classList.add('show');
-            if (combo > 1) comboEl.classList.add('show');
-
-            if (feedbackTimer) clearTimeout(feedbackTimer);
-            feedbackTimer = setTimeout(() => {
-                vibeEl.classList.remove('show');
-                comboEl.classList.remove('show');
-            }, 1200);
+        function showComboFeedback(n) {
+            const el = document.getElementById('combo-text');
+            el.textContent = `Combo ${n}`;
+            const qs = [
+                { t: '25%', l: '30%' },
+                { t: '25%', l: '70%' },
+                { t: '70%', l: '30%' },
+                { t: '70%', l: '70%' }
+            ];
+            const q = qs[Math.floor(Math.random() * qs.length)];
+            el.style.top = q.t; el.style.left = q.l;
+            el.classList.remove('show', 'punch');
+            void el.offsetWidth;
+            el.classList.add('show', 'punch');
+            if (comboTimer) clearTimeout(comboTimer);
+            comboTimer = setTimeout(() => el.classList.remove('show'), 800);
         }
 
         function onArrowClicked(a) {
@@ -718,15 +750,20 @@
                 }
                 lastSuccessTime = now;
 
-                SFX.playStreak(comboCount);
+                if (comboCount > 1) {
+                    SFX.playStreak(comboCount - 1);
+                    showComboFeedback(comboCount);
+                }
 
-                // Vibe Logic
-                if (comboCount >= 20) { SFX.playVibe('perfect'); showFeedback('PERFECT!', comboCount); }
-                else if (comboCount >= 15) { SFX.playVibe('amazing'); showFeedback('AMAZING!', comboCount); }
-                else if (comboCount >= 10) { SFX.playVibe('excellent'); showFeedback('EXCELLENT!', comboCount); }
-                else if (comboCount >= 5) { SFX.playVibe('nice'); showFeedback('NICE!', comboCount); }
-                else if (comboCount >= 2) { SFX.playVibe('good'); showFeedback('GOOD!', comboCount); }
-                else if (comboCount === 1) { showFeedback('', comboCount); }
+                // Vibe Logic (mod 4 like Unity's specific checks)
+                if (comboCount > 0 && comboCount % 4 === 0) {
+                    showVibe();
+                }
+
+                // Like Logic (12% chance like Unity)
+                if (Math.random() < 0.12) {
+                    SFX.playLike();
+                }
 
                 activeArrowsCount--; updateArrowsLeftUI(activeArrowsCount);
                 if (activeArrowsCount <= 0) setTimeout(() => { isWinning = true; canInteract = false; SFX.playWin(); document.getElementById('win-screen').classList.add('visible'); }, 400);
@@ -752,7 +789,7 @@
         function tickTimer() { currentTime -= 0.1; if (currentTime <= 0) { currentTime = 0; handleGameOver(true); } updateTimerDisplay(); }
         function updateTimerDisplay() { const s = Math.ceil(currentTime), m = String(Math.floor(s / 60)).padStart(2, '0'), sec = String(s % 60).padStart(2, '0'); document.getElementById('timer-text').textContent = `${m}:${sec}`; }
         function updateLivesUI() { for (let i = 0; i < 3; i++) document.getElementById(`heart-${i}`).classList.toggle('inactive', i >= lives); }
-        function updateArrowsLeftUI(n) { const el = document.getElementById('arrows-left-text'); el.textContent = n; el.classList.remove('punch'); void el.offsetWidth; el.classList.add('punch'); }
+        function updateArrowsLeftUI(n) { const el = document.getElementById('arrows-left-text'); el.textContent = n; el.classList.remove('punch-simple'); void el.offsetWidth; el.classList.add('punch-simple'); }
         function flashWrong() { const el = document.getElementById('wrong-flash'); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 220); }
         function lerpColor(a, b, t) { const h2r = (h) => { let r = 0, g = 0, b = 0; if (h.length == 4) { r = parseInt(h[1] + h[1], 16); g = parseInt(h[2] + h[2], 16); b = parseInt(h[3] + h[3], 16); } else { r = parseInt(h.slice(1, 3), 16); g = parseInt(h.slice(3, 5), 16); b = parseInt(h.slice(5, 7), 16); } return { r, g, b }; }; const c1 = h2r(a), c2 = h2r(b); return `rgb(${Math.round(c1.r + (c2.r - c1.r) * t)},${Math.round(c1.g + (c2.g - c1.g) * t)},${Math.round(c1.b + (c2.b - c1.b) * t)})`; }
         function restartLevel() { location.reload(); }
