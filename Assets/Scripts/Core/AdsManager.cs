@@ -33,9 +33,9 @@ namespace Assets.Scripts.Core
         {
             get
             {
-#if UNITY_ANDROID
+#if (UNITY_ANDROID || UNITY_EDITOR) && !UNITY_IOS
                 return "24f080a95"; 
-#elif UNITY_IPHONE
+#elif UNITY_IOS || UNITY_IPHONE
                 return "252e4a28d";
 #else
                 return "unexpected_platform";
@@ -47,12 +47,10 @@ namespace Assets.Scripts.Core
         {
             get
             {
-#if UNITY_ANDROID
-                return "dctkavzgndg9gm8m"; // back_to_lobby_interstital
-#elif UNITY_IPHONE
-                return "88alfrvdudilhun7"; // back_to_lobby_interstital
+#if UNITY_IOS || UNITY_IPHONE
+                return "88alfrvdudilhun7"; // iOS back_to_lobby_interstital
 #else
-                return "unexpected_platform";
+                return "dctkavzgndg9gm8m"; // Android back_to_lobby_interstital
 #endif
             }
         }
@@ -61,12 +59,10 @@ namespace Assets.Scripts.Core
         {
             get
             {
-#if UNITY_ANDROID || UNITY_EDITOR
-                return "if9z8hp6gm6ukwvh"; // Android ad_rewarded
-#elif UNITY_IPHONE
+#if UNITY_IOS || UNITY_IPHONE
                 return "lmgxqjtfhmyikgzm"; // iOS ad_rewarded
 #else
-                return "unexpected_platform";
+                return "if9z8hp6gm6ukwvh"; // Android ad_rewarded
 #endif
             }
         }
@@ -75,12 +71,10 @@ namespace Assets.Scripts.Core
         {
             get
             {
-                #if UNITY_ANDROID || UNITY_EDITOR
-                return "if9z8hp6gm6ukwvh"; // Android ad_rewarded
-#elif UNITY_IPHONE
+#if UNITY_IOS || UNITY_IPHONE
                 return "ncnu1ipmqxwjbszr"; // iOS ad_rewarded
 #else
-                return "unexpected_platform";
+                return "if9z8hp6gm6ukwvh"; // Android ad_rewarded fallback
 #endif
             }
         }
@@ -89,12 +83,10 @@ namespace Assets.Scripts.Core
         {
             get
             {
-                #if UNITY_ANDROID || UNITY_EDITOR
-                 return "rd82j6gdgow61x63"; // Android ad_rewarded
-#elif UNITY_IPHONE
+#if UNITY_IOS || UNITY_IPHONE
                 return "jbr5jpvpbixrle5a"; // iOS ad_rewarded
 #else
-                return "unexpected_platform";
+                 return "rd82j6gdgow61x63"; // Android ad_rewarded
 #endif
             }
         }
@@ -131,14 +123,15 @@ namespace Assets.Scripts.Core
 
             try
             {
-                Debug.Log("[AdsManager] Initializing Unity Services...");
+                Debug.Log($"[AdsManager] Unity Services State: {UnityServices.State}");
                 await UnityServices.InitializeAsync();
+                Debug.Log("[AdsManager] Unity Services Initialized.");
                 
                 // Request ATT for iOS mandatory check
                 IOSAdsHelper.RequestATT();
 
                 string currentAppKey = AppKey;
-                Debug.Log($"[AdsManager] Initializing LevelPlay SDK with AppKey: {currentAppKey}...");
+                Debug.Log($"[AdsManager] Initializing LevelPlay SDK with AppKey: {currentAppKey} (Platform: {Application.platform})");
                 
                 // Validation check for common confusion between Unity Game ID and ironSource App Key
                 if (currentAppKey.Length <= 7 && int.TryParse(currentAppKey, out _))
@@ -149,8 +142,7 @@ namespace Assets.Scripts.Core
                 LevelPlay.OnInitSuccess += OnSdkInitSuccess;
                 LevelPlay.OnInitFailed += OnSdkInitFailed;
                 
-                LevelPlay.Init(currentAppKey,SystemInfo.deviceUniqueIdentifier
-);
+                LevelPlay.Init(currentAppKey, SystemInfo.deviceUniqueIdentifier);
             }
             catch (Exception e)
             {

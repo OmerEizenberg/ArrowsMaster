@@ -75,6 +75,7 @@ namespace Assets.Scripts.Core
         public bool p_isHintRewarded = false;
 
         private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
+        private List<GameObject> m_ActiveVoices = new List<GameObject>();
         private bool wasTimerActiveBeforeAd = false;
         private List<int> p_pickedArrowIds = new List<int>();
         private Coroutine m_PeriodicSaveCoroutine;
@@ -269,7 +270,7 @@ namespace Assets.Scripts.Core
                 isHintActive = true;
                 bestArrow.ShowPreview();
                 // We'll reset hint active state via a delayed call or coroutine
-                StartCoroutine(ClearHintActive(3.0f, bestArrow));
+                StartCoroutine(ClearHintActive(45.0f, bestArrow));
             }
 
             ResetHintTimer();
@@ -639,6 +640,7 @@ namespace Assets.Scripts.Core
         {
             if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
+            ClearActiveVoices();
             Debug.Log("Level Complete! Waiting for win screen...");
             
             // Award Collected Currency
@@ -752,6 +754,7 @@ namespace Assets.Scripts.Core
         {
             if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
+            ClearActiveVoices();
             Debug.Log("Game Over!");
 
             if (m_PlayOnPriceText != null)
@@ -995,6 +998,26 @@ namespace Assets.Scripts.Core
                 }
             }
             m_ActiveCombos.Clear();
+        }
+
+        public void RegisterVoice(GameObject voice)
+        {
+            if (voice != null)
+            {
+                m_ActiveVoices.Add(voice);
+            }
+        }
+
+        public void ClearActiveVoices()
+        {
+            foreach (var voice in m_ActiveVoices)
+            {
+                if (voice != null)
+                {
+                    Destroy(voice);
+                }
+            }
+            m_ActiveVoices.Clear();
         }
 
         public Vector2 GetValidComboPosition(bool isVoice)

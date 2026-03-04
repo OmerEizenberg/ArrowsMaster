@@ -94,6 +94,10 @@ public class IOSBuildPostProcess
         plist.ReadFromFile(plistPath);
         
         PlistElementDict rootDict = plist.root;
+        
+        // ATT Permission Message
+        rootDict.SetString("NSUserTrackingUsageDescription", "Your data will be used to provide you with a better and more personalized ad experience.");
+
         PlistElementArray backgroundModes = rootDict.CreateArray("UIBackgroundModes");
         backgroundModes.AddString("remote-notification");
         

@@ -386,6 +386,7 @@ namespace Assets.Scripts.Core
                                     if(gameManager.p_StreakCount-1 == 3 || gameManager.p_StreakCount-1 == 7 || gameManager.p_StreakCount-1 == 11)
                                     {
                                         GameObject voiceObj = Instantiate(m_VoicePrefab, uiParent);
+                                        GameManager.Instance.RegisterVoice(voiceObj);
                                         RectTransform voiceRect = voiceObj.GetComponent<RectTransform>();
                                         if (voiceRect != null)
                                         {
