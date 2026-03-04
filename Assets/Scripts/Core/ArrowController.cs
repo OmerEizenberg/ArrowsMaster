@@ -335,7 +335,7 @@ namespace Assets.Scripts.Core
             highlightCoroutine = null;
         }
 
-        public void OnArrowClicked(Segment clickedSegment)
+        public void OnArrowClicked(Segment clickedSegment, Vector2 clickPosition)
         {
             if (GameManager.Instance != null && !GameManager.Instance.CanInteract) return;
 
@@ -383,7 +383,6 @@ namespace Assets.Scripts.Core
                                         gameManager.RegisterCombo(comboRect);
                                     }
 
-                                    // 2. Setup Voice Position (if applicable)
                                     if(gameManager.p_StreakCount-1 == 3 || gameManager.p_StreakCount-1 == 7 || gameManager.p_StreakCount-1 == 11)
                                     {
                                         GameObject voiceObj = Instantiate(m_VoicePrefab, uiParent);
@@ -391,7 +390,7 @@ namespace Assets.Scripts.Core
                                         if (voiceRect != null)
                                         {
                                             voiceRect.anchoredPosition = Vector2.zero;
-                                            gameManager.RegisterCombo(voiceRect);
+                                            // Don't register voice indications in the combo list so they don't get cleared on the next click
                                         }
                                     }
 
@@ -435,7 +434,7 @@ namespace Assets.Scripts.Core
                         moveCoroutine = StartCoroutine(AutoMoveRoutine());
                         
                         // Notify GameManager that this arrow is moving (solved)
-                        GameManager.Instance.NotifyArrowSuccess(); 
+                        GameManager.Instance.NotifyArrowSuccess(clickPosition); 
                     }
                     else
                     {

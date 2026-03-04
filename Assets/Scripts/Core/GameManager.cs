@@ -52,7 +52,7 @@ namespace Assets.Scripts.Core
         public event Action OnLevelWon;
         public event Action<bool> OnHintVisibilityChanged;
         public event Action<string> OnTimerUpdated; // Passes formatted time string MM:SS
-        public event Action<int> OnLevelCurrencyChanged; 
+        public event Action<int, Vector2> OnLevelCurrencyChanged; 
         public event Action<int> OnMaxStreakBroken;
         public bool p_isLevelProgression = true;
 
@@ -428,7 +428,7 @@ namespace Assets.Scripts.Core
 
             OnLevelStarted?.Invoke();
             // Reset UI for level currency
-            OnLevelCurrencyChanged?.Invoke(0);
+            OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
             
             isEntranceFinished = false;
             isWinning = false;
@@ -484,7 +484,7 @@ namespace Assets.Scripts.Core
 
             OnLevelStarted?.Invoke();
             // Reset UI for level currency
-            OnLevelCurrencyChanged?.Invoke(0);
+            OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
 
             isEntranceFinished = false;
             isWinning = false;
@@ -508,7 +508,7 @@ namespace Assets.Scripts.Core
             UpdateArrowsLeftUI(false);
         }
 
-        public void NotifyArrowSuccess()
+        public void NotifyArrowSuccess(Vector2 clickPosition)
         {
             if (UserDataManager.Instance.CurrentLevel >= 5)
             {
@@ -518,7 +518,7 @@ namespace Assets.Scripts.Core
                 Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
                 
                 // Notify UI
-                OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency);
+                OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency, clickPosition);
             }
 
             if (activeArrowsCount > 0)

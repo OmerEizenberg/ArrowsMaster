@@ -21,9 +21,11 @@ namespace Assets.Scripts.GameUI
         private int m_CurrentAmount = 0;
         private Coroutine m_PunchCoroutine;
         private Vector3 m_OriginalScale;
-
+        private Vector2 m_FloatingDistance = new Vector2(0f, 0f);
         private void Start()
         {
+             m_FloatingDistance = new Vector2(-Screen.width/23f, Screen.height/20f);
+
             if (m_CurrencyText != null)
             {
                 m_OriginalScale = m_CurrencyText.transform.localScale;
@@ -44,7 +46,7 @@ namespace Assets.Scripts.GameUI
             }
         }
 
-        private void UpdateCurrencyDisplay(int newAmount)
+        private void UpdateCurrencyDisplay(int newAmount, Vector2 clickPos)
         {
             int difference = newAmount - m_CurrentAmount;
             
@@ -53,7 +55,7 @@ namespace Assets.Scripts.GameUI
                 // Instantiate floating text
                 if (m_FloatingTextPrefab != null)
                 {
-                    ShowFloatingText(difference);
+                    ShowFloatingText(difference, clickPos);
                 }
 
                 // Punch animation for main text
@@ -72,7 +74,7 @@ namespace Assets.Scripts.GameUI
             }
         }
 
-        private void ShowFloatingText(int amount)
+        private void ShowFloatingText(int amount, Vector2 clickPos)
         {
             if (m_CurrencyText == null) return;
 
@@ -88,15 +90,39 @@ namespace Assets.Scripts.GameUI
                 RectTransform rect = floatingObj.GetComponent<RectTransform>();
                 if (rect != null)
                 {
-                    // Randomize x position slightly
-                    float xOffset = Random.Range(m_SpawnOffsetRange.x, m_SpawnOffsetRange.y);
-                    
-                    // Position relative to the main currency text:
-                    // Start at CurrencyText's position + upward offset + random X
-                    Vector2 basePos = m_CurrencyText.rectTransform.anchoredPosition;
-                    
-                    // We can assume a standard vertical offset (e.g., 50 units above the center of the text)
-                    rect.anchoredPosition = basePos + new Vector2(xOffset, m_CurrencyText.rectTransform.rect.height + m_SpawnOffsetYRange); 
+                    if (clickPos != Vector2.zero)
+                    {
+                        RectTransform parentRect = rect.parent as RectTransform;
+                        Canvas canvas = rect.GetComponentInParent<Canvas>();
+                        
+                        // Use the correct camera for coordinate conversion
+                        Camera cam = null;
+                        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                        {
+                            cam = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+                        }
+
+                        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, (clickPos+m_FloatingDistance), cam, out Vector2 localPos))
+                        {
+                            // Important: ensure anchors are center-middle so anchoredPosition matches the calculated localPos
+                            rect.anchorMin = new Vector2(0.5f, 0.5f);
+                            rect.anchorMax = new Vector2(0.5f, 0.5f);
+                            rect.pivot = new Vector2(0.5f, 0.5f);
+                            rect.anchoredPosition = localPos;
+                        }
+                    }
+                    else
+                    {
+                        // Randomize x position slightly
+                        float xOffset = Random.Range(m_SpawnOffsetRange.x, m_SpawnOffsetRange.y);
+                        
+                        // Position relative to the main currency text:
+                        // Start at CurrencyText's position + upward offset + random X
+                        Vector2 basePos = m_CurrencyText.rectTransform.anchoredPosition;
+                        
+                        // We can assume a standard vertical offset (e.g., 50 units above the center of the text)
+                        rect.anchoredPosition = basePos + new Vector2(xOffset, m_CurrencyText.rectTransform.rect.height + m_SpawnOffsetYRange); 
+                    }
                 }
 
                 StartCoroutine(AnimateFloatingText(floatingText, rect));

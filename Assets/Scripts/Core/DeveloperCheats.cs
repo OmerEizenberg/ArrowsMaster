@@ -73,7 +73,7 @@ namespace Assets.Scripts.Core
                     
                     // Notify game manager that this arrow succeeded
                     // This will decrement the active arrow count
-                    gameManager.NotifyArrowSuccess();
+                    gameManager.NotifyArrowSuccess(Vector2.zero);
                     
                     // Destroy the arrow immediately
                     Destroy(arrow.gameObject);

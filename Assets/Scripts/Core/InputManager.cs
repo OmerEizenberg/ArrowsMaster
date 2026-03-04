@@ -135,7 +135,7 @@ namespace Assets.Scripts.Core
                                 GameManager.Instance.StartTimer();
                             }
                             
-                            arrow.OnArrowClicked(upSegment);
+                            arrow.OnArrowClicked(upSegment, endTouchPos);
                         }
                     }
                     else if (upSegment == null && pendingSegment == null)
@@ -177,7 +177,7 @@ namespace Assets.Scripts.Core
                     GameManager.Instance.StartTimer();
                 }
                 
-                closestArrow.OnArrowClicked(closestSegment);
+                closestArrow.OnArrowClicked(closestSegment, screenPos);
             }
         }
 
