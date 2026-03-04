@@ -39,11 +39,11 @@ namespace Assets.Scripts.Core
 
         // Timer-related fields
         private float currentTime = 0f;
-        private int levelDuration = 0; // 0 means no time limit
+        private float levelDuration = 0f; // 0 means no time limit
         private bool isTimerActive = false;
         public bool IsTimedLevel => levelDuration > 0;
         public float CurrentTime => currentTime;
-        public int LevelDuration => levelDuration;
+        public float LevelDuration => levelDuration;
 
         // Events
         public event Action<int> OnLivesChanged;
@@ -76,6 +76,8 @@ namespace Assets.Scripts.Core
 
         private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
         private bool wasTimerActiveBeforeAd = false;
+        private List<int> p_pickedArrowIds = new List<int>();
+        private Coroutine m_PeriodicSaveCoroutine;
 
         private Vector2 m_ScreenCenter;
         private Vector2[] m_QuarterCenters = new Vector2[4];
@@ -165,10 +167,15 @@ namespace Assets.Scripts.Core
                     }
                 };
             }
+            
+            // Check and restore progress if exists
+            CheckAndRestoreProgress();
         }
 
         private void OnDestroy()
         {
+            if (m_PeriodicSaveCoroutine != null) StopCoroutine(m_PeriodicSaveCoroutine);
+            
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnRewardReceived -= HandleRewardReceived;
@@ -350,6 +357,7 @@ namespace Assets.Scripts.Core
             
             HideFailureScreen();
             ResetHintTimer();
+            SaveCurrentProgress(); // Save after PlayOn
         }
 
         public void RestartCurrentLevel()
@@ -368,6 +376,7 @@ namespace Assets.Scripts.Core
             {
                 if (p_isLevelProgression)
                 {
+                    UserDataManager.Instance.ClearLevelProgress(); // Clear when manually restarting level progression
                     StartLevel(levelManager.CurrentLevelId);
                 }
                 else
@@ -399,11 +408,12 @@ namespace Assets.Scripts.Core
             isTimeUp = false;
             currentTime = 0f;
             lastDisplayedSecond = -1;
-            levelDuration = 0;
+            levelDuration = 0f;
             playOnPurchaseCount = 0;
 
             if (levelManager != null)
             {
+                p_pickedArrowIds.Clear();
                 levelManager.LoadLevelFromResources(levelId);
             }
 
@@ -436,8 +446,11 @@ namespace Assets.Scripts.Core
             ResetHintTimer();
             ResetSelectionStates();
 
-            m_GameUI.gameObject.SetActive(true);
+            m_GameUI.SetGameUIVisible(true);
             UpdateUIVisibility();
+
+            if (m_PeriodicSaveCoroutine != null) StopCoroutine(m_PeriodicSaveCoroutine);
+            m_PeriodicSaveCoroutine = StartCoroutine(PeriodicSaveCoroutine());
         }
 
         public void StartChallengeLevel(string levelId, int year, int month, int day)
@@ -461,11 +474,12 @@ namespace Assets.Scripts.Core
             isTimeUp = false;
             currentTime = 0f;
             lastDisplayedSecond = -1;
-            levelDuration = 0;
+            levelDuration = 0f;
             playOnPurchaseCount = 0;
 
             if (levelManager != null)
             {
+                p_pickedArrowIds.Clear();
                 levelManager.LoadChallengeLevelFromResources(levelId);
             }
 
@@ -491,9 +505,12 @@ namespace Assets.Scripts.Core
             ResetHintTimer();
             ResetSelectionStates();
 
-            m_GameUI.gameObject.SetActive(true);
+            m_GameUI.SetGameUIVisible(true);
             if (m_FunFact != null) m_FunFact.SetActive(false);
             UpdateUIVisibility();
+
+            if (m_PeriodicSaveCoroutine != null) StopCoroutine(m_PeriodicSaveCoroutine);
+            m_PeriodicSaveCoroutine = StartCoroutine(PeriodicSaveCoroutine());
         }
 
         private void ResetLives()
@@ -508,7 +525,7 @@ namespace Assets.Scripts.Core
             UpdateArrowsLeftUI(false);
         }
 
-        public void NotifyArrowSuccess(Vector2 clickPosition)
+        public void NotifyArrowSuccess(Vector2 clickPosition, int arrowId)
         {
             if (UserDataManager.Instance.CurrentLevel >= 5)
             {
@@ -524,7 +541,9 @@ namespace Assets.Scripts.Core
             if (activeArrowsCount > 0)
             {
                 activeArrowsCount--;
+                p_pickedArrowIds.Add(arrowId);
                 UpdateArrowsLeftUI(true);
+                SaveCurrentProgress(); // Save on every successful arrow
                 if (activeArrowsCount == 0)
                 {
                     isWinning = true;
@@ -638,6 +657,9 @@ namespace Assets.Scripts.Core
             {
                 UserDataManager.Instance.SaveMonthlyChallengeProgress(currentChallengeYear, currentChallengeMonth, currentChallengeDay);
             }
+            
+            UserDataManager.Instance.ClearLevelProgress(); // Clear on win
+            if (m_PeriodicSaveCoroutine != null) { StopCoroutine(m_PeriodicSaveCoroutine); m_PeriodicSaveCoroutine = null; }
 
             // --- Analytics: level_end (Success) ---
             if (FirebaseManager.Instance != null && levelManager != null)
@@ -683,23 +705,19 @@ namespace Assets.Scripts.Core
                 VibrationManager.VibrateSuccess();
 
                 m_WinParticles.SetActive(true);
-                m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
+            m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
             }
 
             yield return new WaitForSeconds(2.5f);
             
-            if (m_GameUI != null)
-            {
-                m_GameUI.gameObject.SetActive(false);
-            }
-
+            m_GameUI.SetGameUIVisible(false);
+            
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.ShowInterstitial(true);
                 AdsManager.Instance.SpawnCoinsSmallExplosion();
             }
-
-            m_LobbyUI.SetActive(true);
+            
             m_WinParticles.SetActive(false);
             CameraController.Instance.ResetZoom();
             OnLevelWon?.Invoke();
@@ -711,6 +729,7 @@ namespace Assets.Scripts.Core
             {
                 CurrentLives--;
                 OnLivesChanged?.Invoke(CurrentLives);
+                SaveCurrentProgress(); // Save after losing a life
 
                 if (CurrentLives <= 0)
                 {
@@ -725,6 +744,7 @@ namespace Assets.Scripts.Core
             {
                 CurrentLives++;
                 OnLivesChanged?.Invoke(CurrentLives);
+                SaveCurrentProgress(); // Save after gaining a life
             }
         }
 
@@ -776,6 +796,8 @@ namespace Assets.Scripts.Core
             }
             // -------------------------------------------
 
+            UserDataManager.Instance.ClearLevelProgress(); // Clear on game over
+            if (m_PeriodicSaveCoroutine != null) { StopCoroutine(m_PeriodicSaveCoroutine); m_PeriodicSaveCoroutine = null; }
             OnGameOver?.Invoke();
         }
 
@@ -857,7 +879,7 @@ namespace Assets.Scripts.Core
         }
         
         // Timer-related methods
-        public void InitializeTimer(int durationInSeconds)
+        public void InitializeTimer(float durationInSeconds)
         {
             levelDuration = durationInSeconds;
             if (levelDuration > 0)
@@ -975,7 +997,7 @@ namespace Assets.Scripts.Core
             m_ActiveCombos.Clear();
         }
 
-        public Vector2 GetValidComboPosition(bool isVoice = false)
+        public Vector2 GetValidComboPosition(bool isVoice)
         {
             if (isVoice)
             {
@@ -986,6 +1008,120 @@ namespace Assets.Scripts.Core
             return m_QuarterCenters[UnityEngine.Random.Range(0, 4)];
         }
 
-        
+        private void CheckAndRestoreProgress()
+        {
+            LevelProgress progress = UserDataManager.Instance.LoadLevelProgress();
+            if (progress != null && progress.hasProgress && !string.IsNullOrEmpty(progress.levelId))
+            {
+                Debug.Log($"[GameManager] Found saved progress for level {progress.levelId}. Restoring...");
+                RestoreLevelProgress(progress);
+            }
+        }
+
+        private void RestoreLevelProgress(LevelProgress progress)
+        {
+            CurrentLives = progress.remainingLives > 0 ? progress.remainingLives : maxLives;
+            OnLivesChanged?.Invoke(CurrentLives);
+            HideScreens();
+            if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
+
+            p_isLevelProgression = progress.isChallenge ? false : true;
+            currentChallengeYear = progress.challengeYear;
+            currentChallengeMonth = progress.challengeMonth;
+            currentChallengeDay = progress.challengeDay;
+            p_pickedArrowIds = new List<int>(progress.pickedArrowIds);
+
+            // Reset arrow count before loading
+            activeArrowsCount = 0;
+            UpdateArrowsLeftUI(false);
+            collectedLevelCurrency = 0;
+
+            isTimerActive = false;
+            isTimeUp = false;
+            lastDisplayedSecond = -1;
+            levelDuration = 0f; // Will be set by LoadLevel
+            playOnPurchaseCount = 0;
+
+            if (levelManager != null)
+            {
+                if (progress.isChallenge)
+                {
+                    levelManager.LoadChallengeLevelFromResources(progress.levelId, p_pickedArrowIds);
+                }
+                else
+                {
+                    levelManager.LoadLevelFromResources(progress.levelId, p_pickedArrowIds);
+                }
+            }
+
+            // Restore time AFTER level loading to avoid it being overwritten by InitializeTimer
+            currentTime = progress.remainingTime;
+            levelDuration = progress.levelDuration; // Restore levelDuration as well
+            if (p_pickedArrowIds != null && p_pickedArrowIds.Count > 0)
+            {
+                isTimerActive = true; // Auto-resume if progress was made
+            }
+            else
+            {
+                isTimerActive = progress.isTimerActive;
+            }
+
+            Debug.Log($"[GameManager] Progress Restored: Level={progress.levelId}, Time={currentTime}/{levelDuration}, Lives={CurrentLives}, Active={isTimerActive}");
+
+            OnLevelStarted?.Invoke();
+            OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
+
+            isEntranceFinished = false;
+            isWinning = false;
+            if (m_FunFact != null) m_FunFact.SetActive(false);
+            ResetHintTimer();
+            ResetSelectionStates();
+
+            m_GameUI.SetGameUIVisible(true);
+            UpdateUIVisibility();
+
+            if (m_PeriodicSaveCoroutine != null) StopCoroutine(m_PeriodicSaveCoroutine);
+            m_PeriodicSaveCoroutine = StartCoroutine(PeriodicSaveCoroutine());
+            
+            // Special case: if timer was already active, it will resumed in Update once isEntranceFinished is true
+        }
+
+        private void SaveCurrentProgress()
+        {
+            if (isWinning || (failureScreen != null && failureScreen.activeInHierarchy) || (m_LobbyUI != null && m_LobbyUI.activeInHierarchy))
+            {
+                return;
+            }
+
+            if (levelManager == null || string.IsNullOrEmpty(levelManager.CurrentLevelId)) return;
+
+            LevelProgress progress = new LevelProgress();
+            progress.levelId = levelManager.CurrentLevelId;
+            progress.isChallenge = !p_isLevelProgression;
+            progress.pickedArrowIds = new List<int>(p_pickedArrowIds);
+            progress.remainingTime = currentTime;
+            progress.remainingLives = CurrentLives;
+            progress.levelDuration = levelDuration;
+            progress.isTimerActive = isTimerActive;
+            progress.challengeYear = currentChallengeYear;
+            progress.challengeMonth = currentChallengeMonth;
+            progress.challengeDay = currentChallengeDay;
+            progress.hasProgress = true;
+
+            UserDataManager.Instance.SaveLevelProgress(progress);
+            Debug.Log($"[GameManager] Progress saved for level {progress.levelId}. Picked arrows: {progress.pickedArrowIds.Count}, Time={currentTime}/{levelDuration}, Active={isTimerActive}");
+        }
+
+        private System.Collections.IEnumerator PeriodicSaveCoroutine()
+        {
+            while (true)
+            {
+                yield return new WaitForSeconds(5.0f);
+                if (isEntranceFinished && !isWinning && !isTimeUp)
+                {
+                    SaveCurrentProgress();
+                }
+            }
+        }
     }
 }

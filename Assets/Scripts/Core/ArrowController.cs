@@ -434,7 +434,7 @@ namespace Assets.Scripts.Core
                         moveCoroutine = StartCoroutine(AutoMoveRoutine());
                         
                         // Notify GameManager that this arrow is moving (solved)
-                        GameManager.Instance.NotifyArrowSuccess(clickPosition); 
+                        GameManager.Instance.NotifyArrowSuccess(clickPosition, ArrowId); 
                     }
                     else
                     {

@@ -104,7 +104,7 @@ namespace Assets.Scripts.Core
             return jsonFile;
         }
 
-        public void LoadLevelFromResources(string levelId)
+        public void LoadLevelFromResources(string levelId, List<int> pickedArrows = null)
         {
             currentLevelId = levelId;
             TextAsset jsonFile = GetLevelTextAsset(levelId);
@@ -112,7 +112,7 @@ namespace Assets.Scripts.Core
             if (jsonFile != null)
             {
                 ClearLevel();
-                LoadLevel(jsonFile.text);
+                LoadLevel(jsonFile.text, pickedArrows);
             }
             else
             {
@@ -132,14 +132,14 @@ namespace Assets.Scripts.Core
             return -1;
         }
 
-          public void LoadChallengeLevelFromResources(string levelId)
+          public void LoadChallengeLevelFromResources(string levelId, List<int> pickedArrows = null)
         {
             currentLevelId = levelId;
             TextAsset jsonFile = Resources.Load<TextAsset>($"ChallengeLevels/{levelId}");
             if (jsonFile != null)
             {
                 ClearLevel();
-                LoadLevel(jsonFile.text);
+                LoadLevel(jsonFile.text, pickedArrows);
             }
             else
             {
@@ -166,7 +166,7 @@ namespace Assets.Scripts.Core
             GridManager.Instance.InitializeGrid(Vector2Int.zero); // Reset with zero or just clear map
         }
 
-        public void LoadLevel(string json)
+        public void LoadLevel(string json, List<int> pickedArrows = null)
         {
             LevelData data = JsonUtility.FromJson<LevelData>(json);
             // Initialize timer if level has duration
@@ -193,6 +193,8 @@ namespace Assets.Scripts.Core
             arrows = new List<ArrowController>();
             foreach (ArrowData arrowData in data.arrows)
             {
+                if (pickedArrows != null && pickedArrows.Contains(arrowData.id)) continue;
+
                 ArrowController arrow = Instantiate(arrowPrefab, Vector3.zero, Quaternion.identity);
                 arrow.PrepareIncrementalInit(arrowData);
                 currentLevelObjects.Add(arrow.gameObject);

@@ -269,8 +269,14 @@ public class GameUIContoleer : MonoBehaviour
             AdsManager.Instance.ShowInterstitial(true);
         }
         
-        m_LobbyUI.SetActive(true);
-        m_GameUI.SetActive(false);
+        UserDataManager.Instance.ClearLevelProgress();
+        SetGameUIVisible(false);
+    }
+
+    public void SetGameUIVisible(bool visible)
+    {
+        if (m_LobbyUI != null) m_LobbyUI.SetActive(!visible);
+        if (m_GameUI != null) m_GameUI.SetActive(visible);
     }
 
     private void ToggleHintButton(bool visible)

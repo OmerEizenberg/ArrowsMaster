@@ -1,9 +1,26 @@
+using System;
 using UnityEngine;
 using Assets.Scripts.Data;
 using System.Collections.Generic;
 
 namespace Assets.Scripts.Core
 {
+    [Serializable]
+    public class LevelProgress
+    {
+        public string levelId;
+        public bool isChallenge;
+        public List<int> pickedArrowIds = new List<int>();
+        public float remainingTime;
+        public float levelDuration;
+        public int remainingLives;
+        public bool isTimerActive;
+        public int challengeYear;
+        public int challengeMonth;
+        public int challengeDay;
+        public bool hasProgress = false;
+    }
+
     public class UserDataManager
     {
         private static UserDataManager instance;
@@ -28,6 +45,7 @@ namespace Assets.Scripts.Core
         private const string CurrentLevelAttemptsKey = "CurrentLevelAttempts";
         private const string LastAttemptLevelIdKey = "LastAttemptLevelId";
         private const string MaxStreakKey = "MaxStreakRecord";
+        private const string LevelProgressKey = "LevelProgress";
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
@@ -242,6 +260,43 @@ namespace Assets.Scripts.Core
         {
             int mask = GetMonthlyChallengeBitmask(year, month);
             return (mask & (1 << (day - 1))) != 0;
+        }
+
+        public void SaveLevelProgress(LevelProgress progress)
+        {
+            if (progress == null)
+            {
+                ClearLevelProgress();
+                return;
+            }
+            string json = JsonUtility.ToJson(progress);
+            PlayerPrefs.SetString(LevelProgressKey, json);
+            PlayerPrefs.Save();
+        }
+
+        public LevelProgress LoadLevelProgress()
+        {
+            string json = PlayerPrefs.GetString(LevelProgressKey, string.Empty);
+            if (string.IsNullOrEmpty(json))
+            {
+                return new LevelProgress { hasProgress = false };
+            }
+            try
+            {
+                LevelProgress progress = JsonUtility.FromJson<LevelProgress>(json);
+                return progress;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[UserDataManager] Error loading level progress: {e.Message}");
+                return new LevelProgress { hasProgress = false };
+            }
+        }
+
+        public void ClearLevelProgress()
+        {
+            PlayerPrefs.DeleteKey(LevelProgressKey);
+            PlayerPrefs.Save();
         }
     }
 }
