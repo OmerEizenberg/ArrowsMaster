@@ -34,9 +34,9 @@ namespace Assets.Scripts.Core
             get
             {
 #if UNITY_ANDROID
-                return "24f080a95"; // Correct ironSource Android App Key
+                return "24f080a95"; 
 #elif UNITY_IPHONE
-                return "252e4a28d"; // Correct ironSource iOS App Key
+                return "252e4a28d";
 #else
                 return "unexpected_platform";
 #endif
