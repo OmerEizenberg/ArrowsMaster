@@ -300,14 +300,12 @@ namespace Assets.Scripts.Core
         }
 
         // ── Entrance Animation ────────────────────────────────────────────────
-        // Phase 1: Zoom out to show full grid + 20% padding (instant)
+        // Phase 1: Set camera zoom to half of the level's max zoom (instant)
         // Phase 2: Arrows grow (handled by LevelManager)
-        // Phase 3: Zoom IN to 80% of grid visible (smooth, initZoomInDuration)
-        // Phase 4: Zoom OUT to exact fit / maxZoom cap (smooth, initZoomOutDuration)
+        // Phase 3: Zoom OUT to the level's max zoom (smooth, initZoomInDuration)
 
         /// <summary>
-        /// Phase 1: Instantly positions camera zoomed out to show the full grid + 20%.
-        /// Returns the calculated "fit" zoom so LevelManager can pass it to ZoomInThenOut.
+        /// Phase 1: Instantly positions camera at half of the required zoom to fit the level.
         /// </summary>
         public IEnumerator PlayInitializationZoomAnimation(Vector2Int gridSize, Vector3 focusPosition)
         {
@@ -328,21 +326,21 @@ namespace Assets.Scripts.Core
             float fitHorizontal = (levelWidth  * initPaddingMultiplier) / (2f * aspect);
             float fitZoom       = Mathf.Max(fitVertical, fitHorizontal);
 
-            // Phase 1 start zoom: full grid + 20% extra buffer
-            float startZoom = fitZoom + initExtraZoomBuffer;
-
             // Compute the final "gameplay" zoom (what the player sees after animation)
             float finalZoom = fitZoom;//Mathf.Min(25f, fitZoom);
             finalZoom       = Mathf.Max(finalZoom, minZoom);
 
+            // Phase 1 start zoom: half the max zoom for the level
+            float startZoom = finalZoom * 0.5f;
+
             // Store zoom limits for gameplay
             maxZoom         = finalZoom;
-            absoluteMaxZoom = Mathf.Max(25f, startZoom);
+            absoluteMaxZoom = Mathf.Max(25f, fitZoom + initExtraZoomBuffer);
             defaultZoom     = finalZoom;
 
             Vector3 centerPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
 
-            // Instantly snap to zoomed-out view
+            // Instantly snap to initial zoomed-in view
             cam.orthographicSize = startZoom;
             transform.position   = centerPos;
 
@@ -352,10 +350,10 @@ namespace Assets.Scripts.Core
         }
 
         /// <summary>
-        /// After arrows finish growing, smoothly zoom in from the zoomed-out position
-        /// directly to the final fit zoom (min of grid-fit and maxZoom cap).
+        /// After arrows finish growing, smoothly zoom out from the initial position
+        /// directly to the final default zoom (max zoom of the level).
         /// </summary>
-        public IEnumerator ZoomInToDefault(Vector3 focusPosition)
+        public IEnumerator AnimateToDefaultZoom(Vector3 focusPosition, float duration = -1f)
         {
             isInternalAnimation = true;
 
@@ -366,7 +364,7 @@ namespace Assets.Scripts.Core
             Vector3 targetPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
 
             float elapsed  = 0f;
-            float duration = initZoomInDuration;
+            if (duration < 0) duration = initZoomInDuration;
 
             while (elapsed < duration)
             {

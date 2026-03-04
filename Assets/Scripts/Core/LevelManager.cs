@@ -237,7 +237,7 @@ namespace Assets.Scripts.Core
             }
             m_LevelCenter = levelCenter;
 
-            // 1. Set camera to zoomed out position showing entire level
+            // 1. Set camera to zoomed in position (half max zoom)
             if (CameraController.Instance != null)
             {
                 CameraController.Instance.SetBounds(data.gridSize.ToVector2Int());
@@ -249,9 +249,18 @@ namespace Assets.Scripts.Core
                 SoundManager.Instance.PlayLevelInitialized();
             }
 
-            // 2. Animate Arrow Growth while camera is zoomed out
+            // 2. Animate Zoom and Arrow Growth in parallel
             int maxPath = 0;
             foreach (var arrow in data.arrows) maxPath = Mathf.Max(maxPath, arrow.path.Count);
+            float growthDuration = maxPath * 0.04f;
+
+            Coroutine zoomCoroutine = null;
+            if (CameraController.Instance != null)
+            {
+                OnEntranceAnimationStarted?.Invoke();
+                // Start camera zoom-out in parallel with growth
+                zoomCoroutine = StartCoroutine(CameraController.Instance.AnimateToDefaultZoom(levelCenter, growthDuration));
+            }
 
             for (int i = 0; i < maxPath; i++)
             {
@@ -262,12 +271,8 @@ namespace Assets.Scripts.Core
                 yield return s_GrowthWait;
             }
 
-            // 3. After arrows finish, zoom camera in to default
-            if (CameraController.Instance != null)
-            {
-                OnEntranceAnimationStarted?.Invoke();
-                yield return StartCoroutine(CameraController.Instance.ZoomInToDefault(levelCenter));
-            }
+            // 3. Ensure camera finishing zoom before spawning background circles
+            if (zoomCoroutine != null) yield return zoomCoroutine;
 
             // 4. Spawn Background Circles AFTER animation
             m_BackgroundCircleInfos.Clear();
