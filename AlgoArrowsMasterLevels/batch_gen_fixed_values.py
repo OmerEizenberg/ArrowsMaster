@@ -361,7 +361,7 @@ def post_process_fill_gaps(level_data, image_path, config):
             avg_c = [sum(pixel_colors.get(p, (0,0,0,0))[c] for p in path)//len(path) for c in range(3)]
             new_arrow = {
                 "id": next_id,
-                "color": rgb_to_hex(avg_c),
+                "color": "#000000",
                 "path": [{"x": p[0], "y": p[1]} for p in path],
                 "lookDirection": dir_map[(look_dx, look_dy)]
             }
@@ -670,8 +670,7 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
                     for p in path: test_occupied[p] = arrow_id
                     
                     if is_level_solvable(test_level, pre_occupied=test_occupied):
-                        avg_c = [sum(pixel_colors.get(p, (0,0,0,0))[c] for p in path)//len(path) for c in range(3)]
-                        new_arrow["color"] = rgb_to_hex(avg_c)
+                        new_arrow["color"] = "#000000"
                         arrows.append(new_arrow)
                         update_head_maps(new_arrow)
                         for p in path: 
@@ -862,7 +861,7 @@ def run_core_generator(image_path, grid_width, grid_height, config):
             dir_map = {(1, 0): "right", (-1, 0): "left", (0, 1): "up", (0, -1): "down"}
             arrow_obj = {
                 "id": arrow_id,
-                "color": rgb_to_hex((avg_r, avg_g, avg_b)),
+                "color": "#000000",
                 "path": [{"x": p[0], "y": p[1]} for p in current_path],
                 "lookDirection": dir_map[best_dir]
             }

@@ -11732,7 +11732,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Refill lives by coins or by watching
+  m_text: 'Refill lives by coins or by watching ad
 
     and Keep Playing!'
   m_isRightToLeft: 0
@@ -12231,7 +12231,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &624092797
 RectTransform:
   m_ObjectHideFlags: 0
@@ -13535,7 +13535,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &727383318
 RectTransform:
   m_ObjectHideFlags: 0
