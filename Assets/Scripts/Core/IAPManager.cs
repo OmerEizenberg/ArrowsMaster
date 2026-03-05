@@ -109,11 +109,6 @@ namespace Assets.Scripts.Core
 
             var builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance(store));
 
-            // Add products with explicit store IDs to ensure consistency across platforms
-            builder.AddProduct(ProductNoAds999, UnityEngine.Purchasing.ProductType.NonConsumable);
-            builder.AddProduct(ProductNoAds499, UnityEngine.Purchasing.ProductType.NonConsumable);
-            builder.AddProduct(ProductNoAds199, UnityEngine.Purchasing.ProductType.NonConsumable);
-            builder.AddProduct(ProductDonate199, UnityEngine.Purchasing.ProductType.NonConsumable);
 
             // New Coin Products (Consumable)
             builder.AddProduct(ProductCoins199, UnityEngine.Purchasing.ProductType.Consumable);
@@ -121,6 +116,12 @@ namespace Assets.Scripts.Core
             builder.AddProduct(ProductCoins999, UnityEngine.Purchasing.ProductType.Consumable);
             builder.AddProduct(ProductCoins1999, UnityEngine.Purchasing.ProductType.Consumable);
             builder.AddProduct(ProductCoins4999, UnityEngine.Purchasing.ProductType.Consumable);
+
+            // Add products with explicit store IDs to ensure consistency across platforms
+            builder.AddProduct(ProductNoAds999, UnityEngine.Purchasing.ProductType.NonConsumable);
+            //builder.AddProduct(ProductNoAds499, UnityEngine.Purchasing.ProductType.NonConsumable);
+           // builder.AddProduct(ProductNoAds199, UnityEngine.Purchasing.ProductType.NonConsumable);
+            //builder.AddProduct(ProductDonate199, UnityEngine.Purchasing.ProductType.NonConsumable);
 
             // No Ads + Coins bundle (Non-Consumable)
             builder.AddProduct(ProductNoAdsCoins999, UnityEngine.Purchasing.ProductType.NonConsumable);
