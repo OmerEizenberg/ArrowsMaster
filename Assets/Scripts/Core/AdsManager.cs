@@ -15,6 +15,8 @@ namespace Assets.Scripts.Core
         private LevelPlayRewardedAd coinsRewardedAd;
         private LevelPlayBannerAd settingsBannerAd;
         private bool isInitialized = false;
+        private bool isInitializing = false;
+        private int sdkInitRetryCount = 0;
         private float lastAdShowTime = -30f;
         private const float AD_COOLDOWN = 30f;
 
@@ -119,12 +121,17 @@ namespace Assets.Scripts.Core
 
         private async Task InitializeSDK()
         {
-            if (isInitialized) return;
+            if (isInitialized || isInitializing) return;
 
+            isInitializing = true;
             try
             {
-                Debug.Log($"[AdsManager] Unity Services State: {UnityServices.State}");
-                await UnityServices.InitializeAsync();
+                if (UnityServices.State != ServicesInitializationState.Initialized)
+                {
+                    Debug.Log($"[AdsManager] Initializing Unity Services... (Current State: {UnityServices.State})");
+                    await UnityServices.InitializeAsync();
+                }
+                
                 Debug.Log("[AdsManager] Unity Services Initialized.");
                 
                 // Request ATT for iOS mandatory check
@@ -133,12 +140,14 @@ namespace Assets.Scripts.Core
                 string currentAppKey = AppKey;
                 Debug.Log($"[AdsManager] Initializing LevelPlay SDK with AppKey: {currentAppKey} (Platform: {Application.platform})");
                 
-                // Validation check for common confusion between Unity Game ID and ironSource App Key
                 if (currentAppKey.Length <= 7 && int.TryParse(currentAppKey, out _))
                 {
-                    Debug.LogWarning("[AdsManager] WARNING: The provided AppKey looks like a Unity Game ID. LevelPlay requires an ironSource App Key (typically 8-10 characters). If ads don't load, please verify this in the ironSource dashboard.");
+                    Debug.LogWarning("[AdsManager] WARNING: The provided AppKey looks like a Unity Game ID. LevelPlay requires an ironSource App Key.");
                 }
 
+                // Unsubscribe first to avoid duplicate registrations on retry
+                LevelPlay.OnInitSuccess -= OnSdkInitSuccess;
+                LevelPlay.OnInitFailed -= OnSdkInitFailed;
                 LevelPlay.OnInitSuccess += OnSdkInitSuccess;
                 LevelPlay.OnInitFailed += OnSdkInitFailed;
                 
@@ -146,7 +155,23 @@ namespace Assets.Scripts.Core
             }
             catch (Exception e)
             {
-                Debug.LogError($"[AdsManager] Unity Services Initialization Failed: {e.Message}\n{e.StackTrace}");
+                Debug.LogError($"[AdsManager] SDK Initialization Process Failed: {e.Message}");
+                isInitializing = false;
+                _ = RetrySDKInitialization(20000); // Retry in 20s on critical failure
+            }
+        }
+
+        private async Task RetrySDKInitialization(int delayMs)
+        {
+            if (isInitialized || isInitializing) return;
+            
+            Debug.Log($"[AdsManager] Retrying SDK Initialization in {delayMs/1000}s... (Attempt {sdkInitRetryCount + 1})");
+            await Task.Delay(delayMs);
+            
+            if (this != null && !isInitialized && !isInitializing)
+            {
+                sdkInitRetryCount++;
+                EnqueueAction(() => _ = InitializeSDK());
             }
         }
 
@@ -176,6 +201,9 @@ namespace Assets.Scripts.Core
             EnqueueAction(() => {
                 Debug.Log("[AdsManager] LevelPlay SDK Initialized Successfully.");
                 isInitialized = true;
+                isInitializing = false;
+                sdkInitRetryCount = 0;
+                
                 CreateInterstitialAd();
                 CreateRewardedAd();
                 CreateCoinsRewardedAd();
@@ -187,6 +215,11 @@ namespace Assets.Scripts.Core
         {
             EnqueueAction(() => {
                 Debug.LogError($"[AdsManager] LevelPlay SDK Initialization Failed: {error}");
+                isInitializing = false;
+                
+                // Exponential backoff for retries: 15s, 30s, 60s, 120s...
+                int retryDelay = 15000 * (int)Mathf.Pow(2, Mathf.Min(sdkInitRetryCount, 4));
+                _ = RetrySDKInitialization(retryDelay);
             });
         }
 
@@ -226,7 +259,11 @@ namespace Assets.Scripts.Core
 
         public void LoadInterstitial()
         {
-            if (!isInitialized) return;
+            if (!isInitialized) 
+            {
+                if (!isInitializing) _ = InitializeSDK();
+                return;
+            }
             if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 6)
             {
                 Debug.Log($"[AdsManager] Skipping Interstitial Load: User Level {UserDataManager.Instance.CurrentLevel} < 6.");
@@ -273,7 +310,8 @@ namespace Assets.Scripts.Core
             else
             {
                 Debug.LogWarning($"[AdsManager] Interstitial Ad is not ready. Initialized: {isInitialized}");
-                LoadInterstitial();
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                else LoadInterstitial();
             }
         }
 
@@ -392,7 +430,11 @@ namespace Assets.Scripts.Core
 
         public void LoadRewarded()
         {
-            if (!isInitialized) return;
+            if (!isInitialized) 
+            {
+                if (!isInitializing) _ = InitializeSDK();
+                return;
+            }
             RewardedAd.LoadAd();
         }
 
@@ -408,7 +450,8 @@ namespace Assets.Scripts.Core
             else 
             {
                 Debug.LogWarning($"[AdsManager] Rewarded Ad is not ready. Initialized: {isInitialized}");
-                LoadRewarded();
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                else LoadRewarded();
             }
         }
 
@@ -529,7 +572,11 @@ namespace Assets.Scripts.Core
 
         public void LoadCoinsRewarded()
         {
-            if (!isInitialized || coinsRewardedAd == null) return;
+            if (!isInitialized || coinsRewardedAd == null) 
+            {
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                return;
+            }
             coinsRewardedAd.LoadAd();
         }
 
@@ -545,7 +592,8 @@ namespace Assets.Scripts.Core
             else
             {
                 Debug.LogWarning($"[AdsManager] Coins Rewarded Ad is not ready. Initialized: {isInitialized}");
-                LoadCoinsRewarded();
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                else LoadCoinsRewarded();
             }
         }
 

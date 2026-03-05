@@ -545,6 +545,15 @@ namespace Assets.Scripts.Lobby
             }
         }
 
+        public void OnRestorePurchasesButtonClicked()
+        {
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+            if (IAPManager.Instance != null)
+            {
+                IAPManager.Instance.RestorePurchases();
+            }
+        }
+
         public void OnWatchAdForCoinsButtonClicked()
         {
             if (AdsManager.Instance != null)

@@ -14,7 +14,12 @@ namespace Assets.Scripts.Core
         NoAds499,
         NoAds199,
         Donate199,
-        NoAdsCoins999
+        NoAdsCoins999,
+        Coins199,
+        Coins499,
+        Coins999,
+        Coins1999,
+        Coins4999
     }
 
     public class IAPManager : MonoBehaviour, IDetailedStoreListener
@@ -71,19 +76,22 @@ namespace Assets.Scripts.Core
         {
             try
             {
-                // Ensure Unity Services are initialized
-                // Note: AdsManager also does this, which is fine as it's idempotent.
-                if (UnityServices.State == ServicesInitializationState.Uninitialized)
+                // Ensure Unity Services are initialized correctly
+                if (UnityServices.State != ServicesInitializationState.Initialized)
                 {
-                    Debug.Log("[IAPManager] Initializing Unity Services...");
-                    await UnityServices.InitializeAsync();
+                    Debug.Log($"[IAPManager] Initializing Unity Services (Current State: {UnityServices.State})...");
+                    var options = new InitializationOptions().SetEnvironmentName("production");
+                    await UnityServices.InitializeAsync(options);
                 }
 
+                Debug.Log($"[IAPManager] Unity Services Initialized. State: {UnityServices.State}");
                 InitializePurchasing();
             }
             catch (Exception e)
             {
                 Debug.LogError($"[IAPManager] Unity Services Initialization Failed: {e.Message}");
+                // Even if services fail, we try to initialize purchasing once in case it's a transient issue
+                InitializePurchasing();
             }
         }
 
@@ -91,9 +99,17 @@ namespace Assets.Scripts.Core
         {
             if (IsInitialized()) return;
 
-            var builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance());
+            // Choosing the module based on platform can be more reliable than auto-detection
+            AppStore store = AppStore.NotSpecified;
+#if UNITY_ANDROID
+            store = AppStore.GooglePlay;
+#elif UNITY_IOS || UNITY_IPHONE || UNITY_STANDALONE_OSX
+            store = AppStore.AppleAppStore;
+#endif
 
-            // Add products
+            var builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance(store));
+
+            // Add products with explicit store IDs to ensure consistency across platforms
             builder.AddProduct(ProductNoAds999, UnityEngine.Purchasing.ProductType.NonConsumable);
             builder.AddProduct(ProductNoAds499, UnityEngine.Purchasing.ProductType.NonConsumable);
             builder.AddProduct(ProductNoAds199, UnityEngine.Purchasing.ProductType.NonConsumable);
@@ -109,6 +125,7 @@ namespace Assets.Scripts.Core
             // No Ads + Coins bundle (Non-Consumable)
             builder.AddProduct(ProductNoAdsCoins999, UnityEngine.Purchasing.ProductType.NonConsumable);
 
+            Debug.Log($"[IAPManager] Calling UnityPurchasing.Initialize with store: {store}...");
             UnityPurchasing.Initialize(this, builder);
         }
 
@@ -121,7 +138,10 @@ namespace Assets.Scripts.Core
         {
             if (!IsInitialized())
             {
-                Debug.LogError("[IAPManager] Purchase failed: Store not initialized.");
+                Debug.LogWarning($"[IAPManager] BuyProduct called but store not initialized. Attempting re-init for: {productId}");
+                InitializePurchasing();
+                // We don't return here because InitializePurchasing is async in nature (via UnityPurchasing.Initialize)
+                // The user will need to tap again once initialized, or we can improve this with a pending purchase queue.
                 return;
             }
 
@@ -138,6 +158,11 @@ namespace Assets.Scripts.Core
                 ProductTypeID.NoAds199 => ProductNoAds199,
                 ProductTypeID.Donate199 => ProductDonate199,
                 ProductTypeID.NoAdsCoins999 => ProductNoAdsCoins999,
+                ProductTypeID.Coins199 => ProductCoins199,
+                ProductTypeID.Coins499 => ProductCoins499,
+                ProductTypeID.Coins999 => ProductCoins999,
+                ProductTypeID.Coins1999 => ProductCoins1999,
+                ProductTypeID.Coins4999 => ProductCoins4999,
                 _ => ProductNoAds999
             };
 
@@ -148,12 +173,25 @@ namespace Assets.Scripts.Core
 
         public void OnInitialized(IStoreController controller, IExtensionProvider extensions)
         {
-            Debug.Log("[IAPManager] Initialization successful.");
+            Debug.Log($"[IAPManager] Initialization successful. Store: {StandardPurchasingModule.Instance().appStore}");
             m_StoreController = controller;
             m_StoreExtensionProvider = extensions;
 
+            // iOS specific features
+            if (Application.platform == RuntimePlatform.IPhonePlayer || Application.platform == RuntimePlatform.OSXPlayer)
+            {
+                var apple = extensions.GetExtension<IAppleExtensions>();
+                // Handle "Ask to Buy" deferred purchases
+                apple.RegisterPurchaseDeferredListener(OnDeferredPurchase);
+            }
+
             // Check if user already owns No Ads (Cross-session check)
             CheckAlreadyOwnedProducts();
+        }
+
+        private void OnDeferredPurchase(Product product)
+        {
+            Debug.Log($"[IAPManager] Purchase deferred (e.g., Ask to Buy): {product.definition.id}");
         }
 
         private void CheckAlreadyOwnedProducts()
@@ -162,10 +200,17 @@ namespace Assets.Scripts.Core
             // This is crucial for iOS restoration requirements
             bool alreadyOwned = false;
             
-            if (m_StoreController.products.WithID(ProductNoAds999).hasReceipt) alreadyOwned = true;
-            else if (m_StoreController.products.WithID(ProductNoAds499).hasReceipt) alreadyOwned = true;
-            else if (m_StoreController.products.WithID(ProductNoAds199).hasReceipt) alreadyOwned = true;
-            else if (m_StoreController.products.WithID(ProductNoAdsCoins999).hasReceipt) alreadyOwned = true;
+            string[] noAdsIds = { ProductNoAds999, ProductNoAds499, ProductNoAds199, ProductNoAdsCoins999 };
+            foreach (var id in noAdsIds)
+            {
+                var product = m_StoreController.products.WithID(id);
+                if (product != null && product.hasReceipt)
+                {
+                    alreadyOwned = true;
+                    Debug.Log($"[IAPManager] Found owned non-consumable: {id}");
+                    break;
+                }
+            }
 
             if (alreadyOwned && !HasNoAds)
             {
