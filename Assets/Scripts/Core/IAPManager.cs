@@ -29,19 +29,32 @@ namespace Assets.Scripts.Core
         private IStoreController m_StoreController;
         private IExtensionProvider m_StoreExtensionProvider;
 
-        // Product IDs
-        public const string ProductNoAds999 = "com.everybodygames.arrowsmaster.no_ads_999";
-        public const string ProductNoAds499 = "com.everybodygames.arrowsmaster.no_ads_499";
-        public const string ProductNoAds199 = "com.everybodygames.arrowsmaster.no_ads_199";
-        public const string ProductDonate199 = "com.everybodygames.arrowsmaster.donate_199";
+        // Product IDs (Platform specific)
+#if UNITY_IOS
+        public const string ProductNoAds999 = "no_ads_999";
+      //  public const string ProductNoAds499 = "no_ads_499";
+      //  public const string ProductNoAds199 = "no_ads_199";
+      //  public const string ProductDonate199 = "donate_199";
 
-        // New Product IDs
+        public const string ProductCoins199 = "coins199";
+        public const string ProductCoins499 = "coins499";
+        public const string ProductCoins999 = "coins999";
+        public const string ProductCoins1999 = "coins1999";
+        public const string ProductCoins4999 = "coins4999";
+        public const string ProductNoAdsCoins999 = "noadscoins_999";
+#else
+        public const string ProductNoAds999 = "com.everybodygames.arrowsmaster.no_ads_999";
+       // public const string ProductNoAds499 = "com.everybodygames.arrowsmaster.no_ads_499";
+       // public const string ProductNoAds199 = "com.everybodygames.arrowsmaster.no_ads_199";
+       // public const string ProductDonate199 = "com.everybodygames.arrowsmaster.donate_199";
+
         public const string ProductCoins199 = "com.everybodygames.arrowsmaster.coins_199";
         public const string ProductCoins499 = "com.everybodygames.arrowsmaster.coins_499";
         public const string ProductCoins999 = "com.everybodygames.arrowsmaster.coins_999";
         public const string ProductCoins1999 = "com.everybodygames.arrowsmaster.coins_1999";
         public const string ProductCoins4999 = "com.everybodygames.arrowsmaster.coins_4999";
         public const string ProductNoAdsCoins999 = "com.everybodygames.arrowsmaster.noadscoins_999";
+#endif
 
         private const string NoAdsPrefKey = "UserHasNoAds";
 
@@ -117,12 +130,9 @@ namespace Assets.Scripts.Core
             builder.AddProduct(ProductCoins1999, UnityEngine.Purchasing.ProductType.Consumable);
             builder.AddProduct(ProductCoins4999, UnityEngine.Purchasing.ProductType.Consumable);
 
-            // Add products with explicit store IDs to ensure consistency across platforms
+            // Non-Consumable Products
             builder.AddProduct(ProductNoAds999, UnityEngine.Purchasing.ProductType.NonConsumable);
-            //builder.AddProduct(ProductNoAds499, UnityEngine.Purchasing.ProductType.NonConsumable);
-           // builder.AddProduct(ProductNoAds199, UnityEngine.Purchasing.ProductType.NonConsumable);
-            //builder.AddProduct(ProductDonate199, UnityEngine.Purchasing.ProductType.NonConsumable);
-
+            
             // No Ads + Coins bundle (Non-Consumable)
             builder.AddProduct(ProductNoAdsCoins999, UnityEngine.Purchasing.ProductType.NonConsumable);
 
@@ -137,6 +147,20 @@ namespace Assets.Scripts.Core
 
         public void BuyProduct(string productId)
         {
+            // Safety: Translate Android-style IDs to iOS IDs if needed
+#if UNITY_IOS
+            productId = productId switch {
+                "com.everybodygames.arrowsmaster.no_ads_999" => "no_ads_999",
+                "com.everybodygames.arrowsmaster.noadscoins_999" => "noadscoins_999",
+                "com.everybodygames.arrowsmaster.coins_199" => "coins199",
+                "com.everybodygames.arrowsmaster.coins_499" => "coins499",
+                "com.everybodygames.arrowsmaster.coins_999" => "coins999",
+                "com.everybodygames.arrowsmaster.coins_1999" => "coins1999",
+                "com.everybodygames.arrowsmaster.coins_4999" => "coins4999",
+                _ => productId
+            };
+#endif
+
             if (!IsInitialized())
             {
                 Debug.LogWarning($"[IAPManager] BuyProduct called but store not initialized. Attempting re-init for: {productId}");
@@ -155,9 +179,9 @@ namespace Assets.Scripts.Core
             string productId = type switch
             {
                 ProductTypeID.NoAds999 => ProductNoAds999,
-                ProductTypeID.NoAds499 => ProductNoAds499,
-                ProductTypeID.NoAds199 => ProductNoAds199,
-                ProductTypeID.Donate199 => ProductDonate199,
+               // ProductTypeID.NoAds499 => ProductNoAds499,
+              //  ProductTypeID.NoAds199 => ProductNoAds199,
+               // ProductTypeID.Donate199 => ProductDonate199,
                 ProductTypeID.NoAdsCoins999 => ProductNoAdsCoins999,
                 ProductTypeID.Coins199 => ProductCoins199,
                 ProductTypeID.Coins499 => ProductCoins499,
@@ -201,7 +225,7 @@ namespace Assets.Scripts.Core
             // This is crucial for iOS restoration requirements
             bool alreadyOwned = false;
             
-            string[] noAdsIds = { ProductNoAds999, ProductNoAds499, ProductNoAds199, ProductNoAdsCoins999 };
+            string[] noAdsIds = { ProductNoAds999, ProductNoAdsCoins999 };
             foreach (var id in noAdsIds)
             {
                 var product = m_StoreController.products.WithID(id);
@@ -242,12 +266,15 @@ namespace Assets.Scripts.Core
                     SetNoAds(true);
 
                     break;
-                case ProductNoAds499:
+                /*case ProductNoAds499:
+                   Debug.Log($"[IAPManager] No Ads purchased successfully: {id}");
+                    SetNoAds(true);
+                    break;
                 case ProductNoAds199:
                     Debug.Log($"[IAPManager] No Ads purchased successfully: {id}");
                     SetNoAds(true);
                     break;
-
+                */
                 case ProductNoAdsCoins999:
                     Debug.Log($"[IAPManager] No Ads + Coins purchased successfully: {id}");
                     SetNoAds(true);
@@ -275,9 +302,9 @@ namespace Assets.Scripts.Core
                     UserDataManager.Instance.AddArrowsCurrency(150000); // 150000 coins placeholder as requested
                     break;
 
-                case ProductDonate199:
+               /* case ProductDonate199:
                     Debug.Log($"[IAPManager] Donation purchased successfully: {id}");
-                    break;
+                    break;*/
 
                 default:
                     Debug.LogWarning($"[IAPManager] ProcessPurchase: Unknown product ID {id}");

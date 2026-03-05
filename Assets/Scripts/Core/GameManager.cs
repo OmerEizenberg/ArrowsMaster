@@ -911,7 +911,7 @@ namespace Assets.Scripts.Core
         private int lastDisplayedSecond = -1;
         private void UpdateTimerUI()
         {
-            if (IsTimedLevel || levelDuration > 0)
+            if (IsTimedLevel)
             {
                 int currentSecond = Mathf.Max(0, Mathf.FloorToInt(currentTime));
                 if (currentSecond != lastDisplayedSecond)
@@ -1080,13 +1080,20 @@ namespace Assets.Scripts.Core
             // Restore time AFTER level loading to avoid it being overwritten by InitializeTimer
             currentTime = progress.remainingTime;
             levelDuration = progress.levelDuration; // Restore levelDuration as well
-            if (p_pickedArrowIds != null && p_pickedArrowIds.Count > 0)
+            if (IsTimedLevel)
             {
-                isTimerActive = true; // Auto-resume if progress was made
+                if (p_pickedArrowIds != null && p_pickedArrowIds.Count > 0)
+                {
+                    isTimerActive = true; // Auto-resume if progress was made
+                }
+                else
+                {
+                    isTimerActive = progress.isTimerActive;
+                }
             }
             else
             {
-                isTimerActive = progress.isTimerActive;
+                isTimerActive = false;
             }
 
             Debug.Log($"[GameManager] Progress Restored: Level={progress.levelId}, Time={currentTime}/{levelDuration}, Lives={CurrentLives}, Active={isTimerActive}");
