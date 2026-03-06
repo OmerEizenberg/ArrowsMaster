@@ -9,7 +9,7 @@ from PIL import Image
 
 # Merge COMMON_CONFIG into DIFF_CONFIG so every function gets one complete config
 DIFF_CONFIG = {
-    "TARGET_DENSITY": 0.901,
+    "TARGET_DENSITY": 0.8401,
     "MAX_RETRY_ATTEMPTS": 100,
     # Image parsing thresholds
     "WHITE_THRESHOLD": 245,
@@ -20,17 +20,24 @@ DIFF_CONFIG = {
 # Phase-based arrow length strategy: try Long first, then Mid, then Short.
 # No probability rolls — each phase is exhausted before moving to the next.
 LENGTH_PHASES = [
-    (9, 25),  # Phase 1: Long
-    (5, 12),  # Phase 2: Mid
-    (2, 6),   # Phase 3: Short (gap filler)
+    (12, 30),  # Phase 1: Long
+    (4, 12),  # Phase 2: Mid
+    (2, 4),   # Phase 3: Short (gap filler)
 ]
+
+# Momentum bias: probability of continuing in the same direction during path growth.
+# Higher = fewer turns, straighter arrows.
+MOMENTUM_BIAS = 0.80
+
+# How many consecutive empty passes before a phase is considered exhausted.
+PHASE_PATIENCE = 3
 
 DURATION_MULTIPLIER = 0.28
 
 # --- ARROW WIDTH ---
 # Set to a float (e.g. 0.3) to embed arrowWidth in every generated arrow's JSON.
 # Set to None to omit the field and use the game's default width (0.2f).
-ARROW_WIDTH = None  # e.g. 0.3
+ARROW_WIDTH = 0.32  # e.g. 0.3
 
 def _arrow_width_field():
     """Returns a dict with the arrowWidth field if ARROW_WIDTH is set, else empty dict."""
@@ -38,8 +45,8 @@ def _arrow_width_field():
 
 # --- FIXED LEVEL VALUES CONFIGURATION ---
 FIXED_LEVEL_VALUES = {
-    1: (31, 31), 2: (31, 31), 3: (34, 34), 4: (28, 28), 5: (31, 31), 6: (34, 34), 7: (31, 31), 8: (36, 36), 9: (28, 28), 10: (31, 31),
-    11: (33, 33), 12: (33, 33), 13: (35, 35), 14: (29, 29), 15: (33, 33), 16: (35, 35), 17: (33, 33), 18: (38, 38), 19: (29, 29), 20: (33, 33),
+    1: (31, 31), 2: (31, 31), 3: (34, 34), 4: (28, 28), 5: (31, 31), 6: (34, 34), 7: (31, 31), 8: (20, 20), 9: (24, 24), 10: (25, 25),
+    11: (26, 26), 12: (26, 26), 13: (35, 35), 14: (29, 29), 15: (33, 33), 16: (35, 35), 17: (33, 33), 18: (38, 38), 19: (29, 29), 20: (33, 33),
     21: (34, 34), 22: (34, 34), 23: (38, 38), 24: (30, 30), 25: (34, 34), 26: (38, 38), 27: (34, 34), 28: (41, 41), 29: (30, 30), 30: (34, 34),
     31: (37, 37), 32: (37, 37), 33: (40, 40), 34: (32, 32), 35: (37, 37), 36: (40, 40), 37: (37, 37), 38: (44, 44), 39: (32, 32), 40: (37, 37),
     41: (38, 38), 42: (38, 38), 43: (42, 42), 44: (33, 33), 45: (38, 38), 46: (42, 42), 47: (38, 38), 48: (46, 46), 49: (33, 33), 50: (38, 38),
@@ -56,36 +63,29 @@ DEFAULT_WIDTH_RANGE = (20, 45)
 # A broad set of distinct colors to quantize the source image into sections.
 # Each pixel in the source image will be snapped to its closest color here.
 PALETTE_HEXES = [
-    "#000000",  # Black
-    "#ffffff",  # White
-    "#ff0000",  # Red
-    "#00ff00",  # Green
-    "#0000ff",  # Blue
-    "#ffff00",  # Yellow
-    "#ff6600",  # Orange
-    "#ff00ff",  # Magenta
-    "#00ffff",  # Cyan
-    "#800000",  # Dark Red
-    "#008000",  # Dark Green
-    "#000080",  # Dark Blue (Navy)
-    "#808000",  # Olive
-    "#800080",  # Purple
-    "#008080",  # Teal
-    "#c0c0c0",  # Silver
-    "#808080",  # Gray
-    "#ffc0cb",  # Pink
-    "#ffd700",  # Gold
-    "#a52a2a",  # Brown
-    "#40e0d0",  # Turquoise
-    "#ee82ee",  # Violet
-    "#f5deb3",  # Wheat
-    "#4b0082",  # Indigo
-    "#ff69b4",  # Hot Pink
-    "#7fff00",  # Chartreuse
-    "#dc143c",  # Crimson
-    "#1e90ff",  # Dodger Blue
-    "#228b22",  # Forest Green
-    "#ff8c00",  # Dark Orange
+    "#1e272e",  # Black +
+    "#fc5c65",  # Red +
+    "#26de81",  # Green +
+    "#4b7bec",  # Blue +
+    "#fed330",  # Yellow +
+    "#fa8231",  # Orange +
+    "#eb3b5a",  # Dark Red +
+    "#20bf6b",  # Dark Green +
+    "#1B1464",  # Dark Blue (Navy) +
+    "#A3CB38",  # Olive +
+    "#c56cf0",  # Purple +
+    "#4b4b4b",  # Black white+
+    "#808e9b",  # Silver +
+    "#a5b1c2",  # Gray +
+    "#ef5777",  # Pink +
+    "#f78fb3",  # Pink +
+    "#f7b731",  # Gold +
+    "#2bcbba",  # Turquoise +
+    "#f5cd79",  # Wheat +
+    "#a55eea",  # Indigo +
+    "#4b6584",  #  +
+    "#009432",  # Forest Green + 
+    "#f0932b",  # Dark Orange +
 ]
 
 # Convert to RGB tuples once at module load
@@ -217,21 +217,47 @@ def is_level_solvable(level_data, pre_occupied=None):
             
     return removed_count == total
 
-def section_coverage_score(candidate_pos, shape_mask, occupied_set, pixel_colors, section_color, temp_path_set):
+def get_wall_count(pos, shape_mask, occupied_set, pixel_colors, section_color, temp_path_set=None):
     """
-    Greedy coverage heuristic: count free same-section neighbors of a candidate position.
-    A higher score means this direction opens up more of the section for future growth.
+    Counts how many neighbors of 'pos' are 'walls'.
+    A wall is a cell that is:
+    - Outside of the shape_mask
+    - A different color from 'section_color'
+    - Already occupied or in the current temp_path
+    Higher wall counts mean the cell is at an edge or corner.
     """
-    cx, cy = candidate_pos
-    score = 0
+    cx, cy = pos
+    wall_count = 0
     for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
         nx, ny = cx + dx, cy + dy
-        if ((nx, ny) in shape_mask
-                and (nx, ny) not in occupied_set
-                and (nx, ny) not in temp_path_set
-                and pixel_colors.get((nx, ny)) == section_color):
-            score += 1
+        is_free_same_color = (
+            (nx, ny) in shape_mask and 
+            (nx, ny) not in occupied_set and 
+            (temp_path_set is None or (nx, ny) not in temp_path_set) and 
+            pixel_colors.get((nx, ny)) == section_color
+        )
+        if not is_free_same_color:
+            wall_count += 1
+    return wall_count
+
+def section_wall_hugging_score(pos, shape_mask, occupied_set, pixel_colors, section_color, temp_path_set):
+    """
+    Score a candidate point by its 'wall' adjacency to encourage filling edges first.
+    Includes a one-step lookahead: also considers the walliness of neighbors.
+    """
+    score = get_wall_count(pos, shape_mask, occupied_set, pixel_colors, section_color, temp_path_set) * 10
+    
+    # Lookahead: sum wall count of neighbors to further bias towards perimeter crawling
+    for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+        nx, ny = pos[0] + dx, pos[1] + dy
+        if ((nx, ny) in shape_mask and 
+            (nx, ny) not in occupied_set and 
+            (nx, ny) not in temp_path_set and 
+            pixel_colors.get((nx, ny)) == section_color):
+            score += get_wall_count((nx, ny), shape_mask, occupied_set, pixel_colors, section_color, temp_path_set)
+            
     return score
+
 
 def run_reverse_generator_with_sections(image_path, grid_width, grid_height, config, palette_rgbs):
     try:
@@ -254,6 +280,7 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
     total_shape_points = len(shape_mask)
     target_points = int(total_shape_points * config["TARGET_DENSITY"])
     free_points = set(shape_mask)
+    sweep_side = random.choice(["left", "right", "top", "bottom"])
 
     dist_to_bounds = {}
     for p in shape_mask:
@@ -297,13 +324,29 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
                     if (py - hy) * ody > 0 and edir[1] != 0 and (hy - py) * edir[1] > 0:
                         is_mutual = True; break
                 if is_mutual: continue
-                priority = dist_to_boundary + len(escape_routes.get(p, set())) * 40
+                # --- SWEEP BIAS ---
+                side_bias = 0
+                if sweep_side == "left": side_bias = (grid_width - px) * 10
+                elif sweep_side == "right": side_bias = px * 10
+                elif sweep_side == "top": side_bias = py * 10
+                elif sweep_side == "bottom": side_bias = (grid_height - py) * 10
+
+                dir_bias = 0
+                if sweep_side == "left" and edir == (-1, 0): dir_bias = 150
+                elif sweep_side == "right" and edir == (1, 0): dir_bias = 150
+                elif sweep_side == "top" and edir == (0, 1): dir_bias = 150
+                elif sweep_side == "bottom" and edir == (0, -1): dir_bias = 150
+
+                # --- WALL HUGGING BIAS ---
+                wall_bias = get_wall_count(p, shape_mask, occupied, pixel_colors, pixel_colors[p]) * 50
+
+                priority = dist_to_boundary + len(escape_routes.get(p, set())) * 40 + side_bias + dir_bias + wall_bias
                 cands.append((p, edir, priority))
         return cands
 
     def try_place_arrow(head_node, escape_dir, phase_min, phase_max):
         """Try to grow and place an arrow from head_node with length in [phase_min, phase_max].
-        Uses greedy coverage direction selection (no turn probability).
+        Uses 2-depth greedy coverage + momentum bias to produce fewer turns.
         Returns True if an arrow was successfully placed."""
         nonlocal arrow_id
         section_color_rgb = pixel_colors[head_node]
@@ -311,11 +354,10 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
         for target_len in range(phase_max, phase_min - 1, -1):  # try longest first
             path = [head_node]
             temp_path_occupied = {head_node}
-            curr_dir = (-escape_dir[0], -escape_dir[1])
+            curr_dir = (-escape_dir[0], -escape_dir[1])  # initial momentum away from escape
 
             for i in range(target_len - 1):
                 last_x, last_y = path[-1]
-                # Collect valid same-section neighbors
                 valid_dirs = []
                 for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
                     nx, ny = last_x + dx, last_y + dy
@@ -323,26 +365,29 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
                             and (nx, ny) not in occupied
                             and (nx, ny) not in temp_path_occupied
                             and pixel_colors.get((nx, ny)) == section_color_rgb):
-                        if i == 0 and (dx, dy) == escape_dir: continue  # can't go back toward escape
+                        if i == 0 and (dx, dy) == escape_dir: continue
                         valid_dirs.append((dx, dy))
                 if not valid_dirs: break
 
-                # --- GREEDY COVERAGE DIRECTION SELECTION ---
-                # Score each direction by how many free same-section cells its
-                # destination has adjacent to it. Prefer the direction that
-                # keeps the most space open (maximises future coverage).
-                scored = []
-                for d in valid_dirs:
-                    nx, ny = last_x + d[0], last_y + d[1]
-                    score = section_coverage_score(
-                        (nx, ny), shape_mask, occupied, pixel_colors,
-                        section_color_rgb, temp_path_occupied
-                    )
-                    scored.append((d, score))
-                scored.sort(key=lambda x: x[1], reverse=True)
-                best_score = scored[0][1]
-                top_dirs = [d for d, s in scored if s == best_score]
-                chosen_dir = random.choice(top_dirs)  # random tiebreak only
+                # --- MOMENTUM BIAS: strongly prefer continuing in curr_dir ---
+                # This reduces the number of turns in the generated arrows.
+                if curr_dir in valid_dirs and random.random() < MOMENTUM_BIAS:
+                    chosen_dir = curr_dir
+                else:
+                    # Fall back to wall-hugging greedy when not continuing straight
+                    scored = []
+                    for d in valid_dirs:
+                        nx, ny = last_x + d[0], last_y + d[1]
+                        score = section_wall_hugging_score(
+                            (nx, ny), shape_mask, occupied, pixel_colors,
+                            section_color_rgb, temp_path_occupied
+                        )
+                        scored.append((d, score))
+                    scored.sort(key=lambda x: x[1], reverse=True)
+                    best_score = scored[0][1]
+                    top_dirs = [d for d, s in scored if s == best_score]
+                    chosen_dir = random.choice(top_dirs)
+
                 curr_dir = chosen_dir
                 path.append((last_x + curr_dir[0], last_y + curr_dir[1]))
                 temp_path_occupied.add(path[-1])
@@ -390,25 +435,30 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
         return False
 
     # ---- PHASE-BASED MAIN LOOP ----
-    # Phase 1: Long  (9-22)  → Phase 2: Mid (5-12)  → Phase 3: Short (2-6)
-    # A phase ends when a full pass over all candidates yields zero successful placements.
+    # Phase 1: Long → Phase 2: Mid → Phase 3: Short
+    # Each pass tries ALL candidates sorted by priority.
+    # A phase ends only after PHASE_PATIENCE consecutive empty passes.
     for phase_idx, (phase_min, phase_max) in enumerate(LENGTH_PHASES):
         phase_names = ["Long", "Mid", "Short"]
         print(f"    Phase {phase_idx+1} ({phase_names[phase_idx]}, len {phase_min}-{phase_max})...")
+        consecutive_empty = 0
         while len(occupied) < target_points:
             candidates = build_candidates()
             if not candidates: break
+            # Sort by priority (high = better) then shuffle same-priority clusters
             candidates.sort(key=lambda x: x[2], reverse=True)
-            # Try the top pool of candidates
-            top_pool = candidates[:max(1, len(candidates) // 5)]
-            random.shuffle(top_pool)
             placed_this_pass = False
-            for head_node, escape_dir, _ in top_pool:
+            for head_node, escape_dir, _ in candidates:
+                if head_node not in free_points: continue  # may have been filled already
                 if try_place_arrow(head_node, escape_dir, phase_min, phase_max):
                     placed_this_pass = True
                     break  # rebuild candidates fresh after each placement
-            if not placed_this_pass:
-                break  # this phase is exhausted — move to next
+            if placed_this_pass:
+                consecutive_empty = 0
+            else:
+                consecutive_empty += 1
+                if consecutive_empty >= PHASE_PATIENCE:
+                    break  # phase is truly exhausted
 
     return {
         "gridSize": {"x": grid_width, "y": grid_height}, "arrows": arrows,
@@ -416,56 +466,166 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
     }
 
 def post_process_fill_gaps_sections(level_data, config):
+    """
+    Exhaustively fill remaining free shape cells with small arrows.
+
+    Improvements:
+    - Side-aware filling: processes cells in sweeping order (left->right, etc.)
+    - Tries ALL 4 escape directions per free point.
+    - Iterates until no more progress can be made.
+    - Correct self-aim check uses occupied dict.
+    - Momentum bias during path growth reduces turns.
+    """
     pixel_colors = level_data["pixel_colors"]
     shape_mask = level_data["shape_mask"]
     gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
     occupied = {(p["x"], p["y"]): a["id"] for a in level_data["arrows"] for p in a["path"]}
-    free_points = [p for p in shape_mask if p not in occupied]
-    random.shuffle(free_points)
     next_id = max([a["id"] for a in level_data["arrows"]] + [0]) + 1
     dir_map = {(1, 0): "right", (-1, 0): "left", (0, 1): "up", (0, -1): "down"}
-    
-    for start_node in free_points:
-        if start_node in occupied: continue
-        # pixel_colors stores pure (R,G,B); no [:3] slice needed
+    all_escape_dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+    def escape_is_clear(head_pos, escape_dir, path_set):
+        """Returns True if the escape lane from head_pos is free of occupied cells and path cells."""
+        ax, ay = head_pos[0] + escape_dir[0], head_pos[1] + escape_dir[1]
+        while 0 <= ax < gw and 0 <= ay < gh:
+            if (ax, ay) in occupied or (ax, ay) in path_set:
+                return False
+            ax += escape_dir[0]; ay += escape_dir[1]
+        return True
+
+    def try_fill_from(start_node, escape_dir, min_len, max_len):
+        """Attempt to place a short arrow starting at start_node with the given escape direction."""
+        nonlocal next_id
+        if start_node in occupied:
+            return False
         section_rgb = pixel_colors[start_node]
-        for _t in range(5):
-            target_length = random.randint(2, 6)
-            path, temp_path_set, curr_dir = [start_node], {start_node}, None
-            for i in range(target_length - 1):
-                last_x, last_y = path[-1]
-                valid_dirs = []
-                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                    nx, ny = last_x + dx, last_y + dy
-                    if (nx, ny) in shape_mask and (nx, ny) not in occupied and (nx, ny) not in temp_path_set:
-                        if pixel_colors[(nx, ny)] == section_rgb:
-                            valid_dirs.append((dx, dy))
-                if not valid_dirs: break
-                chosen_dir = curr_dir if curr_dir in valid_dirs and random.random() > 0.2 else random.choice(valid_dirs)
-                path.append((last_x + chosen_dir[0], last_y + chosen_dir[1]))
-                temp_path_set.add(path[-1]); curr_dir = chosen_dir
+        body_dir = (-escape_dir[0], -escape_dir[1])
+
+        for target_len in range(max_len, min_len - 1, -1):
+            path = [start_node]
+            temp_set = {start_node}
+            curr_dir = body_dir
+
+            for i in range(target_len - 1):
+                lx, ly = path[-1]
+                valid = []
+                for dx, dy in all_escape_dirs:
+                    nx, ny = lx + dx, ly + dy
+                    if ((nx, ny) in shape_mask
+                            and (nx, ny) not in occupied
+                            and (nx, ny) not in temp_set
+                            and pixel_colors.get((nx, ny)) == section_rgb):
+                        if i == 0 and (dx, dy) == escape_dir: continue
+                        valid.append((dx, dy))
+                if not valid: break
+                # Wall-hugging growth for gap fill
+                scored = []
+                for dx, dy in all_escape_dirs:
+                    nx, ny = lx + dx, ly + dy
+                    if ((nx, ny) in shape_mask and (nx, ny) not in occupied and (nx, ny) not in temp_set and pixel_colors.get((nx, ny)) == section_rgb):
+                        if i == 0 and (dx, dy) == escape_dir: continue
+                        score = get_wall_count((nx, ny), shape_mask, occupied, pixel_colors, section_rgb, temp_set)
+                        scored.append(((dx, dy), score))
+                
+                if not scored: break
+                
+                # Biased random: strongly prefer high wall count
+                scored.sort(key=lambda x: x[1], reverse=True)
+                top_score = scored[0][1]
+                best_dirs = [d for d, s in scored if s == top_score]
+                
+                if curr_dir in best_dirs and random.random() < MOMENTUM_BIAS:
+                    chosen = curr_dir
+                else:
+                    chosen = random.choice(best_dirs)
+                curr_dir = chosen
+                path.append((lx + curr_dir[0], ly + curr_dir[1]))
+                temp_set.add(path[-1])
+
             if len(path) < 2: continue
-            head, prev = path[-1], path[-2]
-            look_dx, look_dy = head[0] - prev[0], head[1] - prev[1]
-            aim_x, aim_y = head[0] + look_dx, head[1] + look_dy
-            is_self_aiming = False
-            while 0 <= aim_x < gw and 0 <= aim_y < gh:
-                if (aim_x, aim_y) in temp_path_set: is_self_aiming = True; break
-                aim_x += look_dx; aim_y += look_dy
-            if is_self_aiming: continue
+            if not escape_is_clear(start_node, escape_dir, temp_set):
+                continue
+
+            path_rev = list(reversed(path))
+            look_dir = dir_map[escape_dir]
+
             new_arrow = {
-                "id": next_id, "color": rgb_to_hex(section_rgb),
+                "id": next_id,
+                "color": rgb_to_hex(section_rgb),
                 **_arrow_width_field(),
-                "path": [{"x": p[0], "y": p[1]} for p in path],
-                "lookDirection": dir_map[(look_dx, look_dy)]
+                "path": [{"x": p[0], "y": p[1]} for p in path_rev],
+                "lookDirection": look_dir
             }
-            test_occupied = occupied.copy()
+            test_occupied = dict(occupied)
             for p in path: test_occupied[p] = next_id
-            if is_level_solvable({"gridSize": level_data["gridSize"], "arrows": level_data["arrows"] + [new_arrow]}, pre_occupied=test_occupied):
+            if is_level_solvable(
+                {"gridSize": level_data["gridSize"], "arrows": level_data["arrows"] + [new_arrow]},
+                pre_occupied=test_occupied
+            ):
                 level_data["arrows"].append(new_arrow)
                 for p in path: occupied[p] = next_id
-                next_id += 1; break
+                next_id += 1
+                return True
+        return False
+
+    # ---- Multi-sweep gap fill ----
+    # 1. Try side-aware sweeps (left->right, right->left, top->bottom, bottom->top)
+    # This helps fill from edges inward systematically.
+    sweep_configs = [
+        ("left-to-right", lambda p: p[0]),
+        ("right-to-left", lambda p: -p[0]),
+        ("top-to-bottom", lambda p: p[1]),
+        ("bottom-to-top", lambda p: -p[1]),
+    ]
+    
+    while True:
+        total_placed_this_round = 0
+        for sweep_name, sort_key in sweep_configs:
+            # When sweeping, also prioritize higher wall count within that sweep
+            free_points = sorted(
+                [p for p in shape_mask if p not in occupied], 
+                key=lambda p: (sort_key(p), -get_wall_count(p, shape_mask, occupied, pixel_colors, pixel_colors[p]))
+            )
+            placed_this_sweep = 0
+            for start_node in free_points:
+                if start_node in occupied: continue
+                dirs = list(all_escape_dirs)
+                random.shuffle(dirs)
+                for edir in dirs:
+                    ex, ey = start_node[0] + edir[0], start_node[1] + edir[1]
+                    lane_usable = not (0 <= ex < gw and 0 <= ey < gh and (ex, ey) in occupied)
+                    if not lane_usable: continue
+                    if try_fill_from(start_node, edir, 2, 5):
+                        placed_this_sweep += 1
+                        break
+            if placed_this_sweep > 0:
+                total_placed_this_round += placed_this_sweep
+                print(f"    Side-aware sweep ({sweep_name}): placed {placed_this_sweep} arrows.")
+        if total_placed_this_round == 0:
+            break
+
+    # 2. Final random exhaustion sweep
+    while True:
+        free_points = [p for p in shape_mask if p not in occupied]
+        if not free_points: break
+        random.shuffle(free_points)
+        placed_this_round = 0
+        for start_node in free_points:
+            if start_node in occupied: continue
+            dirs = list(all_escape_dirs)
+            random.shuffle(dirs)
+            for edir in dirs:
+                ex, ey = start_node[0] + edir[0], start_node[1] + edir[1]
+                lane_usable = not (0 <= ex < gw and 0 <= ey < gh and (ex, ey) in occupied)
+                if not lane_usable: continue
+                if try_fill_from(start_node, edir, 2, 5):
+                    placed_this_round += 1
+                    break
+        if placed_this_round == 0: break
+        print(f"    Random exhaustion round: placed {placed_this_round} arrows.")
+
     return level_data
+
 
 def merge_stuck_arrows_sections(level_data):
     arrows = level_data.get("arrows", [])
@@ -543,7 +703,7 @@ def generate_palette_level(image_path, grid_width, grid_height):
             return {
                 "gridSize": level_data["gridSize"],
                 "arrows": level_data["arrows"],
-                "duration": level_data["duration"]
+               # "duration": level_data["duration"]
             }
         else:
             reason = "SOLVER FAILED" if final_density >= DIFF_CONFIG["TARGET_DENSITY"] else "DENSITY LOW"

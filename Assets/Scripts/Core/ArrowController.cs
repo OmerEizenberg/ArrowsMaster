@@ -64,7 +64,8 @@ namespace Assets.Scripts.Core
             lineRenderer = GetComponent<LineRenderer>();
             if (lineRenderer == null) lineRenderer = gameObject.AddComponent<LineRenderer>();
             
-            float lineWidth = data.arrowWidth ?? 0.2f; // Use per-arrow width if specified, otherwise default
+            // arrowWidth of 0 (or absent from JSON) means use the default width.
+            float lineWidth = (data.arrowWidth > 0f) ? data.arrowWidth : 0.2f;
             lineRenderer.startWidth = lineWidth; 
             lineRenderer.endWidth = lineWidth;
             lineRenderer.useWorldSpace = true;
