@@ -27,6 +27,15 @@ LENGTH_PHASES = [
 
 DURATION_MULTIPLIER = 0.28
 
+# --- ARROW WIDTH ---
+# Set to a float (e.g. 0.3) to embed arrowWidth in every generated arrow's JSON.
+# Set to None to omit the field and use the game's default width (0.2f).
+ARROW_WIDTH = None  # e.g. 0.3
+
+def _arrow_width_field():
+    """Returns a dict with the arrowWidth field if ARROW_WIDTH is set, else empty dict."""
+    return {"arrowWidth": ARROW_WIDTH} if ARROW_WIDTH is not None else {}
+
 # --- FIXED LEVEL VALUES CONFIGURATION ---
 FIXED_LEVEL_VALUES = {
     1: (31, 31), 2: (31, 31), 3: (34, 34), 4: (28, 28), 5: (31, 31), 6: (34, 34), 7: (31, 31), 8: (36, 36), 9: (28, 28), 10: (31, 31),
@@ -357,6 +366,7 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
 
             new_arrow = {
                 "id": arrow_id, "color": rgb_to_hex(section_color_rgb),
+                **_arrow_width_field(),
                 "path": [{"x": p[0], "y": p[1]} for p in path_rev],
                 "lookDirection": look_dir
             }
@@ -445,6 +455,7 @@ def post_process_fill_gaps_sections(level_data, config):
             if is_self_aiming: continue
             new_arrow = {
                 "id": next_id, "color": rgb_to_hex(section_rgb),
+                **_arrow_width_field(),
                 "path": [{"x": p[0], "y": p[1]} for p in path],
                 "lookDirection": dir_map[(look_dx, look_dy)]
             }

@@ -34,7 +34,7 @@ DIFFICULTY_CONFIGS = {
         "SORT_STRATEGY": "seeds"
     },
     3: { # New Reverse-Backtracking Logic
-        "TARGET_DENSITY": 0.901,
+        "TARGET_DENSITY": 0.881,
         "TURN_CHANCE": 0.4,
         "LENGTH_TIERS": [
             (0.2, (2, 6)),   # Short: 20%

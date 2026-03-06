@@ -6,7 +6,7 @@
   "arrows": [
     {
       "id": 1,
-      "color": "#FFFFFF",
+      "color": "#000000",
       "path": [
         {
           "x": 0,
@@ -24,7 +24,7 @@
     },
     {
       "id": 1,
-      "color": "#FFFFFF",
+      "color": "#000000",
       "path": [
         
         {
@@ -43,7 +43,7 @@
     },
     {
       "id": 1,
-      "color": "#FFFFFF",
+      "color": "#000000",
       "path": [
         {
           "x": 2,

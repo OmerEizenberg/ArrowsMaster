@@ -19,6 +19,7 @@ namespace Assets.Scripts.Data
         public string color;
         public string lookDirection;
         public List<Vector2IntData> path;
+        public float? arrowWidth; // Optional: per-arrow line width. If null, uses the default (0.2f).
     }
 
     [Serializable]

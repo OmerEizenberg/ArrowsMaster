@@ -64,8 +64,9 @@ namespace Assets.Scripts.Core
             lineRenderer = GetComponent<LineRenderer>();
             if (lineRenderer == null) lineRenderer = gameObject.AddComponent<LineRenderer>();
             
-            lineRenderer.startWidth = 0.2f; 
-            lineRenderer.endWidth = 0.2f;
+            float lineWidth = data.arrowWidth ?? 0.2f; // Use per-arrow width if specified, otherwise default
+            lineRenderer.startWidth = lineWidth; 
+            lineRenderer.endWidth = lineWidth;
             lineRenderer.useWorldSpace = true;
             lineRenderer.numCapVertices = 5;
             lineRenderer.numCornerVertices = 5;
@@ -74,10 +75,22 @@ namespace Assets.Scripts.Core
             if (s_SharedLineMaterial == null) s_SharedLineMaterial = new Material(Shader.Find("Sprites/Default"));
             lineRenderer.material = s_SharedLineMaterial;
 
-            lineRenderer.startColor = Color.black;
-            lineRenderer.endColor = Color.black;
             lineRenderer.sortingOrder = 0; 
             hasReducedLife = false;
+            m_IsMarkedBlocked = false;
+
+            // Parse color from data
+            m_OriginalColor = Color.black;
+            m_OriginalColor.a = 1.0f;
+
+            if (!string.IsNullOrWhiteSpace(data.color))
+            {
+                if (ColorUtility.TryParseHtmlString(data.color, out Color parsedColor))
+                {
+                    m_OriginalColor = parsedColor;
+                }
+            }
+            SetArrowColor(m_OriginalColor);
 
             // Setup Preview LineRenderer
             GameObject previewObj = new GameObject("PreviewLine");
@@ -305,6 +318,8 @@ namespace Assets.Scripts.Core
 
         [SerializeField] private Color blockedColor = new Color(0.906f, 0.298f, 0.235f); // #e74c3c
         private Color currentArrowColor = Color.black;
+        private Color m_OriginalColor = Color.black;
+        private bool m_IsMarkedBlocked = false;
         private Coroutine highlightCoroutine;
 
         public void SetPressedStyle()
@@ -318,7 +333,9 @@ namespace Assets.Scripts.Core
         {
             if (isMoving) return;
             if (highlightCoroutine != null) StopCoroutine(highlightCoroutine);
-            highlightCoroutine = StartCoroutine(AnimateColorReset(Color.black, 0.12f));
+            
+            Color targetColor = m_IsMarkedBlocked ? blockedColor : m_OriginalColor;
+            highlightCoroutine = StartCoroutine(AnimateColorReset(targetColor, 0.12f));
         }
 
         private IEnumerator AnimateColorReset(Color targetColor, float duration)
@@ -468,7 +485,7 @@ namespace Assets.Scripts.Core
         private IEnumerator SuccessColorAnimation()
         {
             Color successColor = new Color(0.18f, 0.8f, 0.44f); // #2ecc71
-            Color startFlashColor = Color.black; // #000000
+            Color startFlashColor = m_OriginalColor; 
             float duration = 0.33f;
             float halfDuration = duration / 2f;
 
@@ -1014,6 +1031,7 @@ namespace Assets.Scripts.Core
             SoundManager.Instance.PlayArrowBlocked();
             VibrationManager.VibrateSelection();
             SetArrowColor(blockedColor);
+            m_IsMarkedBlocked = true;
             GameManager.Instance.PlayWrongAnimation();
             yield return s_BlockedPause;
             
