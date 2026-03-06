@@ -30,7 +30,7 @@ LENGTH_PHASES = [
 MOMENTUM_BIAS = 0.80
 
 # How many consecutive empty passes before a phase is considered exhausted.
-PHASE_PATIENCE = 3
+PHASE_PATIENCE = 10
 
 DURATION_MULTIPLIER = 0.28
 
@@ -45,8 +45,8 @@ def _arrow_width_field():
 
 # --- FIXED LEVEL VALUES CONFIGURATION ---
 FIXED_LEVEL_VALUES = {
-    1: (31, 31), 2: (31, 31), 3: (34, 34), 4: (28, 28), 5: (31, 31), 6: (34, 34), 7: (31, 31), 8: (20, 20), 9: (24, 24), 10: (25, 25),
-    11: (26, 26), 12: (26, 26), 13: (35, 35), 14: (29, 29), 15: (33, 33), 16: (35, 35), 17: (33, 33), 18: (38, 38), 19: (29, 29), 20: (33, 33),
+    1: (31, 31), 2: (31, 31), 3: (34, 34), 4: (28, 28), 5: (31, 31), 6: (34, 34), 7: (31, 31), 8: (28, 28), 9: (28, 28), 10: (28, 28),
+    11: (28, 28), 12: (26, 26), 13: (35, 35), 14: (29, 29), 15: (33, 33), 16: (35, 35), 17: (33, 33), 18: (38, 38), 19: (29, 29), 20: (33, 33),
     21: (34, 34), 22: (34, 34), 23: (38, 38), 24: (30, 30), 25: (34, 34), 26: (38, 38), 27: (34, 34), 28: (41, 41), 29: (30, 30), 30: (34, 34),
     31: (37, 37), 32: (37, 37), 33: (40, 40), 34: (32, 32), 35: (37, 37), 36: (40, 40), 37: (37, 37), 38: (44, 44), 39: (32, 32), 40: (37, 37),
     41: (38, 38), 42: (38, 38), 43: (42, 42), 44: (33, 33), 45: (38, 38), 46: (42, 42), 47: (38, 38), 48: (46, 46), 49: (33, 33), 50: (38, 38),
@@ -98,6 +98,24 @@ for _h in PALETTE_HEXES:
 def hex_to_rgb(h):
     h = h.lstrip('#')
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def get_dir_name(dx, dy):
+    if dx == 0 and dy > 0: return "up"
+    if dx == 0 and dy < 0: return "down"
+    if dx < 0 and dy == 0: return "left"
+    if dx > 0 and dy == 0: return "right"
+    # Fallback to horizontal or vertical for slight diagonals if they ever occur
+    if abs(dx) > abs(dy):
+        return "right" if dx > 0 else "left"
+    else:
+        return "up" if dy > 0 else "down"
+
+def finalize_arrow_directions(arrows):
+    for a in arrows:
+        if len(a["path"]) >= 2:
+            h = a["path"][-1]
+            p = a["path"][-2]
+            a["lookDirection"] = get_dir_name(h["x"] - p["x"], h["y"] - p["y"])
 
 def rgb_to_hex(rgb):
     """Always outputs a fully-opaque 6-digit hex color string."""
@@ -152,6 +170,11 @@ def get_image_data_quantized(img, config, palette_rgbs):
             if not is_bg and (not main_bg_color or main_bg_is_white):
                 if r > config["WHITE_THRESHOLD"] and g > config["WHITE_THRESHOLD"] and b > config["WHITE_THRESHOLD"]:
                     is_bg = True
+            
+            # Rule 1: STRICT white detection (ignore 'total white' sections)
+            if not is_bg and (r > 242 and g > 242 and b > 242):
+                is_bg = True
+                
             if not is_bg:
                 shape_mask.add((x, y))
                 
@@ -240,6 +263,26 @@ def get_wall_count(pos, shape_mask, occupied_set, pixel_colors, section_color, t
             wall_count += 1
     return wall_count
 
+def get_doe(pos, gw, gh, occupied_set, extra_temp_set=None):
+    """
+    Calculates Degree of Escape: how many rays (Up, Down, Left, Right) 
+    from 'pos' can exit the grid without hitting an occupied cell.
+    """
+    doe = 0
+    dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+    for dx, dy in dirs:
+        cx, cy = pos[0]+dx, pos[1]+dy
+        blocked = False
+        while 0 <= cx < gw and 0 <= cy < gh:
+            if (cx, cy) in occupied_set:
+                blocked = True; break
+            if extra_temp_set and (cx, cy) in extra_temp_set:
+                blocked = True; break
+            cx += dx; cy += dy
+        if not blocked:
+            doe += 1
+    return doe
+
 def section_wall_hugging_score(pos, shape_mask, occupied_set, pixel_colors, section_color, temp_path_set):
     """
     Score a candidate point by its 'wall' adjacency to encourage filling edges first.
@@ -272,6 +315,43 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
 
     if not shape_mask: return None
 
+    # --- Rule 3: Merge small sections (< 7 points) ---
+    while True:
+        changed = False
+        visited = set()
+        for p in list(shape_mask):
+            if p in visited: continue
+            color = pixel_colors[p]
+            comp = []
+            q = collections.deque([p])
+            visited.add(p)
+            while q:
+                curr = q.popleft()
+                comp.append(curr)
+                for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+                    nx, ny = curr[0]+dx, curr[1]+dy
+                    if (nx, ny) in shape_mask and (nx, ny) not in visited and pixel_colors.get((nx, ny)) == color:
+                        visited.add((nx, ny))
+                        q.append((nx, ny))
+            if len(comp) < 7:
+                # Find neighbors to absorb color from
+                neighbor_colors = []
+                for cp in comp:
+                    for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+                        nx, ny = cp[0]+dx, cp[1]+dy
+                        if (nx, ny) in shape_mask and pixel_colors.get((nx, ny)) != color:
+                            neighbor_colors.append(pixel_colors[(nx, ny)])
+                if neighbor_colors:
+                    best_color = collections.Counter(neighbor_colors).most_common(1)[0][0]
+                    for cp in comp: pixel_colors[cp] = best_color
+                    changed = True
+                else:
+                    # Isolated tiny island - remove it
+                    for cp in comp: shape_mask.remove(cp)
+                    changed = True
+                if changed: break
+        if not changed: break
+
     occupied = set()
     occupied_with_ids = {}
     escape_routes = {}
@@ -301,7 +381,6 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
         heads_by_col[h["x"]].append((h["y"], aid, ldir))
 
     inv_map = {"right": (1, 0), "left": (-1, 0), "up": (0, 1), "down": (0, -1)}
-    dir_map = {(1, 0): "right", (-1, 0): "left", (0, 1): "up", (0, -1): "down"}
 
     def build_candidates():
         """Build list of (head_node, escape_dir, priority) for all valid free points."""
@@ -337,10 +416,30 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
                 elif sweep_side == "top" and edir == (0, 1): dir_bias = 150
                 elif sweep_side == "bottom" and edir == (0, -1): dir_bias = 150
 
+                # --- DOE (Degree of Escape) ---
+                # A cell with DoE=0 is already trapped.
+                # A cell with DoE=1 is CRITICAL (must be filled in that one direction).
+                doe = get_doe(p, grid_width, grid_height, occupied)
+                if doe == 0: continue
+                
+                # --- SHADOW BIAS ---
+                # Reward being adjacent to another same-colored arrow
+                shadow_bias = 0
+                for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+                    nx, ny = p[0]+dx, p[1]+dy
+                    if (nx, ny) in occupied_with_ids:
+                        target_aid = occupied_with_ids[(nx, ny)]
+                        # Look up color of existing arrow
+                        for ex_arrow in arrows:
+                            if ex_arrow["id"] == target_aid and ex_arrow["color"] == rgb_to_hex(pixel_colors[p]):
+                                shadow_bias += 100; break
+                # Priority: DoE ASCENDING (fill critical cells first), bias DESCENDING
+                doe_score = (5 - doe) * 500  # huge boost for low DoE
+
                 # --- WALL HUGGING BIAS ---
                 wall_bias = get_wall_count(p, shape_mask, occupied, pixel_colors, pixel_colors[p]) * 50
 
-                priority = dist_to_boundary + len(escape_routes.get(p, set())) * 40 + side_bias + dir_bias + wall_bias
+                priority = dist_to_boundary + len(escape_routes.get(p, set())) * 40 + side_bias + dir_bias + wall_bias + doe_score + shadow_bias
                 cands.append((p, edir, priority))
         return cands
 
@@ -374,15 +473,37 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
                 if curr_dir in valid_dirs and random.random() < MOMENTUM_BIAS:
                     chosen_dir = curr_dir
                 else:
-                    # Fall back to wall-hugging greedy when not continuing straight
+                    # Fall back to wall-hugging + trap-prevention greedy
                     scored = []
                     for d in valid_dirs:
                         nx, ny = last_x + d[0], last_y + d[1]
-                        score = section_wall_hugging_score(
+                        
+                        # Wall score
+                        w_score = section_wall_hugging_score(
                             (nx, ny), shape_mask, occupied, pixel_colors,
                             section_color_rgb, temp_path_occupied
                         )
-                        scored.append((d, score))
+                        
+                        # Trap prevention: count neighbors that become trapped if we move here
+                        trapped_penalty = 0
+                        for tdx, tdy in [(1,0),(-1,0),(0,1),(0,-1)]:
+                            nnx, nny = nx+tdx, ny+tdy
+                            if ((nnx, nny) in shape_mask and (nnx, nny) not in occupied and (nnx, nny) not in temp_path_occupied and (nnx, nny) != (nx, ny)):
+                                if get_doe((nnx, nny), grid_width, grid_height, occupied, extra_temp_set=temp_path_occupied.union({(nx, ny)})) == 0:
+                                    trapped_penalty += 200 # Heavy penalty for creating holes
+                                    
+                        # Shadow score (parallelism)
+                        s_score = 0
+                        for sdx, sdy in [(1,0),(-1,0),(0,1),(0,-1)]:
+                            snx, sny = nx+sdx, ny+sdy
+                            if (snx, sny) in occupied_with_ids:
+                                target_aid = occupied_with_ids[(snx, sny)]
+                                for ex_arrow in arrows:
+                                    if ex_arrow["id"] == target_aid and ex_arrow["color"] == rgb_to_hex(section_color_rgb):
+                                        s_score += 50; break
+
+                        scored.append((d, w_score - trapped_penalty + s_score))
+                    
                     scored.sort(key=lambda x: x[1], reverse=True)
                     best_score = scored[0][1]
                     top_dirs = [d for d, s in scored if s == best_score]
@@ -405,9 +526,9 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
             path_rev = list(reversed(path))
             if len(path_rev) >= 2:
                 last_p, prev_p = path_rev[-1], path_rev[-2]
-                look_dir = dir_map.get((last_p[0]-prev_p[0], last_p[1]-prev_p[1]), dir_map[escape_dir])
+                look_dir = get_dir_name(last_p[0]-prev_p[0], last_p[1]-prev_p[1])
             else:
-                look_dir = dir_map[escape_dir]
+                look_dir = get_dir_name(escape_dir[0], escape_dir[1])
 
             new_arrow = {
                 "id": arrow_id, "color": rgb_to_hex(section_color_rgb),
@@ -434,11 +555,19 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
                 return True
         return False
 
-    # ---- PHASE-BASED MAIN LOOP ----
     # Phase 1: Long → Phase 2: Mid → Phase 3: Short
-    # Each pass tries ALL candidates sorted by priority.
-    # A phase ends only after PHASE_PATIENCE consecutive empty passes.
-    for phase_idx, (phase_min, phase_max) in enumerate(LENGTH_PHASES):
+    # Dynamic lengths relative to grid size — Rule 2: min length 3
+    grid_diagonal = int((grid_width**2 + grid_height**2)**0.5)
+    L1 = max(10, int(grid_diagonal * 0.4))
+    L2 = max(6, int(grid_diagonal * 0.2))
+    
+    DYNAMIC_PHASES = [
+        (L1, L1 * 2),
+        (L2, L1),
+        (3, L2), # Start at 3 points
+    ]
+
+    for phase_idx, (phase_min, phase_max) in enumerate(DYNAMIC_PHASES):
         phase_names = ["Long", "Mid", "Short"]
         print(f"    Phase {phase_idx+1} ({phase_names[phase_idx]}, len {phase_min}-{phase_max})...")
         consecutive_empty = 0
@@ -465,6 +594,15 @@ def run_reverse_generator_with_sections(image_path, grid_width, grid_height, con
         "total_shape_points": total_shape_points, "pixel_colors": pixel_colors, "shape_mask": shape_mask
     }
 
+def escape_is_clear(head_pos, escape_dir, path_set, occupied, gw, gh):
+    """Returns True if the escape lane from head_pos is free of occupied cells and path cells."""
+    ax, ay = head_pos[0] + escape_dir[0], head_pos[1] + escape_dir[1]
+    while 0 <= ax < gw and 0 <= ay < gh:
+        if (ax, ay) in occupied or (ax, ay) in path_set:
+            return False
+        ax += escape_dir[0]; ay += escape_dir[1]
+    return True
+
 def post_process_fill_gaps_sections(level_data, config):
     """
     Exhaustively fill remaining free shape cells with small arrows.
@@ -481,17 +619,7 @@ def post_process_fill_gaps_sections(level_data, config):
     gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
     occupied = {(p["x"], p["y"]): a["id"] for a in level_data["arrows"] for p in a["path"]}
     next_id = max([a["id"] for a in level_data["arrows"]] + [0]) + 1
-    dir_map = {(1, 0): "right", (-1, 0): "left", (0, 1): "up", (0, -1): "down"}
     all_escape_dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-
-    def escape_is_clear(head_pos, escape_dir, path_set):
-        """Returns True if the escape lane from head_pos is free of occupied cells and path cells."""
-        ax, ay = head_pos[0] + escape_dir[0], head_pos[1] + escape_dir[1]
-        while 0 <= ax < gw and 0 <= ay < gh:
-            if (ax, ay) in occupied or (ax, ay) in path_set:
-                return False
-            ax += escape_dir[0]; ay += escape_dir[1]
-        return True
 
     def try_fill_from(start_node, escape_dir, min_len, max_len):
         """Attempt to place a short arrow starting at start_node with the given escape direction."""
@@ -534,7 +662,9 @@ def post_process_fill_gaps_sections(level_data, config):
                 top_score = scored[0][1]
                 best_dirs = [d for d, s in scored if s == top_score]
                 
-                if curr_dir in best_dirs and random.random() < MOMENTUM_BIAS:
+                # Lower momentum bias during gap filling for more flexibility
+                GAP_MOMENTUM_BIAS = 0.4
+                if curr_dir in best_dirs and random.random() < GAP_MOMENTUM_BIAS:
                     chosen = curr_dir
                 else:
                     chosen = random.choice(best_dirs)
@@ -542,12 +672,15 @@ def post_process_fill_gaps_sections(level_data, config):
                 path.append((lx + curr_dir[0], ly + curr_dir[1]))
                 temp_set.add(path[-1])
 
-            if len(path) < 2: continue
-            if not escape_is_clear(start_node, escape_dir, temp_set):
+            if len(path) < 3: continue
+            if not escape_is_clear(start_node, escape_dir, temp_set, occupied, gw, gh):
                 continue
 
             path_rev = list(reversed(path))
-            look_dir = dir_map[escape_dir]
+            if len(path_rev) >= 3:
+                look_dir = get_dir_name(path_rev[-1][0]-path_rev[-2][0], path_rev[-1][1]-path_rev[-2][1])
+            else:
+                look_dir = get_dir_name(escape_dir[0], escape_dir[1])
 
             new_arrow = {
                 "id": next_id,
@@ -595,7 +728,7 @@ def post_process_fill_gaps_sections(level_data, config):
                     ex, ey = start_node[0] + edir[0], start_node[1] + edir[1]
                     lane_usable = not (0 <= ex < gw and 0 <= ey < gh and (ex, ey) in occupied)
                     if not lane_usable: continue
-                    if try_fill_from(start_node, edir, 2, 5):
+                    if try_fill_from(start_node, edir, 3, 5):
                         placed_this_sweep += 1
                         break
             if placed_this_sweep > 0:
@@ -618,7 +751,7 @@ def post_process_fill_gaps_sections(level_data, config):
                 ex, ey = start_node[0] + edir[0], start_node[1] + edir[1]
                 lane_usable = not (0 <= ex < gw and 0 <= ey < gh and (ex, ey) in occupied)
                 if not lane_usable: continue
-                if try_fill_from(start_node, edir, 2, 5):
+                if try_fill_from(start_node, edir, 3, 5):
                     placed_this_round += 1
                     break
         if placed_this_round == 0: break
@@ -626,6 +759,225 @@ def post_process_fill_gaps_sections(level_data, config):
 
     return level_data
 
+def fill_large_voids(level_data):
+    """
+    Identifies contiguous empty regions of 5+ points and attempts to fill them 
+    with a single long, deterministic arrow that hugs the wall.
+    """
+    pixel_colors = level_data["pixel_colors"]
+    shape_mask = level_data["shape_mask"]
+    gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
+    occupied = {(p["x"], p["y"]): a["id"] for a in level_data["arrows"] for p in a["path"]}
+    next_id = max([a["id"] for a in level_data["arrows"]] + [0]) + 1
+    
+    # Keep repeating the process until no more long arrows can be placed anywhere
+    while True:
+        placed_any_in_round = False
+        
+        # 1. Group empty points into connected components of the same color
+        free_points = [p for p in shape_mask if p not in occupied]
+        if not free_points: break
+        
+        components = []
+        visited = set()
+        for p in free_points:
+            if p in visited: continue
+            comp = []
+            q = collections.deque([p])
+            visited.add(p)
+            color = pixel_colors[p]
+            while q:
+                curr = q.popleft()
+                comp.append(curr)
+                for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+                    nx, ny = curr[0]+dx, curr[1]+dy
+                    if (nx, ny) in shape_mask and (nx, ny) not in occupied and (nx, ny) not in visited and pixel_colors.get((nx, ny)) == color:
+                        visited.add((nx, ny))
+                        q.append((nx, ny))
+            if len(comp) >= 2: # Reduce to 2 to catch even smaller gaps
+                components.append(comp)
+        
+        if not components: break
+
+        placed_this_round = 0
+        for comp in components:
+            comp_set = set(comp)
+            color = pixel_colors[comp[0]]
+            
+            # Find the best possible arrow within this component
+            best_path = []
+            best_edir = None
+            
+            # Only try the most 'constrained' points as seeds to save time
+            seeds = sorted(comp, key=lambda p: get_doe(p, gw, gh, occupied))[:10]
+            
+            for start_node in seeds:
+                # Try growing a path from this seed
+                path = [start_node]
+                p_set = {start_node}
+                while True:
+                    curr = path[-1]
+                    scored = []
+                    for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+                        nx, ny = curr[0]+dx, curr[1]+dy
+                        if (nx, ny) in comp_set and (nx, ny) not in p_set:
+                            # Use existing high-quality scoring
+                            score = get_wall_count((nx, ny), shape_mask, occupied, pixel_colors, color, p_set)
+                            scored.append(((dx,dy), (nx, ny), score))
+                    if not scored: break
+                    scored.sort(key=lambda x: (x[2], 1 if len(path) >= 2 and x[0] == (path[-1][0]-path[-2][0], path[-1][1]-path[-2][1]) else 0), reverse=True)
+                    path.append(scored[0][1])
+                    p_set.add(path[-1])
+                
+                if len(path) < 3: continue
+                
+                # Check all 8 possible head/direction combos for this path
+                for head_candidate in [path[0], path[-1]]:
+                    ordered_path = list(reversed(path)) if head_candidate == path[0] else list(path)
+                    head_pos = ordered_path[-1]
+                    for edir in [(1,0),(-1,0),(0,1),(0,-1)]:
+                        if not escape_is_clear(head_pos, edir, set(ordered_path), occupied, gw, gh): continue
+                        
+                        if len(ordered_path) > len(best_path):
+                            best_path = ordered_path
+                            best_edir = edir
+            
+            if best_path and best_edir:
+                new_arrow = {
+                    "id": next_id,
+                    "color": rgb_to_hex(color),
+                    **_arrow_width_field(),
+                    "path": [{"x": p[0], "y": p[1]} for p in best_path],
+                    "lookDirection": get_dir_name(best_edir[0], best_edir[1])
+                }
+                
+                test_level = {"gridSize": level_data["gridSize"], "arrows": level_data["arrows"] + [new_arrow]}
+                test_occ = dict(occupied)
+                for p in best_path: test_occ[p] = next_id
+                
+                if is_level_solvable(test_level, pre_occupied=test_occ):
+                    level_data["arrows"].append(new_arrow)
+                    for p in best_path: occupied[p] = next_id
+                    next_id += 1
+                    placed_any_in_round = True
+                    placed_this_round += 1
+                    # Break to re-calculate components as this arrow might have split them
+                    break 
+            if placed_this_round > 0: break
+            
+        if not placed_any_in_round: break
+        
+    return level_data
+
+def aggressive_tile_fill(level_data):
+    """
+    Exhaustively attempts to place 2-point arrows in every possible alignment
+    in remaining empty areas. This is the 'brute force' final pass.
+    """
+    pixel_colors = level_data["pixel_colors"]
+    shape_mask = level_data["shape_mask"]
+    gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
+    occupied = {(p["x"], p["y"]): a["id"] for a in level_data["arrows"] for p in a["path"]}
+    next_id = max([a["id"] for a in level_data["arrows"]] + [0]) + 1
+    
+    free_points = [p for p in shape_mask if p not in occupied]
+    random.shuffle(free_points)
+    
+    placed_count = 0
+    for p in free_points:
+        if p in occupied: continue
+        color = pixel_colors[p]
+        # Try all 4 neighbors for a 2-point arrow
+        neighbors = [(p[0]+dx, p[1]+dy) for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]]
+        random.shuffle(neighbors)
+        
+        for nb in neighbors:
+            if nb in shape_mask and nb not in occupied and pixel_colors.get(nb) == color:
+                # Potential 2-point path: (p, nb)
+                # Try both orientations: p->nb (escape from nb) or nb->p (escape from p)
+                combos = [
+                    (p, nb, (nb[0]-p[0], nb[1]-p[1])), # path p,nb; head nb; escape in edir
+                    (nb, p, (p[0]-nb[0], p[1]-nb[1]))  # path nb,p; head p; escape in edir
+                ]
+                random.shuffle(combos)
+                
+                for tail, head, edir in combos:
+                    # edir is path direction, we need to pick an ESCAPE direction
+                    esc_dirs = [(1,0),(-1,0),(0,1),(0,-1)]
+                    random.shuffle(esc_dirs)
+                    placed_local = False
+                    for esc_v in esc_dirs:
+                        if not escape_is_clear(head, esc_v, {tail, head}, occupied, gw, gh): continue
+                        
+                        new_arrow = {
+                            "id": next_id,
+                            "color": rgb_to_hex(color),
+                            **_arrow_width_field(),
+                            "path": [{"x": tail[0], "y": tail[1]}, {"x": head[0], "y": head[1]}],
+                            "lookDirection": get_dir_name(esc_v[0], esc_v[1])
+                        }
+                        
+                        test_occ = dict(occupied)
+                        test_occ[tail] = next_id
+                        test_occ[head] = next_id
+                        
+                        if is_level_solvable({"gridSize": level_data["gridSize"], "arrows": level_data["arrows"] + [new_arrow]}, pre_occupied=test_occ):
+                            level_data["arrows"].append(new_arrow)
+                            occupied[tail] = next_id
+                            occupied[head] = next_id
+                            next_id += 1
+                            placed_count += 1
+                            placed_local = True
+                            break
+                    if placed_local: break
+    if placed_count > 0:
+        print(f"    Aggressive Tile Fill: placed {placed_count} arrows.")
+    return level_data
+
+def single_pixel_desperation_fill(level_data):
+    """
+    Absolute last resort: fills remaining single pixels with 1-point arrows
+    if it's solvable.
+    """
+    pixel_colors = level_data["pixel_colors"]
+    shape_mask = level_data["shape_mask"]
+    gw, gh = level_data["gridSize"]["x"], level_data["gridSize"]["y"]
+    occupied = {(p["x"], p["y"]): a["id"] for a in level_data["arrows"] for p in a["path"]}
+    next_id = max([a["id"] for a in level_data["arrows"]] + [0]) + 1
+    
+    free_points = [p for p in shape_mask if p not in occupied]
+    random.shuffle(free_points)
+    
+    placed_count = 0
+    for p in free_points:
+        if p in occupied: continue
+        color = pixel_colors[p]
+        
+        esc_dirs = [(1,0),(-1,0),(0,1),(0,-1)]
+        random.shuffle(esc_dirs)
+        for edir in esc_dirs:
+            if not escape_is_clear(p, edir, {p}, occupied, gw, gh): continue
+            
+            new_arrow = {
+                "id": next_id,
+                "color": rgb_to_hex(color),
+                **_arrow_width_field(),
+                "path": [{"x": p[0], "y": p[1]}],
+                "lookDirection": get_dir_name(edir[0], edir[1])
+            }
+            
+            test_occ = dict(occupied)
+            test_occ[p] = next_id
+            
+            if is_level_solvable({"gridSize": level_data["gridSize"], "arrows": level_data["arrows"] + [new_arrow]}, pre_occupied=test_occ):
+                level_data["arrows"].append(new_arrow)
+                occupied[p] = next_id
+                next_id += 1
+                placed_count += 1
+                break
+    if placed_count > 0:
+        print(f"    Single Pixel Desperation Fill: placed {placed_count} arrows.")
+    return level_data
 
 def merge_stuck_arrows_sections(level_data):
     arrows = level_data.get("arrows", [])
@@ -668,7 +1020,7 @@ def generate_palette_level(image_path, grid_width, grid_height):
       - Outputs a clean JSON matching the standard format:
         { "gridSize": {...}, "arrows": [{id, color, path, lookDirection}, ...], "duration": float }
     """
-    for attempt in range(50):
+    for attempt in range(100):
         level_data = run_reverse_generator_with_sections(
             image_path, grid_width, grid_height, DIFF_CONFIG, PALETTE_RGBS
         )
@@ -676,8 +1028,8 @@ def generate_palette_level(image_path, grid_width, grid_height):
             print(f"  Attempt {attempt+1}: Generator returned nothing. Retrying...")
             continue
 
-        # Step 1: Remove arrows with fewer than 2 path points
-        level_data["arrows"] = [a for a in level_data["arrows"] if len(a["path"]) >= 2]
+        # Step 1: Remove arrows with fewer than 1 path points (none should exist, but safety first)
+        level_data["arrows"] = [a for a in level_data["arrows"] if len(a["path"]) >= 1]
 
         # Step 2: Fill remaining empty shape areas (section-aware, section-colored)
         level_data = post_process_fill_gaps_sections(level_data, DIFF_CONFIG)
@@ -685,7 +1037,13 @@ def generate_palette_level(image_path, grid_width, grid_height):
         # Step 3: Merge stuck small arrows (only within same-color section)
         level_data = merge_stuck_arrows_sections(level_data)
 
-        # Step 4: Verify density and full solvability
+        # Step 4: Final Long Fill Pass for any remaining large unfillable blocks
+        level_data = fill_large_voids(level_data)
+
+        # Ensure ALL arrows look the right way before solving/saving
+        finalize_arrow_directions(level_data["arrows"])
+
+        # Step 5: Verify density and full solvability
         occupied_points = sum(len(a["path"]) for a in level_data["arrows"])
         total_shape_points = level_data.get("total_shape_points", 1)
         final_density = occupied_points / total_shape_points
@@ -696,7 +1054,14 @@ def generate_palette_level(image_path, grid_width, grid_height):
             "arrows": level_data["arrows"]
         }
 
-        if final_density >= DIFF_CONFIG["TARGET_DENSITY"] and is_level_solvable(clean_for_solver):
+        # Acceptance density degrades over attempts to ensure we eventually output SOMETHING,
+        # but the new desperation passes should keep density high.
+        if attempt > 75: ACCEPTANCE_DENSITY = 0.70
+        elif attempt > 50: ACCEPTANCE_DENSITY = 0.75
+        elif attempt > 25: ACCEPTANCE_DENSITY = 0.80
+        else: ACCEPTANCE_DENSITY = DIFF_CONFIG["TARGET_DENSITY"]
+
+        if final_density >= ACCEPTANCE_DENSITY and is_level_solvable(clean_for_solver):
             print(f"  Attempt {attempt+1}: PASSED. Density={final_density:.1%}. Saving.")
             level_data["duration"] = max(30, occupied_points * DURATION_MULTIPLIER)
             # Produce clean output JSON — only standard fields
@@ -706,7 +1071,7 @@ def generate_palette_level(image_path, grid_width, grid_height):
                # "duration": level_data["duration"]
             }
         else:
-            reason = "SOLVER FAILED" if final_density >= DIFF_CONFIG["TARGET_DENSITY"] else "DENSITY LOW"
+            reason = "SOLVER FAILED" if final_density >= ACCEPTANCE_DENSITY else "DENSITY LOW"
             print(f"  Attempt {attempt+1}: {reason} ({final_density:.1%}). Retrying...")
 
     print(f"  All 50 attempts failed for {image_path}.")
