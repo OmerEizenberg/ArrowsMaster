@@ -79,6 +79,7 @@ namespace Assets.Scripts.Core
         private bool wasTimerActiveBeforeAd = false;
         private List<int> p_pickedArrowIds = new List<int>();
         private Coroutine m_PeriodicSaveCoroutine;
+        private LevelProgress m_LastSavedProgress;
 
         private Vector2 m_ScreenCenter;
         private Vector2[] m_QuarterCenters = new Vector2[4];
@@ -358,7 +359,6 @@ namespace Assets.Scripts.Core
             
             HideFailureScreen();
             ResetHintTimer();
-            SaveCurrentProgress(); // Save after PlayOn
         }
 
         public void RestartCurrentLevel()
@@ -411,6 +411,7 @@ namespace Assets.Scripts.Core
             lastDisplayedSecond = -1;
             levelDuration = 0f;
             playOnPurchaseCount = 0;
+            m_LastSavedProgress = null;
 
             if (levelManager != null)
             {
@@ -477,6 +478,7 @@ namespace Assets.Scripts.Core
             lastDisplayedSecond = -1;
             levelDuration = 0f;
             playOnPurchaseCount = 0;
+            m_LastSavedProgress = null;
 
             if (levelManager != null)
             {
@@ -544,7 +546,6 @@ namespace Assets.Scripts.Core
                 activeArrowsCount--;
                 p_pickedArrowIds.Add(arrowId);
                 UpdateArrowsLeftUI(true);
-                SaveCurrentProgress(); // Save on every successful arrow
                 if (activeArrowsCount == 0)
                 {
                     isWinning = true;
@@ -746,7 +747,6 @@ namespace Assets.Scripts.Core
             {
                 CurrentLives++;
                 OnLivesChanged?.Invoke(CurrentLives);
-                SaveCurrentProgress(); // Save after gaining a life
             }
         }
 
@@ -1107,6 +1107,7 @@ namespace Assets.Scripts.Core
                 isTimerActive = false;
             }
 
+            m_LastSavedProgress = progress;
             Debug.Log($"[GameManager] Progress Restored: Level={progress.levelId}, Time={currentTime}/{levelDuration}, Lives={CurrentLives}, Active={isTimerActive}");
 
             OnLevelStarted?.Invoke();
@@ -1136,6 +1137,27 @@ namespace Assets.Scripts.Core
 
             if (levelManager == null || string.IsNullOrEmpty(levelManager.CurrentLevelId)) return;
 
+            // Optimization: Only save if something has changed
+            if (m_LastSavedProgress != null)
+            {
+                bool changed = false;
+                if (m_LastSavedProgress.levelId != levelManager.CurrentLevelId) changed = true;
+                else if (m_LastSavedProgress.isChallenge != (!p_isLevelProgression)) changed = true;
+                else if (m_LastSavedProgress.remainingLives != CurrentLives) changed = true;
+                else if (m_LastSavedProgress.isTimerActive != isTimerActive) changed = true;
+                else if (m_LastSavedProgress.pickedArrowIds.Count != p_pickedArrowIds.Count) changed = true;
+                else if (isTimerActive && Mathf.Abs(m_LastSavedProgress.remainingTime - currentTime) >= 1.0f) changed = true;
+                else if (!p_isLevelProgression) // Challenge-specific checks
+                {
+                    if (m_LastSavedProgress.challengeYear != currentChallengeYear ||
+                        m_LastSavedProgress.challengeMonth != currentChallengeMonth ||
+                        m_LastSavedProgress.challengeDay != currentChallengeDay)
+                        changed = true;
+                }
+
+                if (!changed) return;
+            }
+
             LevelProgress progress = new LevelProgress();
             progress.levelId = levelManager.CurrentLevelId;
             progress.isChallenge = !p_isLevelProgression;
@@ -1149,6 +1171,7 @@ namespace Assets.Scripts.Core
             progress.challengeDay = currentChallengeDay;
             progress.hasProgress = true;
 
+            m_LastSavedProgress = progress;
             UserDataManager.Instance.SaveLevelProgress(progress);
             Debug.Log($"[GameManager] Progress saved for level {progress.levelId}. Picked arrows: {progress.pickedArrowIds.Count}, Time={currentTime}/{levelDuration}, Active={isTimerActive}");
         }
