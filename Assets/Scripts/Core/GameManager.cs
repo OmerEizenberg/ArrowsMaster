@@ -83,7 +83,7 @@ namespace Assets.Scripts.Core
         private Vector2 m_ScreenCenter;
         private Vector2[] m_QuarterCenters = new Vector2[4];
 
-        public bool CanInteract => isEntranceFinished && !isWinning && !isHintActive && !isTimeUp &&
+        public bool CanInteract => isEntranceFinished && !isWinning && !isTimeUp &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
                                 (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy) &&
                                 (m_FunFact == null || !m_FunFact.activeInHierarchy);
@@ -273,7 +273,7 @@ namespace Assets.Scripts.Core
                 StartCoroutine(ClearHintActive(45.0f, bestArrow));
             }
 
-            ResetHintTimer();
+            ResetHintTimer(false);
         }
 
         public void PlayOn()
@@ -849,10 +849,21 @@ namespace Assets.Scripts.Core
             }
         }
 
-        public void ResetHintTimer()
+        public void ResetHintTimer(bool clearActiveHint = true)
         {
             hintTimer = 0f;
             SetHintVisibility(false);
+            
+            // If there's an active hint, clear it immediately when user starts interacting
+            if (clearActiveHint && isHintActive)
+            {
+                isHintActive = false;
+                List<ArrowController> arrows = GridManager.Instance.GetAllArrows();
+                foreach (var arrow in arrows)
+                {
+                    if (arrow != null) arrow.HidePreview();
+                }
+            }
         }
 
         private void SetHintVisibility(bool visible)
