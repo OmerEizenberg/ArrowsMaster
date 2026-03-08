@@ -50,9 +50,9 @@ namespace Assets.Scripts.Core
             get
             {
 #if UNITY_IOS || UNITY_IPHONE
-                return "88alfrvdudilhun7"; // iOS back_to_lobby_interstital
+                return "88alfrvdudilhun7"; // iOS back_to_lobby_interstitial
 #else
-                return "dctkavzgndg9gm8m"; // Android back_to_lobby_interstital
+                return "dctkavzgndg9gm8m"; // Android back_to_lobby_interstitial
 #endif
             }
         }
@@ -86,9 +86,9 @@ namespace Assets.Scripts.Core
             get
             {
 #if UNITY_IOS || UNITY_IPHONE
-                return "jbr5jpvpbixrle5a"; // iOS ad_rewarded
+                return "jbr5jpvpbixrle5a"; // iOS banner
 #else
-                 return "rd82j6gdgow61x63"; // Android ad_rewarded
+                return "rd82j6gdgow61x63"; // Android banner
 #endif
             }
         }
@@ -208,6 +208,12 @@ namespace Assets.Scripts.Core
                 CreateRewardedAd();
                 CreateCoinsRewardedAd();
                 CreateSettingsBannerAd();
+
+                // If settings is already open when initialization finishes, show the banner
+                if (SettingsManager.Instance != null && SettingsManager.Instance.gameObject.activeInHierarchy)
+                {
+                    ShowSettingsBanner();
+                }
             });
         }
 
@@ -659,7 +665,8 @@ namespace Assets.Scripts.Core
                 CreateSettingsBannerAd();
             }
 
-            Debug.Log("[AdsManager] Showing/Loading Settings Banner Ad.");
+            Debug.Log("[AdsManager] Showing Settings Banner Ad.");
+            settingsBannerAd.ShowAd();
             settingsBannerAd.LoadAd();
         }
 
