@@ -717,7 +717,10 @@ namespace Assets.Scripts.Core
             
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.ShowInterstitial(true);
+                if(UserDataManager.Instance.CurrentLevel%2 == 1)
+                {
+                    AdsManager.Instance.ShowInterstitial(true);
+                }
                 AdsManager.Instance.SpawnCoinsSmallExplosion();
             }
             
