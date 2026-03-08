@@ -35,6 +35,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_ComboTimerContainer;
     [SerializeField] private Image m_ComboTimerImage;
     [SerializeField] private TextMeshProUGUI m_StreakText;
+    [SerializeField] private TextMeshProUGUI m_LevelHeaderText;
 
     // Must match the time condition used in ArrowController.OnArrowClicked (0.9f)
     public const float StreakTimeThreshold = 1.0f;
@@ -51,6 +52,7 @@ public class GameUIContoleer : MonoBehaviour
             UpdateLivesUI(GameManager.Instance.CurrentLives);
             ToggleHintButton(false); // Hide by default
             UpdateTimerVisibility();
+            UpdateLevelHeaderText();
         }
     }
 
@@ -204,7 +206,6 @@ public class GameUIContoleer : MonoBehaviour
             m_TimerContainer.SetActive(GameManager.Instance.IsTimedLevel);
         }
     }
-    
     private void OnLevelStarted()
     {
         UpdateTimerVisibility();
@@ -220,7 +221,50 @@ public class GameUIContoleer : MonoBehaviour
             m_TimerText.color = m_TimerDefaultColor;
         }
 
+        UpdateLevelHeaderText();
+
         ResetComboIndication();
+    }
+
+    private void UpdateLevelHeaderText()
+    {
+        if (m_LevelHeaderText == null || GameManager.Instance == null) return;
+
+        if (GameManager.Instance.p_isLevelProgression)
+        {
+            m_LevelHeaderText.text = $"Level {UserDataManager.Instance.CurrentLevel}";
+        }
+        else
+        {
+            int day = GameManager.Instance.currentChallengeDay;
+            int month = GameManager.Instance.currentChallengeMonth;
+            int year = GameManager.Instance.currentChallengeYear;
+
+            try
+            {
+                System.DateTime date = new System.DateTime(year, month, day);
+                string suffix = GetDaySuffix(day);
+                m_LevelHeaderText.text = $"{day}{suffix} {date:MMM}";
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[GameUIContoleer] Error formatting challenge date: {e.Message}");
+                m_LevelHeaderText.text = "Challenge Level";
+            }
+        }
+    }
+
+    private string GetDaySuffix(int day)
+    {
+        if (day >= 11 && day <= 13) return "th";
+
+        switch (day % 10)
+        {
+            case 1: return "st";
+            case 2: return "nd";
+            case 3: return "rd";
+            default: return "th";
+        }
     }
     
     private void OnGameOver()
