@@ -416,20 +416,27 @@ namespace Assets.Scripts.Lobby
                 return;
             }
 
-            // Get current date
-            System.DateTime now = System.DateTime.Today;
-            int year = now.Year;
-            int month = now.Month;
-            int today = now.Day;
-
-            // Check if today's challenge specifically is completed
-            bool isTodayCompleted = UserDataManager.Instance.IsDayCompleted(year, month, today);
-
-            // The notification should only be visible if TODAY'S challenge is not yet done.
-            // We ignore prior missed days to avoid the notification lingering after the user finishes their daily task.
-            m_ChallengeNotificationImage.SetActive(!isTodayCompleted);
+            // Get current date (only date portion)
+            System.DateTime today = System.DateTime.Today;
+            string lastSeenStr = PlayerPrefs.GetString("LastSeenChallengeDate", string.Empty);
             
-            Debug.Log($"[HomeContoller] UpdateChallengeNotification: Today={year}/{month}/{today}, IsCompleted={isTodayCompleted}");
+            bool showNotification = true;
+            if (!string.IsNullOrEmpty(lastSeenStr))
+            {
+                if (long.TryParse(lastSeenStr, out long binaryTime))
+                {
+                    System.DateTime lastSeenDate = System.DateTime.FromBinary(binaryTime);
+                    // If we have seen it today or later, don't show the notification
+                    if (today <= lastSeenDate)
+                    {
+                        showNotification = false;
+                    }
+                }
+            }
+
+            m_ChallengeNotificationImage.SetActive(showNotification);
+            
+            Debug.Log($"[HomeContoller] UpdateChallengeNotification: Today={today}, ShowNotification={showNotification}");
         }
 
         private void UpdateLobbyAdReadyImage()
@@ -525,6 +532,11 @@ namespace Assets.Scripts.Lobby
                 m_CalanderLayer.SetActive(true);
                 m_ShopLayer.SetActive(false);
                 if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = false;
+
+                // Update the last seen challenge date to today
+                PlayerPrefs.SetString("LastSeenChallengeDate", System.DateTime.Today.ToBinary().ToString());
+                PlayerPrefs.Save();
+                UpdateChallengeNotification();
             }
             RefreshLobbyUI();
         }
