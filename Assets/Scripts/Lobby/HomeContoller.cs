@@ -26,6 +26,7 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private GameObject m_NoAdsBadge;
         [SerializeField] private GameObject m_ShareBadge;
         [SerializeField] private GameObject m_LobbyAdReadyImage;
+        [SerializeField] private GameObject m_ChallengeNotificationImage;
         [SerializeField] private Button m_ChallengeButton;
         [SerializeField] private GameObject m_LockedButton;
         [SerializeField] private GameObject m_LockedChallengeTooltip;
@@ -98,6 +99,7 @@ namespace Assets.Scripts.Lobby
 
             UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
             UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
+            UserDataManager.Instance.OnMonthlyProgressChanged += UpdateChallengeNotification;
             
             if (IAPManager.Instance != null)
             {
@@ -130,12 +132,14 @@ namespace Assets.Scripts.Lobby
             }
 
             CheckForTermsAgreement();
+            UpdateChallengeNotification();
         }
 
         private void OnDisable()
         {
             UserDataManager.Instance.OnLevelChanged -= RefreshLobbyUI;
             UserDataManager.Instance.OnCurrencyChanged -= UpdateCurrencyUI;
+            UserDataManager.Instance.OnMonthlyProgressChanged -= UpdateChallengeNotification;
 
             if (IAPManager.Instance != null)
             {
@@ -398,6 +402,34 @@ namespace Assets.Scripts.Lobby
                 color.a = alpha;
                 m_ChallengeText.color = color;
             }
+
+            UpdateChallengeNotification();
+        }
+
+        private void UpdateChallengeNotification()
+        {
+            if (m_ChallengeNotificationImage == null || UserDataManager.Instance == null) return;
+
+            if (UserDataManager.Instance.CurrentLevel < 20)
+            {
+                m_ChallengeNotificationImage.SetActive(false);
+                return;
+            }
+
+            // Get current date
+            System.DateTime now = System.DateTime.Today;
+            int year = now.Year;
+            int month = now.Month;
+            int today = now.Day;
+
+            // Check if today's challenge specifically is completed
+            bool isTodayCompleted = UserDataManager.Instance.IsDayCompleted(year, month, today);
+
+            // The notification should only be visible if TODAY'S challenge is not yet done.
+            // We ignore prior missed days to avoid the notification lingering after the user finishes their daily task.
+            m_ChallengeNotificationImage.SetActive(!isTodayCompleted);
+            
+            Debug.Log($"[HomeContoller] UpdateChallengeNotification: Today={year}/{month}/{today}, IsCompleted={isTodayCompleted}");
         }
 
         private void UpdateLobbyAdReadyImage()
