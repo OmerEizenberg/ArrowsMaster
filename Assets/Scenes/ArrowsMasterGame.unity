@@ -10829,6 +10829,7 @@ MonoBehaviour:
   initZoomOutDuration: 0.4
   initPaddingMultiplier: 1.1
   initExtraZoomBuffer: 0.5
+  targetViewportCenterY: 0.43
   winZoomMultiplier: 1.5
   zoomReturnDuration: 0.3
   returnStartDelay: 0.15
@@ -16603,23 +16604,218 @@ MonoBehaviour:
   - Think smarter, not harder. Challenge your logic
   - 
   - 
-  - 
+  - "Take a deep breath. You\u2019ve got this."
   - 
   - Your brain is a muscle. Let's give it a workout
   - 
   - 
-  - 
+  - This is your time to unwind.
   - 
   - 
   - 
   - Unlock your cognitive potential, one move at a time
   - 
   - 
-  - 
-  - 
+  - Let the stress melt away.
   - 
   - 
   - Find your flow. One piece at a time
+  - 
+  - 
+  - A peaceful heart solves puzzles faster.
+  - 
+  - Every move has a purpose.
+  - 
+  - 
+  - Relax your shoulders. Clear your mind.
+  - 
+  - 
+  - Silence the noise, find the solution.
+  - 
+  - 
+  - Focus on the present.
+  - 
+  - 
+  - 
+  - 
+  - Clarity comes with patience
+  - 
+  - 
+  - 
+  - Let the logic lead the way.
+  - 
+  - 
+  - Your mind is a calm lake.
+  - 
+  - 
+  - Unplug from the world, plug into the game.
+  - 
+  - Settle into the rhythm.
+  - 
+  - 
+  - 
+  - Precision over speed.
+  - 
+  - 
+  - Peace is found in the patterns.
+  - 
+  - 
+  - Quiet confidence is your best tool.
+  - 
+  - 
+  - Quiet mind, sharp eyes.
+  - 
+  - 
+  - 
+  - The puzzle is a path, not a race.
+  - 
+  - 
+  - 
+  - 
+  - Center your thoughts.
+  - 
+  - 
+  - Every challenge is a chance to grow.
+  - 
+  - 
+  - 
+  - Think outside the box.
+  - 
+  - Balance your effort with ease.
+  - 
+  - A sharp mind solves all.
+  - 
+  - 
+  - Expand your perspective.
+  - 
+  - 
+  - 
+  - 
+  - Strategy is the art of patience.
+  - 
+  - 
+  - 
+  - Training the mind, soothing the soul.
+  - 
+  - 
+  - New levels, new strengths.
+  - 
+  - 
+  - 
+  - Master the chaos.
+  - 
+  - 
+  - 
+  - 
+  - Intelligence is a journey.
+  - 
+  - 
+  - 
+  - 
+  - Complexity is just layers of simplicity.
+  - 
+  - 
+  - 
+  - Sharpen your focus.
+  - 
+  - 
+  - 
+  - 
+  - Logic is the heartbeat of the mind
+  - 
+  - 
+  - 
+  - Your potential is limitless.
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - Wisdom starts with a single move.
+  - 
+  - 
+  - 
+  - There are no mistakes, only lessons.
+  - 
+  - 
+  - 
+  - Even the hardest mountain is climbed one step at a time.
+  - 
+  - 
+  - 
+  - 
+  - A calm sea never made a skilled sailor.
+  - 
+  - 
+  - 
+  - Look closer; things aren't always what they seem.
+  - 
+  - 
+  - 
+  - 
+  - 
+  - Change your perspective, change the game.
+  - 
+  - 
+  - 
+  - The obstacle is the way.
+  - 
+  - 
+  - 
+  - Simplicity is the ultimate sophistication.
+  - 
+  - 
+  - 
+  - 
+  - To know the road ahead, ask those coming back.
+  - 
+  - 
+  - 
+  - 
+  - Small wins lead to big victories.
+  - 
+  - 
+  - 
+  - Growth happens in the quiet moments.
+  - 
+  - 
+  - 
+  - 
+  - Patience is the key to every lock.
+  - 
+  - 
+  - 
+  - Harmony is found in balance.
+  - 
+  - 
+  - 
+  - Every ending is a new beginning.
+  - 
+  - 
+  - 
+  - 
+  - The master has failed more times than the beginner has tried.
+  - 
+  - 
+  - Flexibility is strength.
+  - 
+  - 
+  - 
+  - Deep roots fear no wind.
+  - 
+  - 
+  - 
+  - "Be like water\u2014adapting to every shape."
+  - 
+  - 
+  - 
+  - 
+  - A journey of a thousand miles begins with one click.
+  - 
+  - 
+  - Insight is better than sight.
+  - Nature does not hurry, yet everything is accomplished.
   m_LevelUIElements:
   - {fileID: 0}
   - {fileID: 7570702124109651582, guid: 20bc9d244f0264286ae522f56b5f88c2, type: 3}
