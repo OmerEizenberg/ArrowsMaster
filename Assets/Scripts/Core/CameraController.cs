@@ -24,6 +24,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private float initZoomOutDuration = 0.4f;
         [SerializeField] private float initPaddingMultiplier = 1.2f; // 20% extra space around level
         [SerializeField] private float initExtraZoomBuffer = 0.5f;   // Additional units beyond calculated fit
+        [SerializeField] private float targetViewportCenterY = 0.43f; // Shift center for Top Bar UI
 
         [SerializeField] private float winZoomMultiplier = 3.0f;
 
@@ -175,6 +176,7 @@ namespace Assets.Scripts.Core
             float padding = 2f;
             float cellSize = ArrowController.CellSize;
 
+            // Base world bounds for the level's visual center
             minBounds = new Vector2(-1 * cellSize - padding, -1 * cellSize - padding);
             maxBounds = new Vector2(gridSize.x * cellSize + padding, gridSize.y * cellSize + padding);
             
@@ -243,10 +245,14 @@ namespace Assets.Scripts.Core
                     cachedPosition.x += worldDeltaX * 1.1f;
                     cachedPosition.y += worldDeltaY * 1.1f;
                     
+                    float currentYOffset = (0.5f - targetViewportCenterY) * 2f * cam.orthographicSize;
+                    float minLimitY = minBounds.y + currentYOffset;
+                    float maxLimitY = maxBounds.y + currentYOffset;
+
                     if (cachedPosition.x < minBounds.x || cachedPosition.x > maxBounds.x)
                         cachedPosition.x = Mathf.Clamp(cachedPosition.x, minBounds.x, maxBounds.x);
-                    if (cachedPosition.y < minBounds.y || cachedPosition.y > maxBounds.y)
-                        cachedPosition.y = Mathf.Clamp(cachedPosition.y, minBounds.y, maxBounds.y);
+                    if (cachedPosition.y < minLimitY || cachedPosition.y > maxLimitY)
+                        cachedPosition.y = Mathf.Clamp(cachedPosition.y, minLimitY, maxLimitY);
                     
                     transform.position = cachedPosition;
                     prevMousePos = currentPos;
@@ -338,7 +344,9 @@ namespace Assets.Scripts.Core
             absoluteMaxZoom = Mathf.Max(25f, fitZoom + initExtraZoomBuffer);
             defaultZoom     = finalZoom;
 
-            Vector3 centerPos = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
+            SetBounds(gridSize);
+
+            Vector3 centerPos = GetViewportOffsetPos(focusPosition, startZoom);
 
             // Instantly snap to initial zoomed-in view
             cam.orthographicSize = startZoom;
@@ -371,14 +379,18 @@ namespace Assets.Scripts.Core
                 elapsed += Time.deltaTime;
                 float smoothT = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
 
-                cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, smoothT);
-                transform.position   = Vector3.Lerp(startPos, targetPos, smoothT);
+                float currentZoom = Mathf.Lerp(startZoom, targetZoom, smoothT);
+                cam.orthographicSize = currentZoom;
+                
+                // Recalculate targetPos with current zoom to keep centering consistent during zoom
+                Vector3 currentTargetPos = GetViewportOffsetPos(focusPosition, currentZoom);
+                transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
 
                 yield return null;
             }
 
             cam.orthographicSize = targetZoom;
-            transform.position   = targetPos;
+            transform.position   = GetViewportOffsetPos(focusPosition, targetZoom);
             isInternalAnimation  = false;
             isLevelStarted       = true;
         }
@@ -417,14 +429,17 @@ namespace Assets.Scripts.Core
                 elapsed += Time.deltaTime;
                 float smoothT = Mathf.SmoothStep(0f, 1f, elapsed / duration);
                 
-                cam.orthographicSize = Mathf.Lerp(startZoom, targetZoom, smoothT);
-                transform.position   = Vector3.Lerp(startPos, targetPos, smoothT);
+                float currentZoom = Mathf.Lerp(startZoom, targetZoom, smoothT);
+                cam.orthographicSize = currentZoom;
+                
+                Vector3 currentTargetPos = GetViewportOffsetPos(gridCenter, currentZoom);
+                transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
                 
                 yield return null;
             }
 
             cam.orthographicSize = targetZoom;
-            transform.position   = targetPos;
+            transform.position   = GetViewportOffsetPos(gridCenter, targetZoom);
             isInternalAnimation  = false;
         }
 
@@ -445,12 +460,19 @@ namespace Assets.Scripts.Core
                 elapsed += Time.deltaTime;
                 float smoothT = Mathf.SmoothStep(0f, 1f, elapsed / duration);
                 
-                transform.position = Vector3.Lerp(startPos, targetPos, smoothT);
+                Vector3 currentTargetPos = GetViewportOffsetPos(worldPosition, cam.orthographicSize);
+                transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
                 yield return null;
             }
 
-            transform.position  = targetPos;
+            transform.position  = GetViewportOffsetPos(worldPosition, cam.orthographicSize);
             isInternalAnimation = false;
+        }
+
+        private Vector3 GetViewportOffsetPos(Vector3 worldPos, float orthoSize)
+        {
+            float yOffset = (0.5f - targetViewportCenterY) * 2f * orthoSize;
+            return new Vector3(worldPos.x, worldPos.y + yOffset, transform.position.z);
         }
     }
 }

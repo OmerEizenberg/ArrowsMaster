@@ -242,7 +242,6 @@ namespace Assets.Scripts.Core
             // 1. Set camera to zoomed in position (half max zoom)
             if (CameraController.Instance != null)
             {
-                CameraController.Instance.SetBounds(data.gridSize.ToVector2Int());
                 yield return StartCoroutine(CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), levelCenter));
             }
 
