@@ -37,9 +37,9 @@ DIFFICULTY_CONFIGS = {
         "TARGET_DENSITY": 0.881,
         "TURN_CHANCE": 0.4,
         "LENGTH_TIERS": [
-            (0.2, (2, 6)),   # Short: 20%
+            (0.1, (2, 6)),   # Short: 20%
             (0.4, (5, 12)),  # Mid: 40%
-            (0.4, (9, 22))   # Long: 40%
+            (0.5, (9, 30))   # Long: 40%
         ],
         "MAX_RETRY_ATTEMPTS": 100
     }
