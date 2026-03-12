@@ -46,6 +46,7 @@ namespace Assets.Scripts.Core
         private const string LastAttemptLevelIdKey = "LastAttemptLevelId";
         private const string MaxStreakKey = "MaxStreakRecord";
         private const string LevelProgressKey = "LevelProgress";
+        private const string LastRateUsDateKey = "LastRateUsDate";
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
@@ -62,6 +63,9 @@ namespace Assets.Scripts.Core
         public string LastAttemptLevelId { get; private set; } = string.Empty;
         public int MaxStreak { get; private set; } = 0;
         public System.DateTime InstallDate { get; private set; }
+        public System.DateTime LastRateUsDate { get; private set; }
+        public bool IsRateUsCheckPending { get; set; } = false;
+
 
         private Dictionary<string, int> m_MonthlyCache = new Dictionary<string, int>();
 
@@ -94,6 +98,15 @@ namespace Assets.Scripts.Core
                 else
                 {
                     InstallDate = System.DateTime.Now;
+                }
+            }
+            
+            string lastRateUsDateStr = PlayerPrefs.GetString(LastRateUsDateKey, string.Empty);
+            if (!string.IsNullOrEmpty(lastRateUsDateStr))
+            {
+                if (long.TryParse(lastRateUsDateStr, out long binaryDate))
+                {
+                    LastRateUsDate = System.DateTime.FromBinary(binaryDate);
                 }
             }
         }
@@ -135,6 +148,14 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(ArrowsCurrencyKey, ArrowsCurrency);
             PlayerPrefs.Save();
             OnCurrencyChanged?.Invoke(ArrowsCurrency);
+        }
+
+        public void MarkRateUsSeen()
+        {
+            LastRateUsDate = System.DateTime.Now;
+            PlayerPrefs.SetString(LastRateUsDateKey, LastRateUsDate.ToBinary().ToString());
+            PlayerPrefs.Save();
+            IsRateUsCheckPending = false;
         }
 
         public void ResetProgress()

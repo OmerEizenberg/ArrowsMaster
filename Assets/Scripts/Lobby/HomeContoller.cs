@@ -132,6 +132,7 @@ namespace Assets.Scripts.Lobby
             }
 
             CheckForTermsAgreement();
+            CheckForRateUsPopup();
             UpdateChallengeNotification();
         }
 
@@ -845,6 +846,58 @@ namespace Assets.Scripts.Lobby
             yield return new WaitForSeconds(3f);
             m_LockedChallengeTooltip.SetActive(false);
             m_TooltipCoroutine = null;
+        }
+        private void CheckForRateUsPopup()
+        {
+            if (UserDataManager.Instance == null) return;
+            
+            // Only check if we just came from a win
+            if (!UserDataManager.Instance.IsRateUsCheckPending) return;
+            
+            // Current level must be above 15
+            if (UserDataManager.Instance.CurrentLevel <= 15) return;
+
+            // Check timing condition (45 days)
+            bool shouldShow = false;
+            if (UserDataManager.Instance.LastRateUsDate == System.DateTime.MinValue)
+            {
+                shouldShow = true;
+            }
+            else
+            {
+                System.TimeSpan diff = System.DateTime.Now - UserDataManager.Instance.LastRateUsDate;
+                if (diff.TotalDays >= 45)
+                {
+                    shouldShow = true;
+                }
+            }
+
+            if (shouldShow)
+            {
+                GameObject popupPrefab = Resources.Load<GameObject>("RateUsPopup");
+                if (popupPrefab != null)
+                {
+                    Transform parent = m_LobbyUI != null ? m_LobbyUI.transform.parent : transform;
+                    GameObject popupInstance = Instantiate(popupPrefab, parent, false);
+                    popupInstance.SetActive(true);
+                    popupInstance.transform.SetAsLastSibling();
+
+                    RectTransform rect = popupInstance.GetComponent<RectTransform>();
+                    if (rect != null)
+                    {
+                        rect.localPosition = Vector3.zero;
+                        rect.localScale = Vector3.one;
+                    }
+
+                    UserDataManager.Instance.MarkRateUsSeen();
+                    Debug.Log("[HomeContoller] Rate Us Popup shown.");
+                }
+            }
+            else
+            {
+                // If we shouldn't show it (e.g. within 45 days), just clear the pending flag
+                UserDataManager.Instance.IsRateUsCheckPending = false;
+            }
         }
     }
 }

@@ -655,6 +655,7 @@ namespace Assets.Scripts.Core
             {
                 UserDataManager.Instance.IncrementLevel();
                 UserDataManager.Instance.ClearCurrentLevelAttempts();
+                UserDataManager.Instance.IsRateUsCheckPending = true;
             }
             else
             {
