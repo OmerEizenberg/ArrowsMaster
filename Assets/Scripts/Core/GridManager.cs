@@ -58,18 +58,16 @@ namespace Assets.Scripts.Core
                 allArrowsSet.Remove(arrow);
             }
             
-            // Also clear its occupancy
-            List<Vector2Int> keysToRemove = new List<Vector2Int>();
-            foreach (var kvp in occupancyMap)
+            // Optimization: Only clear keys this arrow actually occupies
+            if (arrow.segments != null)
             {
-                if (kvp.Value == arrow)
+                foreach (var seg in arrow.segments)
                 {
-                    keysToRemove.Add(kvp.Key);
+                    if (occupancyMap.TryGetValue(seg.GridPosition, out var occupant) && occupant == arrow)
+                    {
+                        occupancyMap.Remove(seg.GridPosition);
+                    }
                 }
-            }
-            foreach (var key in keysToRemove)
-            {
-                occupancyMap.Remove(key);
             }
         }
 

@@ -189,20 +189,24 @@ namespace Assets.Scripts.Core
 
             // Rule 2: 0.9f threshold for movable arrows
             float worldThreshold = 0.9f; 
-            // Rule 3: 0.2f threshold for blocked arrows
+            // Rule 3: 0.15f threshold for blocked arrows
             float wrongArrowThreshold = 0.15f; 
             // Rule 4: 2.5f threshold for "all movable" logic
             float worldAnyArrowThreshold = 2.5f; 
+
+            float sqrThreshold = worldThreshold * worldThreshold;
+            float sqrWrongThreshold = wrongArrowThreshold * wrongArrowThreshold;
+            float sqrAnyArrowThreshold = worldAnyArrowThreshold * worldAnyArrowThreshold;
             
             ArrowController directSelectionArrow = null;
             Segment directSelectionSegment = null;
-            float minDistanceDirect = float.MaxValue;
+            float minSqrDistDirect = float.MaxValue;
 
             bool blockedArrowInRange25 = false;
             bool anyArrowInRange25 = false;
             ArrowController fallbackSelectionArrow = null;
             Segment fallbackSelectionSegment = null;
-            float minDistanceFallback = float.MaxValue;
+            float minSqrDistFallback = float.MaxValue;
 
             // Convert click to world space for distance check
             Vector3 worldClickPos = m_Camera.ScreenToWorldPoint(screenPos);
@@ -217,26 +221,26 @@ namespace Assets.Scripts.Core
                 foreach (var segment in arrow.segments)
                 {
                     if (segment == null) continue;
-                    float dist = Vector2.Distance(worldClickPos, segment.transform.position);
+                    float sqrDist = Vector3.SqrMagnitude(worldClickPos - segment.transform.position);
                     
                     // --- Direct Rules (2 & 3) ---
-                    bool isEligibleDirect = (canMove && dist < worldThreshold) || (!canMove && dist < wrongArrowThreshold);
-                    if (isEligibleDirect && dist < minDistanceDirect)
+                    bool isEligibleDirect = (canMove && sqrDist < sqrThreshold) || (!canMove && sqrDist < sqrWrongThreshold);
+                    if (isEligibleDirect && sqrDist < minSqrDistDirect)
                     {
-                        minDistanceDirect = dist;
+                        minSqrDistDirect = sqrDist;
                         directSelectionArrow = arrow;
                         directSelectionSegment = segment;
                     }
 
                     // --- Fallback Rule (4) ---
-                    if (dist < worldAnyArrowThreshold)
+                    if (sqrDist < sqrAnyArrowThreshold)
                     {
                         anyArrowInRange25 = true;
                         if (!canMove) blockedArrowInRange25 = true;
 
-                        if (dist < minDistanceFallback)
+                        if (sqrDist < minSqrDistFallback)
                         {
-                            minDistanceFallback = dist;
+                            minSqrDistFallback = sqrDist;
                             fallbackSelectionArrow = arrow;
                             fallbackSelectionSegment = segment;
                         }

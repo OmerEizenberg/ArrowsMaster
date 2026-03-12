@@ -42,6 +42,7 @@ namespace Assets.Scripts.Core
         private readonly List<Vector3>    _targetWorldPos     = new List<Vector3>(16);
         private readonly List<Vector3>    _impactTargets      = new List<Vector3>(16);
         private readonly List<Vector2Int> _savedPositions     = new List<Vector2Int>(16);
+        private Vector3[] _animationStarts = new Vector3[16]; // Reuse buffer for segment starts
         // Cached WaitForSeconds to avoid per-frame allocation in blocked animation
         private static readonly WaitForSeconds s_BlockedPause = new WaitForSeconds(0.07f);
 
@@ -155,14 +156,14 @@ namespace Assets.Scripts.Core
             box.size = new Vector2(1f, 1f);
 
             // 2. Determine target positions for all segments in this growth step
-            List<Vector3> targets = new List<Vector3>();
+            _targetWorldPos.Clear();
             for (int i = 0; i < segments.Count; i++)
             {
                 int pathIndex = step - (segments.Count - 1 - i);
                 Vector2Int pos = cachedData.path[pathIndex].ToVector2Int();
                 segments[i].GridPosition = pos;
                 Vector3 targetWorldPos = new Vector3(pos.x * CellSize, pos.y * CellSize, 0);
-                targets.Add(targetWorldPos);
+                _targetWorldPos.Add(targetWorldPos);
                 
                 if (instant) segments[i].transform.position = targetWorldPos;
 
@@ -260,11 +261,11 @@ namespace Assets.Scripts.Core
                 Vector3 target1 = new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, z);
                 Vector3 target2 = new Vector3(segments[i+1].GridPosition.x * CellSize, segments[i+1].GridPosition.y * CellSize, z);
                 
-                if (Vector3.Distance(p1, target1) < snapThreshold) p1 = target1;
-                if (Vector3.Distance(p2, target2) < snapThreshold) p2 = target2;
+                if (Vector3.SqrMagnitude(p1 - target1) < snapThreshold * snapThreshold) p1 = target1;
+                if (Vector3.SqrMagnitude(p2 - target2) < snapThreshold * snapThreshold) p2 = target2;
 
                 // Add p1 if it's not a duplicate of the previous point
-                if (linePoints.Count == 0 || Vector3.Distance(linePoints[linePoints.Count - 1], p1) > snapThreshold)
+                if (linePoints.Count == 0 || Vector3.SqrMagnitude(linePoints[linePoints.Count - 1] - p1) > snapThreshold * snapThreshold)
                 {
                     linePoints.Add(p1);
                 }
@@ -302,7 +303,7 @@ namespace Assets.Scripts.Core
                 linePoints.Add(finalPoint - new Vector3(m_LookDirection.x, m_LookDirection.y, 0) * 0.1f);
                 linePoints.Add(finalPoint);
             }
-            else if (Vector3.Distance(linePoints[linePoints.Count - 1], finalPoint) > snapThreshold)
+            else if (Vector3.SqrMagnitude(linePoints[linePoints.Count - 1] - finalPoint) > snapThreshold * snapThreshold)
             {
                 linePoints.Add(finalPoint);
             }
@@ -751,8 +752,8 @@ namespace Assets.Scripts.Core
             int count = segments.Count;
             if (count == 0 || targets.Count != count) yield break;
 
-            Vector3[] starts = new Vector3[count];
-            for (int i = 0; i < count; i++) starts[i] = segments[i].transform.position;
+            if (_animationStarts.Length < count) _animationStarts = new Vector3[count + 8];
+            for (int i = 0; i < count; i++) _animationStarts[i] = segments[i].transform.position;
 
             // Slow animations (entrance, ~0.04s): update every frame for smoothness
             // Fast movement (~0.027s): update every 2 frames (barely noticeable, saves CPU)
@@ -765,7 +766,7 @@ namespace Assets.Scripts.Core
                 float t = elapsed / duration;
                 for (int i = 0; i < count; i++)
                 {
-                    segments[i].transform.position = Vector3.Lerp(starts[i], targets[i], t);
+                    segments[i].transform.position = Vector3.Lerp(_animationStarts[i], targets[i], t);
                 }
                 
                 animationFrameCounter++;
@@ -873,40 +874,19 @@ namespace Assets.Scripts.Core
         {
             if (segments.Count == 0) return true;
             
-            Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = m_LookDirection;
-            
-            Vector2Int currentHeadPos = head.GridPosition;
+            Vector2Int nextPos = segments[segments.Count - 1].GridPosition + currentDir;
 
-            // Check collision with all other arrows
-            foreach (var otherArrow in GridManager.Instance.GetAllArrows())
+            if (GridManager.Instance.IsOutOfBounds(nextPos)) 
+                return true;
+
+            ArrowController occupant = GridManager.Instance.GetOccupant(nextPos);
+            if (occupant != null && occupant != this)
             {
-                if (otherArrow == this) continue; // Skip self
-                
-                // Check intersection with each segment of the other arrow
-                for (int i = 0; i < otherArrow.segments.Count - 1; i++)
-                {
-                    Vector2Int p1 = otherArrow.segments[i].GridPosition;
-                    Vector2Int p2 = otherArrow.segments[i+1].GridPosition;
-                    
-                    if (DoesNextStepCollideWithSegment(currentHeadPos, currentDir, p1, p2))
-                    {
-                        return true; // Blocked
-                    }
-                }
-                
-                // Also check the head of the other arrow if it's the only segment
-                if (otherArrow.segments.Count == 1)
-                {
-                    Vector2Int pH = otherArrow.segments[0].GridPosition;
-                    if (DoesNextStepCollideWithPoint(currentHeadPos, currentDir, pH))
-                    {
-                        return true; // Blocked
-                    }
-                }
+                return true;
             }
             
-            return false; // Not blocked
+            return false;
         }
 
         private int CalculateStepsUntilBlocked()
