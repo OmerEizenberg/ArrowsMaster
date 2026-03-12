@@ -32,7 +32,7 @@ namespace Assets.Scripts.Lobby
             string termsLink = "<link=\"terms\"><u>Terms & Conditions</u></link>";
             string privacyLink = "<link=\"privacy\"><u>Privacy Policy</u></link>";
 
-            m_MainText.text = $"To use Arrows Legend you must agree to our {termsLink} and affirm you have reviewed our {privacyLink}";
+            m_MainText.text = $"To use 'Arrows Legend' you must agree to our {termsLink} and affirm you have reviewed our {privacyLink}";
             
             if (m_SmallText != null)
             {
