@@ -25,7 +25,7 @@ public class SoftForceUpdateView : MonoBehaviour
         #if UNITY_ANDROID
         Application.OpenURL("https://play.google.com/store/apps/details?id=com.everybodygames.arrowsmaster" );
         #elif UNITY_IOS
-        // Application.OpenURL("https://apps.apple.com/us/app/arrowsmaster/id6758734966");
+        // Application.OpenURL("https://apps.apple.com/us/app/arrows-legend-puzzle-escape/id6758734966");
         #endif
     }
 
