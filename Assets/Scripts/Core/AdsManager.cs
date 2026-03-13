@@ -270,9 +270,9 @@ namespace Assets.Scripts.Core
                 if (!isInitializing) _ = InitializeSDK();
                 return;
             }
-            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 6)
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 4)
             {
-                Debug.Log($"[AdsManager] Skipping Interstitial Load: User Level {UserDataManager.Instance.CurrentLevel} < 6.");
+                Debug.Log($"[AdsManager] Skipping Interstitial Load: User Level {UserDataManager.Instance.CurrentLevel} < 4 (Pre-warming starts at 4).");
                 return;
             }
             if (IAPManager.Instance == null)
@@ -644,6 +644,9 @@ namespace Assets.Scripts.Core
                 }
                 // --------------------------------
             };
+
+            Debug.Log("[AdsManager] Pre-loading Settings Banner Ad.");
+            settingsBannerAd.LoadAd();
         }
 
         public void ShowSettingsBanner()
@@ -667,7 +670,7 @@ namespace Assets.Scripts.Core
 
             Debug.Log("[AdsManager] Showing Settings Banner Ad.");
             settingsBannerAd.ShowAd();
-            settingsBannerAd.LoadAd();
+            // Ad is already pre-loaded or loading in background
         }
 
         public void HideSettingsBanner()
