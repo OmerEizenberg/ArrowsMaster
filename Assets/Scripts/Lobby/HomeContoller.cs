@@ -59,6 +59,15 @@ namespace Assets.Scripts.Lobby
         private Coroutine m_ShopScaleCoroutine;
         private Coroutine m_TooltipCoroutine;
 
+        private void Awake()
+        {
+            if (m_CalanderLayer != null) m_CalanderLayer.SetActive(false);
+            if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
+            if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
+            if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+            if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
+        }
+
         private void OnEnable()
         {
             if (UserDataManager.Instance.CurrentLevel < GameManager.COINS_START_LEVEL)

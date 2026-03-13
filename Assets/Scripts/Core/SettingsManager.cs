@@ -27,9 +27,8 @@ namespace Assets.Scripts.Core
         private void Awake()
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
-
             LoadSettings();
+
             CheckPushNotificationPermission();
         }
 

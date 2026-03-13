@@ -208,13 +208,9 @@ namespace Assets.Scripts.Core
                 CreateRewardedAd();
                 CreateCoinsRewardedAd();
                 CreateSettingsBannerAd();
-
-                // If settings is already open when initialization finishes, show the banner
-                if (SettingsManager.Instance != null && SettingsManager.Instance.gameObject.activeInHierarchy)
-                {
-                    ShowSettingsBanner();
-                }
             });
+
+
         }
 
         private void OnSdkInitFailed(LevelPlayInitError error)
@@ -645,9 +641,11 @@ namespace Assets.Scripts.Core
                 // --------------------------------
             };
 
-            Debug.Log("[AdsManager] Pre-loading Settings Banner Ad.");
+            Debug.Log("[AdsManager] Pre-loading Settings Banner Ad (Hidden).");
             settingsBannerAd.LoadAd();
+            settingsBannerAd.HideAd();
         }
+
 
         public void ShowSettingsBanner()
         {
