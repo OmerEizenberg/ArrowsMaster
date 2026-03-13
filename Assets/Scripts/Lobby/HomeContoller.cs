@@ -61,12 +61,14 @@ namespace Assets.Scripts.Lobby
 
         private void OnEnable()
         {
-            if (UserDataManager.Instance.CurrentLevel < 6)
+            if (UserDataManager.Instance.CurrentLevel < GameManager.COINS_START_LEVEL)
             {
                 m_LobbyCurrencyText.transform.parent.gameObject.SetActive(false);
                 m_NoAdsBadge.SetActive(false);
                 m_ShareBadge.SetActive(false);
             }
+
+
             else
             {
                 m_LobbyCurrencyText.transform.parent.gameObject.SetActive(true);
@@ -362,7 +364,9 @@ namespace Assets.Scripts.Lobby
             if (m_NoAdsCoinsBundleButton != null && IAPManager.Instance != null)
             {
                 m_NoAdsCoinsBundleButton.SetActive(!IAPManager.Instance.HasNoAds);
-                if (UserDataManager.Instance.CurrentLevel >= 6)
+                if (UserDataManager.Instance.CurrentLevel >= GameManager.COINS_START_LEVEL)
+
+
                 {
                     m_NoAdsBadge.SetActive(!IAPManager.Instance.HasNoAds);
                 }

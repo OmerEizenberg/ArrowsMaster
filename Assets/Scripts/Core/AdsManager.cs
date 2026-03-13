@@ -270,13 +270,9 @@ namespace Assets.Scripts.Core
                 if (!isInitializing) _ = InitializeSDK();
                 return;
             }
-            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 4)
-            {
-                Debug.Log($"[AdsManager] Skipping Interstitial Load: User Level {UserDataManager.Instance.CurrentLevel} < 4 (Pre-warming starts at 4).");
-                return;
-            }
             if (IAPManager.Instance == null)
                 Debug.LogWarning("[AdsManager] IAPManager.Instance is null. Proceeding without IAP check.");
+
 
             if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
             {
@@ -289,11 +285,15 @@ namespace Assets.Scripts.Core
 
         public void ShowInterstitial(bool isAuto = false)
         {
-            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 5)
+            // Allow showing ads from the unlock level
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < GameManager.ADS_START_LEVEL)
             {
-                Debug.Log($"[AdsManager] Skipping Interstitial Show: User Level {UserDataManager.Instance.CurrentLevel} < 5.");
+                Debug.Log($"[AdsManager] Skipping Interstitial Show: User Level {UserDataManager.Instance.CurrentLevel} < {GameManager.ADS_START_LEVEL}.");
                 return;
             }
+
+
+
             if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
             {
                 Debug.Log("[AdsManager] Skipping Interstitial Show: User has No Ads."+IAPManager.Instance.HasNoAds);

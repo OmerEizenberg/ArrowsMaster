@@ -314,6 +314,7 @@ public class GameUIContoleer : MonoBehaviour
         }
         
         UserDataManager.Instance.ClearLevelProgress();
+        if (GameManager.Instance != null) GameManager.Instance.HideScreens();
         SetGameUIVisible(false);
     }
 

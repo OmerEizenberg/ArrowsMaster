@@ -12,6 +12,10 @@ namespace Assets.Scripts.Core
 
         [Header("References")]
         public LevelManager levelManager;
+        public const int ADS_START_LEVEL = 7;
+        public const int COINS_START_LEVEL = 5;
+
+
         public GameObject failureScreen;
         public GameUIContoleer m_GameUI;
         public GameObject m_LobbyUI;
@@ -104,7 +108,7 @@ namespace Assets.Scripts.Core
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            if (failureScreen != null) failureScreen.SetActive(false);
+            HideScreens();
 
             InitializeScreenPositions();
         }
@@ -531,9 +535,10 @@ namespace Assets.Scripts.Core
 
         public void NotifyArrowSuccess(Vector2 clickPosition, int arrowId)
         {
-            if (UserDataManager.Instance.CurrentLevel >= 5)
+            if (UserDataManager.Instance.CurrentLevel >= COINS_START_LEVEL)
             {
                 // Collect currency logic
+
                 int coinsEarned = Mathf.Max(1, p_StreakCount);
                 collectedLevelCurrency += coinsEarned;
                 Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
@@ -709,26 +714,43 @@ namespace Assets.Scripts.Core
                 }
                 VibrationManager.VibrateSuccess();
 
-                m_WinParticles.SetActive(true);
-            m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
+                if (m_WinParticles != null) m_WinParticles.SetActive(true);
+                if (m_WinLevelText != null)
+                {
+                    m_WinLevelText.gameObject.SetActive(true);
+                    m_WinLevelText.text = m_LevelWinFeedbacks[UnityEngine.Random.Range(0, m_LevelWinFeedbacks.Length)];
+                }
             }
+
 
             yield return new WaitForSeconds(2.5f);
             
-            m_GameUI.SetGameUIVisible(false);
-            
-            if (AdsManager.Instance != null)
+            if (p_isLevelProgression && UserDataManager.Instance.CurrentLevel <= ADS_START_LEVEL)
+
             {
-                if(UserDataManager.Instance.CurrentLevel%2 == 1)
+                Debug.Log($"[GameManager] Below Ads level ({ADS_START_LEVEL}). Transitioning to next level directly.");
+                StartLevel($"level{UserDataManager.Instance.CurrentLevel}");
+            }
+            else
+            {
+                m_GameUI.SetGameUIVisible(false);
+                HideScreens();
+                
+                if (AdsManager.Instance != null)
+            {
+                // Show ad only if we are past the first entry level to the lobby
+                if(UserDataManager.Instance.CurrentLevel > ADS_START_LEVEL && UserDataManager.Instance.CurrentLevel % 2 == 0)
                 {
                     AdsManager.Instance.ShowInterstitial(true);
                 }
                 AdsManager.Instance.SpawnCoinsSmallExplosion();
             }
-            
-            m_WinParticles.SetActive(false);
-            CameraController.Instance.ResetZoom();
-            OnLevelWon?.Invoke();
+                
+                CameraController.Instance.ResetZoom();
+                OnLevelWon?.Invoke();
+            }
+
+
         }
 
         public void LoseLife()
@@ -812,7 +834,10 @@ namespace Assets.Scripts.Core
         public void HideScreens()
         {
             if (failureScreen != null) failureScreen.SetActive(false);
+            if (m_WinParticles != null) m_WinParticles.SetActive(false);
+            if (m_WinLevelText != null) m_WinLevelText.gameObject.SetActive(false);
         }
+
 
         public void HideFailureScreen()
         {
@@ -888,7 +913,9 @@ namespace Assets.Scripts.Core
         {
             if (m_LevelCurrencyContainer != null)
             {
-                m_LevelCurrencyContainer.SetActive(UserDataManager.Instance.CurrentLevel >= 5);
+                m_LevelCurrencyContainer.SetActive(UserDataManager.Instance.CurrentLevel >= COINS_START_LEVEL);
+
+
             }
 
             if (m_StreakRecordContainer != null)
