@@ -35,11 +35,11 @@ DIFFICULTY_CONFIGS = {
     },
     3: { # New Reverse-Backtracking Logic
         "TARGET_DENSITY": 0.881,
-        "TURN_CHANCE": 0.4,
+        "TURN_CHANCE": 0.02,
         "LENGTH_TIERS": [
-            (0.1, (2, 6)),   # Short: 20%
-            (0.4, (5, 12)),  # Mid: 40%
-            (0.5, (9, 30))   # Long: 40%
+            (0.01, (2, 6)),  # Short: 1%
+            (0.04, (5, 12)), # Mid: 4%
+            (0.95, (13, 45))  # Long: 95%
         ],
         "MAX_RETRY_ATTEMPTS": 100
     }
@@ -49,55 +49,55 @@ DIFFICULTY_CONFIGS = {
 # Format: { level_number: (min_width, max_width) }
 FIXED_LEVEL_VALUES = {
     # Block 1 (E:28, SH:36, Spread:8)
-    1: (10, 11), 2: (13, 13), 3: (14, 14), 4: (18, 18), 5: (21, 21), 6: (24, 24), 7: (21, 21), 8: (26, 26), 9: (28, 28), 10: (31, 31),
+    1: (10, 11), 2: (13, 13), 3: (14, 14), 4: (18, 18), 5: (21, 21), 6: (24, 24), 7: (20, 30), 8: (26, 26), 9: (28, 28), 10: (45, 48),
     # Block 2 (E:29, SH:38, Spread:9)
-    11: (33, 33), 12: (33, 33), 13: (32, 32), 14: (29, 29), 15: (33, 33), 16: (35, 35), 17: (33, 33), 18: (38, 38), 19: (29, 29), 20: (33, 33),
+    11: (33, 33), 12: (33, 33), 13: (32, 32), 14: (29, 29), 15: (37, 39), 16: (39, 40), 17: (33, 50), 18: (38, 38), 19: (29, 29), 20: (33, 33),
     # Block 3 (E:30, SH:41, Spread:11)
-    21: (34, 34), 22: (34, 34), 23: (38, 38), 24: (30, 30), 25: (34, 34), 26: (38, 38), 27: (34, 34), 28: (41, 41), 29: (30, 30), 30: (34, 34),
+    21: (34, 34), 22: (34, 34), 23: (38, 38), 24: (30, 30), 25: (37, 41), 26: (38, 38), 27: (34, 34), 28: (41, 41), 29: (32, 36), 30: (34, 34),
     # Block 4 (E:32, SH:44, Spread:12)
-    31: (37, 37), 32: (37, 37), 33: (40, 40), 34: (32, 32), 35: (37, 37), 36: (40, 40), 37: (37, 37), 38: (44, 44), 39: (32, 32), 40: (37, 37),
+    31: (37, 37), 32: (37, 37), 33: (40, 40), 34: (35, 37), 35: (37, 37), 36: (40, 40), 37: (37, 37), 38: (44, 44), 39: (39, 42), 40: (37, 37),
     # Block 5 (E:33, SH:46, Spread:13)
-    41: (34, 38), 42: (38, 38), 43: (42, 42), 44: (33, 33), 45: (38, 38), 46: (42, 42), 47: (38, 38), 48: (46, 46), 49: (33, 33), 50: (38, 38),
+    41: (34, 38), 42: (38, 38), 43: (42, 42), 44: (36, 37), 45: (38, 38), 46: (42, 42), 47: (40, 42), 48: (46, 46), 49: (37, 38), 50: (38, 38),
     # Block 6 (E:34, SH:49, Spread:15)
-    51: (34, 40), 52: (40, 40), 53: (45, 45), 54: (34, 34), 55: (40, 40), 56: (45, 45), 57: (40, 40), 58: (49, 49), 59: (34, 34), 60: (40, 40),
+    51: (34, 40), 52: (40, 40), 53: (45, 45), 54: (34, 37), 55: (40, 40), 56: (45, 45), 57: (40, 40), 58: (49, 49), 59: (35, 37), 60: (44, 47),
     # Block 7 (E:36, SH:52, Spread:16)
     61: (33, 42), 62: (42, 42), 63: (47, 47), 64: (36, 36), 65: (42, 42), 66: (45, 47), 67: (42, 42), 68: (52, 52), 69: (36, 36), 70: (42, 42),
     # Block 8 (E:37, SH:55, Spread:18)
     71: (35, 44), 72: (44, 44), 73: (50, 50), 74: (37, 37), 75: (44, 44), 76: (49, 50), 77: (43, 44), 78: (55, 55), 79: (37, 37), 80: (44, 44),
     # Block 9 (E:38, SH:57, Spread:19)
-    81: (38, 46), 82: (46, 46), 83: (51, 51), 84: (38, 38), 85: (46, 46), 86: (50, 51), 87: (44, 46), 88: (57, 57), 89: (38, 38), 90: (46, 46),
+    81: (38, 46), 82: (46, 46), 83: (51, 51), 84: (41, 43), 85: (46, 46), 86: (46, 48), 87: (44, 46), 88: (57, 57), 89: (38, 38), 90: (46, 46),
     # Block 10 (E:40, SH:60, Spread:20)
-    91: (38, 48), 92: (48, 48), 93: (54, 54), 94: (40, 40), 95: (48, 48), 96: (51, 54), 97: (45, 48), 98: (60, 60), 99: (40, 40), 100: (48, 48),
+    91: (38, 48), 92: (48, 48), 93: (54, 54), 94: (40, 40), 95: (48, 48), 96: (51, 54), 97: (45, 48), 98: (60, 60), 99: (50, 57), 100: (58, 58),
     # Block 11 (E:41, SH:63, Spread:22)
-    101: (41, 50), 102: (50, 50), 103: (56, 56), 104: (41, 41), 105: (50, 50), 106: (54, 56), 107: (47, 50), 108: (62, 63), 109: (41, 41), 110: (50, 50),
+    101: (41, 50), 102: (50, 50), 103: (56, 56), 104: (41, 41), 105: (50, 50), 106: (54, 56), 107: (47, 50), 108: (62, 63), 109: (51, 52), 110: (50, 50),
     # Block 12 (E:42, SH:66, Spread:24)
     111: (42, 52), 112: (52, 52), 113: (59, 59), 114: (42, 42), 115: (52, 52), 116: (56, 59), 117: (49, 52), 118: (62, 66), 119: (42, 42), 120: (52, 52),
     # Block 13 (E:44, SH:69, Spread:25)
-    121: (43, 54), 122: (54, 54), 123: (62, 62), 124: (44, 44), 125: (54, 54), 126: (59, 62), 127: (50, 54), 128: (63, 69), 129: (44, 44), 130: (54, 54),
+    121: (43, 54), 122: (45, 45), 123: (62, 62), 124: (44, 44), 125: (54, 54), 126: (59, 62), 127: (50, 54), 128: (70, 74), 129: (44, 44), 130: (54, 54),
     # Block 14 (E:45, SH:72, Spread:27)
-    131: (44, 56), 132: (56, 56), 133: (64, 64), 134: (45, 45), 135: (56, 56), 136: (62, 64), 137: (51, 56), 138: (63, 72), 139: (45, 45), 140: (54, 56),
+    131: (44, 56), 132: (45, 47), 133: (56, 56), 134: (45, 45), 135: (56, 56), 136: (62, 64), 137: (51, 56), 138: (58, 64), 139: (45, 45), 140: (54, 56),
     # Block 15 (E:46, SH:74, Spread:28)
-    141: (45, 57), 142: (57, 57), 143: (64, 66), 144: (46, 46), 145: (57, 57), 146: (64, 66), 147: (52, 57), 148: (64, 74), 149: (46, 46), 150: (55, 57),
+    141: (45, 57), 142: (57, 57), 143: (62, 62), 144: (49, 50), 145: (57, 57), 146: (64, 66), 147: (52, 57), 148: (64, 74), 149: (58, 60), 150: (55, 57),
     # Block 16 (E:48, SH:77, Spread:29)
-    151: (46, 60), 152: (60, 60), 153: (66, 68), 154: (48, 48), 155: (60, 60), 156: (66, 68), 157: (54, 60), 158: (65, 77), 159: (48, 48), 160: (56, 60),
+    151: (46, 60), 152: (60, 60), 153: (60, 60), 154: (48, 48), 155: (60, 60), 156: (66, 68), 157: (54, 60), 158: (65, 72), 159: (57, 60), 160: (56, 60),
     # Block 17 (E:49, SH:80, Spread:31)
-    161: (47, 61), 162: (61, 61), 163: (68, 71), 164: (49, 49), 165: (61, 61), 166: (68, 71), 167: (55, 61), 168: (66, 80), 169: (49, 49), 170: (57, 61),
+    161: (47, 61), 162: (61, 61), 163: (68, 71), 164: (52, 55), 165: (61, 61), 166: (68, 71), 167: (55, 61), 168: (66, 75), 169: (49, 49), 170: (57, 61),
     # Block 18 (E:50, SH:83, Spread:33)
-    171: (48, 63), 172: (63, 63), 173: (71, 73), 174: (50, 50), 175: (63, 63), 176: (71, 73), 177: (58, 63), 178: (67, 83), 179: (50, 50), 180: (58, 63),
+    171: (48, 63), 172: (60, 63), 173: (71, 73), 174: (50, 50), 175: (63, 63), 176: (71, 73), 177: (58, 63), 178: (67, 83), 179: (54, 59), 180: (58, 63),
     # Block 19 (E:52, SH:86, Spread:34)
-    181: (50, 66), 182: (66, 66), 183: (73, 76), 184: (52, 52), 185: (66, 66), 186: (73, 76), 187: (60, 66), 188: (70, 86), 189: (52, 52), 190: (59, 66),
+    181: (50, 66), 182: (66, 66), 183: (73, 76), 184: (52, 52), 185: (66, 66), 186: (73, 76), 187: (60, 66), 188: (70, 86), 189: (52, 55), 190: (59, 66),
     # Block 20 (E:53, SH:88, Spread:35)
-    191: (53, 67), 192: (67, 67), 193: (76, 78), 194: (53, 53), 195: (67, 67), 196: (76, 78), 197: (62, 67), 198: (70, 88), 199: (53, 53), 200: (60, 67),
+    191: (53, 67), 192: (67, 67), 193: (64, 69), 194: (53, 53), 195: (57, 64), 196: (64, 70), 197: (62, 67), 198: (60, 63), 199: (53, 53), 200: (60, 64),
     # Block 21 (E:54, SH:91, Spread:37)
-    201: (54, 69), 202: (69, 69), 203: (78, 80), 204: (54, 54), 205: (69, 69), 206: (80, 80), 207: (65, 69), 208: (72, 91), 209: (54, 54), 210: (61, 69),
+    201: (54, 69), 202: (69, 69), 203: (78, 80), 204: (54, 54), 205: (69, 69), 206: (80, 80), 207: (65, 69), 208: (72, 85), 209: (54, 54), 210: (61, 69),
     # Block 22 (E:56, SH:94, Spread:38)
-    211: (62, 71), 212: (71, 71), 213: (80, 83), 214: (56, 56), 215: (71, 71), 216: (80, 83), 217: (65, 71), 218: (75, 93), 219: (56, 56), 220: (65, 71),
+    211: (62, 71), 212: (71, 71), 213: (80, 83), 214: (56, 56), 215: (71, 71), 216: (80, 83), 217: (65, 71), 218: (75, 88), 219: (56, 56), 220: (65, 71),
     # Block 23 (E:57, SH:96, Spread:39)
-    221: (63, 73), 222: (73, 73), 223: (83, 84), 224: (57, 57), 225: (73, 73), 226: (81, 84), 227: (65, 73), 228: (75, 94), 229: (57, 57), 230: (67, 73),
+    221: (67, 74), 222: (73, 76), 223: (83, 84), 224: (57, 57), 225: (73, 73), 226: (81, 84), 227: (65, 73), 228: (80, 88), 229: (57, 57), 230: (67, 73),
     # Block 24 (E:58, SH:98, Spread:40)
-    231: (63, 74), 232: (74, 74), 233: (84, 86), 234: (58, 58), 235: (74, 74), 236: (82, 86), 237: (74, 74), 238: (75, 95), 239: (58, 58), 240: (69, 74),
+    231: (63, 74), 232: (74, 74), 233: (84, 86), 234: (58, 58), 235: (74, 74), 236: (78, 82), 237: (74, 74), 238: (85,88), 239: (58, 58), 240: (69, 74),
     # Block 25 (E:60, SH:100, Spread:40)
-    241: (63, 76), 242: (76, 76), 243: (86, 88), 244: (60, 60), 245: (76, 76), 246: (88, 88), 247: (60, 60), 248: (75, 88), 249: (60, 60), 250: (70, 76),
+    241: (63, 76), 242: (76, 76), 243: (86, 88), 244: (60, 66), 245: (76, 76), 246: (58, 68), 247: (60, 60), 248: (75, 88), 249: (60, 60), 250: (75, 78),
 }
 
 # Default range if level number is not found in FIXED_LEVEL_VALUES
@@ -500,9 +500,16 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
     occupied = set() # For quick membership check
     occupied_with_ids = {} # (x, y) -> arrow_id for solver consistency
     escape_routes = {} 
+    arrow_depths = {} # aid -> depth (for Chain Depth logic)
     arrows = []
     arrow_id = 1
     total_shape_points = len(shape_mask)
+    
+    # Calculate center and bounds for Zig-Zag biased turning
+    avg_x = sum(p[0] for p in shape_mask) / len(shape_mask)
+    avg_y = sum(p[1] for p in shape_mask) / len(shape_mask)
+    center = (avg_x, avg_y)
+    max_dist = max(((p[0]-avg_x)**2 + (p[1]-avg_y)**2)**0.5 for p in shape_mask) or 1
     target_points = int(total_shape_points * config["TARGET_DENSITY"])
     free_points = set(shape_mask) # Incremental tracking
 
@@ -533,6 +540,7 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
     max_iters = total_shape_points * 20 # More room for 60x60 final packing
     while len(occupied) < target_points and iteration < max_iters:
         iteration += 1
+        current_density = len(occupied) / total_shape_points
         candidates = []
         inv_map = {"right": (1, 0), "left": (-1, 0), "up": (0, 1), "down": (0, -1)}
         
@@ -563,10 +571,13 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
                             is_mutual = True; break
                 if is_mutual: continue
 
-                current_density = len(occupied) / total_shape_points
                 priority = dist_to_boundary
                 if p in escape_routes:
-                    priority += len(escape_routes.get(p, set())) * 40
+                    # 1. Chain Depth: sum of depths of blocked arrows * weight
+                    # This ensures we prioritize blocking arrows that are already blocking others
+                    blocking_aids = escape_routes.get(p, set())
+                    depth_bonus = sum(arrow_depths.get(aid, 1) for aid in blocking_aids) * 60
+                    priority += depth_bonus
                 candidates.append((p, edir, priority))
         
         if iteration % 200 == 0:
@@ -591,21 +602,28 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
                 tier_roll = random.random()
                 cumulative = 0
                 target_len = 2
+                # Use long tiers up until very high density to ensure the "core" is made of big arrows
                 length_tiers = config["LENGTH_TIERS"]
-                if current_density > 0.88:
-                    length_tiers = [(0.9, (1, 2)), (0.1, (2, 3))]
-                elif current_density > 0.75:
-                    length_tiers = [(0.7, (2, 3)), (0.3, (3, 5))]
-                elif current_density > 0.6:
-                    length_tiers = [(0.4, (2, 4)), (0.4, (4, 8)), (0.2, (6, 12))]
-
+                if current_density > 0.92:
+                    length_tiers = [(0.5, (2, 2)), (0.5, (2, 3))] # Final gaps: Tiny
+                elif current_density > 0.85:
+                    length_tiers = [(0.4, (3, 6)), (0.6, (6, 15))] # High density: Medium
+                
                 for prob, (range_min, range_max) in length_tiers:
                     cumulative += prob
                     if tier_roll <= cumulative:
                         target_len = random.randint(range_min, range_max)
                         break
+
+                # 2. Zig-Zag Pathing: Center-biased and length-dependent turning
+                dist_from_center = ((head_node[0]-center[0])**2 + (head_node[1]-center[1])**2)**0.5
+                center_factor = max(0, 1 - (dist_from_center / max_dist))
                 
-                should_turn = random.random() < config["TURN_CHANCE"]
+                # Base chance increases for extremely long arrows or center proximity
+                base_turn_chance = config["TURN_CHANCE"]
+                if target_len > 25: base_turn_chance = max(base_turn_chance, 0.3)
+                local_turn_chance = base_turn_chance + (center_factor * 0.45)
+
                 path = [head_node]
                 temp_path_occupied = {head_node}
                 curr_dir = (-escape_dir[0], -escape_dir[1])
@@ -620,8 +638,14 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
                             if i == 0 and (dx, dy) == escape_dir: continue
                             valid_dirs.append((dx, dy))
                     if not valid_dirs: break
+                    
+                    # Force a turn if we are long and haven't zig-zagged yet
+                    final_turn_roll = local_turn_chance
+                    if not made_turn and target_len > 10 and i > target_len // 2:
+                        final_turn_roll = 0.7 
+                        
                     chosen_dir = None
-                    if should_turn and not made_turn and i > 0:
+                    if random.random() < final_turn_roll and i > 0:
                         turn_dirs = [d for d in valid_dirs if d[0] != curr_dir[0] and d[1] != curr_dir[1]]
                         if turn_dirs:
                             chosen_dir = random.choice(turn_dirs)
@@ -677,6 +701,13 @@ def run_reverse_generator(image_path, grid_width, grid_height, config):
                             occupied.add(p)
                             occupied_with_ids[p] = arrow_id
                             if p in free_points: free_points.remove(p)
+                        # Update chain depth
+                        blocked_aids = escape_routes.get(head_node, set())
+                        if blocked_aids:
+                            arrow_depths[arrow_id] = 1 + max(arrow_depths.get(aid, 1) for aid in blocked_aids)
+                        else:
+                            arrow_depths[arrow_id] = 1
+
                         ex, ey = head_node[0]+escape_dir[0], head_node[1]+escape_dir[1]
                         while 0 <= ex < grid_width and 0 <= ey < grid_height:
                             if (ex, ey) not in escape_routes: escape_routes[(ex, ey)] = set()
