@@ -308,7 +308,7 @@ public class GameUIContoleer : MonoBehaviour
 
     public void BackToLobby()
     {
-        if (AdsManager.Instance != null)
+        if (AdsManager.Instance != null && GameManager.Instance != null && GameManager.Instance.PickedArrowsCount > 0)
         {
             AdsManager.Instance.ShowInterstitial(true);
         }

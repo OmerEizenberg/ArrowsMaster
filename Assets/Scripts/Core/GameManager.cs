@@ -70,6 +70,7 @@ namespace Assets.Scripts.Core
         public int p_StreakCount { get; private set; } = 0;
         private int collectedLevelCurrency = 0; // Currency collected during the current level attempt
 
+        public int PickedArrowsCount => p_pickedArrowIds.Count;
 
         public bool p_isPlayOnRewarded = false;
         public bool p_isHintRewarded = false;
