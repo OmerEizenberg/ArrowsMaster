@@ -18,7 +18,7 @@ namespace Assets.Scripts.Core
         private bool isInitializing = false;
         private int sdkInitRetryCount = 0;
         private float lastAdShowTime = -30f;
-        private const float AD_COOLDOWN = 30f;
+        private const float AD_COOLDOWN = 120f;
 
         // Track which rewarded ad type is currently being shown
         private enum RewardAdType { None, GameReward, CoinsReward }
@@ -601,7 +601,7 @@ namespace Assets.Scripts.Core
 
         public void SpawnCoinsSmallExplosion()
         {
-            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 6) return;
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 11) return;
 
             GameObject prefab = Resources.Load<GameObject>("CoinsSmallExplosion");
             if (prefab != null)

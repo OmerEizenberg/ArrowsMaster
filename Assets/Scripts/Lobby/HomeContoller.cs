@@ -54,6 +54,8 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private float m_CoinScalePunch = 2.25f;
         // Static so the last displayed value is remembered across OnDisable/OnEnable cycles
         private static int s_LastDisplayedCurrencyValue = -1;
+        private static int s_LastDisplayedLevelValue = -1;
+        [SerializeField] private RollingLevelEffect m_LevelRoller;
         private Coroutine m_CoinCountCoroutine;
         private Coroutine m_LobbyScaleCoroutine;
         private Coroutine m_ShopScaleCoroutine;
@@ -329,21 +331,51 @@ namespace Assets.Scripts.Lobby
             }
             else
             {
-                m_LevelText.text = $"Level {UserDataManager.Instance.CurrentLevel}";
-                levelId = $"level{UserDataManager.Instance.CurrentLevel}";
+                int currentLevel = UserDataManager.Instance.CurrentLevel;
+                bool isVisible = gameObject.activeInHierarchy;
+
+                // Handle Rolling Animation logic
+                if (s_LastDisplayedLevelValue < 0)
+                {
+                    s_LastDisplayedLevelValue = currentLevel;
+                    m_LevelText.text = $"Level {currentLevel}";
+                }
+                else if (isVisible && s_LastDisplayedLevelValue < currentLevel)
+                {
+                    if (m_LevelRoller == null) m_LevelRoller = m_LevelText.GetComponent<RollingLevelEffect>();
+                    if (m_LevelRoller == null) m_LevelRoller = m_LevelText.gameObject.AddComponent<RollingLevelEffect>();
+
+                    m_LevelRoller.AnimateLevel(s_LastDisplayedLevelValue, currentLevel);
+                    s_LastDisplayedLevelValue = currentLevel;
+                }
+                else if (isVisible || s_LastDisplayedLevelValue != currentLevel)
+                {
+                    // If visible, update text and sync value. 
+                    // If not visible, we only update if it has changed, but we keep the text at the LAST DISPLAYED value 
+                    // so OnEnable (when we become visible) can trigger the animation from s_LastDisplayedLevelValue to currentLevel.
+                    if (isVisible)
+                    {
+                        m_LevelText.text = $"Level {currentLevel}";
+                        s_LastDisplayedLevelValue = currentLevel;
+                    }
+                    else
+                    {
+                        m_LevelText.text = $"Level {s_LastDisplayedLevelValue}";
+                    }
+                }
+
+                levelId = $"level{currentLevel}";
                 folder = "Levels";
             }
 
             TextAsset jsonFile = null;
-            
+
             if (folder == "Levels" && GameManager.Instance != null && GameManager.Instance.levelManager != null)
             {
-                // Use the LevelManager to get the correct level file, handling looping if max level is reached
                 jsonFile = GameManager.Instance.levelManager.GetLevelTextAsset(levelId);
             }
             else
             {
-                // Fallback for Challenge levels or if LevelManager is not available
                 jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId}");
             }
             

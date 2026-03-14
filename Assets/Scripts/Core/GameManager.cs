@@ -12,7 +12,7 @@ namespace Assets.Scripts.Core
 
         [Header("References")]
         public LevelManager levelManager;
-        public const int ADS_START_LEVEL = 7;
+        public const int ADS_START_LEVEL = 12;
         public const int COINS_START_LEVEL = 5;
 
 
@@ -742,7 +742,7 @@ namespace Assets.Scripts.Core
                 if (AdsManager.Instance != null)
             {
                 // Show ad only if we are past the first entry level to the lobby
-                if(UserDataManager.Instance.CurrentLevel > ADS_START_LEVEL && UserDataManager.Instance.CurrentLevel % 2 == 0)
+                if(UserDataManager.Instance.CurrentLevel > ADS_START_LEVEL )
                 {
                     AdsManager.Instance.ShowInterstitial(true);
                 }

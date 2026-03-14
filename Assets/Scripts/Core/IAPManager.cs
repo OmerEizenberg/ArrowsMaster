@@ -5,6 +5,7 @@ using UnityEngine.Purchasing;
 using UnityEngine.Purchasing.Extension;
 using Unity.Services.Core;
 using Unity.Services.Core.Environments;
+using System.Threading.Tasks;
 
 namespace Assets.Scripts.Core
 {
@@ -32,10 +33,6 @@ namespace Assets.Scripts.Core
         // Product IDs (Platform specific)
 #if UNITY_IOS
         public const string ProductNoAds999 = "no_ads_999";
-      //  public const string ProductNoAds499 = "no_ads_499";
-      //  public const string ProductNoAds199 = "no_ads_199";
-      //  public const string ProductDonate199 = "donate_199";
-
         public const string ProductCoins199 = "coins199";
         public const string ProductCoins499 = "coins499";
         public const string ProductCoins999 = "coins999";
@@ -44,10 +41,6 @@ namespace Assets.Scripts.Core
         public const string ProductNoAdsCoins999 = "noadscoins_999";
 #else
         public const string ProductNoAds999 = "com.everybodygames.arrowsmaster.no_ads_999";
-       // public const string ProductNoAds499 = "com.everybodygames.arrowsmaster.no_ads_499";
-       // public const string ProductNoAds199 = "com.everybodygames.arrowsmaster.no_ads_199";
-       // public const string ProductDonate199 = "com.everybodygames.arrowsmaster.donate_199";
-
         public const string ProductCoins199 = "com.everybodygames.arrowsmaster.coins_199";
         public const string ProductCoins499 = "com.everybodygames.arrowsmaster.coins_499";
         public const string ProductCoins999 = "com.everybodygames.arrowsmaster.coins_999";
@@ -57,11 +50,15 @@ namespace Assets.Scripts.Core
 #endif
 
         private const string NoAdsPrefKey = "UserHasNoAds";
+        private const string MetadataCachePrefix = "IAP_Cache_";
 
         public bool HasNoAds => PlayerPrefs.GetInt(NoAdsPrefKey, 0) == 1;
 
         public event Action<bool> OnNoAdsStatusChanged;
         public event Action<string> OnPurchaseSuccess;
+
+        private string m_PendingPurchaseId = null;
+        private bool m_IsInitializing = false;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoInitialize()
@@ -85,26 +82,54 @@ namespace Assets.Scripts.Core
             DontDestroyOnLoad(gameObject);
         }
 
-        private async void Start()
+        private void Start()
         {
+            // Start initialization immediately and don't block the main thread
+            _ = InitializeAllServices();
+        }
+
+        private async Task InitializeAllServices()
+        {
+            if (m_IsInitializing || IsInitialized()) return;
+            m_IsInitializing = true;
+
             try
             {
-                // Ensure Unity Services are initialized correctly
-                if (UnityServices.State != ServicesInitializationState.Initialized)
-                {
-                    Debug.Log($"[IAPManager] Initializing Unity Services (Current State: {UnityServices.State})...");
-                    var options = new InitializationOptions().SetEnvironmentName("production");
-                    await UnityServices.InitializeAsync(options);
-                }
-
-                Debug.Log($"[IAPManager] Unity Services Initialized. State: {UnityServices.State}");
+                // Parallel initialization: Start Unity Services and Store setup concurrently
+                var servicesTask = InitializeUnityServices();
+                
+                // We start purchasing initialization. Note: On some platforms, 
+                // UnityPurchasing requires UnityServices to be initialized for certain features,
+                // but the native store module can often start its handshake immediately.
                 InitializePurchasing();
+
+                await servicesTask;
+                Debug.Log("[IAPManager] All services ready.");
             }
             catch (Exception e)
             {
-                Debug.LogError($"[IAPManager] Unity Services Initialization Failed: {e.Message}");
-                // Even if services fail, we try to initialize purchasing once in case it's a transient issue
-                InitializePurchasing();
+                Debug.LogError($"[IAPManager] Initialization Flow Error: {e.Message}");
+            }
+            finally
+            {
+                m_IsInitializing = false;
+            }
+        }
+
+        private async Task InitializeUnityServices()
+        {
+            if (UnityServices.State == ServicesInitializationState.Initialized) return;
+
+            try
+            {
+                Debug.Log($"[IAPManager] Initializing Unity Services (State: {UnityServices.State})...");
+                var options = new InitializationOptions().SetEnvironmentName("production");
+                await UnityServices.InitializeAsync(options);
+                Debug.Log("[IAPManager] Unity Services Initialized.");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPManager] Unity Services Failed: {e.Message}");
             }
         }
 
@@ -112,7 +137,6 @@ namespace Assets.Scripts.Core
         {
             if (IsInitialized()) return;
 
-            // Choosing the module based on platform can be more reliable than auto-detection
             AppStore store = AppStore.NotSpecified;
 #if UNITY_ANDROID
             store = AppStore.GooglePlay;
@@ -122,21 +146,18 @@ namespace Assets.Scripts.Core
 
             var builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance(store));
 
+            // Consumables
+            builder.AddProduct(ProductCoins199, ProductType.Consumable);
+            builder.AddProduct(ProductCoins499, ProductType.Consumable);
+            builder.AddProduct(ProductCoins999, ProductType.Consumable);
+            builder.AddProduct(ProductCoins1999, ProductType.Consumable);
+            builder.AddProduct(ProductCoins4999, ProductType.Consumable);
 
-            // New Coin Products (Consumable)
-            builder.AddProduct(ProductCoins199, UnityEngine.Purchasing.ProductType.Consumable);
-            builder.AddProduct(ProductCoins499, UnityEngine.Purchasing.ProductType.Consumable);
-            builder.AddProduct(ProductCoins999, UnityEngine.Purchasing.ProductType.Consumable);
-            builder.AddProduct(ProductCoins1999, UnityEngine.Purchasing.ProductType.Consumable);
-            builder.AddProduct(ProductCoins4999, UnityEngine.Purchasing.ProductType.Consumable);
+            // Non-Consumables
+            builder.AddProduct(ProductNoAds999, ProductType.NonConsumable);
+            builder.AddProduct(ProductNoAdsCoins999, ProductType.NonConsumable);
 
-            // Non-Consumable Products
-            builder.AddProduct(ProductNoAds999, UnityEngine.Purchasing.ProductType.NonConsumable);
-            
-            // No Ads + Coins bundle (Non-Consumable)
-            builder.AddProduct(ProductNoAdsCoins999, UnityEngine.Purchasing.ProductType.NonConsumable);
-
-            Debug.Log($"[IAPManager] Calling UnityPurchasing.Initialize with store: {store}...");
+            Debug.Log($"[IAPManager] Initializing UnityPurchasing with store: {store}...");
             UnityPurchasing.Initialize(this, builder);
         }
 
@@ -147,26 +168,25 @@ namespace Assets.Scripts.Core
 
         public void BuyProduct(string productId)
         {
-            // Safety: Translate Android-style IDs to iOS IDs if needed
+            // Safety: Translate IDs for iOS
 #if UNITY_IOS
             productId = productId switch {
-                "com.everybodygames.arrowsmaster.no_ads_999" => "no_ads_999",
-                "com.everybodygames.arrowsmaster.noadscoins_999" => "noadscoins_999",
-                "com.everybodygames.arrowsmaster.coins_199" => "coins199",
-                "com.everybodygames.arrowsmaster.coins_499" => "coins499",
-                "com.everybodygames.arrowsmaster.coins_999" => "coins999",
-                "com.everybodygames.arrowsmaster.coins_1999" => "coins1999",
-                "com.everybodygames.arrowsmaster.coins_4999" => "coins4999",
+                "com.everybodygames.arrowsmaster.no_ads_999" => ProductNoAds999,
+                "com.everybodygames.arrowsmaster.noadscoins_999" => ProductNoAdsCoins999,
+                "com.everybodygames.arrowsmaster.coins_199" => ProductCoins199,
+                "com.everybodygames.arrowsmaster.coins_499" => ProductCoins499,
+                "com.everybodygames.arrowsmaster.coins_999" => ProductCoins999,
+                "com.everybodygames.arrowsmaster.coins_1999" => ProductCoins1999,
+                "com.everybodygames.arrowsmaster.coins_4999" => ProductCoins4999,
                 _ => productId
             };
 #endif
 
             if (!IsInitialized())
             {
-                Debug.LogWarning($"[IAPManager] BuyProduct called but store not initialized. Attempting re-init for: {productId}");
-                InitializePurchasing();
-                // We don't return here because InitializePurchasing is async in nature (via UnityPurchasing.Initialize)
-                // The user will need to tap again once initialized, or we can improve this with a pending purchase queue.
+                Debug.LogWarning($"[IAPManager] Store not ready. Queueing purchase for: {productId}");
+                m_PendingPurchaseId = productId;
+                _ = InitializeAllServices();
                 return;
             }
 
@@ -179,9 +199,6 @@ namespace Assets.Scripts.Core
             string productId = type switch
             {
                 ProductTypeID.NoAds999 => ProductNoAds999,
-               // ProductTypeID.NoAds499 => ProductNoAds499,
-              //  ProductTypeID.NoAds199 => ProductNoAds199,
-               // ProductTypeID.Donate199 => ProductDonate199,
                 ProductTypeID.NoAdsCoins999 => ProductNoAdsCoins999,
                 ProductTypeID.Coins199 => ProductCoins199,
                 ProductTypeID.Coins499 => ProductCoins499,
@@ -194,37 +211,75 @@ namespace Assets.Scripts.Core
             BuyProduct(productId);
         }
 
-        // --- IStoreListener Implementation ---
+        // --- IStoreListener ---
 
         public void OnInitialized(IStoreController controller, IExtensionProvider extensions)
         {
-            Debug.Log($"[IAPManager] Initialization successful. Store: {StandardPurchasingModule.Instance().appStore}");
+            Debug.Log("[IAPManager] Store initialization successful.");
             m_StoreController = controller;
             m_StoreExtensionProvider = extensions;
 
-            // iOS specific features
+            // 1. Warm-up and Cache Metadata
+            foreach (var product in m_StoreController.products.all)
+            {
+                // Accessing metadata warms up the native-to-Unity bridge cache
+                var dummyPrice = product.metadata.localizedPriceString;
+                CacheProductMetadata(product);
+            }
+
+            // 2. iOS specific listeners
             if (Application.platform == RuntimePlatform.IPhonePlayer || Application.platform == RuntimePlatform.OSXPlayer)
             {
                 var apple = extensions.GetExtension<IAppleExtensions>();
-                // Handle "Ask to Buy" deferred purchases
                 apple.RegisterPurchaseDeferredListener(OnDeferredPurchase);
             }
 
-            // Check if user already owns No Ads (Cross-session check)
+            // 3. Process Pending Purchase (if any)
+            if (!string.IsNullOrEmpty(m_PendingPurchaseId))
+            {
+                Debug.Log($"[IAPManager] Processing queued purchase: {m_PendingPurchaseId}");
+                string id = m_PendingPurchaseId;
+                m_PendingPurchaseId = null;
+                BuyProduct(id);
+            }
+
             CheckAlreadyOwnedProducts();
+        }
+
+        private void CacheProductMetadata(Product product)
+        {
+            if (product == null || product.metadata == null) return;
+            string key = MetadataCachePrefix + product.definition.id;
+            // Store formatted price string for immediate UI display in next session
+            PlayerPrefs.SetString(key, product.metadata.localizedPriceString);
+            PlayerPrefs.Save();
+        }
+
+        public string GetProductPrice(string productId)
+        {
+            // Try real-time first
+            if (IsInitialized())
+            {
+                var product = m_StoreController.products.WithID(productId);
+                if (product != null && product.metadata != null)
+                {
+                    return product.metadata.localizedPriceString;
+                }
+            }
+
+            // Fallback to cache
+            string key = MetadataCachePrefix + productId;
+            return PlayerPrefs.GetString(key, ""); // Empty if never cached
         }
 
         private void OnDeferredPurchase(Product product)
         {
-            Debug.Log($"[IAPManager] Purchase deferred (e.g., Ask to Buy): {product.definition.id}");
+            Debug.Log($"[IAPManager] Purchase deferred: {product.definition.id}");
         }
 
         private void CheckAlreadyOwnedProducts()
         {
-            // Specifically check for non-consumable "No Ads" products
-            // This is crucial for iOS restoration requirements
             bool alreadyOwned = false;
-            
             string[] noAdsIds = { ProductNoAds999, ProductNoAdsCoins999 };
             foreach (var id in noAdsIds)
             {
@@ -239,7 +294,7 @@ namespace Assets.Scripts.Core
 
             if (alreadyOwned && !HasNoAds)
             {
-                Debug.Log("[IAPManager] Restored 'No Ads' status from existing receipt.");
+                Debug.Log("[IAPManager] Restoring 'No Ads' status.");
                 SetNoAds(true);
             }
         }
@@ -247,71 +302,45 @@ namespace Assets.Scripts.Core
         public void OnInitializeFailed(InitializationFailureReason error)
         {
             Debug.LogError($"[IAPManager] Initialization failed: {error}");
+            m_IsInitializing = false;
         }
 
         public void OnInitializeFailed(InitializationFailureReason error, string message)
         {
             Debug.LogError($"[IAPManager] Initialization failed: {error}. Message: {message}");
+            m_IsInitializing = false;
         }
 
         public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
         {
             string id = args.purchasedProduct.definition.id;
 
-            // Handle compensation based on product ID
             switch (id)
             {
                 case ProductNoAds999:
-                    Debug.Log($"[IAPManager] No Ads purchased successfully: {id}");
-                    SetNoAds(true);
-
-                    break;
-                /*case ProductNoAds499:
-                   Debug.Log($"[IAPManager] No Ads purchased successfully: {id}");
                     SetNoAds(true);
                     break;
-                case ProductNoAds199:
-                    Debug.Log($"[IAPManager] No Ads purchased successfully: {id}");
-                    SetNoAds(true);
-                    break;
-                */
                 case ProductNoAdsCoins999:
-                    Debug.Log($"[IAPManager] No Ads + Coins purchased successfully: {id}");
                     SetNoAds(true);
-                    UserDataManager.Instance.AddArrowsCurrency(25000); // 25000 coins placeholder as requested
+                    UserDataManager.Instance.AddArrowsCurrency(25000);
                     break;
-
                 case ProductCoins199:
-                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
-                    UserDataManager.Instance.AddArrowsCurrency(4500); // 4500 coins placeholder as requested
+                    UserDataManager.Instance.AddArrowsCurrency(4500);
                     break;
                 case ProductCoins499:
-                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
-                    UserDataManager.Instance.AddArrowsCurrency(12000); // 12000 coins placeholder as requested
+                    UserDataManager.Instance.AddArrowsCurrency(12000);
                     break;
                 case ProductCoins999:
-                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
-                    UserDataManager.Instance.AddArrowsCurrency(25000); // 25000 coins placeholder as requested
+                    UserDataManager.Instance.AddArrowsCurrency(25000);
                     break;
                 case ProductCoins1999:
-                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
-                    UserDataManager.Instance.AddArrowsCurrency(60000); // 60000 coins placeholder as requested
+                    UserDataManager.Instance.AddArrowsCurrency(60000);
                     break;
                 case ProductCoins4999:
-                     Debug.Log($"[IAPManager] Coins purchased successfully: {id}");
-                    UserDataManager.Instance.AddArrowsCurrency(150000); // 150000 coins placeholder as requested
-                    break;
-
-               /* case ProductDonate199:
-                    Debug.Log($"[IAPManager] Donation purchased successfully: {id}");
-                    break;*/
-
-                default:
-                    Debug.LogWarning($"[IAPManager] ProcessPurchase: Unknown product ID {id}");
+                    UserDataManager.Instance.AddArrowsCurrency(150000);
                     break;
             }
 
-            // --- Analytics: purchase (Log all successful purchases) ---
             if (FirebaseManager.Instance != null)
             {
                 var metadata = args.purchasedProduct.metadata;
@@ -320,7 +349,6 @@ namespace Assets.Scripts.Core
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, metadata.isoCurrencyCode),
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_ITEM_ID, id));
             }
-            // ----------------------------------------------------------
 
             OnPurchaseSuccess?.Invoke(id);
             SpawnCoinsExplosion();
@@ -336,10 +364,6 @@ namespace Assets.Scripts.Core
                 Vector3 spawnPos = new Vector3(-0.5f, 2.4f, 60.2f);
                 GameObject explosion = Instantiate(prefab, spawnPos, prefab.transform.rotation);
                 Destroy(explosion, 7f);
-            }
-            else
-            {
-                Debug.LogWarning("[IAPManager] CoinsExplosion prefab not found in Resources.");
             }
         }
 
@@ -357,27 +381,20 @@ namespace Assets.Scripts.Core
         {
             PlayerPrefs.SetInt(NoAdsPrefKey, enabled ? 1 : 0);
             PlayerPrefs.Save();
-            Debug.Log($"[IAPManager] No Ads status updated: {enabled}");
             OnNoAdsStatusChanged?.Invoke(enabled);
         }
 
-        // For testing
         public void RestorePurchases()
         {
             if (!IsInitialized()) return;
 
-            if (Application.platform == RuntimePlatform.IPhonePlayer || 
-                Application.platform == RuntimePlatform.OSXPlayer)
+            if (Application.platform == RuntimePlatform.IPhonePlayer || Application.platform == RuntimePlatform.OSXPlayer)
             {
                 Debug.Log("[IAPManager] Restoring purchases...");
                 var apple = m_StoreExtensionProvider.GetExtension<IAppleExtensions>();
                 apple.RestoreTransactions((result, error) => {
-                    Debug.Log($"[IAPManager] Restore transactions result: {result}. Error (if any): {error}");
+                    Debug.Log($"[IAPManager] Restore result: {result}. Error: {error}");
                 });
-            }
-            else
-            {
-                Debug.Log("[IAPManager] Restore transactions not needed or not supported on this platform.");
             }
         }
     }
