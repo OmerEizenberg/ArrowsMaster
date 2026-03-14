@@ -90,7 +90,7 @@ namespace Assets.Scripts.Lobby
                 m_ShareBadge.SetActive(true);
             }
 
-            //PlayerPrefs.DeleteAll();
+    //   PlayerPrefs.DeleteAll();
             RefreshLobbyUI();
 
             int currentCoins = UserDataManager.Instance.ArrowsCurrency;

@@ -35,6 +35,17 @@ namespace Assets.Scripts.GameUI
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnLevelCurrencyChanged += UpdateCurrencyDisplay;
+                m_CurrentAmount = GameManager.Instance.CollectedLevelCurrency;
+                if (m_CurrencyText != null) m_CurrencyText.text = m_CurrentAmount.ToString("N0");
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (GameManager.Instance != null && m_CurrencyText != null)
+            {
+                m_CurrentAmount = GameManager.Instance.CollectedLevelCurrency;
+                m_CurrencyText.text = m_CurrentAmount.ToString("N0");
             }
         }
 
@@ -70,8 +81,9 @@ namespace Assets.Scripts.GameUI
             
             if (m_CurrencyText != null)
             {
-                m_CurrencyText.text = m_CurrentAmount.ToString("N0");
+                m_CurrencyText.text = newAmount.ToString("N0");
             }
+            m_CurrentAmount = newAmount;
         }
 
         private void ShowFloatingText(int amount, Vector2 clickPos)

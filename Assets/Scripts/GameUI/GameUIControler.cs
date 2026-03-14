@@ -19,6 +19,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_FailureTitle; // "Out of Lives!" or "Time's Up!"
     [SerializeField] private TextMeshProUGUI m_FailureSubtitle; // Subtitle text
     [SerializeField] private TextMeshProUGUI m_FailureDescription; // Description text
+    [SerializeField] private GameObject m_NoAdsOfferImage; // Image for the special offer (coins + no ads)
     
     [Header("Timer Colors")]
     [SerializeField] private Color m_TimerDefaultColor = Color.white; // Default timer color
@@ -290,6 +291,12 @@ public class GameUIContoleer : MonoBehaviour
             {
                 m_FailureDescription.text = GameManager.Instance.GetFailureDescription();
             }
+        }
+
+        if (m_NoAdsOfferImage != null)
+        {
+            bool hasNoAds = IAPManager.Instance != null && IAPManager.Instance.HasNoAds;
+            m_NoAdsOfferImage.SetActive(!hasNoAds);
         }
     }
 

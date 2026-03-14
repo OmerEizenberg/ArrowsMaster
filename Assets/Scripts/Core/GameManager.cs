@@ -73,6 +73,7 @@ namespace Assets.Scripts.Core
         public float LastArrowSelectionTime { get; private set; } = -10f;
         public int p_StreakCount { get; private set; } = 0;
         private int collectedLevelCurrency = 0; // Currency collected during the current level attempt
+        public int CollectedLevelCurrency => collectedLevelCurrency;
 
         public int PickedArrowsCount => p_pickedArrowIds.Count;
 
@@ -559,6 +560,7 @@ namespace Assets.Scripts.Core
                     SetHintVisibility(false);
                     StartCoroutine(WinSequence());
                 }
+                SaveCurrentProgress();
             }
         }
 
@@ -1111,7 +1113,7 @@ namespace Assets.Scripts.Core
             // Reset arrow count before loading
             activeArrowsCount = 0;
             UpdateArrowsLeftUI(false);
-            collectedLevelCurrency = 0;
+            collectedLevelCurrency = progress.collectedCoins;
 
             isTimerActive = false;
             isTimeUp = false;
@@ -1154,8 +1156,8 @@ namespace Assets.Scripts.Core
             Debug.Log($"[GameManager] Progress Restored: Level={progress.levelId}, Time={currentTime}/{levelDuration}, Lives={CurrentLives}, Active={isTimerActive}");
 
             OnLevelStarted?.Invoke();
-            OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
-
+            OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency, Vector2.zero);
+            
             isEntranceFinished = false;
             isWinning = false;
             if (m_FunFact != null) m_FunFact.SetActive(false);
@@ -1189,6 +1191,7 @@ namespace Assets.Scripts.Core
                 else if (m_LastSavedProgress.remainingLives != CurrentLives) changed = true;
                 else if (m_LastSavedProgress.isTimerActive != isTimerActive) changed = true;
                 else if (m_LastSavedProgress.pickedArrowIds.Count != p_pickedArrowIds.Count) changed = true;
+                else if (m_LastSavedProgress.collectedCoins != collectedLevelCurrency) changed = true;
                 else if (isTimerActive && Mathf.Abs(m_LastSavedProgress.remainingTime - currentTime) >= 1.0f) changed = true;
                 else if (!p_isLevelProgression) // Challenge-specific checks
                 {
@@ -1212,6 +1215,7 @@ namespace Assets.Scripts.Core
             progress.challengeYear = currentChallengeYear;
             progress.challengeMonth = currentChallengeMonth;
             progress.challengeDay = currentChallengeDay;
+            progress.collectedCoins = collectedLevelCurrency;
             progress.hasProgress = true;
 
             m_LastSavedProgress = progress;

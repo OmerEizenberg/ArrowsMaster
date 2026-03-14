@@ -46,6 +46,13 @@ namespace Assets.Scripts.Core
         // Cached WaitForSeconds to avoid per-frame allocation in blocked animation
         private static readonly WaitForSeconds s_BlockedPause = new WaitForSeconds(0.07f);
 
+        // --- Speed & Acceleration Constants ---
+        private const float K_LegacyStepDuration = 0.027f; // "What it is today"
+        private const float K_InitialSpeedMultiplier = 1.0f; // Starts at 80%
+        private const float K_TargetSpeedMultiplier = 2.0f;  // Reaches 180%
+        private const float K_AccelerationTime = 0.9f;      // Over 2 seconds
+        private const float K_BaseMoveDuration = K_LegacyStepDuration / K_InitialSpeedMultiplier; // Snappier base
+
         public void Initialize(ArrowData data)
         {
             PrepareIncrementalInit(data);
@@ -566,6 +573,8 @@ namespace Assets.Scripts.Core
 
         private IEnumerator AutoMoveRoutine()
         {
+            float moveStartTime = Time.time;
+            
             // Continuous movement - No sleep between steps
             while (true)
             {
@@ -576,8 +585,14 @@ namespace Assets.Scripts.Core
                     yield break;
                 }
                 
+                // Calculate accelerated speed
+                float elapsed = Time.time - moveStartTime;
+                float t = Mathf.Clamp01(elapsed / K_AccelerationTime);
+                float currentSpeedMult = Mathf.Lerp(K_InitialSpeedMultiplier, K_TargetSpeedMultiplier, t);
+                float stepDuration = K_LegacyStepDuration / currentSpeedMult;
+                
                 // Animate the batch move and wait for it
-                yield return StartCoroutine(AnimateAllSegments(targets, 0.027f));
+                yield return StartCoroutine(AnimateAllSegments(targets, stepDuration));
                 
                 // Check if completely escaped (no segments left)
                 if (segments.Count == 0)
@@ -756,7 +771,7 @@ namespace Assets.Scripts.Core
             for (int i = 0; i < count; i++) _animationStarts[i] = segments[i].transform.position;
 
             // Slow animations (entrance, ~0.04s): update every frame for smoothness
-            // Fast movement (~0.027s): update every 2 frames (barely noticeable, saves CPU)
+            // Fast movement: update every 2 frames (barely noticeable, saves CPU)
             int updateFrequency = 1; // Updated: Always update every frame for smoothness across platforms
             animationFrameCounter = 0;
 
@@ -949,7 +964,7 @@ namespace Assets.Scripts.Core
             foreach (var seg in segments)
                 _targetWorldPos.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, 0.027f));
+            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, K_BaseMoveDuration));
         }
 
         private IEnumerator SimulateReverseStep()
@@ -970,7 +985,7 @@ namespace Assets.Scripts.Core
             foreach (var seg in segments)
                 _targetWorldPos.Add(new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0));
             
-            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, 0.027f));
+            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, K_BaseMoveDuration));
         }
 
         private IEnumerator BlockedArrowAnimation()
@@ -1006,7 +1021,7 @@ namespace Assets.Scripts.Core
             _impactTargets.Clear();
             for (int i = 0; i < segments.Count - 1; i++) _impactTargets.Add(segments[i].transform.position);
             _impactTargets.Add(impactPosition);
-            yield return StartCoroutine(AnimateAllSegments(_impactTargets, 0.027f));
+            yield return StartCoroutine(AnimateAllSegments(_impactTargets, K_BaseMoveDuration));
             
             // Phase 3: Impact feedback
             SoundManager.Instance.PlayArrowBlocked();
@@ -1029,7 +1044,7 @@ namespace Assets.Scripts.Core
                     _targetWorldPos.Add(new Vector3(targetPositions[i].x * CellSize, targetPositions[i].y * CellSize, 0));
                 }
                 
-                yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, 0.027f));
+                yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, K_BaseMoveDuration));
             }
             
             RestorePositions(originalPositions);

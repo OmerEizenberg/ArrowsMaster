@@ -84,7 +84,12 @@ public class MonthlyChallengeController : MonoBehaviour
         // 1. Get the first day of the month
         DateTime firstDayOfMonth = new DateTime(year, month, 1);
         m_challengeMonthTitle.isRightToLeftText = CultureInfo.CurrentCulture.TextInfo.IsRightToLeft;
-        m_challengeMonthTitle.text = firstDayOfMonth.ToString("Y", CultureInfo.CurrentCulture);
+        string titleText = firstDayOfMonth.ToString("Y", CultureInfo.CurrentCulture);
+        if (m_challengeMonthTitle.isRightToLeftText)
+        {
+            titleText = ReverseDigits(titleText);
+        }
+        m_challengeMonthTitle.text = titleText;
         p_CurrentYear = year;
         p_CurrentMonth = month;
         // 2. Calculate the starting offset
@@ -278,6 +283,32 @@ public class MonthlyChallengeController : MonoBehaviour
             txt.color = m_PassedColorTxt;
         }
         dateBg.GetComponent<Button>().interactable = false;
+    }
+    private string ReverseDigits(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        char[] chars = text.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+        {
+            if (char.IsDigit(chars[i]))
+            {
+                int start = i;
+                while (i < chars.Length && char.IsDigit(chars[i]))
+                {
+                    i++;
+                }
+                int end = i - 1;
+                while (start < end)
+                {
+                    char temp = chars[start];
+                    chars[start] = chars[end];
+                    chars[end] = temp;
+                    start++;
+                    end--;
+                }
+            }
+        }
+        return new string(chars);
     }
 }
 }

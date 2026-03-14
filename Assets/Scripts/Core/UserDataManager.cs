@@ -18,6 +18,7 @@ namespace Assets.Scripts.Core
         public int challengeYear;
         public int challengeMonth;
         public int challengeDay;
+        public int collectedCoins;
         public bool hasProgress = false;
     }
 
