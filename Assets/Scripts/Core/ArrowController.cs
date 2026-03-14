@@ -757,7 +757,7 @@ namespace Assets.Scripts.Core
 
             // Slow animations (entrance, ~0.04s): update every frame for smoothness
             // Fast movement (~0.027s): update every 2 frames (barely noticeable, saves CPU)
-            int updateFrequency = (duration > 0.035f) ? 1 : 2;
+            int updateFrequency = 1; // Updated: Always update every frame for smoothness across platforms
             animationFrameCounter = 0;
 
             float elapsed = 0;

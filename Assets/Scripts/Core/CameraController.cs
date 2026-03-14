@@ -70,7 +70,9 @@ namespace Assets.Scripts.Core
             defaultZoom = cam.orthographicSize;
             absoluteMaxZoom = maxZoom;
 
-            // Target 60 FPS on mobile
+            // Disable VSync to allow targetFrameRate to take effect
+            QualitySettings.vSyncCount = 0;
+            // Target 120 FPS on supported mobile devices for maximum smoothness
             Application.targetFrameRate = 120;
         }
 
