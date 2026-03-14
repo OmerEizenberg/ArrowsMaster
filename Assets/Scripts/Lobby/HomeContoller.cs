@@ -68,6 +68,13 @@ namespace Assets.Scripts.Lobby
             if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
         }
 
+        private void Start()
+        {
+            UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
+            UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
+            UserDataManager.Instance.OnMonthlyProgressChanged += UpdateChallengeNotification;
+        }
+
         private void OnEnable()
         {
             if (UserDataManager.Instance.CurrentLevel < GameManager.COINS_START_LEVEL)
@@ -76,8 +83,6 @@ namespace Assets.Scripts.Lobby
                 m_NoAdsBadge.SetActive(false);
                 m_ShareBadge.SetActive(false);
             }
-
-
             else
             {
                 m_LobbyCurrencyText.transform.parent.gameObject.SetActive(true);
@@ -99,7 +104,8 @@ namespace Assets.Scripts.Lobby
             else if (s_LastDisplayedCurrencyValue != currentCoins)
             {
                 // Coins changed while we were away — animate from last known to current
-                SetCurrencyTextImmediate(s_LastDisplayedCurrencyValue);
+                int startValue = s_LastDisplayedCurrencyValue;
+                SetCurrencyTextImmediate(startValue);
                 UpdateCurrencyUI(currentCoins);
             }
             else
@@ -108,10 +114,6 @@ namespace Assets.Scripts.Lobby
                 SetCurrencyTextImmediate(currentCoins);
             }
 
-            UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
-            UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
-            UserDataManager.Instance.OnMonthlyProgressChanged += UpdateChallengeNotification;
-            
             if (IAPManager.Instance != null)
             {
                 IAPManager.Instance.OnNoAdsStatusChanged += HandleNoAdsStatusChanged;
@@ -149,10 +151,6 @@ namespace Assets.Scripts.Lobby
 
         private void OnDisable()
         {
-            UserDataManager.Instance.OnLevelChanged -= RefreshLobbyUI;
-            UserDataManager.Instance.OnCurrencyChanged -= UpdateCurrencyUI;
-            UserDataManager.Instance.OnMonthlyProgressChanged -= UpdateChallengeNotification;
-
             if (IAPManager.Instance != null)
             {
                 IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
@@ -174,6 +172,16 @@ namespace Assets.Scripts.Lobby
             if (m_CoinCountCoroutine != null) StopCoroutine(m_CoinCountCoroutine);
             if (m_LobbyScaleCoroutine != null) StopCoroutine(m_LobbyScaleCoroutine);
             if (m_ShopScaleCoroutine != null) StopCoroutine(m_ShopScaleCoroutine);
+        }
+
+        private void OnDestroy()
+        {
+            if (UserDataManager.Instance != null)
+            {
+                UserDataManager.Instance.OnLevelChanged -= RefreshLobbyUI;
+                UserDataManager.Instance.OnCurrencyChanged -= UpdateCurrencyUI;
+                UserDataManager.Instance.OnMonthlyProgressChanged -= UpdateChallengeNotification;
+            }
         }
 
         private void Update()
@@ -203,6 +211,14 @@ namespace Assets.Scripts.Lobby
 
         private void UpdateCurrencyUI(int newAmount)
         {
+            if (!gameObject.activeInHierarchy)
+            {
+                // Update the text immediately so it's correct if shown via another layer (e.g. Shop),
+                // but DON'T update s_LastDisplayedCurrencyValue so OnEnable can detect and animate the change later.
+                SetCurrencyTextImmediate(newAmount);
+                return;
+            }
+
             if (m_CoinCountCoroutine != null) StopCoroutine(m_CoinCountCoroutine);
             m_CoinCountCoroutine = StartCoroutine(AnimateCurrencyText(s_LastDisplayedCurrencyValue, newAmount));
 

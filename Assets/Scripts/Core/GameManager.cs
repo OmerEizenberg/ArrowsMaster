@@ -322,6 +322,7 @@ namespace Assets.Scripts.Core
             {
                 Debug.Log($"[GameManager] Bought PlayOn for {cost}.");
                 playOnPurchaseCount++;
+                UpdateUserBalanceUI(UserDataManager.Instance.ArrowsCurrency);
                 ExecutePlayOn();
             }
             else
@@ -993,6 +994,16 @@ namespace Assets.Scripts.Core
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SCORE, 0));
             }
             // ------------------------------------------
+
+            if (m_PlayOnPriceText != null)
+            {
+                m_PlayOnPriceText.text = GetPlayOnCost().ToString("N0");
+            }
+
+            if (m_UserBalanceText != null)
+            {
+                m_UserBalanceText.text = UserDataManager.Instance.ArrowsCurrency.ToString("N0");
+            }
 
             OnGameOver?.Invoke();
         }
