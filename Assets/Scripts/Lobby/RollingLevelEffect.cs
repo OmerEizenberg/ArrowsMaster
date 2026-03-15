@@ -11,6 +11,8 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private AnimationCurve m_Curve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
         private bool m_IsAnimating = false;
+        private GameObject m_CurrentRoller;
+        private int m_FinalLevel;
 
         private void Awake()
         {
@@ -22,6 +24,7 @@ namespace Assets.Scripts.Lobby
 
         public void AnimateLevel(int oldLevel, int newLevel)
         {
+            m_FinalLevel = newLevel;
             if (m_IsAnimating) return;
             if (m_TargetText == null) return;
 
@@ -82,6 +85,7 @@ namespace Assets.Scripts.Lobby
             
             // Create a container for the roller
             GameObject container = new GameObject("RollerContainer", typeof(RectTransform));
+            m_CurrentRoller = container;
             container.transform.SetParent(m_TargetText.transform, false);
             RectTransform containerRect = container.GetComponent<RectTransform>();
             containerRect.localScale = Vector3.one;
@@ -134,8 +138,27 @@ namespace Assets.Scripts.Lobby
             }
 
             // Cleanup
-            Destroy(container);
+            if (container != null) Destroy(container);
+            m_CurrentRoller = null;
             m_TargetText.text = $"{prefix}{newLevel}";
+            m_IsAnimating = false;
+        }
+
+        private void OnDisable()
+        {
+            if (!m_IsAnimating && m_CurrentRoller == null) return;
+
+            StopAllCoroutines();
+            if (m_CurrentRoller != null)
+            {
+                Destroy(m_CurrentRoller);
+                m_CurrentRoller = null;
+            }
+
+            if (m_TargetText != null && m_FinalLevel > 0)
+            {
+                m_TargetText.text = $"Level {m_FinalLevel}";
+            }
             m_IsAnimating = false;
         }
 
