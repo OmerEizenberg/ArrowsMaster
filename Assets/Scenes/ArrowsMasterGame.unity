@@ -10564,7 +10564,10 @@ MonoBehaviour:
   minZoom: 10
   maxZoom: 22
   mobileZoomSpeed: 0.5
-  dragThresholdPercent: 10
+  dragThresholdPercent: 15
+  inertiaDeceleration: 0.9
+  minInertiaVelocity: 0.1
+  velocitySmoothFactor: 15
   shakeDuration: 0.1
   shakeMagnitude: 0.05
   initZoomInDuration: 0.25

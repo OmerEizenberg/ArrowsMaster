@@ -667,9 +667,9 @@ namespace Assets.Scripts.Core
                 UserDataManager.Instance.ClearCurrentLevelAttempts();
                 UserDataManager.Instance.IsRateUsCheckPending = true;
 
-                // --- Google Play Games Achievements ---
+                // --- Social Platform Achievements (Android/iOS) ---
                 CheckAchievements(completedLevel);
-                // --------------------------------------
+                // --------------------------------------------------
             }
             else
             {
@@ -1230,31 +1230,31 @@ namespace Assets.Scripts.Core
 
         private void CheckAchievements(int completedLevel)
         {
-            if (PlayGamesManager.Instance == null) return;
+            if (SocialManager.Instance == null) return;
 
-            string achievementId = string.Empty;
+            string milestone = string.Empty;
 
             switch (completedLevel)
             {
-                case 1: achievementId = PlayGamesManager.ACHIEVEMENT_FINISH_TUTORIAL; break;
-                case 25: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_25_LEVELS; break;
-                case 50: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_50_LEVELS; break;
-                case 75: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_75_LEVELS; break;
-                case 100: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_100_LEVELS; break;
-                case 150: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_150_LEVELS; break;
-                case 200: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_200_LEVELS; break;
-                case 250: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_250_LEVELS; break;
-                case 300: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_300_LEVELS; break;
-                case 400: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_400_LEVELS; break;
-                case 500: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_500_LEVELS; break;
-                case 600: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_600_LEVELS; break;
-                case 750: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_750_LEVELS; break;
-                case 1000: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_1000_LEVELS; break;
+                case 1: milestone = "tutorial"; break;
+                case 25: milestone = "lvl25"; break;
+                case 50: milestone = "lvl50"; break;
+                case 75: milestone = "lvl75"; break;
+                case 100: milestone = "lvl100"; break;
+                case 150: milestone = "lvl150"; break;
+                case 200: milestone = "lvl200"; break;
+                case 250: milestone = "lvl250"; break;
+                case 300: milestone = "lvl300"; break;
+                case 400: milestone = "lvl400"; break;
+                case 500: milestone = "lvl500"; break;
+                case 600: milestone = "lvl600"; break;
+                case 750: milestone = "lvl750"; break;
+                case 1000: milestone = "lvl1000"; break;
             }
 
-            if (!string.IsNullOrEmpty(achievementId))
+            if (!string.IsNullOrEmpty(milestone))
             {
-                PlayGamesManager.Instance.UnlockAchievement(achievementId);
+                SocialManager.Instance.UnlockAchievement(milestone);
             }
         }
 

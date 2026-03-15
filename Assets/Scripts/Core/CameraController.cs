@@ -15,6 +15,11 @@ namespace Assets.Scripts.Core
         [Header("Pan Settings")]
         [SerializeField] private float dragThresholdPercent = 2.0f; // Percentage of screen width to start panning
         
+        [Header("Inertia Settings")]
+        [SerializeField] private float inertiaDeceleration = 0.9f; // Friction: velocity *= factor
+        [SerializeField] private float minInertiaVelocity = 0.1f;
+        [SerializeField] private float velocitySmoothFactor = 15f; // For smoothing the input velocity
+        
         [Header("Shake Settings")]
         [SerializeField] private float shakeDuration = 0.1f;
         [SerializeField] private float shakeMagnitude = 0.1f;
@@ -26,7 +31,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private float initExtraZoomBuffer = 0.5f;   // Additional units beyond calculated fit
         [SerializeField] private float targetViewportCenterY = 0.43f; // Shift center for Top Bar UI
 
-        [SerializeField] private float winZoomMultiplier = 3.0f;
+        [SerializeField] private float winZoomMultiplier = 1.8f;
 
         public static CameraController Instance { get; private set; }
 
@@ -44,6 +49,10 @@ namespace Assets.Scripts.Core
         private Vector3 touchStartPosition;
         private bool isTouching = false;
         private bool isPanningActive = false;
+        private Vector3 lastWorldDelta;
+        private Vector3 smoothedVelocity;
+        private bool isRollingInertia = false;
+        private Vector3 inertiaVelocity;
         
         // Bounds
         private Vector2 minBounds;
@@ -194,6 +203,9 @@ namespace Assets.Scripts.Core
 
             if (Input.GetMouseButtonDown(0))
             {
+                isRollingInertia = false; // Stop any ongoing inertia
+                inertiaVelocity = Vector3.zero;
+
                 if (touchCount > 1)
                 {
                     isTouching = false;
@@ -205,6 +217,7 @@ namespace Assets.Scripts.Core
                 prevMousePos = touchStartPosition;
                 isTouching = true;
                 isPanningActive = false;
+                smoothedVelocity = Vector3.zero;
             }
 
             if (Input.GetMouseButton(0) && isTouching)
@@ -243,18 +256,19 @@ namespace Assets.Scripts.Core
                     float worldDeltaX = -(deltaX / cachedScreenWidth)  * worldWidth;
                     float worldDeltaY = -(deltaY / cachedScreenHeight) * worldHeight;
                     
-                    cachedPosition = transform.position;
-                    cachedPosition.x += worldDeltaX * 1.1f;
-                    cachedPosition.y += worldDeltaY * 1.1f;
+                    Vector3 worldDelta = new Vector3(worldDeltaX * 1.1f, worldDeltaY * 1.1f, 0);
                     
-                    float currentYOffset = (0.5f - targetViewportCenterY) * 2f * cam.orthographicSize;
-                    float minLimitY = minBounds.y + currentYOffset;
-                    float maxLimitY = maxBounds.y + currentYOffset;
+                    // Calculate and smooth velocity
+                    if (Time.deltaTime > 0)
+                    {
+                        Vector3 frameVelocity = worldDelta / Time.deltaTime;
+                        smoothedVelocity = Vector3.Lerp(smoothedVelocity, frameVelocity, Time.deltaTime * velocitySmoothFactor);
+                    }
 
-                    if (cachedPosition.x < minBounds.x || cachedPosition.x > maxBounds.x)
-                        cachedPosition.x = Mathf.Clamp(cachedPosition.x, minBounds.x, maxBounds.x);
-                    if (cachedPosition.y < minLimitY || cachedPosition.y > maxLimitY)
-                        cachedPosition.y = Mathf.Clamp(cachedPosition.y, minLimitY, maxLimitY);
+                    cachedPosition = transform.position;
+                    cachedPosition += worldDelta;
+                    
+                    cachedPosition = ClampToBounds(cachedPosition);
                     
                     transform.position = cachedPosition;
                     prevMousePos = currentPos;
@@ -263,9 +277,67 @@ namespace Assets.Scripts.Core
 
             if (Input.GetMouseButtonUp(0))
             {
+                if (isPanningActive && smoothedVelocity.magnitude > minInertiaVelocity)
+                {
+                    isRollingInertia = true;
+                    inertiaVelocity = smoothedVelocity;
+                }
+                
                 isTouching = false;
                 isPanningActive = false;
             }
+
+            if (isRollingInertia && !isTouching)
+            {
+                ApplyInertia();
+            }
+        }
+
+        private void ApplyInertia()
+        {
+            if (inertiaVelocity.magnitude < minInertiaVelocity)
+            {
+                isRollingInertia = false;
+                inertiaVelocity = Vector3.zero;
+                return;
+            }
+
+            // Apply movement
+            Vector3 movement = inertiaVelocity * Time.deltaTime;
+            Vector3 newPos = transform.position + movement;
+            
+            // Clamp and check if we hit boundaries
+            Vector3 clampedPos = ClampToBounds(newPos);
+            
+            // If we hit a boundary, stop inertia in that axis or altogether
+            if (Mathf.Abs(clampedPos.x - newPos.x) > 0.001f) inertiaVelocity.x = 0;
+            if (Mathf.Abs(clampedPos.y - newPos.y) > 0.001f) inertiaVelocity.y = 0;
+
+            transform.position = clampedPos;
+
+            // Apply friction (frame-rate independent)
+            inertiaVelocity *= Mathf.Pow(inertiaDeceleration, Time.deltaTime * 60f);
+            
+            // If we are at the edge, the friction should probably be higher or just stop
+            if (inertiaVelocity.magnitude < minInertiaVelocity)
+            {
+                isRollingInertia = false;
+                inertiaVelocity = Vector3.zero;
+            }
+        }
+
+        private Vector3 ClampToBounds(Vector3 targetPos)
+        {
+            float currentYOffset = (0.5f - targetViewportCenterY) * 2f * cam.orthographicSize;
+            float minLimitY = minBounds.y + currentYOffset;
+            float maxLimitY = maxBounds.y + currentYOffset;
+
+            if (targetPos.x < minBounds.x || targetPos.x > maxBounds.x)
+                targetPos.x = Mathf.Clamp(targetPos.x, minBounds.x, maxBounds.x);
+            if (targetPos.y < minLimitY || targetPos.y > maxLimitY)
+                targetPos.y = Mathf.Clamp(targetPos.y, minLimitY, maxLimitY);
+            
+            return targetPos;
         }
 
         private void HandleDesktopZoom()
@@ -274,6 +346,7 @@ namespace Assets.Scripts.Core
             if (scroll != 0.0f)
             {
                 isZoomingInteraction = true;
+                isRollingInertia = false; // Stop inertia when zooming
                 float newSize = cam.orthographicSize - scroll * zoomSpeed;
                 cam.orthographicSize = Mathf.Clamp(newSize, minZoom, absoluteMaxZoom);
             }
@@ -284,6 +357,7 @@ namespace Assets.Scripts.Core
             if (touchCount == 2)
             {
                 isZoomingInteraction = true;
+                isRollingInertia = false; // Stop inertia when zooming
                 Touch touchZero = Input.GetTouch(0);
                 Touch touchOne  = Input.GetTouch(1);
 
@@ -332,7 +406,7 @@ namespace Assets.Scripts.Core
             // Fit zoom = smallest orthographic size that shows the full grid
             float fitVertical   = (levelHeight * initPaddingMultiplier) / 2f;
             float fitHorizontal = (levelWidth  * initPaddingMultiplier) / (2f * aspect);
-            float fitZoom       = Mathf.Max(fitVertical, fitHorizontal);
+            float fitZoom       = Mathf.Max(fitVertical, fitHorizontal) * 0.8f; // 20% closer zoom base
 
             // Compute the final "gameplay" zoom (what the player sees after animation)
             float finalZoom = fitZoom;//Mathf.Min(25f, fitZoom);
