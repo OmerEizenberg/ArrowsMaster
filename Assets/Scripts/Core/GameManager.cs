@@ -662,9 +662,14 @@ namespace Assets.Scripts.Core
 
             if(p_isLevelProgression)
             {
+                int completedLevel = UserDataManager.Instance.CurrentLevel;
                 UserDataManager.Instance.IncrementLevel();
                 UserDataManager.Instance.ClearCurrentLevelAttempts();
                 UserDataManager.Instance.IsRateUsCheckPending = true;
+
+                // --- Google Play Games Achievements ---
+                CheckAchievements(completedLevel);
+                // --------------------------------------
             }
             else
             {
@@ -1221,6 +1226,36 @@ namespace Assets.Scripts.Core
             m_LastSavedProgress = progress;
             UserDataManager.Instance.SaveLevelProgress(progress);
             Debug.Log($"[GameManager] Progress saved for level {progress.levelId}. Picked arrows: {progress.pickedArrowIds.Count}, Time={currentTime}/{levelDuration}, Active={isTimerActive}");
+        }
+
+        private void CheckAchievements(int completedLevel)
+        {
+            if (PlayGamesManager.Instance == null) return;
+
+            string achievementId = string.Empty;
+
+            switch (completedLevel)
+            {
+                case 1: achievementId = PlayGamesManager.ACHIEVEMENT_FINISH_TUTORIAL; break;
+                case 25: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_25_LEVELS; break;
+                case 50: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_50_LEVELS; break;
+                case 75: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_75_LEVELS; break;
+                case 100: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_100_LEVELS; break;
+                case 150: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_150_LEVELS; break;
+                case 200: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_200_LEVELS; break;
+                case 250: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_250_LEVELS; break;
+                case 300: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_300_LEVELS; break;
+                case 400: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_400_LEVELS; break;
+                case 500: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_500_LEVELS; break;
+                case 600: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_600_LEVELS; break;
+                case 750: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_750_LEVELS; break;
+                case 1000: achievementId = PlayGamesManager.ACHIEVEMENT_COMPLETED_1000_LEVELS; break;
+            }
+
+            if (!string.IsNullOrEmpty(achievementId))
+            {
+                PlayGamesManager.Instance.UnlockAchievement(achievementId);
+            }
         }
 
         private System.Collections.IEnumerator PeriodicSaveCoroutine()
