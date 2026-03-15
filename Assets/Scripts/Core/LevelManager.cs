@@ -337,8 +337,17 @@ namespace Assets.Scripts.Core
             {
                 CameraController.Instance.PlayWinZoomAnimation(m_CurrentGridSize, m_LevelCenter);
             }
+
+            foreach (var arrow in arrows)
+            {
+                if (arrow != null)
+                {
+                    arrow.StartWinScaleAnimation(0.6f, 0.33f); // Scale by 50% over 0.33s (camera zoom duration)
+                }
+            }
+
             StartCoroutine(DoRippleEffect());
-            StartCoroutine(FadeOutCircles(1.5f));
+            StartCoroutine(FadeOutCircles(3.0f));
         }
 
         private System.Collections.IEnumerator FadeOutCircles(float delay)
@@ -396,14 +405,14 @@ namespace Assets.Scripts.Core
 
                             info.transform.localScale = Vector3.one * scale;
                             Color c = Color.Lerp(m_CircleColor, targetColor, proximity);
-                            c.a *= m_WinCirclesAlpha;
+                            //c.a *= m_WinCirclesAlpha;
                             info.renderer.color = c;
                         }
                         else if (waveFront > dist)
                         {
                             info.transform.localScale = Vector3.one;
                             Color c = m_CircleColor;
-                            c.a *= m_WinCirclesAlpha;
+                            //c.a *= m_WinCirclesAlpha;
                             info.renderer.color = c;
                         }
                     }
@@ -422,6 +431,8 @@ namespace Assets.Scripts.Core
                     info.renderer.color = c;
                 }
             }
+            yield return new WaitForSeconds(0.5f);
+            HideArrows();
         }
     }
 }

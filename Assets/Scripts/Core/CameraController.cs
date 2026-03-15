@@ -31,7 +31,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private float initExtraZoomBuffer = 0.5f;   // Additional units beyond calculated fit
         [SerializeField] private float targetViewportCenterY = 0.43f; // Shift center for Top Bar UI
 
-        [SerializeField] private float winZoomMultiplier = 1.8f;
+        [SerializeField] private float winZoomMultiplier = 1.0f;
 
         public static CameraController Instance { get; private set; }
 
@@ -406,7 +406,7 @@ namespace Assets.Scripts.Core
             // Fit zoom = smallest orthographic size that shows the full grid
             float fitVertical   = (levelHeight * initPaddingMultiplier) / 2f;
             float fitHorizontal = (levelWidth  * initPaddingMultiplier) / (2f * aspect);
-            float fitZoom       = Mathf.Max(fitVertical, fitHorizontal) * 0.8f; // 20% closer zoom base
+            float fitZoom       = Mathf.Max(fitVertical, fitHorizontal) * 0.85f; // 20% closer zoom base
 
             // Compute the final "gameplay" zoom (what the player sees after animation)
             float finalZoom = fitZoom;//Mathf.Min(25f, fitZoom);
@@ -480,7 +480,7 @@ namespace Assets.Scripts.Core
         {
             isLevelStarted = false; // Disable zoom-back mechanic immediately
             isInternalAnimation = true;
-            float duration = 0.33f;
+            float duration = 1.0f;
             float elapsed  = 0f;
             
             float startZoom = cam.orthographicSize;
@@ -494,8 +494,8 @@ namespace Assets.Scripts.Core
             float fitHorizontal = (gridSize.x * cellSize + padding * 2) / (2f * aspectRatio);
             
             // Only zoom out: targetZoom must be at least startZoom
-            float targetZoom    = Mathf.Max(fitVertical, fitHorizontal) * winZoomMultiplier;
-            targetZoom = Mathf.Max(targetZoom, startZoom);
+            float targetZoom    = Mathf.Max(fitVertical, fitHorizontal) ;
+            targetZoom = Mathf.Max(targetZoom, startZoom)* winZoomMultiplier;
                 
             Vector3 gridCenter = new Vector3((gridSize.x - 1) * cellSize / 2f, (gridSize.y - 1) * cellSize / 2f, transform.position.z);
             Vector3 targetPos  = gridCenter;

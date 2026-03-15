@@ -526,6 +526,44 @@ namespace Assets.Scripts.Core
             // After escape finishes, it's destroyed anyway.
         }
 
+        public void StartWinScaleAnimation(float targetScaleFactor, float duration)
+        {
+            StartCoroutine(WinScaleAnimation(targetScaleFactor, duration));
+        }
+
+        private IEnumerator WinScaleAnimation(float targetScaleFactor, float duration)
+        {
+            float elapsed = 0f;
+            List<Vector3> startScales = new List<Vector3>();
+            foreach (var seg in segments)
+            {
+                startScales.Add(seg.transform.localScale);
+            }
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                for (int i = 0; i < segments.Count; i++)
+                {
+                    if (segments[i] != null)
+                    {
+                        segments[i].transform.localScale = Vector3.Lerp(startScales[i], startScales[i] * targetScaleFactor, t);
+                    }
+                }
+                yield return null;
+            }
+
+            for (int i = 0; i < segments.Count; i++)
+            {
+                if (segments[i] != null)
+                {
+                    segments[i].transform.localScale = startScales[i] * targetScaleFactor;
+                }
+            }
+        }
+
         private void SetArrowColor(Color color)
         {
             currentArrowColor = color;

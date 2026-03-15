@@ -696,9 +696,6 @@ namespace Assets.Scripts.Core
             }
             // --------------------------------------
 
-            yield return new WaitForSeconds(0.2f);
-            levelManager.HideArrows();
-
             if (levelManager != null)
             {
                 levelManager.PlayWinAnimation();
