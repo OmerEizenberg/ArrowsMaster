@@ -109,7 +109,7 @@ public class GameUIContoleer : MonoBehaviour
 
         if (m_StreakText != null)
         {
-            m_StreakText.text = "X" + GameManager.Instance.p_StreakCount;
+            m_StreakText.text = "X" + GameManager.Instance.p_ComboMultiplier;
             StartCoroutine(PunchScaleRoutine(m_StreakText.rectTransform, 1.4f, 0.08f, 0.05f));
         }
     }

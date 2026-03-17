@@ -72,6 +72,17 @@ namespace Assets.Scripts.Core
         private bool isTimeUp = false;
         public float LastArrowSelectionTime { get; private set; } = -10f;
         public int p_StreakCount { get; private set; } = 0;
+        public int p_ComboMultiplier
+        {
+            get
+            {
+                if (p_StreakCount >= 10) return 10;
+                if (p_StreakCount >= 5) return 5;
+                if (p_StreakCount >= 2) return 2;
+                return 1;
+            }
+        }
+
         private int collectedLevelCurrency = 0; // Currency collected during the current level attempt
         public int CollectedLevelCurrency => collectedLevelCurrency;
 
@@ -541,7 +552,7 @@ namespace Assets.Scripts.Core
             {
                 // Collect currency logic
 
-                int coinsEarned = Mathf.Max(1, p_StreakCount);
+                int coinsEarned = p_ComboMultiplier;
                 collectedLevelCurrency += coinsEarned;
                 Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
                 
