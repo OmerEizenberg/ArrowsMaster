@@ -852,6 +852,7 @@ namespace Assets.Scripts.Core
             if (failureScreen != null) failureScreen.SetActive(false);
             if (m_WinParticles != null) m_WinParticles.SetActive(false);
             if (m_WinLevelText != null) m_WinLevelText.gameObject.SetActive(false);
+            if (m_GameUI != null) m_GameUI.StopFailureFadeCoroutine();
         }
 
 
@@ -861,6 +862,7 @@ namespace Assets.Scripts.Core
             {
                 failureScreen.SetActive(false);
             }
+            if (m_GameUI != null) m_GameUI.StopFailureFadeCoroutine();
         }
 
         private void Update()

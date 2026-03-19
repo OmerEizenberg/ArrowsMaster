@@ -21,6 +21,12 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_FailureDescription; // Description text
     [SerializeField] private GameObject m_NoAdsOfferImage; // Image for the special offer (coins + no ads)
     
+    [Header("Restart Button Fade")]
+    [SerializeField] private GameObject m_RestartButton;
+    [SerializeField] private Image m_RestartButtonImage;
+    [SerializeField] private TextMeshProUGUI m_RestartButtonText;
+    private Coroutine m_RestartButtonFadeCoroutine;
+    
     [Header("Timer Colors")]
     [SerializeField] private Color m_TimerDefaultColor = Color.white; // Default timer color
     [SerializeField] private Color m_TimerWarningColor = Color.red; // Color when 30 seconds or less
@@ -209,6 +215,7 @@ public class GameUIContoleer : MonoBehaviour
     }
     private void OnLevelStarted()
     {
+        StopFailureFadeCoroutine();
         UpdateTimerVisibility();
         int minutes = Mathf.FloorToInt(GameManager.Instance.CurrentTime / 60f);
         int seconds = Mathf.FloorToInt(GameManager.Instance.CurrentTime % 60f);
@@ -271,6 +278,62 @@ public class GameUIContoleer : MonoBehaviour
     private void OnGameOver()
     {
         UpdateFailureScreenText();
+        
+        if (m_RestartButtonFadeCoroutine != null) StopCoroutine(m_RestartButtonFadeCoroutine);
+        m_RestartButtonFadeCoroutine = StartCoroutine(RestartButtonFadeRoutine());
+    }
+
+    public void StopFailureFadeCoroutine()
+    {
+        if (m_RestartButtonFadeCoroutine != null)
+        {
+            StopCoroutine(m_RestartButtonFadeCoroutine);
+            m_RestartButtonFadeCoroutine = null;
+        }
+        
+        // Ensure button is reset to a visible state if needed, or hidden if we are starting a level
+        // For now, let's just make sure it's not stuck in a half-faded state if we exit failure screen
+        SetRestartButtonAlpha(1f);
+    }
+
+    private IEnumerator RestartButtonFadeRoutine()
+    {
+        if (m_RestartButton == null) yield break;
+
+        // Hide immediately
+        m_RestartButton.SetActive(false);
+        SetRestartButtonAlpha(0f);
+
+        // Wait 3 seconds
+        yield return new WaitForSeconds(3f);
+
+        // Fade in
+        m_RestartButton.SetActive(true);
+        float elapsed = 0f;
+        float duration = 1f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float alpha = Mathf.Clamp01(elapsed / duration);
+            SetRestartButtonAlpha(alpha);
+            yield return null;
+        }
+        SetRestartButtonAlpha(1f);
+        m_RestartButtonFadeCoroutine = null;
+    }
+
+    private void SetRestartButtonAlpha(float alpha)
+    {
+        if (m_RestartButtonImage != null)
+        {
+            Color c = m_RestartButtonImage.color;
+            c.a = alpha;
+            m_RestartButtonImage.color = c;
+        }
+        if (m_RestartButtonText != null)
+        {
+            m_RestartButtonText.alpha = alpha;
+        }
     }
     
     private void UpdateFailureScreenText()
