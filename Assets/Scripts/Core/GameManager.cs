@@ -59,6 +59,7 @@ namespace Assets.Scripts.Core
         public event Action<int, Vector2> OnLevelCurrencyChanged; 
         public event Action<int> OnMaxStreakBroken;
         public bool p_isLevelProgression = true;
+        public static bool g_IsFromGame = false;
 
         public int currentChallengeYear;
         public int currentChallengeMonth;
@@ -407,6 +408,7 @@ namespace Assets.Scripts.Core
 
         public void StartLevel(string levelId)
         {
+            g_IsFromGame = true;
             if (UserDataManager.Instance.LastAttemptLevelId != levelId || UserDataManager.Instance.CurrentLevelAttempts == 0)
             {
                 UserDataManager.Instance.ResetCurrentLevelAttempts(levelId);
@@ -475,6 +477,7 @@ namespace Assets.Scripts.Core
 
         public void StartChallengeLevel(string levelId, int year, int month, int day)
         {
+            g_IsFromGame = true;
             ResetLives();
             HideScreens();
             if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);

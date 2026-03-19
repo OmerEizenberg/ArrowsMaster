@@ -149,6 +149,7 @@ namespace Assets.Scripts.Lobby
             CheckForTermsAgreement();
             CheckForRateUsPopup();
             UpdateChallengeNotification();
+            CheckForNoAdsOffer();
         }
 
         private void OnDisable()
@@ -958,6 +959,45 @@ namespace Assets.Scripts.Lobby
             {
                 // If we shouldn't show it (e.g. within 45 days), just clear the pending flag
                 UserDataManager.Instance.IsRateUsCheckPending = false;
+            }
+        }
+
+        private void CheckForNoAdsOffer()
+        {
+            if (!GameManager.g_IsFromGame) return;
+            GameManager.g_IsFromGame = false;
+
+            if (IAPManager.Instance == null || IAPManager.Instance.HasNoAds) return;
+
+            if (UserDataManager.Instance == null || UserDataManager.Instance.CurrentLevel <= 16 || UserDataManager.Instance.ArrowsCurrency >= 1200) return;
+
+            string lastSeenTimeStr = PlayerPrefs.GetString("LastNoAdsOfferTime", string.Empty);
+            if (!string.IsNullOrEmpty(lastSeenTimeStr))
+            {
+                if (long.TryParse(lastSeenTimeStr, out long binaryTime))
+                {
+                    System.DateTime lastSeenTime = System.DateTime.FromBinary(binaryTime);
+                    if ((System.DateTime.Now - lastSeenTime).TotalMinutes < 30)
+                    {
+                        Debug.Log($"[HomeContoller] Skipping No Ads offer (seen { (int)(System.DateTime.Now - lastSeenTime).TotalMinutes } mins ago)");
+                        return;
+                    }
+                }
+            }
+
+            if (m_NoAdsLayer != null)
+            {
+                Debug.Log("[HomeContoller] Special No Ads Offer conditions met: showing No Ads layer!");
+
+                m_SettingsLayer.SetActive(false);
+                m_CalanderLayer.SetActive(false);
+                m_ShopLayer.SetActive(false);
+                m_DonateLayer.SetActive(false);
+                m_NoAdsLayer.SetActive(true);
+
+                // Store current time as last seen
+                PlayerPrefs.SetString("LastNoAdsOfferTime", System.DateTime.Now.ToBinary().ToString());
+                PlayerPrefs.Save();
             }
         }
     }
