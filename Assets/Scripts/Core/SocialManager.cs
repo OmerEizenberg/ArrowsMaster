@@ -166,21 +166,20 @@ namespace Assets.Scripts.Core
 #elif UNITY_IOS
             switch (milestone)
             {
-                // TODO: Replace these with your actual App Store Connect achievement IDs
-                case "tutorial": return "com.everybodygames.arrowsmaster.tutorial";
-                case "lvl25": return "com.everybodygames.arrowsmaster.lvl25";
-                case "lvl50": return "com.everybodygames.arrowsmaster.lvl50";
-                case "lvl75": return "com.everybodygames.arrowsmaster.lvl75";
-                case "lvl100": return "com.everybodygames.arrowsmaster.lvl100";
-                case "lvl150": return "com.everybodygames.arrowsmaster.lvl150";
-                case "lvl200": return "com.everybodygames.arrowsmaster.lvl200";
-                case "lvl250": return "com.everybodygames.arrowsmaster.lvl250";
-                case "lvl300": return "com.everybodygames.arrowsmaster.lvl300";
-                case "lvl400": return "com.everybodygames.arrowsmaster.lvl400";
-                case "lvl500": return "com.everybodygames.arrowsmaster.lvl500";
-                case "lvl600": return "com.everybodygames.arrowsmaster.lvl600";
-                case "lvl750": return "com.everybodygames.arrowsmaster.lvl750";
-                case "lvl1000": return "com.everybodygames.arrowsmaster.lvl1000";
+                case "tutorial": return "CgkIkrOzieYREAIQAQ";
+                case "lvl25": return "CgkIkrOzieYREAIQAw";
+                case "lvl50": return "CgkIkrOzieYREAIQAg";
+                case "lvl75": return "CgkIkrOzieYREAIQBA";
+                case "lvl100": return "CgkIkrOzieYREAIQBQ";
+                case "lvl150": return "CgkIkrOzieYREAIQBg";
+                case "lvl200": return "CgkIkrOzieYREAIQBw";
+                case "lvl250": return "CgkIkrOzieYREAIQCA";
+                case "lvl300": return "CgkIkrOzieYREAIQCQ";
+                case "lvl400": return "CgkIkrOzieYREAIQCg";
+                case "lvl500": return "CgkIkrOzieYREAIQCw";
+                case "lvl600": return "CgkIkrOzieYREAIQDA";
+                case "lvl750": return "CgkIkrOzieYREAIQDQ";
+                case "lvl1000": return "CgkIkrOzieYREAIQDg";
             }
 #endif
             return string.Empty;

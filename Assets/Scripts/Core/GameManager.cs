@@ -700,7 +700,7 @@ namespace Assets.Scripts.Core
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_SCORE, levelManager.TotalPointsInLevel));
 
                 // FTUE: tutorial_complete
-                if (levelManager.CurrentLevelId == "Level1")
+                if (levelManager.CurrentLevelId == "Level15")
                 {
                     FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_TUTORIAL_COMPLETE);
                 }
@@ -1246,7 +1246,7 @@ namespace Assets.Scripts.Core
 
             switch (completedLevel)
             {
-                case 1: milestone = "tutorial"; break;
+                case 15: milestone = "tutorial"; break;
                 case 25: milestone = "lvl25"; break;
                 case 50: milestone = "lvl50"; break;
                 case 75: milestone = "lvl75"; break;
