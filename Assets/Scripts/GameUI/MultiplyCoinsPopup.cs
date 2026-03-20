@@ -25,7 +25,8 @@ namespace Assets.Scripts.GameUI
         [SerializeField] private TextMeshProUGUI m_AnimatedCoinsText; // The one that counts up from original to multiplied
         [SerializeField] private Button m_MultiplyButton;
         [SerializeField] private Button m_NoThanksButton;
-        
+        [SerializeField] private Canvas m_Canvas;
+
         [Header("Config")]
         [SerializeField] private MultiplyRewardConfig m_Config;
 
@@ -65,6 +66,9 @@ namespace Assets.Scripts.GameUI
 
         private void OnEnable()
         {
+            // Ensure the Canvas has a camera reference for ScreenSpaceCamera mode
+            m_Canvas.worldCamera = Camera.main;
+
             // Pull win amount from GameManager as the primary source/fallback
             if (GameManager.Instance != null)
             {
@@ -185,6 +189,9 @@ namespace Assets.Scripts.GameUI
         public void OnMultiplyClicked()
         {
             if (m_IsSpinning || m_IsAdShowing || m_RewardClaimed) return;
+            if (m_MultiplyButton != null) m_MultiplyButton.interactable = false;
+            if (m_NoThanksButton != null) m_NoThanksButton.interactable = false;
+            
             Debug.Log("[SlotMachine] MultiplyClicked! Starting Spin...");
             StartCoroutine(SpinReelRoutine());
         }
@@ -347,6 +354,10 @@ namespace Assets.Scripts.GameUI
         public void OnNoThanksClicked()
         {
             if (m_IsSpinning || m_IsAdShowing || m_RewardClaimed) return;
+            
+            if (m_MultiplyButton != null) m_MultiplyButton.interactable = false;
+            if (m_NoThanksButton != null) m_NoThanksButton.interactable = false;
+            
             Close();
         }
 

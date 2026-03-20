@@ -297,7 +297,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: COINS MULTIPLAYER
+  m_text: FORTUNE REEL
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
@@ -734,6 +734,7 @@ MonoBehaviour:
   m_AnimatedCoinsText: {fileID: 2819270025620708148}
   m_MultiplyButton: {fileID: 6091132366059924105}
   m_NoThanksButton: {fileID: 8051261202184775189}
+  m_Canvas: {fileID: 8081197049139456060}
   m_Config: {fileID: 11400000, guid: ce1542ebee9b344489f3ff91fccb5036, type: 2}
 --- !u!1 &6096257500061917490
 GameObject:
@@ -809,8 +810,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4278236913
-  m_fontColor: {r: 0.9433962, g: 0.71469414, b: 0, a: 1}
+    rgba: 4280863487
+  m_fontColor: {r: 1, g: 0.7932945, b: 0.15566039, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1068,7 +1069,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Multiply
+  m_text: MULTIPLY
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
@@ -1636,7 +1637,7 @@ Canvas:
   m_GameObject: {fileID: 8734495640765151318}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
+  m_RenderMode: 1
   m_Camera: {fileID: 0}
   m_PlaneDistance: 100
   m_PixelPerfect: 0
@@ -1648,7 +1649,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 30
   m_TargetDisplay: 0
 --- !u!114 &9061258103928672195
 MonoBehaviour:
