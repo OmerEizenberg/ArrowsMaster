@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using Assets.Scripts.Core;
+using Assets.Scripts.GameUI;
 using TMPro;
 
 public class GameUIContoleer : MonoBehaviour
@@ -392,6 +393,25 @@ public class GameUIContoleer : MonoBehaviour
     {
         if (m_LobbyUI != null) m_LobbyUI.SetActive(!visible);
         if (m_GameUI != null) m_GameUI.SetActive(visible);
+    }
+
+    public MultiplyCoinsPopup ShowMultiplyCoinsPopup(int coinsWon)
+    {
+        GameObject prefab = Resources.Load<GameObject>("MultiplayerPopup");
+        if (prefab == null)
+        {
+            Debug.LogWarning("[GameUIContoleer] MultiplyCoinsPopup prefab not found in Resources as 'MultiplayerPopup'.");
+            return null;
+        }
+        
+        GameObject popupGO = Instantiate(prefab, null);
+        popupGO.SetActive(true);
+        MultiplyCoinsPopup popup = popupGO.GetComponent<MultiplyCoinsPopup>();
+        if (popup != null)
+        {
+            popup.Setup(coinsWon);
+        }
+        return popup;
     }
 
     private void ToggleHintButton(bool visible)

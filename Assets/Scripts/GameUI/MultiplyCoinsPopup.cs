@@ -1,0 +1,366 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System.Collections;
+using System.Collections.Generic;
+using Assets.Scripts.Core;
+
+namespace Assets.Scripts.GameUI
+{
+    public class MultiplyCoinsPopup : MonoBehaviour
+    {
+        [Header("Slot Machine UI")]
+        [SerializeField] private RectTransform m_SymbolsParent; // Container for the symbols
+        [SerializeField] private TextMeshProUGUI m_SymbolTemplate; // Template for the multipliers
+        [SerializeField] private float m_SymbolSpacing = 120f; // Vertical distance between symbols
+        
+        [Header("3D Effect Parameters")]
+        [SerializeField] private float m_MinAlpha = 0.2f;
+        [SerializeField] private float m_MaxAlpha = 1.0f;
+        [SerializeField] private float m_MinScale = 0.7f;
+        [SerializeField] private float m_MaxScale = 1.3f;
+        
+        [Header("General UI")]
+        [SerializeField] private TextMeshProUGUI m_CoinsWonText;
+        [SerializeField] private TextMeshProUGUI m_AnimatedCoinsText; // The one that counts up from original to multiplied
+        [SerializeField] private Button m_MultiplyButton;
+        [SerializeField] private Button m_NoThanksButton;
+        
+        [Header("Config")]
+        [SerializeField] private MultiplyRewardConfig m_Config;
+
+        private List<TextMeshProUGUI> m_ReelSymbols = new List<TextMeshProUGUI>();
+        private int[] m_AvailableMultipliers;
+        private int m_InitialCoins;
+        private bool m_IsSpinning = false;
+        private bool m_IsAdShowing = false;
+        private int m_CurrentMultiplier = 1;
+        private bool m_RewardClaimed = false;
+        
+        private float m_ReelOffset = 0f; // Current scroll offset (normalized to symbols)
+
+        public void Setup(int coinsWon)
+        {
+            m_InitialCoins = coinsWon;
+            Debug.Log($"[SlotMachine] Setup called. Coins: {m_InitialCoins}");
+            if (m_CoinsWonText != null) m_CoinsWonText.text = coinsWon.ToString("N0");
+            if (m_AnimatedCoinsText != null) m_AnimatedCoinsText.gameObject.SetActive(false);
+            
+            m_IsSpinning = false;
+            m_IsAdShowing = false;
+            m_RewardClaimed = false;
+            
+            if (m_MultiplyButton != null)
+            {
+                m_MultiplyButton.onClick.RemoveAllListeners();
+                m_MultiplyButton.onClick.AddListener(OnMultiplyClicked);
+            }
+                
+            if (m_NoThanksButton != null)
+            {
+                m_NoThanksButton.onClick.RemoveAllListeners();
+                m_NoThanksButton.onClick.AddListener(OnNoThanksClicked);
+            }
+        }
+
+        private void OnEnable()
+        {
+            InitializeSlotMachine();
+            
+            // Subscribe to ad events here to ensure they are always active
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.OnMultiplyRewardReceived -= HandleRewardReceived;
+                AdsManager.Instance.OnMultiplyRewardReceived += HandleRewardReceived;
+                AdsManager.Instance.OnAdClosed -= HandleAdClosed;
+                AdsManager.Instance.OnAdClosed += HandleAdClosed;
+                
+                AdsManager.Instance.LoadMultiplyRewarded();
+            }
+        }
+
+        private void InitializeSlotMachine()
+        {
+            Debug.Log("[SlotMachine] Initializing Reel...");
+            
+            if (m_SymbolTemplate == null)
+            {
+                Debug.LogError("[SlotMachine] ERROR: Symbol Template is not assigned in the Inspector!");
+                return;
+            }
+            if (m_SymbolsParent == null)
+            {
+                Debug.LogError("[SlotMachine] ERROR: Symbols Parent is not assigned in the Inspector!");
+                return;
+            }
+
+            // Get multipliers from config zones
+            if (m_Config != null && m_Config.zones != null && m_Config.zones.Length > 0)
+            {
+                m_AvailableMultipliers = new int[m_Config.zones.Length];
+                for (int i = 0; i < m_Config.zones.Length; i++)
+                    m_AvailableMultipliers[i] = m_Config.zones[i].multiplier;
+            }
+            else
+            {
+                m_AvailableMultipliers = new int[] { 2, 3, 4, 3, 2 };
+            }
+
+            // Clear existing symbols
+            foreach (var sym in m_ReelSymbols) if (sym != null) Destroy(sym.gameObject);
+            m_ReelSymbols.Clear();
+
+            // Create 5 symbols
+            if (m_SymbolTemplate != null && m_SymbolsParent != null)
+            {
+                m_SymbolTemplate.gameObject.SetActive(false);
+                for (int i = 0; i < 5; i++)
+                {
+                    TextMeshProUGUI sym = Instantiate(m_SymbolTemplate, m_SymbolsParent);
+                    sym.gameObject.SetActive(true);
+                    // Cycle through available multipliers
+                    sym.text = "X" + m_AvailableMultipliers[i % m_AvailableMultipliers.Length];
+                    m_ReelSymbols.Add(sym);
+                }
+                Debug.Log($"[SlotMachine] Successfully created {m_ReelSymbols.Count} reel symbols.");
+            }
+
+            UpdateReelPositions();
+            
+            // Hide legacy pointer if it exists in the prefab
+            Transform pointer = transform.Find("Popup/Pointer");
+            if (pointer == null) pointer = transform.Find("Pointer");
+            if (pointer != null) pointer.gameObject.SetActive(false);
+        }
+
+        private void OnDestroy()
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.OnMultiplyRewardReceived -= HandleRewardReceived;
+                AdsManager.Instance.OnAdClosed -= HandleAdClosed;
+            }
+        }
+
+        private void UpdateReelPositions()
+        {
+            int count = m_ReelSymbols.Count;
+            if (count == 0) return;
+
+            for (int i = 0; i < count; i++)
+            {
+                // Calculate position relative to container center
+                // 0 is top, 2 is center, 4 is bottom (logical mapping)
+                float posIndex = (i + m_ReelOffset) % count;
+                if (posIndex < 0) posIndex += count;
+
+                // Position 2 is the exact center window
+                float distanceFromCenter = posIndex - 2f;
+                
+                // Vertical position on screen
+                m_ReelSymbols[i].rectTransform.anchoredPosition = new Vector2(0, -distanceFromCenter * m_SymbolSpacing);
+
+                // 3D Effect based on distance from center [0 to 2]
+                float absDist = Mathf.Abs(distanceFromCenter);
+                float normalizedDist = Mathf.Clamp01(absDist / 2f); // 0 (center) to 1 (edges)
+
+                // Smoothly map using the parameters
+                float alpha = Mathf.Lerp(m_MaxAlpha, m_MinAlpha, normalizedDist);
+                float scale = Mathf.Lerp(m_MaxScale, m_MinScale, normalizedDist);
+
+                // If perfectly centered, update the current prize multiplier
+                if (absDist <= 0.2f)
+                {
+                    int.TryParse(m_ReelSymbols[i].text.Replace("X", ""), out m_CurrentMultiplier);
+                }
+
+                Color c = m_ReelSymbols[i].color;
+                c.a = alpha;
+                m_ReelSymbols[i].color = c;
+                m_ReelSymbols[i].transform.localScale = Vector3.one * scale;
+            }
+        }
+
+        public void OnMultiplyClicked()
+        {
+            if (m_IsSpinning || m_IsAdShowing || m_RewardClaimed) return;
+            Debug.Log("[SlotMachine] MultiplyClicked! Starting Spin...");
+            StartCoroutine(SpinReelRoutine());
+        }
+
+        private IEnumerator SpinReelRoutine()
+        {
+            m_IsSpinning = true;
+            
+            float speed = Random.Range(30f, 40f); // Fast initial speed
+            float duration = 2.0f; // Shortened to 2.0s as requested
+            float elapsed = 0f;
+
+            // Phase 1: Rapid Spin with Easing Out
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                // Quadratic easing out for the spin speed
+                float currentSpeed = Mathf.Lerp(speed, 2f, t * t);
+                
+                m_ReelOffset += currentSpeed * Time.deltaTime;
+                UpdateReelPositions();
+                yield return null;
+            }
+
+            // Phase 2: Snap to the nearest symbol center
+            float targetOffset = Mathf.Round(m_ReelOffset);
+            float snapElapsed = 0f;
+            float snapDuration = 0.5f;
+            float startOffset = m_ReelOffset;
+
+            while (snapElapsed < snapDuration)
+            {
+                snapElapsed += Time.deltaTime;
+                float t = snapElapsed / snapDuration;
+                // Ease out sine for the final snap
+                t = Mathf.Sin(t * Mathf.PI * 0.5f);
+                
+                m_ReelOffset = Mathf.Lerp(startOffset, targetOffset, t);
+                UpdateReelPositions();
+                yield return null;
+            }
+
+            m_ReelOffset = targetOffset;
+            UpdateReelPositions();
+            m_IsSpinning = false;
+            
+            // Punch Animation on the selected multiplier
+            for (int i = 0; i < m_ReelSymbols.Count; i++)
+            {
+                float posIndex = (i + m_ReelOffset) % m_ReelSymbols.Count;
+                if (posIndex < 0) posIndex += m_ReelSymbols.Count;
+                float distanceFromCenter = posIndex - 2f;
+                if (Mathf.Abs(distanceFromCenter) <= 0.2f)
+                {
+                    StartCoroutine(PunchSymbolRoutine(m_ReelSymbols[i].transform));
+                    break;
+                }
+            }
+
+            Debug.Log($"[SlotMachine] Spin Stopped on X{m_CurrentMultiplier}. Waiting 0.5s...");
+
+            // Wait 0.5 seconds stationary after stop before starting RV as requested
+            yield return new WaitForSeconds(0.5f);
+
+            Debug.Log("[SlotMachine] Requesting Rewarded Video Ad...");
+            if (AdsManager.Instance != null && AdsManager.Instance.IsMultiplyRewardedReady)
+            {
+                m_IsAdShowing = true;
+                AdsManager.Instance.ShowRewardedForMultiply();
+            }
+            else if (AdsManager.Instance == null)
+            {
+                // Fallback for editor testing
+                Debug.Log("[SlotMachine] AdsManager NULL. Fallback to reward animation.");
+                StartCoroutine(RewardAnimationRoutine());
+            }
+            else
+            {
+                Debug.LogWarning("[SlotMachine] Ad not ready. User can click 'Multiply' again to retry spin/show.");
+                // If ad isn't ready, let the user trigger the process again
+            }
+        }
+
+        private IEnumerator PunchSymbolRoutine(Transform target)
+        {
+            float duration = 0.4f;
+            float elapsed = 0f;
+            Vector3 startScale = Vector3.one * m_MaxScale;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                // Simple punch curve
+                float scale = 1f + Mathf.Sin(t * Mathf.PI) * 0.3f;
+                target.localScale = startScale * scale;
+                yield return null;
+            }
+            target.localScale = startScale;
+        }
+
+        private void HandleRewardReceived()
+        {
+            Debug.Log("[SlotMachine] Ad Reward Received! Starting count-up...");
+            m_IsAdShowing = false;
+            StartCoroutine(RewardAnimationRoutine());
+        }
+
+        private void HandleAdClosed()
+        {
+            if (m_IsAdShowing && !m_RewardClaimed)
+            {
+                Debug.Log("[SlotMachine] Ad Closed without reward.");
+                m_IsAdShowing = false;
+                // m_RewardClaimed stays false, so user can try again if they want
+            }
+        }
+
+        private IEnumerator RewardAnimationRoutine()
+        {
+            m_RewardClaimed = true;
+            m_IsAdShowing = false;
+            
+            if (m_AnimatedCoinsText != null)
+            {
+                m_AnimatedCoinsText.gameObject.SetActive(true);
+                m_AnimatedCoinsText.text = m_InitialCoins.ToString();
+                
+                // Hide static text to avoid overlap
+                if (m_CoinsWonText != null) m_CoinsWonText.gameObject.SetActive(false);
+            }
+            
+            int targetCoins = m_InitialCoins * m_CurrentMultiplier;
+            int additionalCoins = targetCoins - m_InitialCoins;
+            
+            Debug.Log($"[SlotMachine] Granting Reward: {m_InitialCoins} x {m_CurrentMultiplier} = {targetCoins}");
+            
+            float duration = 1.6f;
+            float elapsed = 0f;
+            
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                t = 1f - Mathf.Pow(1f - t, 3f); // Ease out cubic
+                
+                int current = Mathf.RoundToInt(Mathf.Lerp(m_InitialCoins, targetCoins, t));
+                if (m_AnimatedCoinsText != null) m_AnimatedCoinsText.text = current.ToString();
+                yield return null;
+            }
+            
+            if (m_AnimatedCoinsText != null) m_AnimatedCoinsText.text = targetCoins.ToString();
+            
+            if (UserDataManager.Instance != null && additionalCoins > 0)
+            {
+                UserDataManager.Instance.AddArrowsCurrency(additionalCoins);
+            }
+            
+            if (AdsManager.Instance != null) AdsManager.Instance.SpawnCoinsSmallExplosion();
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayMediumCheer();
+
+            yield return new WaitForSeconds(1.8f);
+            Close();
+        }
+
+        private void OnNoThanksClicked()
+        {
+            if (m_IsSpinning || m_IsAdShowing || m_RewardClaimed) return;
+            Close();
+        }
+
+        private void Close()
+        {
+            Debug.Log("[SlotMachine] Closing Multiply Coins Popup.");
+            Destroy(gameObject);
+        }
+    }
+}

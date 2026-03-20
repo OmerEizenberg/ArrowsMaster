@@ -13,6 +13,7 @@ namespace Assets.Scripts.Core
         private LevelPlayInterstitialAd interstitialAd;
         private LevelPlayRewardedAd RewardedAd;
         private LevelPlayRewardedAd coinsRewardedAd;
+        private LevelPlayRewardedAd multiplyRewardedAd;
         private LevelPlayBannerAd settingsBannerAd;
         private bool isInitialized = false;
         private bool isInitializing = false;
@@ -21,15 +22,17 @@ namespace Assets.Scripts.Core
         private const float AD_COOLDOWN = 120f;
 
         // Track which rewarded ad type is currently being shown
-        private enum RewardAdType { None, GameReward, CoinsReward }
+        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward }
         private RewardAdType pendingRewardType = RewardAdType.None;
 
         private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _mainThreadQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
 
         public event Action OnRewardReceived;
         public event Action OnCoinsRewardReceived;
+        public event Action OnMultiplyRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
+        public bool IsMultiplyRewardedReady => multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady();
 
         private string AppKey
         {
@@ -77,6 +80,18 @@ namespace Assets.Scripts.Core
                 return "ncnu1ipmqxwjbszr"; // iOS ad_rewarded
 #else
                 return "if9z8hp6gm6ukwvh"; // Android ad_rewarded fallback
+#endif
+            }
+        }
+
+        private string MultiplyRewardedAdUnitId
+        {
+            get
+            {
+#if UNITY_IOS || UNITY_IPHONE
+                return "p2o3lph3mrt9zq8x"; // iOS ad_rewarded_multiply
+#else
+                return "dctkavzgndg9gm8m"; // Android ad_rewarded_multiply
 #endif
             }
         }
@@ -207,6 +222,7 @@ namespace Assets.Scripts.Core
                 CreateInterstitialAd();
                 CreateRewardedAd();
                 CreateCoinsRewardedAd();
+                CreateMultiplyRewardedAd();
                 CreateSettingsBannerAd();
             });
 
@@ -496,6 +512,11 @@ namespace Assets.Scripts.Core
                     }
                     break;
 
+                case RewardAdType.MultiplyReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: MultiplyReward → firing OnMultiplyRewardReceived.");
+                    OnMultiplyRewardReceived?.Invoke();
+                    break;
+
                 default:
                     Debug.Log("[AdsManager] ProcessPendingReward: No pending reward (None). Ignoring.");
                     break;
@@ -599,6 +620,102 @@ namespace Assets.Scripts.Core
             }
         }
 
+        // --- Multiply Rewarded Ad ---
+        private void CreateMultiplyRewardedAd()
+        {
+            if (multiplyRewardedAd != null) multiplyRewardedAd.DestroyAd();
+            multiplyRewardedAd = new LevelPlayRewardedAd(MultiplyRewardedAdUnitId);
+
+            multiplyRewardedAd.OnAdClosed += (info) => {
+                EnqueueAction(() => {
+                    Debug.Log("[AdsManager] Multiply Rewarded Ad Closed. Requesting next.");
+                    lastAdShowTime = Time.time;
+                    OnAdClosed?.Invoke();
+                    LoadMultiplyRewarded();
+                });
+            };
+
+            multiplyRewardedAd.OnAdDisplayFailed += (info, err) => {
+                EnqueueAction(() => {
+                    Debug.LogError($"[AdsManager] Multiply Rewarded Ad Display Failed: {err}. ");
+                    pendingRewardType = RewardAdType.None;
+                    OnAdClosed?.Invoke();
+                    LoadMultiplyRewarded();
+                });
+            };
+
+            multiplyRewardedAd.OnAdDisplayed += (info) => {
+                EnqueueAction(() => {
+                    Debug.Log($"[AdsManager] Multiply Rewarded Ad Displayed: {info}");
+
+                    // --- Analytics: ad_impression (ILRD) ---
+                    if (FirebaseManager.Instance != null)
+                    {
+                        FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "rewarded_multiply"),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
+                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
+                    }
+                });
+            };
+
+            multiplyRewardedAd.OnAdRewarded += (info, reward) => {
+                EnqueueAction(() => {
+                    Debug.Log("[AdsManager] Multiply Rewarded Ad Rewarded Event Received.");
+                    ProcessPendingReward();
+                });
+            };
+
+            multiplyRewardedAd.OnAdLoaded += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Multiply Rewarded Ad Loaded: {info}"));
+            multiplyRewardedAd.OnAdLoadFailed += (info) => {
+                EnqueueAction(() => {
+                    Debug.LogWarning($"[AdsManager] Multiply Rewarded Ad Load Failed: {info}. Retrying in 15s...");
+                    _ = RetryLoadMultiplyRewarded(15000);
+                });
+            };
+
+            LoadMultiplyRewarded();
+        }
+
+        private async Task RetryLoadMultiplyRewarded(int delayMs)
+        {
+            await Task.Delay(delayMs);
+            if (this != null && multiplyRewardedAd != null && !multiplyRewardedAd.IsAdReady())
+            {
+                EnqueueAction(LoadMultiplyRewarded);
+            }
+        }
+
+        public void LoadMultiplyRewarded()
+        {
+            if (!isInitialized || multiplyRewardedAd == null)
+            {
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                return;
+            }
+            multiplyRewardedAd.LoadAd();
+        }
+
+        public void ShowRewardedForMultiply()
+        {
+            if (multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady())
+            {
+                Debug.Log("[AdsManager] Showing Multiply Rewarded Ad (MultiplyReward).");
+                pendingRewardType = RewardAdType.MultiplyReward;
+                OnAdOpened?.Invoke();
+                multiplyRewardedAd.ShowAd();
+            }
+            else
+            {
+                Debug.LogWarning($"[AdsManager] Multiply Rewarded Ad is not ready. Initialized: {isInitialized}");
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                else LoadMultiplyRewarded();
+            }
+        }
+
         public void SpawnCoinsSmallExplosion()
         {
             if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 11) return;
@@ -685,6 +802,7 @@ namespace Assets.Scripts.Core
             if (interstitialAd != null) interstitialAd.DestroyAd();
             if (RewardedAd != null) RewardedAd.DestroyAd();
             if (coinsRewardedAd != null) coinsRewardedAd.DestroyAd();
+            if (multiplyRewardedAd != null) multiplyRewardedAd.DestroyAd();
             if (settingsBannerAd != null) settingsBannerAd.DestroyAd();
         }
     }

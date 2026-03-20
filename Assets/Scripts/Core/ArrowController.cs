@@ -146,7 +146,7 @@ namespace Assets.Scripts.Core
         /// </summary>
         private void SpawnSegmentStep(int step, bool instant)
         {
-            if (cachedData == null || step >= cachedData.path.Count) return;
+            if (this == null || cachedData == null || step >= cachedData.path.Count) return;
 
             // 1. Create a new segment at index 0 (the tail end of the growing path)
             Vector2Int spawnPos = cachedData.path[0].ToVector2Int();
@@ -197,7 +197,7 @@ namespace Assets.Scripts.Core
 
         public IEnumerator UpdateGrowthSlide(int step, float duration)
         {
-            if (cachedData == null || step >= cachedData.path.Count) yield break;
+            if (this == null || cachedData == null || step >= cachedData.path.Count) yield break;
 
             SpawnSegmentStep(step, false);
 
@@ -816,10 +816,12 @@ namespace Assets.Scripts.Core
             float elapsed = 0;
             while (elapsed < duration)
             {
+                if (this == null) yield break; // Object destroyed during yield
                 float t = elapsed / duration;
                 for (int i = 0; i < count; i++)
                 {
-                    segments[i].transform.position = Vector3.Lerp(_animationStarts[i], targets[i], t);
+                    if (segments[i] != null)
+                        segments[i].transform.position = Vector3.Lerp(_animationStarts[i], targets[i], t);
                 }
                 
                 animationFrameCounter++;
@@ -833,7 +835,12 @@ namespace Assets.Scripts.Core
                 yield return null;
             }
 
-            for (int i = 0; i < count; i++) segments[i].transform.position = targets[i];
+            if (this == null) yield break;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (segments[i] != null) segments[i].transform.position = targets[i];
+            }
             UpdateVisuals(); // Final sync
         }
 

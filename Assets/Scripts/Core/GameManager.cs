@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
+using Assets.Scripts.GameUI;
 
 
 namespace Assets.Scripts.Core
@@ -743,6 +744,18 @@ namespace Assets.Scripts.Core
 
 
             yield return new WaitForSeconds(2.5f);
+
+            // --- MULTIPLY REWARD POPUP (Every 2 levels) ---
+            if (collectedLevelCurrency > 0 && m_GameUI != null && UserDataManager.Instance.CurrentLevel % 2 == 0)
+            {
+                MultiplyCoinsPopup popup = m_GameUI.ShowMultiplyCoinsPopup(collectedLevelCurrency);
+                if (popup != null)
+                {
+                    // Wait for popup to finish before transition
+                    while (popup != null) yield return null;
+                }
+            }
+            // -----------------------------
             
             if (p_isLevelProgression && UserDataManager.Instance.CurrentLevel <= ADS_START_LEVEL)
 
