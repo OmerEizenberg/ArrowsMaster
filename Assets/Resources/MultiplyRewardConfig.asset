@@ -13,25 +13,15 @@ MonoBehaviour:
   m_Name: MultiplyRewardConfig
   m_EditorClassIdentifier: 
   zones:
-  - minX: 0
-    maxX: 0.2
-    multiplier: 2
-    color: {r: 1, g: 0.2784314, b: 0.34117648, a: 1}
-  - minX: 0.2
-    maxX: 0.4
-    multiplier: 3
-    color: {r: 1, g: 0.64705884, b: 0.007843138, a: 1}
-  - minX: 0.4
-    maxX: 0.6
-    multiplier: 4
-    color: {r: 0.18039216, g: 0.8352941, b: 0.4509804, a: 1}
-  - minX: 0.6
-    maxX: 0.8
-    multiplier: 3
-    color: {r: 1, g: 0.64705884, b: 0.007843138, a: 1}
-  - minX: 0.8
-    maxX: 1
-    multiplier: 2
-    color: {r: 1, g: 0.2784314, b: 0.34117648, a: 1}
+  - multiplier: 2
+    weight: 3
+  - multiplier: 3
+    weight: 2
+  - multiplier: 4
+    weight: 2
+  - multiplier: 3
+    weight: 2
+  - multiplier: 2
+    weight: 3
   pointerSpeed: 2
   curveAmplitude: 50

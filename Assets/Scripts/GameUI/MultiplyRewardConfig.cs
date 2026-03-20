@@ -6,10 +6,8 @@ namespace Assets.Scripts.GameUI
     [Serializable]
     public class MultiplierZone
     {
-        public float minX; // Normalized 0-1
-        public float maxX; // Normalized 0-1
         public int multiplier;
-        public Color color;
+        public float weight = 1.0f;
     }
 
     [CreateAssetMenu(fileName = "MultiplyRewardConfig", menuName = "Game/MultiplyRewardConfig")]

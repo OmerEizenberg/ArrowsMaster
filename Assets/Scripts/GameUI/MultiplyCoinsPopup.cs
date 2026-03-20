@@ -91,6 +91,24 @@ namespace Assets.Scripts.GameUI
             }
         }
 
+        private MultiplierZone GetWeightedMultiplierFromConfig()
+        {
+            if (m_Config == null || m_Config.zones == null || m_Config.zones.Length == 0)
+                return new MultiplierZone() { multiplier = 2 };
+
+            float totalWeight = 0;
+            foreach (var z in m_Config.zones) totalWeight += z.weight;
+            
+            float r = UnityEngine.Random.Range(0f, totalWeight);
+            float cumulative = 0;
+            foreach (var z in m_Config.zones)
+            {
+                cumulative += z.weight;
+                if (r <= cumulative) return z;
+            }
+            return m_Config.zones[0];
+        }
+
         private void InitializeSlotMachine()
         {
             Debug.Log("[SlotMachine] Initializing Reel...");
@@ -128,10 +146,10 @@ namespace Assets.Scripts.GameUI
                 m_SymbolTemplate.gameObject.SetActive(false);
                 for (int i = 0; i < 5; i++)
                 {
+                    MultiplierZone zone = GetWeightedMultiplierFromConfig();
                     TextMeshProUGUI sym = Instantiate(m_SymbolTemplate, m_SymbolsParent);
                     sym.gameObject.SetActive(true);
-                    // Cycle through available multipliers
-                    sym.text = "X" + m_AvailableMultipliers[i % m_AvailableMultipliers.Length];
+                    sym.text = "X" + zone.multiplier;
                     m_ReelSymbols.Add(sym);
                 }
                 Debug.Log($"[SlotMachine] Successfully created {m_ReelSymbols.Count} reel symbols.");
@@ -143,6 +161,44 @@ namespace Assets.Scripts.GameUI
             Transform pointer = transform.Find("Popup/Pointer");
             if (pointer == null) pointer = transform.Find("Pointer");
             if (pointer != null) pointer.gameObject.SetActive(false);
+        }
+
+        private int PickWinnerIndexFromCurrentReel()
+        {
+            float totalWeight = 0;
+            Dictionary<int, float> weightsPerIndex = new Dictionary<int, float>();
+            
+            for (int i = 0; i < m_ReelSymbols.Count; i++)
+            {
+                int val = 2;
+                int.TryParse(m_ReelSymbols[i].text.Replace("X", ""), out val);
+                
+                // Find weight in config for this multiplier value
+                float weight = 1.0f;
+                if (m_Config != null && m_Config.zones != null)
+                {
+                    foreach (var z in m_Config.zones)
+                    {
+                        if (z.multiplier == val)
+                        {
+                            weight = z.weight;
+                            break;
+                        }
+                    }
+                }
+                
+                weightsPerIndex[i] = weight;
+                totalWeight += weight;
+            }
+            
+            float r = UnityEngine.Random.Range(0f, totalWeight);
+            float cumulative = 0f;
+            foreach (var pair in weightsPerIndex)
+            {
+                cumulative += pair.Value;
+                if (r <= cumulative) return pair.Key;
+            }
+            return 2;
         }
 
         private void OnDestroy()
@@ -200,13 +256,17 @@ namespace Assets.Scripts.GameUI
         {
             m_IsSpinning = true;
             
-            float speed = Random.Range(30f, 40f); 
+            // PRE-DETERMINE THE WINNER based on weights of the 5 symbols currently in the reel
+            int winnerIndex = PickWinnerIndexFromCurrentReel();
+            
+            float speed = UnityEngine.Random.Range(30f, 40f); 
             float duration = 2.0f; // Shortened to 2.0s
             float elapsed = 0f;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
+                    
                 float t = elapsed / duration;
                 float currentSpeed = Mathf.Lerp(speed, 2f, t * t);
                 m_ReelOffset += currentSpeed * Time.deltaTime;
@@ -214,7 +274,16 @@ namespace Assets.Scripts.GameUI
                 yield return null;
             }
 
-            float targetOffset = Mathf.Round(m_ReelOffset);
+            // Forced snap target calculation:
+            // Goal: m_ReelSymbols[winnerIndex] ends up at center (posIndex 2)
+            // Equation: (winnerIndex + targetOffset) % 5 = 2
+            // targetOffset should be roughly near current offset
+            float count = m_ReelSymbols.Count;
+            float currentVal = m_ReelOffset;
+            float desiredOffsetBase = 2f - winnerIndex;
+            // Shift desiredOffsetBase by multiples of 'count' to be closest to currentVal
+            float targetOffset = desiredOffsetBase + (Mathf.Round((currentVal - desiredOffsetBase) / count) * count);
+
             float snapElapsed = 0f;
             float snapDuration = 0.5f;
             float startOffset = m_ReelOffset;
@@ -235,19 +304,9 @@ namespace Assets.Scripts.GameUI
             m_IsSpinning = false;
             
             // Punch Animation on the winning symbol
-            for (int i = 0; i < m_ReelSymbols.Count; i++)
-            {
-                float posIndex = (i + m_ReelOffset) % m_ReelSymbols.Count;
-                if (posIndex < 0) posIndex += m_ReelSymbols.Count;
-                float distanceFromCenter = posIndex - 2f;
-                if (Mathf.Abs(distanceFromCenter) <= 0.2f)
-                {
-                    StartCoroutine(PunchSymbolRoutine(m_ReelSymbols[i].transform));
-                    break;
-                }
-            }
+            StartCoroutine(PunchSymbolRoutine(m_ReelSymbols[winnerIndex].transform));
 
-            Debug.Log($"[SlotMachine] Spin Stopped on X{m_CurrentMultiplier}. Waiting 0.5s...");
+            Debug.Log($"[SlotMachine] Spin Forced on X{m_CurrentMultiplier} (Symbol {winnerIndex}). Waiting 0.5s...");
 
             yield return new WaitForSeconds(0.5f);
 
