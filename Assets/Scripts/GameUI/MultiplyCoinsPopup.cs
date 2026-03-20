@@ -260,17 +260,18 @@ namespace Assets.Scripts.GameUI
             }
         }
 
-        private IEnumerator PunchSymbolRoutine(Transform target)
+        private IEnumerator PunchSymbolRoutine(Transform target, float punchFactor = 1.3f)
         {
             float duration = 0.4f;
             float elapsed = 0f;
-            Vector3 startScale = Vector3.one * m_MaxScale;
+            Vector3 startScale = target.localScale;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                float scale = 1f + Mathf.Sin(t * Mathf.PI) * 0.3f;
+                // Simple punch curve
+                float scale = 1f + Mathf.Sin(t * Mathf.PI) * (punchFactor - 1f);
                 target.localScale = startScale * scale;
                 yield return null;
             }
@@ -300,9 +301,9 @@ namespace Assets.Scripts.GameUI
             
             if (m_AnimatedCoinsText != null)
             {
+                if (m_CoinsWonText != null) m_CoinsWonText.gameObject.SetActive(false);
                 m_AnimatedCoinsText.gameObject.SetActive(true);
                 m_AnimatedCoinsText.text = m_InitialCoins.ToString();
-                if (m_CoinsWonText != null) m_CoinsWonText.gameObject.SetActive(false);
             }
             
             int targetCoins = m_InitialCoins * m_CurrentMultiplier;
@@ -324,7 +325,12 @@ namespace Assets.Scripts.GameUI
                 yield return null;
             }
             
-            if (m_AnimatedCoinsText != null) m_AnimatedCoinsText.text = targetCoins.ToString();
+            if (m_AnimatedCoinsText != null)
+            {
+                m_AnimatedCoinsText.text = targetCoins.ToString();
+                // Final punch animation on the reward text
+                StartCoroutine(PunchSymbolRoutine(m_AnimatedCoinsText.transform, 1.2f));
+            }
             
             if (UserDataManager.Instance != null && additionalCoins > 0)
             {
@@ -334,11 +340,11 @@ namespace Assets.Scripts.GameUI
             if (AdsManager.Instance != null) AdsManager.Instance.SpawnCoinsSmallExplosion();
             if (SoundManager.Instance != null) SoundManager.Instance.PlayMediumCheer();
 
-            yield return new WaitForSeconds(2.2f);
+            yield return new WaitForSeconds(2.5f);
             Close();
         }
 
-        private void OnNoThanksClicked()
+        public void OnNoThanksClicked()
         {
             if (m_IsSpinning || m_IsAdShowing || m_RewardClaimed) return;
             Close();

@@ -35,8 +35,8 @@ RectTransform:
   - {fileID: 2742404973076298419}
   - {fileID: 6546036873286995255}
   - {fileID: 2480229462283444769}
-  - {fileID: 3538290795500858239}
   - {fileID: 3052656475895367264}
+  - {fileID: 3538290795500858239}
   m_Father: {fileID: 5437311659399950256}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -488,13 +488,13 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 5224025869014113090}
-        m_TargetAssemblyTypeName: 
-        m_MethodName: 
+      - m_Target: {fileID: 7127404736335312676}
+        m_TargetAssemblyTypeName: Assets.Scripts.GameUI.MultiplyCoinsPopup, Assembly-CSharp
+        m_MethodName: OnNoThanksClicked
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
@@ -622,7 +622,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 241525020663284454}
+      - m_Target: {fileID: 7127404736335312676}
         m_TargetAssemblyTypeName: Assets.Scripts.GameUI.MultiplyCoinsPopup, Assembly-CSharp
         m_MethodName: OnMultiplyClicked
         m_Mode: 1
@@ -645,7 +645,7 @@ GameObject:
   - component: {fileID: 5437311659399950256}
   - component: {fileID: 6119790620002131825}
   - component: {fileID: 8563673673421067409}
-  - component: {fileID: 241525020663284454}
+  - component: {fileID: 7127404736335312676}
   m_Layer: 5
   m_Name: MultiplayerPopup
   m_TagString: Untagged
@@ -711,7 +711,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &241525020663284454
+--- !u!114 &7127404736335312676
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
