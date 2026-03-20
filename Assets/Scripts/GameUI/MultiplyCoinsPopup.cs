@@ -65,9 +65,17 @@ namespace Assets.Scripts.GameUI
 
         private void OnEnable()
         {
+            // Pull win amount from GameManager as the primary source/fallback
+            if (GameManager.Instance != null)
+            {
+                m_InitialCoins = GameManager.Instance.p_lastWinAmount;
+                Debug.Log($"[SlotMachine] OnEnable: Retrieved win amount from GameManager: {m_InitialCoins}");
+                if (m_CoinsWonText != null) m_CoinsWonText.text = m_InitialCoins.ToString("N0");
+            }
+
             InitializeSlotMachine();
             
-            // Subscribe to ad events here to ensure they are always active
+            // Ensure ad events are hooked up
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnMultiplyRewardReceived -= HandleRewardReceived;
@@ -150,25 +158,18 @@ namespace Assets.Scripts.GameUI
             for (int i = 0; i < count; i++)
             {
                 // Calculate position relative to container center
-                // 0 is top, 2 is center, 4 is bottom (logical mapping)
                 float posIndex = (i + m_ReelOffset) % count;
                 if (posIndex < 0) posIndex += count;
 
-                // Position 2 is the exact center window
                 float distanceFromCenter = posIndex - 2f;
-                
-                // Vertical position on screen
                 m_ReelSymbols[i].rectTransform.anchoredPosition = new Vector2(0, -distanceFromCenter * m_SymbolSpacing);
 
-                // 3D Effect based on distance from center [0 to 2]
                 float absDist = Mathf.Abs(distanceFromCenter);
-                float normalizedDist = Mathf.Clamp01(absDist / 2f); // 0 (center) to 1 (edges)
+                float normalizedDist = Mathf.Clamp01(absDist / 2f); 
 
-                // Smoothly map using the parameters
                 float alpha = Mathf.Lerp(m_MaxAlpha, m_MinAlpha, normalizedDist);
                 float scale = Mathf.Lerp(m_MaxScale, m_MinScale, normalizedDist);
 
-                // If perfectly centered, update the current prize multiplier
                 if (absDist <= 0.2f)
                 {
                     int.TryParse(m_ReelSymbols[i].text.Replace("X", ""), out m_CurrentMultiplier);
@@ -192,25 +193,20 @@ namespace Assets.Scripts.GameUI
         {
             m_IsSpinning = true;
             
-            float speed = Random.Range(30f, 40f); // Fast initial speed
-            float duration = 2.0f; // Shortened to 2.0s as requested
+            float speed = Random.Range(30f, 40f); 
+            float duration = 2.0f; // Shortened to 2.0s
             float elapsed = 0f;
 
-            // Phase 1: Rapid Spin with Easing Out
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                
-                // Quadratic easing out for the spin speed
                 float currentSpeed = Mathf.Lerp(speed, 2f, t * t);
-                
                 m_ReelOffset += currentSpeed * Time.deltaTime;
                 UpdateReelPositions();
                 yield return null;
             }
 
-            // Phase 2: Snap to the nearest symbol center
             float targetOffset = Mathf.Round(m_ReelOffset);
             float snapElapsed = 0f;
             float snapDuration = 0.5f;
@@ -220,7 +216,6 @@ namespace Assets.Scripts.GameUI
             {
                 snapElapsed += Time.deltaTime;
                 float t = snapElapsed / snapDuration;
-                // Ease out sine for the final snap
                 t = Mathf.Sin(t * Mathf.PI * 0.5f);
                 
                 m_ReelOffset = Mathf.Lerp(startOffset, targetOffset, t);
@@ -232,7 +227,7 @@ namespace Assets.Scripts.GameUI
             UpdateReelPositions();
             m_IsSpinning = false;
             
-            // Punch Animation on the selected multiplier
+            // Punch Animation on the winning symbol
             for (int i = 0; i < m_ReelSymbols.Count; i++)
             {
                 float posIndex = (i + m_ReelOffset) % m_ReelSymbols.Count;
@@ -247,7 +242,6 @@ namespace Assets.Scripts.GameUI
 
             Debug.Log($"[SlotMachine] Spin Stopped on X{m_CurrentMultiplier}. Waiting 0.5s...");
 
-            // Wait 0.5 seconds stationary after stop before starting RV as requested
             yield return new WaitForSeconds(0.5f);
 
             Debug.Log("[SlotMachine] Requesting Rewarded Video Ad...");
@@ -258,14 +252,11 @@ namespace Assets.Scripts.GameUI
             }
             else if (AdsManager.Instance == null)
             {
-                // Fallback for editor testing
-                Debug.Log("[SlotMachine] AdsManager NULL. Fallback to reward animation.");
                 StartCoroutine(RewardAnimationRoutine());
             }
             else
             {
-                Debug.LogWarning("[SlotMachine] Ad not ready. User can click 'Multiply' again to retry spin/show.");
-                // If ad isn't ready, let the user trigger the process again
+                Debug.LogWarning("[SlotMachine] Ad not ready.");
             }
         }
 
@@ -279,7 +270,6 @@ namespace Assets.Scripts.GameUI
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                // Simple punch curve
                 float scale = 1f + Mathf.Sin(t * Mathf.PI) * 0.3f;
                 target.localScale = startScale * scale;
                 yield return null;
@@ -300,7 +290,6 @@ namespace Assets.Scripts.GameUI
             {
                 Debug.Log("[SlotMachine] Ad Closed without reward.");
                 m_IsAdShowing = false;
-                // m_RewardClaimed stays false, so user can try again if they want
             }
         }
 
@@ -313,15 +302,13 @@ namespace Assets.Scripts.GameUI
             {
                 m_AnimatedCoinsText.gameObject.SetActive(true);
                 m_AnimatedCoinsText.text = m_InitialCoins.ToString();
-                
-                // Hide static text to avoid overlap
                 if (m_CoinsWonText != null) m_CoinsWonText.gameObject.SetActive(false);
             }
             
             int targetCoins = m_InitialCoins * m_CurrentMultiplier;
             int additionalCoins = targetCoins - m_InitialCoins;
             
-            Debug.Log($"[SlotMachine] Granting Reward: {m_InitialCoins} x {m_CurrentMultiplier} = {targetCoins}");
+            Debug.Log($"[SlotMachine] Starting Reward Animation: {m_InitialCoins} x {m_CurrentMultiplier} = {targetCoins}");
             
             float duration = 1.6f;
             float elapsed = 0f;
@@ -330,7 +317,7 @@ namespace Assets.Scripts.GameUI
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                t = 1f - Mathf.Pow(1f - t, 3f); // Ease out cubic
+                t = 1f - Mathf.Pow(1f - t, 3f);
                 
                 int current = Mathf.RoundToInt(Mathf.Lerp(m_InitialCoins, targetCoins, t));
                 if (m_AnimatedCoinsText != null) m_AnimatedCoinsText.text = current.ToString();
@@ -347,7 +334,7 @@ namespace Assets.Scripts.GameUI
             if (AdsManager.Instance != null) AdsManager.Instance.SpawnCoinsSmallExplosion();
             if (SoundManager.Instance != null) SoundManager.Instance.PlayMediumCheer();
 
-            yield return new WaitForSeconds(1.8f);
+            yield return new WaitForSeconds(2.2f);
             Close();
         }
 

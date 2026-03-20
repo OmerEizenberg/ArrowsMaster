@@ -111,6 +111,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private GameObject m_WinParticles;
         [SerializeField] private TextMeshProUGUI m_WinLevelText;
         private string[] m_LevelWinFeedbacks = new string[] { "Perfect !", "Well Done !", "Excellent !", "Amazing !", "Incredible !", "Masterpiece !", "Legendary !" , "You're a Legend !" , "Fantastic!" , "Awesome !" , "Phenomenal!"};
+        public int p_lastWinAmount;
 
         private void Awake()
         {
@@ -748,6 +749,7 @@ namespace Assets.Scripts.Core
             // --- MULTIPLY REWARD POPUP (Every 2 levels) ---
             if (collectedLevelCurrency > 0 && m_GameUI != null && UserDataManager.Instance.CurrentLevel % 2 == 0)
             {
+                p_lastWinAmount = collectedLevelCurrency;
                 MultiplyCoinsPopup popup = m_GameUI.ShowMultiplyCoinsPopup(collectedLevelCurrency);
                 if (popup != null)
                 {
