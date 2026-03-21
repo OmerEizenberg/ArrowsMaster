@@ -89,9 +89,9 @@ namespace Assets.Scripts.Core
             get
             {
 #if UNITY_IOS || UNITY_IPHONE
-                return "p2o3lph3mrt9zq8x"; // iOS ad_rewarded_multiply
+                return "zgyen7itv8su1vt9"; // iOS ad_rewarded_multiply
 #else
-                return "dctkavzgndg9gm8m"; // Android ad_rewarded_multiply
+                return "xl1zg79un0qwx6u8"; // Android ad_rewarded_multiply
 #endif
             }
         }
