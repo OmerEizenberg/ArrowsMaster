@@ -363,6 +363,13 @@ namespace Assets.Scripts.Core
                 Debug.Log("[AdsManager] Interstitial Ad Closed. Loading next one.");
                 lastAdShowTime = Time.time;
                 OnAdClosed?.Invoke();
+                
+                if (pendingRewardType != RewardAdType.None)
+                {
+                    Debug.Log("[AdsManager] Interstitial was used as a fallback. Giving pending reward.");
+                    ProcessPendingReward();
+                }
+
                 LoadInterstitial();
             });
         }
@@ -372,6 +379,12 @@ namespace Assets.Scripts.Core
             EnqueueAction(() => {
                 Debug.LogError($"[AdsManager] Interstitial Ad Display Failed: {error}");
                 OnAdClosed?.Invoke();
+                
+                if (pendingRewardType != RewardAdType.None)
+                {
+                    pendingRewardType = RewardAdType.None;
+                }
+
                 LoadInterstitial();
             });
         }
@@ -465,11 +478,22 @@ namespace Assets.Scripts.Core
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
+            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            {
+                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready. Falling back to Interstitial.");
+                pendingRewardType = RewardAdType.GameReward;
+                OnAdOpened?.Invoke();
+                interstitialAd.ShowAd(); // Direct ShowAd skips cooldowns & No Ads checks
+            }
             else 
             {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad is not ready. Initialized: {isInitialized}");
+                Debug.LogWarning($"[AdsManager] Both Rewarded Ad and Interstitial Ad are not ready. Initialized: {isInitialized}");
                 if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else LoadRewarded();
+                else 
+                { 
+                    LoadRewarded(); 
+                    LoadInterstitial(); 
+                }
             }
         }
 
