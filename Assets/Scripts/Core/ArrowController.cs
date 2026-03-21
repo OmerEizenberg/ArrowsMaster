@@ -12,7 +12,7 @@ namespace Assets.Scripts.Core
         
         [Header("Visuals")]
         public Sprite HeadSprite;
-        public Vector3 HeadScale = new Vector3(1.4f, 1.4f, 1.4f);
+        public Vector3 HeadScale = new Vector3(0.477f, 0.477f, 0.477f);
         public GameObject pointEffectPrefab;
         [SerializeField] private GameObject m_ComboPrefab;
         [SerializeField] private GameObject m_VoicePrefab;
