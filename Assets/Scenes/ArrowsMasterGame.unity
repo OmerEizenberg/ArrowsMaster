@@ -15787,7 +15787,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 420, y: -96.666664}
+  m_AnchoredPosition: {x: 420, y: -96.66666}
   m_SizeDelta: {x: 840, y: 133.33333}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &945667519
@@ -16213,6 +16213,7 @@ MonoBehaviour:
   p_isHintRewarded: 0
   m_WinParticles: {fileID: 1054648608}
   m_WinLevelText: {fileID: 1127372420}
+  p_lastWinAmount: 0
 --- !u!1 &971793433
 GameObject:
   m_ObjectHideFlags: 0
@@ -33849,8 +33850,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 2100000, guid: a7b322f7a6cd14170ba531bc5c645e4a, type: 2}
-  m_Color: {r: 0.19339621, g: 0.7248057, b: 1, a: 1}
+  m_Material: {fileID: 2100000, guid: 7f77513fcecfa46448b573bc30d66334, type: 2}
+  m_Color: {r: 0.56078434, g: 0, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

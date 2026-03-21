@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: OfferGlence
+  m_Name: FailureGlence
   m_Shader: {fileID: 4800000, guid: ff5e54936cf884ae181ae92cecab3c2b, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -36,12 +36,12 @@ Material:
     - PixelSnap: 0
     - _ColorMask: 15
     - _EnableExternalAlpha: 0
-    - _GlintAngle: 183
-    - _GlintIntensity: 0.2
+    - _GlintAngle: 172
+    - _GlintIntensity: 0.1
     - _GlintInterval: 4.7
-    - _GlintSmoothness: 0.1
-    - _GlintSpeed: 0.3
-    - _GlintWidth: 0.0001
+    - _GlintSmoothness: 0.06
+    - _GlintSpeed: 0.95
+    - _GlintWidth: 0.026
     - _RipplesScale: 0
     - _RipplesSpeed: 0.62
     - _ShoreLine: 0.276
