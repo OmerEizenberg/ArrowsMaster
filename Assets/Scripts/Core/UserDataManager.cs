@@ -48,6 +48,7 @@ namespace Assets.Scripts.Core
         private const string MaxStreakKey = "MaxStreakRecord";
         private const string LevelProgressKey = "LevelProgress";
         private const string LastRateUsDateKey = "LastRateUsDate";
+        private const string LevelStreakKey = "LevelStreak";
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
@@ -63,6 +64,7 @@ namespace Assets.Scripts.Core
         }
         public string LastAttemptLevelId { get; private set; } = string.Empty;
         public int MaxStreak { get; private set; } = 0;
+        public int LevelStreak { get; private set; } = 0;
         public System.DateTime InstallDate { get; private set; }
         public System.DateTime LastRateUsDate { get; private set; }
         public bool IsRateUsCheckPending { get; set; } = false;
@@ -82,6 +84,7 @@ namespace Assets.Scripts.Core
             CurrentLevelAttempts = PlayerPrefs.GetInt(CurrentLevelAttemptsKey, 0);
             LastAttemptLevelId = PlayerPrefs.GetString(LastAttemptLevelIdKey, string.Empty);
             MaxStreak = PlayerPrefs.GetInt(MaxStreakKey, 0);
+            LevelStreak = PlayerPrefs.GetInt(LevelStreakKey, 0);
             
             string installDateStr = PlayerPrefs.GetString(InstallDateKey, string.Empty);
             if (string.IsNullOrEmpty(installDateStr))
@@ -238,6 +241,28 @@ namespace Assets.Scripts.Core
                 PlayerPrefs.SetInt(MaxStreakKey, MaxStreak);
                 PlayerPrefs.Save();
                 Debug.Log($"[UserDataManager] New Max Streak Record: {MaxStreak}");
+            }
+        }
+
+        public void IncrementLevelStreak()
+        {
+            if (CurrentLevel >= 25)
+            {
+                LevelStreak++;
+                PlayerPrefs.SetInt(LevelStreakKey, LevelStreak);
+                PlayerPrefs.Save();
+                Debug.Log($"[UserDataManager] Level Streak incremented to: {LevelStreak}");
+            }
+        }
+
+        public void ResetLevelStreak()
+        {
+            if (LevelStreak > 0)
+            {
+                LevelStreak = 0;
+                PlayerPrefs.SetInt(LevelStreakKey, LevelStreak);
+                PlayerPrefs.Save();
+                Debug.Log($"[UserDataManager] Level Streak reset.");
             }
         }
 

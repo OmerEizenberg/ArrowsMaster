@@ -40,6 +40,11 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private TextMeshProUGUI m_ShopCurrencyText;
         [SerializeField] private TextMeshProUGUI m_RewardedAdAmountText;
 
+        [Header("Level Streak")]
+        [SerializeField] private GameObject m_LevelStreakIcon;
+        [SerializeField] private TextMeshProUGUI m_LevelStreakText;
+        [SerializeField] private GameObject m_StreakPopup;
+
         [SerializeField] private Color m_CircleColor;
         [SerializeField] private Color m_SuperHardColor;
         [SerializeField] private Color m_NightmareColor;
@@ -430,6 +435,16 @@ namespace Assets.Scripts.Lobby
                 }
             }
 
+            if (UserDataManager.Instance.CurrentLevel >= 25)
+            {
+                if (m_LevelStreakIcon != null) m_LevelStreakIcon.SetActive(true);
+                if (m_LevelStreakText != null) m_LevelStreakText.text = UserDataManager.Instance.LevelStreak.ToString();
+            }
+            else
+            {
+                if (m_LevelStreakIcon != null) m_LevelStreakIcon.SetActive(false);
+            }
+
             UpdateLobbyAdReadyImage();
             UpdateChallengeLock();
         }
@@ -728,6 +743,20 @@ namespace Assets.Scripts.Lobby
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.StartChallengeLevel(levelName, year, month, day);
+            }
+        }
+
+        public void OnLevelStreakButtonClicked()
+        {
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+            
+            if (m_StreakPopup != null)
+            {
+                m_StreakPopup.SetActive(true);
+            }
+            else
+            {
+                Debug.LogWarning("[HomeContoller] m_StreakPopup reference is missing!");
             }
         }
 

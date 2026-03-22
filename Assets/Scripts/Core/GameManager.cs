@@ -393,6 +393,7 @@ namespace Assets.Scripts.Core
             if (p_isLevelProgression && (failureScreen == null || !failureScreen.activeInHierarchy))
             {
                 UserDataManager.Instance.IncrementCurrentLevelAttempts();
+                UserDataManager.Instance.ResetLevelStreak();
             }
 
             if (levelManager != null && !string.IsNullOrEmpty(levelManager.CurrentLevelId))
@@ -559,6 +560,10 @@ namespace Assets.Scripts.Core
                 // Collect currency logic
 
                 int coinsEarned = p_ComboMultiplier;
+                if (p_ComboMultiplier == 1 && UserDataManager.Instance.CurrentLevel >= 25 && UserDataManager.Instance.LevelStreak >= 6)
+                {
+                    coinsEarned = 2;
+                }
                 collectedLevelCurrency += coinsEarned;
                 Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
                 
@@ -680,6 +685,7 @@ namespace Assets.Scripts.Core
             if(p_isLevelProgression)
             {
                 int completedLevel = UserDataManager.Instance.CurrentLevel;
+                UserDataManager.Instance.IncrementLevelStreak();
                 UserDataManager.Instance.IncrementLevel();
                 UserDataManager.Instance.ClearCurrentLevelAttempts();
                 UserDataManager.Instance.IsRateUsCheckPending = true;
@@ -850,6 +856,7 @@ namespace Assets.Scripts.Core
             if (p_isLevelProgression)
             {
                 UserDataManager.Instance.IncrementCurrentLevelAttempts();
+                UserDataManager.Instance.ResetLevelStreak();
             }
 
             // --- Analytics: level_end (Fail - Lives) ---
