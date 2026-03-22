@@ -266,6 +266,17 @@ namespace Assets.Scripts.Core
             }
         }
 
+        public void RestoreLevelStreak(int previousStreak)
+        {
+            if (previousStreak > 0)
+            {
+                LevelStreak = previousStreak;
+                PlayerPrefs.SetInt(LevelStreakKey, LevelStreak);
+                PlayerPrefs.Save();
+                Debug.Log($"[UserDataManager] Level Streak restored to: {LevelStreak}");
+            }
+        }
+
         private string GetMonthlyKey(int year, int month)
         {
             return $"MonthlyChallenge_{year}_{month}";

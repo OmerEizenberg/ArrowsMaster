@@ -99,6 +99,7 @@ namespace Assets.Scripts.Core
         private List<int> p_pickedArrowIds = new List<int>();
         private Coroutine m_PeriodicSaveCoroutine;
         private LevelProgress m_LastSavedProgress;
+        private int m_SavedStreakBeforeGameOver = 0;
 
         private Vector2 m_ScreenCenter;
         private Vector2[] m_QuarterCenters = new Vector2[4];
@@ -379,6 +380,12 @@ namespace Assets.Scripts.Core
                }
             }
             
+            if (m_SavedStreakBeforeGameOver > 0)
+            {
+                UserDataManager.Instance.RestoreLevelStreak(m_SavedStreakBeforeGameOver);
+                m_SavedStreakBeforeGameOver = 0;
+            }
+
             HideFailureScreen();
             ResetHintTimer();
         }
@@ -436,6 +443,7 @@ namespace Assets.Scripts.Core
             levelDuration = 0f;
             playOnPurchaseCount = 0;
             m_LastSavedProgress = null;
+            m_SavedStreakBeforeGameOver = 0;
 
             if (levelManager != null)
             {
@@ -504,6 +512,7 @@ namespace Assets.Scripts.Core
             levelDuration = 0f;
             playOnPurchaseCount = 0;
             m_LastSavedProgress = null;
+            m_SavedStreakBeforeGameOver = 0;
 
             if (levelManager != null)
             {
@@ -856,6 +865,7 @@ namespace Assets.Scripts.Core
             if (p_isLevelProgression)
             {
                 UserDataManager.Instance.IncrementCurrentLevelAttempts();
+                m_SavedStreakBeforeGameOver = UserDataManager.Instance.LevelStreak;
                 UserDataManager.Instance.ResetLevelStreak();
             }
 

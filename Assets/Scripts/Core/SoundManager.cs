@@ -27,6 +27,7 @@ namespace Assets.Scripts.Core
         public AudioClip ExcellentVoice;
         public AudioClip NiceVoice;
         public AudioClip AmazingVoice;
+        public AudioClip FireOnSound;
         public AudioClip[] streakSounds;
         public AudioClip ShopSound;
         public AudioClip NewRecordSound;
@@ -142,6 +143,11 @@ namespace Assets.Scripts.Core
         public void PlayWin()
         {
             PlaySound(WinSound);
+        }
+
+        public void PlayFireOn()
+        {
+            PlaySound(FireOnSound);
         }
 
         public void PlayShop()

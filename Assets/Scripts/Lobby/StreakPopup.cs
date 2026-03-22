@@ -55,10 +55,10 @@ namespace Assets.Scripts.Lobby
                 {
                     StartCoroutine(AnimateStep(m_StepImages[i]));
 
-                    // Optional: Play a nice tick/pop sound per step
+                    // Play fire on sound per step
                     if (SoundManager.Instance != null)
                     {
-                        SoundManager.Instance.PlayClick();
+                        SoundManager.Instance.PlayFireOn();
                     }
 
                     yield return new WaitForSeconds(m_AnimDelayBetweenSteps);

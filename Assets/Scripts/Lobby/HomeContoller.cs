@@ -748,7 +748,11 @@ namespace Assets.Scripts.Lobby
 
         public void OnLevelStreakButtonClicked()
         {
-            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+            if (SoundManager.Instance != null) 
+            {
+                SoundManager.Instance.PlayClick();
+                //SoundManager.Instance.PlayFireOn();
+            }
             
             if (m_StreakPopup != null)
             {
