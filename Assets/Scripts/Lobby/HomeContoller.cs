@@ -43,7 +43,10 @@ namespace Assets.Scripts.Lobby
         [Header("Level Streak")]
         [SerializeField] private GameObject m_LevelStreakIcon;
         [SerializeField] private TextMeshProUGUI m_LevelStreakText;
+        [SerializeField] private TextMeshProUGUI m_LevelStreakTextShade;
         [SerializeField] private GameObject m_StreakPopup;
+        [SerializeField] private Sprite m_LevelStreakActiveSprite;
+        [SerializeField] private Sprite m_LevelStreakInactiveSprite;
 
         [SerializeField] private Color m_CircleColor;
         [SerializeField] private Color m_SuperHardColor;
@@ -437,8 +440,30 @@ namespace Assets.Scripts.Lobby
 
             if (UserDataManager.Instance.CurrentLevel >= 25)
             {
-                if (m_LevelStreakIcon != null) m_LevelStreakIcon.SetActive(true);
+                if (m_LevelStreakIcon != null) 
+                {
+                    m_LevelStreakIcon.SetActive(true);
+                    bool isStreakActive = UserDataManager.Instance.LevelStreak >= 6;
+                    
+                    var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
+                    if (iconImage != null && m_LevelStreakActiveSprite != null && m_LevelStreakInactiveSprite != null)
+                    {
+                        iconImage.sprite = isStreakActive ? m_LevelStreakActiveSprite : m_LevelStreakInactiveSprite;
+                    }
+
+                    var fireSkew = m_LevelStreakIcon.GetComponent<Assets.Scripts.GameUI.UIFireSkew>();
+                    if (fireSkew != null)
+                    {
+                        if (fireSkew.enabled != isStreakActive)
+                        {
+                            fireSkew.enabled = isStreakActive;
+                            // Ensure the graphic resets to standard un-skewed mesh if disabled
+                            m_LevelStreakIcon.GetComponent<UnityEngine.UI.Graphic>()?.SetVerticesDirty();
+                        }
+                    }
+                }
                 if (m_LevelStreakText != null) m_LevelStreakText.text = UserDataManager.Instance.LevelStreak.ToString();
+                if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = UserDataManager.Instance.LevelStreak.ToString();
             }
             else
             {
