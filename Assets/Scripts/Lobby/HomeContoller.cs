@@ -57,6 +57,19 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private Color m_LevelColor;
         [SerializeField] private MonthlyChallengeController m_MonthlyChallengeController;
 
+        [Header("Bottom Bar Tabs")]
+        [SerializeField] private RectTransform m_SelectedTabBg;
+        [SerializeField] private RectTransform m_HomeTab;
+        [SerializeField] private RectTransform m_CalendarTab;
+        [SerializeField] private RectTransform m_ShopTab;
+        [SerializeField] private RectTransform m_HomeIcon;
+        [SerializeField] private RectTransform m_CalendarIcon;
+        [SerializeField] private RectTransform m_ShopIcon;
+        [SerializeField] private RectTransform m_HomeText;
+        [SerializeField] private RectTransform m_CalendarText;
+        [SerializeField] private RectTransform m_ShopText;
+        private Coroutine m_TabSlideCoroutine;
+
         // Currency animation
         [SerializeField] private float m_CoinAnimDuration = 1.5f;
         [SerializeField] private float m_CoinScalePunch = 2.25f;
@@ -158,6 +171,8 @@ namespace Assets.Scripts.Lobby
             CheckForRateUsPopup();
             UpdateChallengeNotification();
             CheckForNoAdsOffer();
+
+            SnapTabBackground();
         }
 
         private void OnDisable()
@@ -183,6 +198,7 @@ namespace Assets.Scripts.Lobby
             if (m_CoinCountCoroutine != null) StopCoroutine(m_CoinCountCoroutine);
             if (m_LobbyScaleCoroutine != null) StopCoroutine(m_LobbyScaleCoroutine);
             if (m_ShopScaleCoroutine != null) StopCoroutine(m_ShopScaleCoroutine);
+            if (m_TabSlideCoroutine != null) StopCoroutine(m_TabSlideCoroutine);
         }
 
         private void OnDestroy()
@@ -630,6 +646,7 @@ namespace Assets.Scripts.Lobby
             {
                 m_CalanderLayer.SetActive(false);
                 if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
+                SlideTabBackground(m_HomeTab);
             }else{
                 m_SettingsLayer.SetActive(false);
                 m_CalanderLayer.SetActive(true);
@@ -640,6 +657,7 @@ namespace Assets.Scripts.Lobby
                 PlayerPrefs.SetString("LastSeenChallengeDate", System.DateTime.Today.ToBinary().ToString());
                 PlayerPrefs.Save();
                 UpdateChallengeNotification();
+                SlideTabBackground(m_CalendarTab);
             }
             RefreshLobbyUI();
         }
@@ -651,6 +669,7 @@ namespace Assets.Scripts.Lobby
             m_CalanderLayer.SetActive(false);
             m_ShopLayer.SetActive(false);
             if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
+            SlideTabBackground(m_HomeTab);
             RefreshLobbyUI();
         }
 
@@ -673,12 +692,14 @@ namespace Assets.Scripts.Lobby
             m_DonateLayer.SetActive(false);
             m_NoAdsLayer.SetActive(false);
             m_ShopLayer.SetActive(true);
+            SlideTabBackground(m_ShopTab);
         }
 
         public void HideShop()
         {
             SoundManager.Instance.PlayClick();
             m_ShopLayer.SetActive(false);
+            SlideTabBackground(m_HomeTab);
         }
        
         public void OnBuyProductButtonClicked(string productId)
@@ -1018,6 +1039,107 @@ namespace Assets.Scripts.Lobby
                 // If we shouldn't show it (e.g. within 45 days), just clear the pending flag
                 UserDataManager.Instance.IsRateUsCheckPending = false;
             }
+        }
+
+        private void SnapTabBackground()
+        {
+            if (m_SelectedTabBg == null) return;
+            
+            RectTransform targetTab = m_HomeTab;
+            if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy) targetTab = m_ShopTab;
+            else if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy) targetTab = m_CalendarTab;
+
+            if (targetTab != null)
+            {
+                // Defer to next frame so LayoutGroups have updated positions
+                StartCoroutine(SnapTabBackgroundCoroutine(targetTab));
+            }
+        }
+
+        private IEnumerator SnapTabBackgroundCoroutine(RectTransform targetTab)
+        {
+            yield return new WaitForEndOfFrame();
+            if (m_SelectedTabBg != null && targetTab != null)
+            {
+                Vector3 newPos = m_SelectedTabBg.position;
+                newPos.x = targetTab.position.x;
+                m_SelectedTabBg.position = newPos;
+            }
+            
+            Vector3 selectedScale = new Vector3(1.2f, 1.2f, 1.2f);
+            
+            if (m_HomeIcon != null) m_HomeIcon.localScale = (targetTab == m_HomeTab) ? selectedScale : Vector3.one;
+            if (m_CalendarIcon != null) m_CalendarIcon.localScale = (targetTab == m_CalendarTab) ? selectedScale : Vector3.one;
+            if (m_ShopIcon != null) m_ShopIcon.localScale = (targetTab == m_ShopTab) ? selectedScale : Vector3.one;
+            
+            if (m_HomeText != null) m_HomeText.localScale = (targetTab == m_HomeTab) ? selectedScale : Vector3.one;
+            if (m_CalendarText != null) m_CalendarText.localScale = (targetTab == m_CalendarTab) ? selectedScale : Vector3.one;
+            if (m_ShopText != null) m_ShopText.localScale = (targetTab == m_ShopTab) ? selectedScale : Vector3.one;
+        }
+
+        private void SlideTabBackground(RectTransform targetTab)
+        {
+            if (m_SelectedTabBg == null || targetTab == null) return;
+            
+            if (m_TabSlideCoroutine != null)
+                StopCoroutine(m_TabSlideCoroutine);
+
+            m_TabSlideCoroutine = StartCoroutine(AnimateTabBackground(targetTab));
+        }
+
+        private IEnumerator AnimateTabBackground(RectTransform targetTab)
+        {
+            float duration = 0.25f;
+            float elapsed = 0f;
+            Vector3 startPos = m_SelectedTabBg.position;
+            Vector3 targetWorldPosition = targetTab.position;
+
+            Vector3 homeIconStartScale = m_HomeIcon != null ? m_HomeIcon.localScale : Vector3.one;
+            Vector3 calIconStartScale = m_CalendarIcon != null ? m_CalendarIcon.localScale : Vector3.one;
+            Vector3 shopIconStartScale = m_ShopIcon != null ? m_ShopIcon.localScale : Vector3.one;
+
+            Vector3 homeTextStartScale = m_HomeText != null ? m_HomeText.localScale : Vector3.one;
+            Vector3 calTextStartScale = m_CalendarText != null ? m_CalendarText.localScale : Vector3.one;
+            Vector3 shopTextStartScale = m_ShopText != null ? m_ShopText.localScale : Vector3.one;
+
+            Vector3 targetSelectedScale = new Vector3(1.2f, 1.2f, 1.2f);
+            Vector3 targetDeselectedScale = Vector3.one;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                // Ease out cubic
+                float easedT = 1f - Mathf.Pow(1f - t, 3f);
+                
+                Vector3 newPos = m_SelectedTabBg.position;
+                newPos.x = Mathf.Lerp(startPos.x, targetWorldPosition.x, easedT);
+                m_SelectedTabBg.position = newPos;
+                
+                if (m_HomeIcon != null) m_HomeIcon.localScale = Vector3.Lerp(homeIconStartScale, (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale, easedT);
+                if (m_CalendarIcon != null) m_CalendarIcon.localScale = Vector3.Lerp(calIconStartScale, (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale, easedT);
+                if (m_ShopIcon != null) m_ShopIcon.localScale = Vector3.Lerp(shopIconStartScale, (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale, easedT);
+                
+                if (m_HomeText != null) m_HomeText.localScale = Vector3.Lerp(homeTextStartScale, (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale, easedT);
+                if (m_CalendarText != null) m_CalendarText.localScale = Vector3.Lerp(calTextStartScale, (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale, easedT);
+                if (m_ShopText != null) m_ShopText.localScale = Vector3.Lerp(shopTextStartScale, (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale, easedT);
+
+                yield return null;
+            }
+
+            Vector3 finalPos = m_SelectedTabBg.position;
+            finalPos.x = targetWorldPosition.x;
+            m_SelectedTabBg.position = finalPos;
+            
+            if (m_HomeIcon != null) m_HomeIcon.localScale = (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale;
+            if (m_CalendarIcon != null) m_CalendarIcon.localScale = (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale;
+            if (m_ShopIcon != null) m_ShopIcon.localScale = (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale;
+            
+            if (m_HomeText != null) m_HomeText.localScale = (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale;
+            if (m_CalendarText != null) m_CalendarText.localScale = (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale;
+            if (m_ShopText != null) m_ShopText.localScale = (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale;
+
+            m_TabSlideCoroutine = null;
         }
 
         private void CheckForNoAdsOffer()
