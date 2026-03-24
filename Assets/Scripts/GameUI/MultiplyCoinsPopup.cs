@@ -311,7 +311,7 @@ namespace Assets.Scripts.GameUI
             yield return new WaitForSeconds(0.5f);
 
             Debug.Log("[SlotMachine] Requesting Rewarded Video Ad...");
-            if (AdsManager.Instance != null && AdsManager.Instance.IsMultiplyRewardedReady)
+            if (AdsManager.Instance != null && (AdsManager.Instance.IsMultiplyRewardedReady || AdsManager.Instance.IsInterstitialReady))
             {
                 m_IsAdShowing = true;
                 AdsManager.Instance.ShowRewardedForMultiply();

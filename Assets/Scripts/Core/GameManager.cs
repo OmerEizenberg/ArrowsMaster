@@ -764,7 +764,8 @@ namespace Assets.Scripts.Core
 
             // --- MULTIPLY REWARD POPUP (Cooldown based) ---
             bool isCooldownUp = (Time.time - m_LastMultiplyPopupTime) >= 180f;
-            if (collectedLevelCurrency > 0 && m_GameUI != null && isCooldownUp && UserDataManager.Instance.CurrentLevel > 16 && UserDataManager.Instance.CurrentLevel%2 == 1)
+            bool isAdReady = AdsManager.Instance != null && (AdsManager.Instance.IsMultiplyRewardedReady || AdsManager.Instance.IsInterstitialReady);
+            if (collectedLevelCurrency > 0 && m_GameUI != null && isCooldownUp && UserDataManager.Instance.CurrentLevel > 16 && UserDataManager.Instance.CurrentLevel%2 == 1 && isAdReady)
             {
                 m_LastMultiplyPopupTime = Time.time;
                 p_lastWinAmount = collectedLevelCurrency;

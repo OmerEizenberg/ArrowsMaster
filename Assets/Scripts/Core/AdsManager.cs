@@ -33,6 +33,7 @@ namespace Assets.Scripts.Core
         public event Action OnAdOpened;
         public event Action OnAdClosed;
         public bool IsMultiplyRewardedReady => multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady();
+        public bool IsInterstitialReady => interstitialAd != null && interstitialAd.IsAdReady();
 
         private string AppKey
         {
@@ -732,11 +733,22 @@ namespace Assets.Scripts.Core
                 OnAdOpened?.Invoke();
                 multiplyRewardedAd.ShowAd();
             }
+            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            {
+                Debug.LogWarning("[AdsManager] Multiply Rewarded Ad is not ready. Falling back to Interstitial.");
+                pendingRewardType = RewardAdType.MultiplyReward;
+                OnAdOpened?.Invoke();
+                interstitialAd.ShowAd();
+            }
             else
             {
-                Debug.LogWarning($"[AdsManager] Multiply Rewarded Ad is not ready. Initialized: {isInitialized}");
+                Debug.LogWarning($"[AdsManager] Multiply Rewarded Ad and Interstitial are not ready. Initialized: {isInitialized}");
                 if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else LoadMultiplyRewarded();
+                else
+                {
+                    LoadMultiplyRewarded();
+                    LoadInterstitial();
+                }
             }
         }
 
