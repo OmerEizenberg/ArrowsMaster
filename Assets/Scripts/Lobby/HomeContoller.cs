@@ -1066,15 +1066,29 @@ namespace Assets.Scripts.Lobby
                 m_SelectedTabBg.position = newPos;
             }
             
-            Vector3 selectedScale = new Vector3(1.2f, 1.2f, 1.2f);
+            Vector3 textSelectedScale = new Vector3(1.2f, 1.2f, 1.2f);
+            Vector3 iconSelectedScale = new Vector3(1.65f, 1.65f, 1.65f);
+            float iconSelectedY = 97f;
+            float iconDeselectedY = 67f;
             
-            if (m_HomeIcon != null) m_HomeIcon.localScale = (targetTab == m_HomeTab) ? selectedScale : Vector3.one;
-            if (m_CalendarIcon != null) m_CalendarIcon.localScale = (targetTab == m_CalendarTab) ? selectedScale : Vector3.one;
-            if (m_ShopIcon != null) m_ShopIcon.localScale = (targetTab == m_ShopTab) ? selectedScale : Vector3.one;
-            
-            if (m_HomeText != null) m_HomeText.localScale = (targetTab == m_HomeTab) ? selectedScale : Vector3.one;
-            if (m_CalendarText != null) m_CalendarText.localScale = (targetTab == m_CalendarTab) ? selectedScale : Vector3.one;
-            if (m_ShopText != null) m_ShopText.localScale = (targetTab == m_ShopTab) ? selectedScale : Vector3.one;
+            UpdateTabImmediate(m_HomeIcon, m_HomeText, targetTab == m_HomeTab, iconSelectedScale, textSelectedScale, iconSelectedY, iconDeselectedY);
+            UpdateTabImmediate(m_CalendarIcon, m_CalendarText, targetTab == m_CalendarTab, iconSelectedScale, textSelectedScale, iconSelectedY, iconDeselectedY);
+            UpdateTabImmediate(m_ShopIcon, m_ShopText, targetTab == m_ShopTab, iconSelectedScale, textSelectedScale, iconSelectedY, iconDeselectedY);
+        }
+
+        private void UpdateTabImmediate(RectTransform icon, RectTransform text, bool isSelected, Vector3 iconScale, Vector3 textScale, float iconSelectedY, float iconDeselectedY)
+        {
+            if (icon != null)
+            {
+                icon.localScale = isSelected ? iconScale : Vector3.one;
+                Vector2 pos = icon.anchoredPosition;
+                pos.y = isSelected ? iconSelectedY : iconDeselectedY;
+                icon.anchoredPosition = pos;
+            }
+            if (text != null)
+            {
+                text.localScale = isSelected ? textScale : Vector3.one;
+            }
         }
 
         private void SlideTabBackground(RectTransform targetTab)
@@ -1094,50 +1108,75 @@ namespace Assets.Scripts.Lobby
             Vector3 startPos = m_SelectedTabBg.position;
             Vector3 targetWorldPosition = targetTab.position;
 
-            Vector3 homeIconStartScale = m_HomeIcon != null ? m_HomeIcon.localScale : Vector3.one;
-            Vector3 calIconStartScale = m_CalendarIcon != null ? m_CalendarIcon.localScale : Vector3.one;
-            Vector3 shopIconStartScale = m_ShopIcon != null ? m_ShopIcon.localScale : Vector3.one;
+            // Capture start states
+            Vector3 hIconScaleS = m_HomeIcon != null ? m_HomeIcon.localScale : Vector3.one;
+            Vector3 cIconScaleS = m_CalendarIcon != null ? m_CalendarIcon.localScale : Vector3.one;
+            Vector3 sIconScaleS = m_ShopIcon != null ? m_ShopIcon.localScale : Vector3.one;
 
-            Vector3 homeTextStartScale = m_HomeText != null ? m_HomeText.localScale : Vector3.one;
-            Vector3 calTextStartScale = m_CalendarText != null ? m_CalendarText.localScale : Vector3.one;
-            Vector3 shopTextStartScale = m_ShopText != null ? m_ShopText.localScale : Vector3.one;
+            float hIconYS = m_HomeIcon != null ? m_HomeIcon.anchoredPosition.y : 67f;
+            float cIconYS = m_CalendarIcon != null ? m_CalendarIcon.anchoredPosition.y : 67f;
+            float sIconYS = m_ShopIcon != null ? m_ShopIcon.anchoredPosition.y : 67f;
 
-            Vector3 targetSelectedScale = new Vector3(1.2f, 1.2f, 1.2f);
-            Vector3 targetDeselectedScale = Vector3.one;
+            Vector3 hTextScaleS = m_HomeText != null ? m_HomeText.localScale : Vector3.one;
+            Vector3 cTextScaleS = m_CalendarText != null ? m_CalendarText.localScale : Vector3.one;
+            Vector3 sTextScaleS = m_ShopText != null ? m_ShopText.localScale : Vector3.one;
+
+            Vector3 textSelScale = new Vector3(1.2f, 1.2f, 1.2f);
+            Vector3 iconSelScale = new Vector3(1.5f, 1.5f, 1.5f);
+            float iconSelY = 87f;
+            float iconDesY = 67f;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                // Ease out cubic
                 float easedT = 1f - Mathf.Pow(1f - t, 3f);
                 
                 Vector3 newPos = m_SelectedTabBg.position;
                 newPos.x = Mathf.Lerp(startPos.x, targetWorldPosition.x, easedT);
                 m_SelectedTabBg.position = newPos;
                 
-                if (m_HomeIcon != null) m_HomeIcon.localScale = Vector3.Lerp(homeIconStartScale, (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale, easedT);
-                if (m_CalendarIcon != null) m_CalendarIcon.localScale = Vector3.Lerp(calIconStartScale, (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale, easedT);
-                if (m_ShopIcon != null) m_ShopIcon.localScale = Vector3.Lerp(shopIconStartScale, (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale, easedT);
-                
-                if (m_HomeText != null) m_HomeText.localScale = Vector3.Lerp(homeTextStartScale, (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale, easedT);
-                if (m_CalendarText != null) m_CalendarText.localScale = Vector3.Lerp(calTextStartScale, (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale, easedT);
-                if (m_ShopText != null) m_ShopText.localScale = Vector3.Lerp(shopTextStartScale, (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale, easedT);
+                // Animate Home
+                if (m_HomeIcon != null)
+                {
+                    m_HomeIcon.localScale = Vector3.Lerp(hIconScaleS, (targetTab == m_HomeTab) ? iconSelScale : Vector3.one, easedT);
+                    Vector2 p = m_HomeIcon.anchoredPosition;
+                    p.y = Mathf.Lerp(hIconYS, (targetTab == m_HomeTab) ? iconSelY : iconDesY, easedT);
+                    m_HomeIcon.anchoredPosition = p;
+                }
+                if (m_HomeText != null) m_HomeText.localScale = Vector3.Lerp(hTextScaleS, (targetTab == m_HomeTab) ? textSelScale : Vector3.one, easedT);
+
+                // Animate Calendar
+                if (m_CalendarIcon != null)
+                {
+                    m_CalendarIcon.localScale = Vector3.Lerp(cIconScaleS, (targetTab == m_CalendarTab) ? iconSelScale : Vector3.one, easedT);
+                    Vector2 p = m_CalendarIcon.anchoredPosition;
+                    p.y = Mathf.Lerp(cIconYS, (targetTab == m_CalendarTab) ? iconSelY : iconDesY, easedT);
+                    m_CalendarIcon.anchoredPosition = p;
+                }
+                if (m_CalendarText != null) m_CalendarText.localScale = Vector3.Lerp(cTextScaleS, (targetTab == m_CalendarTab) ? textSelScale : Vector3.one, easedT);
+
+                // Animate Shop
+                if (m_ShopIcon != null)
+                {
+                    m_ShopIcon.localScale = Vector3.Lerp(sIconScaleS, (targetTab == m_ShopTab) ? iconSelScale : Vector3.one, easedT);
+                    Vector2 p = m_ShopIcon.anchoredPosition;
+                    p.y = Mathf.Lerp(sIconYS, (targetTab == m_ShopTab) ? iconSelY : iconDesY, easedT);
+                    m_ShopIcon.anchoredPosition = p;
+                }
+                if (m_ShopText != null) m_ShopText.localScale = Vector3.Lerp(sTextScaleS, (targetTab == m_ShopTab) ? textSelScale : Vector3.one, easedT);
 
                 yield return null;
             }
 
-            Vector3 finalPos = m_SelectedTabBg.position;
-            finalPos.x = targetWorldPosition.x;
-            m_SelectedTabBg.position = finalPos;
+            // Final state
+            Vector3 fPos = m_SelectedTabBg.position;
+            fPos.x = targetWorldPosition.x;
+            m_SelectedTabBg.position = fPos;
             
-            if (m_HomeIcon != null) m_HomeIcon.localScale = (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale;
-            if (m_CalendarIcon != null) m_CalendarIcon.localScale = (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale;
-            if (m_ShopIcon != null) m_ShopIcon.localScale = (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale;
-            
-            if (m_HomeText != null) m_HomeText.localScale = (targetTab == m_HomeTab) ? targetSelectedScale : targetDeselectedScale;
-            if (m_CalendarText != null) m_CalendarText.localScale = (targetTab == m_CalendarTab) ? targetSelectedScale : targetDeselectedScale;
-            if (m_ShopText != null) m_ShopText.localScale = (targetTab == m_ShopTab) ? targetSelectedScale : targetDeselectedScale;
+            UpdateTabImmediate(m_HomeIcon, m_HomeText, targetTab == m_HomeTab, iconSelScale, textSelScale, iconSelY, iconDesY);
+            UpdateTabImmediate(m_CalendarIcon, m_CalendarText, targetTab == m_CalendarTab, iconSelScale, textSelScale, iconSelY, iconDesY);
+            UpdateTabImmediate(m_ShopIcon, m_ShopText, targetTab == m_ShopTab, iconSelScale, textSelScale, iconSelY, iconDesY);
 
             m_TabSlideCoroutine = null;
         }
