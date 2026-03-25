@@ -1553,6 +1553,7 @@ MonoBehaviour:
   m_LobbyCurrencyText: {fileID: 505547371}
   m_ShopCurrencyText: {fileID: 1857573225}
   m_RewardedAdAmountText: {fileID: 1262343805}
+  m_WatchAdForCoinsButton: {fileID: 727383317}
   m_LevelStreakIcon: {fileID: 951063264}
   m_LevelStreakText: {fileID: 382205782}
   m_LevelStreakTextShade: {fileID: 1889888584}
