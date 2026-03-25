@@ -22,7 +22,7 @@ namespace Assets.Scripts.Core
         private const float AD_COOLDOWN = 120f;
 
         // Track which rewarded ad type is currently being shown
-        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward }
+        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward }
         private RewardAdType pendingRewardType = RewardAdType.None;
 
         private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _mainThreadQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
@@ -30,9 +30,13 @@ namespace Assets.Scripts.Core
         public event Action OnRewardReceived;
         public event Action OnCoinsRewardReceived;
         public event Action OnMultiplyRewardReceived;
+        public event Action OnHintRewardReceived;
+        public event Action OnPlayOnRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
+        public bool IsRewardedReady => RewardedAd != null && RewardedAd.IsAdReady();
         public bool IsMultiplyRewardedReady => multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady();
+        public bool IsCoinsRewardedReady => coinsRewardedAd != null && coinsRewardedAd.IsAdReady();
         public bool IsInterstitialReady => interstitialAd != null && interstitialAd.IsAdReady();
 
         private string AppKey
@@ -541,6 +545,16 @@ namespace Assets.Scripts.Core
                     Debug.Log("[AdsManager] ProcessPendingReward: MultiplyReward → firing OnMultiplyRewardReceived.");
                     OnMultiplyRewardReceived?.Invoke();
                     break;
+                
+                case RewardAdType.HintReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: HintReward → firing OnHintRewardReceived.");
+                    OnHintRewardReceived?.Invoke();
+                    break;
+                
+                case RewardAdType.PlayOnReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: PlayOnReward → firing OnPlayOnRewardReceived.");
+                    OnPlayOnRewardReceived?.Invoke();
+                    break;
 
                 default:
                     Debug.Log("[AdsManager] ProcessPendingReward: No pending reward (None). Ignoring.");
@@ -637,11 +651,22 @@ namespace Assets.Scripts.Core
                 OnAdOpened?.Invoke();
                 coinsRewardedAd.ShowAd();
             }
+            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            {
+                Debug.LogWarning("[AdsManager] Coins Rewarded Ad is not ready. Falling back to Interstitial.");
+                pendingRewardType = RewardAdType.CoinsReward;
+                OnAdOpened?.Invoke();
+                interstitialAd.ShowAd();
+            }
             else
             {
-                Debug.LogWarning($"[AdsManager] Coins Rewarded Ad is not ready. Initialized: {isInitialized}");
+                Debug.LogWarning($"[AdsManager] Coins Rewarded Ad and Interstitial are not ready. Initialized: {isInitialized}");
                 if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else LoadCoinsRewarded();
+                else
+                {
+                    LoadCoinsRewarded();
+                    LoadInterstitial();
+                }
             }
         }
 
@@ -747,6 +772,62 @@ namespace Assets.Scripts.Core
                 else
                 {
                     LoadMultiplyRewarded();
+                    LoadInterstitial();
+                }
+            }
+        }
+
+        public void ShowRewardedForHint()
+        {
+            if (RewardedAd != null && RewardedAd.IsAdReady())
+            {
+                Debug.Log("[AdsManager] Showing Rewarded Ad for Hint (HintReward).");
+                pendingRewardType = RewardAdType.HintReward;
+                OnAdOpened?.Invoke();
+                RewardedAd.ShowAd();
+            }
+            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            {
+                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for hint. Falling back to Interstitial.");
+                pendingRewardType = RewardAdType.HintReward;
+                OnAdOpened?.Invoke();
+                interstitialAd.ShowAd();
+            }
+            else
+            {
+                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for Hint. Initialized: {isInitialized}");
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                else
+                {
+                    LoadRewarded();
+                    LoadInterstitial();
+                }
+            }
+        }
+
+        public void ShowRewardedForPlayOn()
+        {
+            if (RewardedAd != null && RewardedAd.IsAdReady())
+            {
+                Debug.Log("[AdsManager] Showing Rewarded Ad for PlayOn (PlayOnReward).");
+                pendingRewardType = RewardAdType.PlayOnReward;
+                OnAdOpened?.Invoke();
+                RewardedAd.ShowAd();
+            }
+            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            {
+                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for playon. Falling back to Interstitial.");
+                pendingRewardType = RewardAdType.PlayOnReward;
+                OnAdOpened?.Invoke();
+                interstitialAd.ShowAd();
+            }
+            else
+            {
+                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for PlayOn. Initialized: {isInitialized}");
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                else
+                {
+                    LoadRewarded();
                     LoadInterstitial();
                 }
             }

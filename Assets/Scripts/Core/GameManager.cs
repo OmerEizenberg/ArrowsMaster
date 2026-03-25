@@ -149,6 +149,8 @@ namespace Assets.Scripts.Core
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnRewardReceived += HandleRewardReceived;
+                AdsManager.Instance.OnHintRewardReceived += ShowHint;
+                AdsManager.Instance.OnPlayOnRewardReceived += ExecutePlayOn;
                 AdsManager.Instance.OnAdOpened += HandleAdOpened;
                 AdsManager.Instance.OnAdClosed += HandleAdClosed;
             }
@@ -203,6 +205,8 @@ namespace Assets.Scripts.Core
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnRewardReceived -= HandleRewardReceived;
+                AdsManager.Instance.OnHintRewardReceived -= ShowHint;
+                AdsManager.Instance.OnPlayOnRewardReceived -= ExecutePlayOn;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
                 AdsManager.Instance.OnAdClosed -= HandleAdClosed;
             }
@@ -223,15 +227,16 @@ namespace Assets.Scripts.Core
 
         private void HandleRewardReceived()
         {
+            // Legacy/Fallback for generic GameReward if still used
             if (p_isHintRewarded)
             {
-                Debug.Log("[GameManager] Hint Reward Received! Triggering show hint...");
+                Debug.Log("[GameManager] Hint Reward Received via legacy path! Triggering show hint...");
                 ShowHint();
                 p_isHintRewarded = false;
             }
             else if (p_isPlayOnRewarded)
             {
-                Debug.Log("[GameManager] PlayOn Reward Received (Ad)!");
+                Debug.Log("[GameManager] PlayOn Reward Received via legacy path (Ad)!");
                 ExecutePlayOn();
                 p_isPlayOnRewarded = false;
             }
@@ -301,18 +306,16 @@ namespace Assets.Scripts.Core
 
         public void PlayOn()
         {
-            p_isPlayOnRewarded = true;
-            p_isHintRewarded = false;
             Debug.Log("[GameManager] PlayOn method called.");
             if (AdsManager.Instance != null)
             {
-                AdsManager.Instance.ShowRewarded();
+                AdsManager.Instance.ShowRewardedForPlayOn();
             }
             else
             {
                 // Fallback if no AdsManager
                 Debug.Log(">>> No ad AdsManager");
-                HandleRewardReceived();
+                ExecutePlayOn();
             }
         }
 
@@ -912,7 +915,8 @@ namespace Assets.Scripts.Core
             if (isEntranceFinished && !isWinning && !isHintVisible && !isFailureVisible && !isLobbyVisible)
             {
                 hintTimer += Time.deltaTime;
-                if (hintTimer >= 5.0f)
+                bool isAdReady = AdsManager.Instance != null && (AdsManager.Instance.IsRewardedReady || AdsManager.Instance.IsInterstitialReady);
+                if (hintTimer >= 5.0f && isAdReady)
                 {
                     SetHintVisibility(true);
                     SoundManager.Instance.PlayHint();

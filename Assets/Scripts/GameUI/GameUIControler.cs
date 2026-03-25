@@ -21,6 +21,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_FailureSubtitle; // Subtitle text
     [SerializeField] private TextMeshProUGUI m_FailureDescription; // Description text
     [SerializeField] private GameObject m_NoAdsOfferImage; // Image for the special offer (coins + no ads)
+    [SerializeField] private GameObject m_PlayOnAdButton; // Button to watch ad for PlayOn
     
     [Header("Restart Button Fade")]
     [SerializeField] private GameObject m_RestartButton;
@@ -362,6 +363,12 @@ public class GameUIContoleer : MonoBehaviour
             bool hasNoAds = IAPManager.Instance != null && IAPManager.Instance.HasNoAds;
             m_NoAdsOfferImage.SetActive(!hasNoAds);
         }
+
+        if (m_PlayOnAdButton != null && AdsManager.Instance != null)
+        {
+            bool isAdReady = AdsManager.Instance.IsRewardedReady || AdsManager.Instance.IsInterstitialReady;
+            m_PlayOnAdButton.SetActive(isAdReady);
+        }
     }
 
     public void restartLevel()
@@ -426,9 +433,7 @@ public class GameUIContoleer : MonoBehaviour
     {
         if (AdsManager.Instance != null)
         {
-            GameManager.Instance.p_isHintRewarded = true;
-            GameManager.Instance.p_isPlayOnRewarded = false;
-            AdsManager.Instance.ShowRewarded();
+            AdsManager.Instance.ShowRewardedForHint();
         }
     }
 }

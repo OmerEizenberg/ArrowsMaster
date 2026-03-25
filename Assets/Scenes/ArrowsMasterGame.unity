@@ -6277,6 +6277,7 @@ MonoBehaviour:
   m_FailureSubtitle: {fileID: 598936578}
   m_FailureDescription: {fileID: 598936578}
   m_NoAdsOfferImage: {fileID: 29634319}
+  m_PlayOnAdButton: {fileID: 624092796}
   m_RestartButton: {fileID: 1471860092}
   m_RestartButtonImage: {fileID: 29779314}
   m_RestartButtonText: {fileID: 1710408629}

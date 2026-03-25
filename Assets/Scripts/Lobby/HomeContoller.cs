@@ -39,6 +39,7 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private TextMeshProUGUI m_LobbyCurrencyText;
         [SerializeField] private TextMeshProUGUI m_ShopCurrencyText;
         [SerializeField] private TextMeshProUGUI m_RewardedAdAmountText;
+        [SerializeField] private GameObject m_WatchAdForCoinsButton;
 
         [Header("Level Streak")]
         [SerializeField] private GameObject m_LevelStreakIcon;
@@ -578,7 +579,14 @@ namespace Assets.Scripts.Lobby
                 }
             }
 
-            m_LobbyAdReadyImage.SetActive(!isCooldownActive);
+            bool isAdReady = AdsManager.Instance != null && (AdsManager.Instance.IsCoinsRewardedReady || AdsManager.Instance.IsInterstitialReady);
+            
+            m_LobbyAdReadyImage.SetActive(!isCooldownActive && isAdReady);
+            
+            if (m_WatchAdForCoinsButton != null)
+            {
+                m_WatchAdForCoinsButton.SetActive(!isCooldownActive && isAdReady);
+            }
         }
         
         public void OnSettingsButtonClicked()
