@@ -585,7 +585,7 @@ namespace Assets.Scripts.Lobby
             
             if (m_WatchAdForCoinsButton != null)
             {
-                m_WatchAdForCoinsButton.SetActive(!isCooldownActive && isAdReady);
+                m_WatchAdForCoinsButton.SetActive(isAdReady);
             }
         }
         
