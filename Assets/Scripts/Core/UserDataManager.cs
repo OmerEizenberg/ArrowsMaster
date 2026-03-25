@@ -249,11 +249,14 @@ namespace Assets.Scripts.Core
             if (CurrentLevel >= 25)
             {
                 LevelStreak++;
+                NeedsLevelStreakAnimation = true;
                 PlayerPrefs.SetInt(LevelStreakKey, LevelStreak);
                 PlayerPrefs.Save();
                 Debug.Log($"[UserDataManager] Level Streak incremented to: {LevelStreak}");
             }
         }
+
+        public bool NeedsLevelStreakAnimation { get; set; } = false;
 
         public void ResetLevelStreak()
         {

@@ -661,6 +661,10 @@ namespace Assets.Scripts.Core
             {
                 UserDataManager.Instance.UpdateMaxStreak(p_StreakCount);
                 OnMaxStreakBroken?.Invoke(p_StreakCount);
+                if (SoundManager.Instance != null)
+                {
+                    SoundManager.Instance.PlayNewRecord();
+                }
             }
         }
 
@@ -981,7 +985,7 @@ namespace Assets.Scripts.Core
 
             if (m_StreakRecordContainer != null)
             {
-                m_StreakRecordContainer.SetActive(UserDataManager.Instance.CurrentLevel >= 6);
+                m_StreakRecordContainer.SetActive(UserDataManager.Instance.CurrentLevel >= 25);
             }
         }
         

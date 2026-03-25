@@ -48,6 +48,17 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private GameObject m_StreakPopup;
         [SerializeField] private Sprite m_LevelStreakActiveSprite;
         [SerializeField] private Sprite m_LevelStreakInactiveSprite;
+        
+        [Header("Streak Fire Jump Settings")]
+        [SerializeField] private float m_FireJumpDuration = 0.85f;
+        [SerializeField] private float m_FireJumpArcHeightPercent = 0.15f; // % of screen height
+        [SerializeField] private float m_FireJumpStartOffsetXPercent = 0.3f; // % of screen width
+        [SerializeField] private float m_FireJumpStartOffsetYPercent = -0.4f; // % of screen height
+        [SerializeField] private float m_FireJumpStartScale = 0.5f;
+        [SerializeField] private float m_FireJumpEndScale = 2.0f;
+        [SerializeField] private float m_FireJumpRotation = 720f;
+        [SerializeField] private float m_FireJumpStartDelay = 0.75f;
+
 
         [SerializeField] private Color m_CircleColor;
         [SerializeField] private Color m_SuperHardColor;
@@ -460,7 +471,12 @@ namespace Assets.Scripts.Lobby
                 if (m_LevelStreakIcon != null) 
                 {
                     m_LevelStreakIcon.SetActive(true);
-                    bool isStreakActive = UserDataManager.Instance.LevelStreak >= 6;
+                    
+                    bool showAnimation = UserDataManager.Instance.NeedsLevelStreakAnimation;
+                    int displayStreak = UserDataManager.Instance.LevelStreak;
+                    if (showAnimation) displayStreak--;
+
+                    bool isStreakActive = displayStreak >= 6;
                     
                     var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
                     if (iconImage != null && m_LevelStreakActiveSprite != null && m_LevelStreakInactiveSprite != null)
@@ -478,9 +494,15 @@ namespace Assets.Scripts.Lobby
                             m_LevelStreakIcon.GetComponent<UnityEngine.UI.Graphic>()?.SetVerticesDirty();
                         }
                     }
+
+                    if (m_LevelStreakText != null) m_LevelStreakText.text = displayStreak.ToString();
+                    if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = displayStreak.ToString();
+
+                    if (showAnimation)
+                    {
+                        StartCoroutine(AnimateStreakFire(displayStreak + 1));
+                    }
                 }
-                if (m_LevelStreakText != null) m_LevelStreakText.text = UserDataManager.Instance.LevelStreak.ToString();
-                if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = UserDataManager.Instance.LevelStreak.ToString();
             }
             else
             {
@@ -805,7 +827,6 @@ namespace Assets.Scripts.Lobby
             if (SoundManager.Instance != null) 
             {
                 SoundManager.Instance.PlayClick();
-                //SoundManager.Instance.PlayFireOn();
             }
             
             if (m_StreakPopup != null)
@@ -1226,6 +1247,86 @@ namespace Assets.Scripts.Lobby
                 PlayerPrefs.SetString("LastNoAdsOfferTime", System.DateTime.Now.ToBinary().ToString());
                 PlayerPrefs.Save();
             }
+        }
+        private IEnumerator AnimateStreakFire(int targetStreak)
+        {
+            UserDataManager.Instance.NeedsLevelStreakAnimation = false;
+            
+            // Wait for a small delay to let transition finish
+            yield return new WaitForSeconds(m_FireJumpStartDelay);
+            
+            if (m_LevelStreakIcon == null) yield break;
+
+            // Create fire sprite as child of the icon for perfect arrival
+            GameObject fireObj = new GameObject("FireAnimation", typeof(RectTransform), typeof(Image));
+            fireObj.transform.SetParent(m_LevelStreakIcon.transform, false);
+            
+            Image fireImage = fireObj.GetComponent<Image>();
+            fireImage.sprite = m_LevelStreakActiveSprite;
+            fireImage.SetNativeSize();
+            
+            RectTransform fireRect = fireObj.GetComponent<RectTransform>();
+            fireRect.localScale = Vector3.one * 0.5f;
+
+            // Start position (Local Offset)
+            Vector2 startPosLocal = new Vector2(
+                Screen.width * m_FireJumpStartOffsetXPercent,
+                Screen.height * m_FireJumpStartOffsetYPercent
+            );
+            
+            fireRect.anchoredPosition = startPosLocal;
+            fireRect.localScale = Vector3.one * m_FireJumpStartScale;
+            Vector2 targetPosLocal = Vector2.zero; // Destination is the parent icon
+            
+            // Animation
+            float duration = m_FireJumpDuration;
+            float elapsed = 0f;
+            float arcHeight = Screen.height * m_FireJumpArcHeightPercent;
+            
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float tSlow = 1f - Mathf.Pow(1f - t, 3); // Ease out
+                
+                Vector2 currentPos = Vector2.Lerp(startPosLocal, targetPosLocal, tSlow);
+                
+                // Parabolic arc (local upward)
+                float arc = Mathf.Sin(t * Mathf.PI) * arcHeight;
+                fireRect.anchoredPosition = currentPos + new Vector2(0, arc);
+                
+                fireRect.localScale = Vector3.Lerp(Vector3.one * m_FireJumpStartScale, Vector3.one * m_FireJumpEndScale, t);
+                fireRect.localEulerAngles = new Vector3(0, 0, t * m_FireJumpRotation);
+
+                yield return null;
+            }
+
+            // Arrival
+            Destroy(fireObj);
+            
+            // Update UI
+            if (m_LevelStreakText != null) m_LevelStreakText.text = targetStreak.ToString();
+            if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = targetStreak.ToString();
+            
+            // Update Icon state
+            bool isStreakActive = targetStreak >= 6;
+            var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
+            if (iconImage != null && m_LevelStreakActiveSprite != null && m_LevelStreakInactiveSprite != null)
+            {
+                iconImage.sprite = isStreakActive ? m_LevelStreakActiveSprite : m_LevelStreakInactiveSprite;
+            }
+            
+            var fireSkew = m_LevelStreakIcon.GetComponent<Assets.Scripts.GameUI.UIFireSkew>();
+            if (fireSkew != null)
+            {
+                fireSkew.enabled = isStreakActive;
+                m_LevelStreakIcon.GetComponent<UnityEngine.UI.Graphic>()?.SetVerticesDirty();
+            }
+
+            // Arrival Feedback
+            VibrationManager.VibrateSuccess();
+            StartCoroutine(ScalePunch(m_LevelStreakIcon.transform));
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayFireOn();
         }
     }
 }

@@ -1560,6 +1560,14 @@ MonoBehaviour:
   m_StreakPopup: {fileID: 663230117}
   m_LevelStreakActiveSprite: {fileID: 21300000, guid: 75c68b5eb13f5427f8e781bca5dfb225, type: 3}
   m_LevelStreakInactiveSprite: {fileID: 21300000, guid: 9bd2e0f0c4598429a85776c9e1aaa55d, type: 3}
+  m_FireJumpDuration: 0.65
+  m_FireJumpArcHeightPercent: 0.1
+  m_FireJumpStartOffsetXPercent: 0.125
+  m_FireJumpStartOffsetYPercent: 0
+  m_FireJumpStartScale: 0.5
+  m_FireJumpEndScale: 0.2
+  m_FireJumpRotation: 50
+  m_FireJumpStartDelay: 1
   m_CircleColor: {r: 0, g: 0, b: 0, a: 1}
   m_SuperHardColor: {r: 0.8784314, g: 0.3372549, b: 0.99215686, a: 1}
   m_NightmareColor: {r: 0.92156863, g: 0.3019608, b: 0.29411766, a: 0}
@@ -20715,9 +20723,6 @@ MonoBehaviour:
   m_FireIcon: {fileID: 1877184838}
   m_BaseSprite: {fileID: 21300000, guid: 9bd2e0f0c4598429a85776c9e1aaa55d, type: 3}
   m_TargetSprite: {fileID: 21300000, guid: 75c68b5eb13f5427f8e781bca5dfb225, type: 3}
-  m_PunchScale: 1.2
-  m_PunchDuration: 0.2
-  m_FadeDuration: 0.3
 --- !u!1 &1101273648
 GameObject:
   m_ObjectHideFlags: 0
@@ -38789,6 +38794,7 @@ GameObject:
   - component: {fileID: 1877184837}
   - component: {fileID: 1877184839}
   - component: {fileID: 1877184838}
+  - component: {fileID: 1877184840}
   m_Layer: 5
   m_Name: FireIcon
   m_TagString: Untagged
@@ -38853,6 +38859,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1877184836}
   m_CullTransparentMesh: 1
+--- !u!114 &1877184840
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1877184836}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 562e8bbd6058e41c98ca0cb2580f12b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  skewAmount: 6
+  speed: 5
+  randomPhase: 5
 --- !u!1 &1879229901
 GameObject:
   m_ObjectHideFlags: 0
