@@ -89,6 +89,8 @@ namespace Assets.Scripts.Lobby
         private static int s_LastDisplayedCurrencyValue = -1;
         private static int s_LastDisplayedLevelValue = -1;
         [SerializeField] private RollingLevelEffect m_LevelRoller;
+        private Coroutine m_FireAnimationCoroutine;
+        private GameObject m_ActiveFireSprite;
         private Coroutine m_CoinCountCoroutine;
         private Coroutine m_LobbyScaleCoroutine;
         private Coroutine m_ShopScaleCoroutine;
@@ -211,6 +213,8 @@ namespace Assets.Scripts.Lobby
             if (m_LobbyScaleCoroutine != null) StopCoroutine(m_LobbyScaleCoroutine);
             if (m_ShopScaleCoroutine != null) StopCoroutine(m_ShopScaleCoroutine);
             if (m_TabSlideCoroutine != null) StopCoroutine(m_TabSlideCoroutine);
+            
+            CleanupFireAnimation();
         }
 
         private void OnDestroy()
@@ -500,12 +504,14 @@ namespace Assets.Scripts.Lobby
 
                     if (showAnimation)
                     {
-                        StartCoroutine(AnimateStreakFire(displayStreak + 1));
+                        CleanupFireAnimation();
+                        m_FireAnimationCoroutine = StartCoroutine(AnimateStreakFire(displayStreak + 1));
                     }
                 }
             }
             else
             {
+                CleanupFireAnimation();
                 if (m_LevelStreakIcon != null) m_LevelStreakIcon.SetActive(false);
             }
 
@@ -671,6 +677,7 @@ namespace Assets.Scripts.Lobby
         public void OnCalanderButtonClicked()
         {
             SoundManager.Instance.PlayClick();
+            CleanupFireAnimation();
 
             if(m_CalanderLayer.activeInHierarchy)
             {
@@ -694,6 +701,7 @@ namespace Assets.Scripts.Lobby
         public void OnHomeButtonClicked()
         {
             SoundManager.Instance.PlayClick();
+            CleanupFireAnimation();
 
             m_SettingsLayer.SetActive(false);
             m_CalanderLayer.SetActive(false);
@@ -718,6 +726,7 @@ namespace Assets.Scripts.Lobby
         public void ShowShop()
         {
             SoundManager.Instance.PlayShop();
+            CleanupFireAnimation();
             m_SettingsLayer.SetActive(false);
             m_DonateLayer.SetActive(false);
             m_NoAdsLayer.SetActive(false);
@@ -841,6 +850,7 @@ namespace Assets.Scripts.Lobby
 
         private void SwitchToGameUI()
         {
+            CleanupFireAnimation();
             // Use local references if assigned, otherwise fallback to GameManager
             GameObject lobby = m_LobbyUI;
             GameObject game = m_GameUI;
@@ -1258,14 +1268,14 @@ namespace Assets.Scripts.Lobby
             if (m_LevelStreakIcon == null) yield break;
 
             // Create fire sprite as child of the icon for perfect arrival
-            GameObject fireObj = new GameObject("FireAnimation", typeof(RectTransform), typeof(Image));
-            fireObj.transform.SetParent(m_LevelStreakIcon.transform, false);
+            m_ActiveFireSprite = new GameObject("FireAnimation", typeof(RectTransform), typeof(Image));
+            m_ActiveFireSprite.transform.SetParent(m_LevelStreakIcon.transform, false);
             
-            Image fireImage = fireObj.GetComponent<Image>();
+            Image fireImage = m_ActiveFireSprite.GetComponent<Image>();
             fireImage.sprite = m_LevelStreakActiveSprite;
             fireImage.SetNativeSize();
             
-            RectTransform fireRect = fireObj.GetComponent<RectTransform>();
+            RectTransform fireRect = m_ActiveFireSprite.GetComponent<RectTransform>();
             fireRect.localScale = Vector3.one * 0.5f;
 
             // Start position (Local Offset)
@@ -1302,7 +1312,11 @@ namespace Assets.Scripts.Lobby
             }
 
             // Arrival
-            Destroy(fireObj);
+            if (m_ActiveFireSprite != null)
+            {
+                Destroy(m_ActiveFireSprite);
+                m_ActiveFireSprite = null;
+            }
             
             // Update UI
             if (m_LevelStreakText != null) m_LevelStreakText.text = targetStreak.ToString();
@@ -1327,6 +1341,24 @@ namespace Assets.Scripts.Lobby
             VibrationManager.VibrateSuccess();
             StartCoroutine(ScalePunch(m_LevelStreakIcon.transform));
             if (SoundManager.Instance != null) SoundManager.Instance.PlayFireOn();
+            
+            m_ActiveFireSprite = null;
+            m_FireAnimationCoroutine = null;
+        }
+
+        private void CleanupFireAnimation()
+        {
+            if (m_FireAnimationCoroutine != null)
+            {
+                StopCoroutine(m_FireAnimationCoroutine);
+                m_FireAnimationCoroutine = null;
+            }
+
+            if (m_ActiveFireSprite != null)
+            {
+                Destroy(m_ActiveFireSprite);
+                m_ActiveFireSprite = null;
+            }
         }
     }
 }

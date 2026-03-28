@@ -44113,6 +44113,10 @@ PrefabInstance:
       propertyPath: m_hasFontAssetChanged
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 4317025748768224625, guid: c186afed293704484bd3837c89b24cdd, type: 3}
+      propertyPath: m_MatchWidthOrHeight
+      value: 0.353
+      objectReference: {fileID: 0}
     - target: {fileID: 4823175171773133148, guid: c186afed293704484bd3837c89b24cdd, type: 3}
       propertyPath: m_Name
       value: TESTINGONLY

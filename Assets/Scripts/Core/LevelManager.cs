@@ -76,7 +76,7 @@ namespace Assets.Scripts.Core
                     // We assume levels 1-10 are tutorials/intro and we want to loop from Level 11 to Max.
                     // If Max is small (<11), we loop from 1.
                     
-                    int startLoopIdx = 175;
+                    int startLoopIdx = 280;
                     if (m_MaxLevelIndex < startLoopIdx) startLoopIdx = 1;
 
                     // Standard 0-indexed modulo arithmetic mapped to our range [startLoopIdx, m_MaxLevelIndex]
