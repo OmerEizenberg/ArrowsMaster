@@ -10,7 +10,7 @@ namespace Assets.Scripts.GameUI
     public class MultiplyCoinsPopup : MonoBehaviour
     {
         [Header("Slot Machine UI")]
-        [SerializeField] private RectTransform m_SymbolsParent; // Container for the symbols
+        [SerializeField] private RectTransform[] m_ReelParents; // Array of containers for the 3 reels
         [SerializeField] private TextMeshProUGUI m_SymbolTemplate; // Template for the multipliers
         [SerializeField] private float m_SymbolSpacing = 120f; // Vertical distance between symbols
         
@@ -30,7 +30,7 @@ namespace Assets.Scripts.GameUI
         [Header("Config")]
         [SerializeField] private MultiplyRewardConfig m_Config;
 
-        private List<TextMeshProUGUI> m_ReelSymbols = new List<TextMeshProUGUI>();
+        private List<TextMeshProUGUI>[] m_AllReelSymbols;
         private int[] m_AvailableMultipliers;
         private int m_InitialCoins;
         private bool m_IsSpinning = false;
@@ -38,7 +38,7 @@ namespace Assets.Scripts.GameUI
         private int m_CurrentMultiplier = 1;
         private bool m_RewardClaimed = false;
         
-        private float m_ReelOffset = 0f; // Current scroll offset (normalized to symbols)
+        private float[] m_ReelOffsets; // Array of scroll offsets for each reel
 
         public void Setup(int coinsWon)
         {
@@ -111,20 +111,24 @@ namespace Assets.Scripts.GameUI
 
         private void InitializeSlotMachine()
         {
-            Debug.Log("[SlotMachine] Initializing Reel...");
+            Debug.Log("[SlotMachine] Initializing 3 Reels...");
             
             if (m_SymbolTemplate == null)
             {
                 Debug.LogError("[SlotMachine] ERROR: Symbol Template is not assigned in the Inspector!");
                 return;
             }
-            if (m_SymbolsParent == null)
+            if (m_ReelParents == null || m_ReelParents.Length == 0)
             {
-                Debug.LogError("[SlotMachine] ERROR: Symbols Parent is not assigned in the Inspector!");
+                Debug.LogError("[SlotMachine] ERROR: Reel Parents are not assigned in the Inspector!");
                 return;
             }
 
-            // Get multipliers from config zones
+            int reelCount = m_ReelParents.Length;
+            m_AllReelSymbols = new List<TextMeshProUGUI>[reelCount];
+            m_ReelOffsets = new float[reelCount];
+
+            // Get multipliers from config zones for symbol generation
             if (m_Config != null && m_Config.zones != null && m_Config.zones.Length > 0)
             {
                 m_AvailableMultipliers = new int[m_Config.zones.Length];
@@ -136,70 +140,49 @@ namespace Assets.Scripts.GameUI
                 m_AvailableMultipliers = new int[] { 2, 3, 4, 3, 2 };
             }
 
-            // Clear existing symbols
-            foreach (var sym in m_ReelSymbols) if (sym != null) Destroy(sym.gameObject);
-            m_ReelSymbols.Clear();
+            m_SymbolTemplate.gameObject.SetActive(false);
 
-            // Create 5 symbols
-            if (m_SymbolTemplate != null && m_SymbolsParent != null)
+            for (int r = 0; r < reelCount; r++)
             {
-                m_SymbolTemplate.gameObject.SetActive(false);
+                m_AllReelSymbols[r] = new List<TextMeshProUGUI>();
+                m_ReelOffsets[r] = 0f;
+
+                // Clear existing children in this reel parent (if any)
+                foreach (Transform child in m_ReelParents[r])
+                {
+                    if (child.gameObject != m_SymbolTemplate.gameObject)
+                        Destroy(child.gameObject);
+                }
+
+                // Create 5 symbols per reel
                 for (int i = 0; i < 5; i++)
                 {
                     MultiplierZone zone = GetWeightedMultiplierFromConfig();
-                    TextMeshProUGUI sym = Instantiate(m_SymbolTemplate, m_SymbolsParent);
+                    TextMeshProUGUI sym = Instantiate(m_SymbolTemplate, m_ReelParents[r]);
                     sym.gameObject.SetActive(true);
                     sym.text = "X" + zone.multiplier;
-                    m_ReelSymbols.Add(sym);
+                    m_AllReelSymbols[r].Add(sym);
                 }
-                Debug.Log($"[SlotMachine] Successfully created {m_ReelSymbols.Count} reel symbols.");
+                UpdateReelPositions(r);
             }
 
-            UpdateReelPositions();
-            
-            // Hide legacy pointer if it exists in the prefab
-            Transform pointer = transform.Find("Popup/Pointer");
-            if (pointer == null) pointer = transform.Find("Pointer");
-            if (pointer != null) pointer.gameObject.SetActive(false);
+            Debug.Log($"[SlotMachine] Successfully initialized {reelCount} reels.");
         }
 
-        private int PickWinnerIndexFromCurrentReel()
+        private int ForceMultiplierInReel(int reelIndex, int value)
         {
-            float totalWeight = 0;
-            Dictionary<int, float> weightsPerIndex = new Dictionary<int, float>();
-            
-            for (int i = 0; i < m_ReelSymbols.Count; i++)
+            // Ensure the target multiplier value exists in the specified reel.
+            // Check if it already exists among the 5 symbols.
+            for (int i = 0; i < m_AllReelSymbols[reelIndex].Count; i++)
             {
-                int val = 2;
-                int.TryParse(m_ReelSymbols[i].text.Replace("X", ""), out val);
-                
-                // Find weight in config for this multiplier value
-                float weight = 1.0f;
-                if (m_Config != null && m_Config.zones != null)
-                {
-                    foreach (var z in m_Config.zones)
-                    {
-                        if (z.multiplier == val)
-                        {
-                            weight = z.weight;
-                            break;
-                        }
-                    }
-                }
-                
-                weightsPerIndex[i] = weight;
-                totalWeight += weight;
+                if (m_AllReelSymbols[reelIndex][i].text == "X" + value) return i;
             }
-            
-            float r = UnityEngine.Random.Range(0f, totalWeight);
-            float cumulative = 0f;
-            foreach (var pair in weightsPerIndex)
-            {
-                cumulative += pair.Value;
-                if (r <= cumulative) return pair.Key;
-            }
-            return 2;
+            // If not found, replace the middle one (index 2 is a safe bet) or a random one.
+            int randomIndex = UnityEngine.Random.Range(0, 5);
+            m_AllReelSymbols[reelIndex][randomIndex].text = "X" + value;
+            return randomIndex;
         }
+
 
         private void OnDestroy()
         {
@@ -210,19 +193,20 @@ namespace Assets.Scripts.GameUI
             }
         }
 
-        private void UpdateReelPositions()
+        private void UpdateReelPositions(int r)
         {
-            int count = m_ReelSymbols.Count;
+            if (m_AllReelSymbols == null || r >= m_AllReelSymbols.Length) return;
+            int count = m_AllReelSymbols[r].Count;
             if (count == 0) return;
 
             for (int i = 0; i < count; i++)
             {
                 // Calculate position relative to container center
-                float posIndex = (i + m_ReelOffset) % count;
+                float posIndex = (i + m_ReelOffsets[r]) % count;
                 if (posIndex < 0) posIndex += count;
 
                 float distanceFromCenter = posIndex - 2f;
-                m_ReelSymbols[i].rectTransform.anchoredPosition = new Vector2(0, -distanceFromCenter * m_SymbolSpacing);
+                m_AllReelSymbols[r][i].rectTransform.anchoredPosition = new Vector2(0, -distanceFromCenter * m_SymbolSpacing);
 
                 float absDist = Mathf.Abs(distanceFromCenter);
                 float normalizedDist = Mathf.Clamp01(absDist / 2f); 
@@ -230,15 +214,10 @@ namespace Assets.Scripts.GameUI
                 float alpha = Mathf.Lerp(m_MaxAlpha, m_MinAlpha, normalizedDist);
                 float scale = Mathf.Lerp(m_MaxScale, m_MinScale, normalizedDist);
 
-                if (absDist <= 0.2f)
-                {
-                    int.TryParse(m_ReelSymbols[i].text.Replace("X", ""), out m_CurrentMultiplier);
-                }
-
-                Color c = m_ReelSymbols[i].color;
+                Color c = m_AllReelSymbols[r][i].color;
                 c.a = alpha;
-                m_ReelSymbols[i].color = c;
-                m_ReelSymbols[i].transform.localScale = Vector3.one * scale;
+                m_AllReelSymbols[r][i].color = c;
+                m_AllReelSymbols[r][i].transform.localScale = Vector3.one * scale;
             }
         }
 
@@ -256,61 +235,37 @@ namespace Assets.Scripts.GameUI
         {
             m_IsSpinning = true;
             
-            // PRE-DETERMINE THE WINNER based on weights of the 5 symbols currently in the reel
-            int winnerIndex = PickWinnerIndexFromCurrentReel();
+            // PRE-DETERMINE THE WINNER globally for all 3 reels
+            MultiplierZone winnerZone = GetWeightedMultiplierFromConfig();
+            m_CurrentMultiplier = winnerZone.multiplier;
             
-            float speed = UnityEngine.Random.Range(30f, 40f); 
-            float duration = 2.0f; // Shortened to 2.0s
-            float elapsed = 0f;
-
-            while (elapsed < duration)
+            int reelCount = m_ReelParents.Length;
+            int[] winnerIndices = new int[reelCount];
+            for (int r = 0; r < reelCount; r++)
             {
-                elapsed += Time.deltaTime;
-                    
-                float t = elapsed / duration;
-                float currentSpeed = Mathf.Lerp(speed, 2f, t * t);
-                m_ReelOffset += currentSpeed * Time.deltaTime;
-                UpdateReelPositions();
-                yield return null;
+                winnerIndices[r] = ForceMultiplierInReel(r, m_CurrentMultiplier);
             }
 
-            // Forced snap target calculation:
-            // Goal: m_ReelSymbols[winnerIndex] ends up at center (posIndex 2)
-            // Equation: (winnerIndex + targetOffset) % 5 = 2
-            // targetOffset should be roughly near current offset
-            float count = m_ReelSymbols.Count;
-            float currentVal = m_ReelOffset;
-            float desiredOffsetBase = 2f - winnerIndex;
-            // Shift desiredOffsetBase by multiples of 'count' to be closest to currentVal
-            float targetOffset = desiredOffsetBase + (Mathf.Round((currentVal - desiredOffsetBase) / count) * count);
-
-            float snapElapsed = 0f;
-            float snapDuration = 0.5f;
-            float startOffset = m_ReelOffset;
-
-            while (snapElapsed < snapDuration)
+            // Start all reels with staggered delays and durations to stop one by one
+            List<Coroutine> spinningCoroutines = new List<Coroutine>();
+            for (int r = 0; r < reelCount; r++)
             {
-                snapElapsed += Time.deltaTime;
-                float t = snapElapsed / snapDuration;
-                t = Mathf.Sin(t * Mathf.PI * 0.5f);
-                
-                m_ReelOffset = Mathf.Lerp(startOffset, targetOffset, t);
-                UpdateReelPositions();
-                yield return null;
+                // Each reel spins longer than the previous to stop from left to right
+                float startDelay = r * 0.15f;
+                float spinDuration = 1.0f + r * 0.6f; 
+                spinningCoroutines.Add(StartCoroutine(AnimateSingleReel(r, winnerIndices[r], spinDuration, startDelay)));
             }
 
-            m_ReelOffset = targetOffset;
-            UpdateReelPositions();
+            // Wait for all reels to stop
+            foreach (var cor in spinningCoroutines) yield return cor;
+
             m_IsSpinning = false;
             
-            // Punch Animation on the winning symbol
-            StartCoroutine(PunchSymbolRoutine(m_ReelSymbols[winnerIndex].transform));
+            Debug.Log($"[SlotMachine] All 3 Reels stopped on X{m_CurrentMultiplier}. Waiting small delay...");
 
-            Debug.Log($"[SlotMachine] Spin Forced on X{m_CurrentMultiplier} (Symbol {winnerIndex}). Waiting 0.5s...");
+            yield return new WaitForSeconds(0.6f);
 
-            yield return new WaitForSeconds(0.5f);
-
-            Debug.Log("[SlotMachine] Requesting Rewarded Video Ad...");
+            Debug.Log("[SlotMachine] Proceeding to Ad sequence.");
             if (AdsManager.Instance != null && (AdsManager.Instance.IsMultiplyRewardedReady || AdsManager.Instance.IsInterstitialReady))
             {
                 m_IsAdShowing = true;
@@ -324,6 +279,52 @@ namespace Assets.Scripts.GameUI
             {
                 Debug.LogWarning("[SlotMachine] Ad not ready.");
             }
+        }
+
+        private IEnumerator AnimateSingleReel(int r, int targetIndex, float duration, float startDelay)
+        {
+            if (startDelay > 0) yield return new WaitForSeconds(startDelay);
+
+            float speed = UnityEngine.Random.Range(35f, 45f);
+            float elapsed = 0f;
+
+            // Spin phase
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float currentSpeed = Mathf.Lerp(speed, 5f, t * t);
+                m_ReelOffsets[r] += currentSpeed * Time.deltaTime;
+                UpdateReelPositions(r);
+                yield return null;
+            }
+
+            // Snap phase
+            float symbolsCount = m_AllReelSymbols[r].Count;
+            float currentVal = m_ReelOffsets[r];
+            float desiredOffsetBase = 2f - targetIndex;
+            float targetOffset = desiredOffsetBase + (Mathf.Round((currentVal - desiredOffsetBase) / symbolsCount) * symbolsCount);
+
+            float snapElapsed = 0f;
+            float snapDuration = 0.45f;
+            float startOffset = m_ReelOffsets[r];
+
+            while (snapElapsed < snapDuration)
+            {
+                snapElapsed += Time.deltaTime;
+                float t = snapElapsed / snapDuration;
+                t = Mathf.Sin(t * Mathf.PI * 0.5f);
+                m_ReelOffsets[r] = Mathf.Lerp(startOffset, targetOffset, t);
+                UpdateReelPositions(r);
+                yield return null;
+            }
+
+            m_ReelOffsets[r] = targetOffset;
+            UpdateReelPositions(r);
+
+            // Arrival feedback
+            StartCoroutine(PunchSymbolRoutine(m_AllReelSymbols[r][targetIndex].transform));
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
         }
 
         private IEnumerator PunchSymbolRoutine(Transform target, float punchFactor = 1.3f)
