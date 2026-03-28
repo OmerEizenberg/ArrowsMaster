@@ -22,7 +22,9 @@ namespace Assets.Scripts.GameUI
         
         [Header("General UI")]
         [SerializeField] private TextMeshProUGUI m_CoinsWonText;
+        [SerializeField] private TextMeshProUGUI m_CoinsWonTextShadow;
         [SerializeField] private TextMeshProUGUI m_AnimatedCoinsText; // The one that counts up from original to multiplied
+        [SerializeField] private TextMeshProUGUI m_AnimatedCoinsTextShadow;
         [SerializeField] private Button m_MultiplyButton;
         [SerializeField] private Button m_NoThanksButton;
         [SerializeField] private Canvas m_Canvas;
@@ -45,7 +47,10 @@ namespace Assets.Scripts.GameUI
             m_InitialCoins = coinsWon;
             Debug.Log($"[SlotMachine] Setup called. Coins: {m_InitialCoins}");
             if (m_CoinsWonText != null) m_CoinsWonText.text = coinsWon.ToString("N0");
+            if (m_CoinsWonTextShadow != null) m_CoinsWonTextShadow.text = coinsWon.ToString("N0");
+            
             if (m_AnimatedCoinsText != null) m_AnimatedCoinsText.gameObject.SetActive(false);
+            if (m_AnimatedCoinsTextShadow != null) m_AnimatedCoinsTextShadow.gameObject.SetActive(false);
             
             m_IsSpinning = false;
             m_IsAdShowing = false;
@@ -75,6 +80,7 @@ namespace Assets.Scripts.GameUI
                 m_InitialCoins = GameManager.Instance.p_lastWinAmount;
                 Debug.Log($"[SlotMachine] OnEnable: Retrieved win amount from GameManager: {m_InitialCoins}");
                 if (m_CoinsWonText != null) m_CoinsWonText.text = m_InitialCoins.ToString("N0");
+                if (m_CoinsWonTextShadow != null) m_CoinsWonTextShadow.text = m_InitialCoins.ToString("N0");
             }
 
             InitializeSlotMachine();
@@ -414,8 +420,14 @@ namespace Assets.Scripts.GameUI
             if (m_AnimatedCoinsText != null)
             {
                 if (m_CoinsWonText != null) m_CoinsWonText.gameObject.SetActive(false);
+                if (m_CoinsWonTextShadow != null) m_CoinsWonTextShadow.gameObject.SetActive(false);
+                
                 m_AnimatedCoinsText.gameObject.SetActive(true);
                 m_AnimatedCoinsText.text = m_InitialCoins.ToString();
+                
+                
+                m_AnimatedCoinsTextShadow.gameObject.SetActive(true);
+                m_AnimatedCoinsTextShadow.text = m_AnimatedCoinsText.text;
             }
             
             int targetCoins = m_InitialCoins * m_CurrentMultiplier;
@@ -433,15 +445,19 @@ namespace Assets.Scripts.GameUI
                 t = 1f - Mathf.Pow(1f - t, 3f);
                 
                 int current = Mathf.RoundToInt(Mathf.Lerp(m_InitialCoins, targetCoins, t));
-                if (m_AnimatedCoinsText != null) m_AnimatedCoinsText.text = current.ToString();
+                m_AnimatedCoinsText.text = current.ToString();
+                m_AnimatedCoinsTextShadow.text = m_AnimatedCoinsText.text;
                 yield return null;
             }
             
             if (m_AnimatedCoinsText != null)
             {
                 m_AnimatedCoinsText.text = targetCoins.ToString();
+                m_AnimatedCoinsTextShadow.text = targetCoins.ToString();
+                
                 // Final punch animation on the reward text
                 StartCoroutine(PunchSymbolRoutine(m_AnimatedCoinsText.transform, 1.2f));
+                StartCoroutine(PunchSymbolRoutine(m_AnimatedCoinsTextShadow.transform, 1.2f));
             }
             
             if (UserDataManager.Instance != null && additionalCoins > 0)
@@ -469,7 +485,14 @@ namespace Assets.Scripts.GameUI
         private void Close()
         {
             Debug.Log("[SlotMachine] Closing Multiply Coins Popup.");
-            Destroy(gameObject);
+            if(transform.parent != null)
+            {
+                Destroy(transform.parent.gameObject);
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
         }
     }
 }

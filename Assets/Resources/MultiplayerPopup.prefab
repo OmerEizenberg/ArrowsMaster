@@ -1096,8 +1096,10 @@ MonoBehaviour:
   m_MaxAlpha: 1
   m_MinScale: 0.7
   m_MaxScale: 1.3
-  m_CoinsWonText: {fileID: 2819270025620708148}
-  m_AnimatedCoinsText: {fileID: 2819270025620708148}
+  m_CoinsWonText: {fileID: 2012197898036839064}
+  m_CoinsWonTextShadow: {fileID: 2819270025620708148}
+  m_AnimatedCoinsText: {fileID: 2012197898036839064}
+  m_AnimatedCoinsTextShadow: {fileID: 2819270025620708148}
   m_MultiplyButton: {fileID: 6091132366059924105}
   m_NoThanksButton: {fileID: 8051261202184775189}
   m_Canvas: {fileID: 8081197049139456060}
