@@ -246,13 +246,19 @@ namespace Assets.Scripts.GameUI
                 winnerIndices[r] = ForceMultiplierInReel(r, m_CurrentMultiplier);
             }
 
-            // Start all reels with staggered delays and durations to stop one by one
+            // Start all reels with staggered delays and durations to stop in reverse order (2 -> 1 -> 0)
             List<Coroutine> spinningCoroutines = new List<Coroutine>();
             for (int r = 0; r < reelCount; r++)
             {
-                // Each reel spins longer than the previous to stop from left to right
-                float startDelay = r * 0.15f;
-                float spinDuration = 1.0f + r * 0.6f; 
+                // Each reel spins longer or shorter to control stop order
+                // For 2 -> 1 -> 0, reel 2 stays first (shortest duration), then 1, then 0
+                int reverseIndex = (reelCount - 1 - r); // 0 -> 2, 1 -> 1, 2 -> 0
+                
+                float startDelay = reverseIndex * 0.15f;
+                float spinDuration = 0.8f + reverseIndex * 0.6f; 
+                // Add minor randomization to duration for unique look
+                spinDuration += UnityEngine.Random.Range(-0.1f, 0.1f);
+
                 spinningCoroutines.Add(StartCoroutine(AnimateSingleReel(r, winnerIndices[r], spinDuration, startDelay)));
             }
 
@@ -285,41 +291,80 @@ namespace Assets.Scripts.GameUI
         {
             if (startDelay > 0) yield return new WaitForSeconds(startDelay);
 
-            float speed = UnityEngine.Random.Range(35f, 45f);
+            // Wider peak speed range for more varied mechanical "power"
+            float peakSpeed = UnityEngine.Random.Range(85f, 115f);
             float elapsed = 0f;
 
-            // Spin phase
+            // --- Physical Spin Phase (Acceleration -> Peak -> Deceleration) ---
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                float currentSpeed = Mathf.Lerp(speed, 5f, t * t);
-                m_ReelOffsets[r] += currentSpeed * Time.deltaTime;
+                
+                float speedCurve;
+                if (t < 0.3f)
+                {
+                    // Quadratic acceleration for a smooth start
+                    float localT = t / 0.3f;
+                    speedCurve = localT * localT;
+                }
+                else if (t < 0.65f)
+                {
+                    // Constant Peak Speed
+                    speedCurve = 1.0f;
+                }
+                else
+                {
+                    // Cubic deceleration for a "heavy" mechanical ramp down
+                    float localT = (t - 0.65f) / 0.35f;
+                    speedCurve = 1f - (localT * localT * localT);
+                }
+                
+                speedCurve = Mathf.Clamp(speedCurve, 0.08f, 1.0f);
+                m_ReelOffsets[r] += peakSpeed * speedCurve * Time.deltaTime;
                 UpdateReelPositions(r);
                 yield return null;
             }
 
-            // Snap phase
+            // --- Physical Snap (Spring-like Overshoot and Return) ---
             float symbolsCount = m_AllReelSymbols[r].Count;
             float currentVal = m_ReelOffsets[r];
             float desiredOffsetBase = 2f - targetIndex;
-            float targetOffset = desiredOffsetBase + (Mathf.Round((currentVal - desiredOffsetBase) / symbolsCount) * symbolsCount);
+            float targetOffsetEnd = desiredOffsetBase + (Mathf.Round((currentVal - desiredOffsetBase) / symbolsCount) * symbolsCount);
 
+            float startSnapOffset = m_ReelOffsets[r];
+            float snapTotalTime = 0.45f;
             float snapElapsed = 0f;
-            float snapDuration = 0.45f;
-            float startOffset = m_ReelOffsets[r];
-
-            while (snapElapsed < snapDuration)
+            
+            // This curve simulates the reel hitting the brake, jumping past, and falling back
+            while (snapElapsed < snapTotalTime)
             {
                 snapElapsed += Time.deltaTime;
-                float t = snapElapsed / snapDuration;
-                t = Mathf.Sin(t * Mathf.PI * 0.5f);
-                m_ReelOffsets[r] = Mathf.Lerp(startOffset, targetOffset, t);
+                float t = snapElapsed / snapTotalTime;
+                
+                // Back-Ease-Out Approximation
+                // It goes from 0 to ~1.2 before settling exactly at 1.0
+                float overshootAmount = 0.35f;
+                float easedT;
+                if (t < 0.6f)
+                {
+                    float localT = t / 0.6f;
+                    float invT = 1f - localT;
+                    easedT = (1f + overshootAmount) * (1f - invT * invT); // Overshoot
+                }
+                else
+                {
+                    float localT = (t - 0.6f) / 0.4f;
+                    easedT = Mathf.Lerp(1f + overshootAmount, 1.0f, localT * localT); // Settle back
+                }
+
+                // Manual Lerp to ensure overshoot beyond 1.0 works as intended
+                m_ReelOffsets[r] = startSnapOffset + (targetOffsetEnd - startSnapOffset) * easedT;
                 UpdateReelPositions(r);
                 yield return null;
             }
 
-            m_ReelOffsets[r] = targetOffset;
+            m_ReelOffsets[r] = targetOffsetEnd;
             UpdateReelPositions(r);
 
             // Arrival feedback
