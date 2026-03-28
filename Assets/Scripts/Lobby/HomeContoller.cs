@@ -82,6 +82,11 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private RectTransform m_ShopText;
         private Coroutine m_TabSlideCoroutine;
 
+        [Header("Swipe Navigation")]
+        [SerializeField] private float m_SwipeThreshold = 100f;
+        private Vector2 m_SwipeStartPos;
+        private bool m_IsSwiping;
+
         // Currency animation
         [SerializeField] private float m_CoinAnimDuration = 1.5f;
         [SerializeField] private float m_CoinScalePunch = 2.25f;
@@ -230,6 +235,102 @@ namespace Assets.Scripts.Lobby
         private void Update()
         {
             UpdateLobbyAdReadyImage();
+            HandleSwipeNavigation();
+        }
+
+        private void HandleSwipeNavigation()
+        {
+            // If shop is open, user says "dont allow swiping"
+            if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy) return;
+
+            // If other overlays are open (Settings, Donate, NoAds), we probably shouldn't swipe
+            if ((m_SettingsLayer != null && m_SettingsLayer.activeInHierarchy) ||
+                (m_DonateLayer != null && m_DonateLayer.activeInHierarchy) ||
+                (m_NoAdsLayer != null && m_NoAdsLayer.activeInHierarchy))
+            {
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(0))
+            {
+                m_SwipeStartPos = Input.mousePosition;
+                m_IsSwiping = true;
+            }
+            else if (Input.GetMouseButtonUp(0) && m_IsSwiping)
+            {
+                m_IsSwiping = false;
+                Vector2 swipeEndPos = Input.mousePosition;
+                Vector2 delta = swipeEndPos - m_SwipeStartPos;
+
+                if (Mathf.Abs(delta.x) > m_SwipeThreshold && Mathf.Abs(delta.y) < Mathf.Abs(delta.x))
+                {
+                    if (delta.x > 0)
+                    {
+                        // Swipe Left (finger moves towards right)
+                        OnSwipeLeft(swipeEndPos);
+                    }
+                    else
+                    {
+                        // Swipe Right (finger moves towards left)
+                        OnSwipeRight(swipeEndPos);
+                    }
+                }
+            }
+        }
+
+        private void OnSwipeRight(Vector2 endPos)
+        {
+            // Calendar (left) -> Swipe Right (finger moves left) -> Home
+            // Home (middle) -> Swipe Right (finger moves left) -> Shop
+            
+            if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
+            {
+                 if (endPos.y > Screen.height * 0.33f)
+                {
+                    if (m_MonthlyChallengeController != null)
+                    {
+                        m_MonthlyChallengeController.NextMonth();
+                    }
+                }else{
+                    // We are in Calendar, go to Home
+                    OnCalanderButtonClicked(); // Toggles Calendar off, showing Home
+                }
+            }
+            else if (m_ShopLayer != null && !m_ShopLayer.activeInHierarchy)
+            {
+                // We are in Home (since Shop is off and Calendar was checked above), go to Shop
+                ShowShop();
+            }
+        }
+
+        private void OnSwipeLeft(Vector2 endPos)
+        {
+            // Home (middle) -> Swipe Left (finger moves right) -> Calendar
+            // Calendar (left) -> Swipe Left (finger moves right) -> Prev Month (if top 2/3 of screen)
+            
+            if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy)
+            {
+                // In Shop, user said "dont allow swiping"
+                return;
+            }
+
+            if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
+            {
+                // We are in Calendar and swiping finger to the right.
+                // User wants to move to previous month if finger is above 0.33 of screen height.
+                if (endPos.y > Screen.height * 0.33f)
+                {
+                    if (m_MonthlyChallengeController != null)
+                    {
+                        m_MonthlyChallengeController.PrevMonth();
+                    }
+                }
+            }
+            else if (m_CalanderLayer != null && !m_CalanderLayer.activeInHierarchy)
+            {
+                // We are in Home, go to Calendar
+                OnCalanderButtonClicked(); // Toggles Calendar on
+            }
         }
 
         private void UpdateRewardedAdAmount()

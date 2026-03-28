@@ -200,6 +200,8 @@ public class MonthlyChallengeController : MonoBehaviour
 
     public void NextMonth()
     {
+        if(m_NextMonthBtn.gameObject.activeSelf == false) return;
+        
         DateTime next = new DateTime(p_CurrentYear, p_CurrentMonth, 1).AddMonths(1);
         p_CurrentMonth = next.Month;
         p_CurrentYear = next.Year;
@@ -208,6 +210,8 @@ public class MonthlyChallengeController : MonoBehaviour
 
     public void PrevMonth()
     {
+        if(m_PrevMonthBtn.gameObject.activeSelf == false) return;
+        
         DateTime prev = new DateTime(p_CurrentYear, p_CurrentMonth, 1).AddMonths(-1);
         p_CurrentMonth = prev.Month;
         p_CurrentYear = prev.Year;
