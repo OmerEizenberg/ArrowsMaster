@@ -154,8 +154,21 @@ namespace Assets.Scripts.Core
                 
                 Debug.Log("[AdsManager] Unity Services Initialized.");
                 
-                // Request ATT for iOS mandatory check
-                IOSAdsHelper.RequestATT();
+                // Request ATT and wait for choice to set proper LevelPlay consent status
+                bool attChoiceMade = false;
+                IOSAdsHelper.RequestATT(); // Start the system request
+                StartCoroutine(IOSAdsHelper.PollATTStatus((authorized) => {
+                    attChoiceMade = true;
+                    // Note: LevelPlay consent is set inside PollATTStatus
+                    Debug.Log($"[AdsManager] ATT choice made: {authorized}. Continuing SDK Init.");
+                }));
+
+                // Wait for choice slightly to ensure IDFA is ready, but don't block indefinitely online
+                float waitStart = Time.time;
+                while (!attChoiceMade && Time.time - waitStart < 1.0f) // Max 1s wait here if needed, but the init can continue
+                {
+                    await Task.Yield();
+                }
 
                 string currentAppKey = AppKey;
                 Debug.Log($"[AdsManager] Initializing LevelPlay SDK with AppKey: {currentAppKey} (Platform: {Application.platform})");
