@@ -100,6 +100,8 @@ namespace Assets.Scripts.Lobby
         private Coroutine m_LobbyScaleCoroutine;
         private Coroutine m_ShopScaleCoroutine;
         private Coroutine m_TooltipCoroutine;
+        private int m_LastToggleFrame = -1;
+
 
         private void Awake()
         {
@@ -240,14 +242,12 @@ namespace Assets.Scripts.Lobby
 
         private void HandleSwipeNavigation()
         {
-            // If shop is open, user says "dont allow swiping"
-            if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy) return;
-
-            // If other overlays are open (Settings, Donate, NoAds), we probably shouldn't swipe
+            // If sub-overlays are open (Settings, Donate, NoAds), block swiping to avoid accidental transitions
             if ((m_SettingsLayer != null && m_SettingsLayer.activeInHierarchy) ||
                 (m_DonateLayer != null && m_DonateLayer.activeInHierarchy) ||
                 (m_NoAdsLayer != null && m_NoAdsLayer.activeInHierarchy))
             {
+                m_IsSwiping = false;
                 return;
             }
 
@@ -256,82 +256,82 @@ namespace Assets.Scripts.Lobby
                 m_SwipeStartPos = Input.mousePosition;
                 m_IsSwiping = true;
             }
-            else if (Input.GetMouseButtonUp(0) && m_IsSwiping)
+            else if (Input.GetMouseButtonUp(0))
             {
-                m_IsSwiping = false;
-                Vector2 swipeEndPos = Input.mousePosition;
-                Vector2 delta = swipeEndPos - m_SwipeStartPos;
-
-                if (Mathf.Abs(delta.x) > m_SwipeThreshold && Mathf.Abs(delta.y) < Mathf.Abs(delta.x))
+                if (m_IsSwiping)
                 {
-                    if (delta.x > 0)
+                    m_IsSwiping = false;
+                    Vector2 swipeEndPos = Input.mousePosition;
+                    Vector2 delta = swipeEndPos - m_SwipeStartPos;
+
+                    if (Mathf.Abs(delta.x) > m_SwipeThreshold && Mathf.Abs(delta.y) < Mathf.Abs(delta.x))
                     {
-                        // Swipe Left (finger moves towards right)
-                        OnSwipeLeft(swipeEndPos);
-                    }
-                    else
-                    {
-                        // Swipe Right (finger moves towards left)
-                        OnSwipeRight(swipeEndPos);
+                        if (delta.x > 0)
+                        {
+                            // Finger moves towards Right
+                            OnSwipeLeft(swipeEndPos);
+                        }
+                        else
+                        {
+                            // Finger moves towards Left
+                            OnSwipeRight(swipeEndPos);
+                        }
                     }
                 }
             }
         }
 
+
         private void OnSwipeRight(Vector2 endPos)
+
         {
-            // Calendar (left) -> Swipe Right (finger moves left) -> Home
-            // Home (middle) -> Swipe Right (finger moves left) -> Shop
-            
+            // Finger moves towards Left: Calendar (Left) -> Home (Middle) -> Shop (Right)
+
             if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
             {
+                // We are in Calendar (Leftmost), swiping Left -> return to Home
                  if (endPos.y > Screen.height * 0.33f)
                 {
-                    if (m_MonthlyChallengeController != null)
-                    {
-                        m_MonthlyChallengeController.NextMonth();
-                    }
-                }else{
-                    // We are in Calendar, go to Home
-                    OnCalanderButtonClicked(); // Toggles Calendar off, showing Home
+                    if (m_MonthlyChallengeController != null) m_MonthlyChallengeController.NextMonth();
+                }
+                else
+                {
+                    OnCalanderButtonClicked(); // Returns to Home
                 }
             }
             else if (m_ShopLayer != null && !m_ShopLayer.activeInHierarchy)
             {
-                // We are in Home (since Shop is off and Calendar was checked above), go to Shop
+                // We are in Home (Middle), swiping Left -> go to Shop
                 ShowShop();
             }
         }
 
         private void OnSwipeLeft(Vector2 endPos)
         {
-            // Home (middle) -> Swipe Left (finger moves right) -> Calendar
-            // Calendar (left) -> Swipe Left (finger moves right) -> Prev Month (if top 2/3 of screen)
-            
+            // Finger moves towards Right: Calendar (Left) <- Home (Middle) <- Shop (Right)
+
             if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy)
             {
-                // In Shop, user said "dont allow swiping"
-                return;
+                // We are in Shop (Rightmost), swiping Right -> return to Home
+                HideShop();
             }
-
-            if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
+            else if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
             {
-                // We are in Calendar and swiping finger to the right.
-                // User wants to move to previous month if finger is above 0.33 of screen height.
+                // We are in Calendar (Leftmost), swiping Right -> Month Navigation
                 if (endPos.y > Screen.height * 0.33f)
                 {
-                    if (m_MonthlyChallengeController != null)
-                    {
-                        m_MonthlyChallengeController.PrevMonth();
-                    }
+                    if (m_MonthlyChallengeController != null) m_MonthlyChallengeController.PrevMonth();
                 }
             }
             else if (m_CalanderLayer != null && !m_CalanderLayer.activeInHierarchy)
             {
-                // We are in Home, go to Calendar
-                OnCalanderButtonClicked(); // Toggles Calendar on
+                // We are in Home (Middle), swiping Right -> go to Calendar
+                OnCalanderButtonClicked();
             }
         }
+
+
+
 
         private void UpdateRewardedAdAmount()
         {
@@ -731,6 +731,7 @@ namespace Assets.Scripts.Lobby
                 m_ShopLayer.SetActive(false);
             }
         }
+        
         public void OnDonateButtonClicked()
         {
             SoundManager.Instance.PlayClick();
@@ -777,21 +778,34 @@ namespace Assets.Scripts.Lobby
 
         public void OnCalanderButtonClicked()
         {
+            if (Time.frameCount == m_LastToggleFrame) return;
+            m_LastToggleFrame = Time.frameCount;
+
             SoundManager.Instance.PlayClick();
             CleanupFireAnimation();
+            
+            // Prevent interaction confusion by clearing any pending swipe state
+            m_IsSwiping = false;
 
-            if(m_CalanderLayer.activeInHierarchy)
+
+            // If calendar is already the active view, hide it
+            if(m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
             {
                 m_CalanderLayer.SetActive(false);
                 if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
                 SlideTabBackground(m_HomeTab);
-            }else{
-                m_SettingsLayer.SetActive(false);
+            }
+            else
+            {
+                // Deactivate ALL other layers to ensure a clean state
+                if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
+                if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
+                if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+                if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
+
                 m_CalanderLayer.SetActive(true);
-                m_ShopLayer.SetActive(false);
                 if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = false;
 
-                // Update the last seen challenge date to today
                 PlayerPrefs.SetString("LastSeenChallengeDate", System.DateTime.Today.ToBinary().ToString());
                 PlayerPrefs.Save();
                 UpdateChallengeNotification();
@@ -799,21 +813,35 @@ namespace Assets.Scripts.Lobby
             }
             RefreshLobbyUI();
         }
+
+
         public void OnHomeButtonClicked()
         {
+            if (Time.frameCount == m_LastToggleFrame) return;
+            m_LastToggleFrame = Time.frameCount;
+
             SoundManager.Instance.PlayClick();
             CleanupFireAnimation();
 
-            m_SettingsLayer.SetActive(false);
-            m_CalanderLayer.SetActive(false);
-            m_ShopLayer.SetActive(false);
+            // Clear ALL layers to return to raw Home state
+            if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
+            if (m_CalanderLayer != null) m_CalanderLayer.SetActive(false);
+            if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
+            if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
+            if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+
             if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
             SlideTabBackground(m_HomeTab);
             RefreshLobbyUI();
         }
 
+
         public void OnShopButtonClicked()
         {
+            if (Time.frameCount == m_LastToggleFrame) return;
+            m_LastToggleFrame = Time.frameCount;
+
+            // Logic: Is the shop currently the primary active view?
             if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy)
             {
                 HideShop();
@@ -824,10 +852,12 @@ namespace Assets.Scripts.Lobby
             }
         }
 
-
+        
         public void OnCloseShopButtonClicked()
         {
-            HideShop();
+             if (Time.frameCount == m_LastToggleFrame) return;
+             m_LastToggleFrame = Time.frameCount;
+             HideShop();
         }
 
         public void ShowShop()
@@ -835,32 +865,34 @@ namespace Assets.Scripts.Lobby
             SoundManager.Instance.PlayShop();
             CleanupFireAnimation();
             
-            // Explicitly deactivate other overlapping layers
+            // To prevent interaction confusion, explicitly clear any pending swipe state
+            m_IsSwiping = false;
+
+            // Atomically manage layer states to prevent overlap glitches
             if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
             if (m_CalanderLayer != null) m_CalanderLayer.SetActive(false);
             if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
             if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
             
-            m_ShopLayer.SetActive(true);
+            if (m_ShopLayer != null) m_ShopLayer.SetActive(true);
             SlideTabBackground(m_ShopTab);
             
-            // Ensure we are in progression mode if returning to lobby features
             if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
             RefreshLobbyUI();
         }
 
-
         public void HideShop()
         {
             SoundManager.Instance.PlayClick();
-            m_ShopLayer.SetActive(false);
+            m_IsSwiping = false;
+            
+            if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
             SlideTabBackground(m_HomeTab);
             
             if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
             RefreshLobbyUI();
         }
 
-       
         public void OnBuyProductButtonClicked(string productId)
         {
             if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
@@ -1147,6 +1179,7 @@ namespace Assets.Scripts.Lobby
             m_LockedChallengeTooltip.SetActive(false);
             m_TooltipCoroutine = null;
         }
+
         private void CheckForRateUsPopup()
         {
             if (UserDataManager.Instance == null) return;
@@ -1224,11 +1257,12 @@ namespace Assets.Scripts.Lobby
                 newPos.x = targetTab.position.x;
                 m_SelectedTabBg.position = newPos;
             }
-            
+
             Vector3 textSelectedScale = new Vector3(1.2f, 1.2f, 1.2f);
-            Vector3 iconSelectedScale = new Vector3(1.65f, 1.65f, 1.65f);
-            float iconSelectedY = 97f;
+            Vector3 iconSelectedScale = new Vector3(1.5f, 1.5f, 1.5f);
+            float iconSelectedY = 87f;
             float iconDeselectedY = 67f;
+
 
             
             UpdateTabImmediate(m_HomeIcon, m_HomeText, targetTab == m_HomeTab, iconSelectedScale, textSelectedScale, iconSelectedY, iconDeselectedY);
@@ -1263,14 +1297,11 @@ namespace Assets.Scripts.Lobby
 
         private IEnumerator AnimateTabBackground(RectTransform targetTab)
         {
-            // IMPORTANT: Wait for end of frame to ensure layout groups have updated 
-            // the positions of the tabs if a layer was just activated/deactivated.
-            yield return new WaitForEndOfFrame();
-            
             float duration = 0.25f;
             float elapsed = 0f;
             Vector3 startPos = m_SelectedTabBg.position;
             Vector3 targetWorldPosition = targetTab.position;
+
 
 
             // Capture start states
@@ -1290,6 +1321,7 @@ namespace Assets.Scripts.Lobby
             Vector3 iconSelScale = new Vector3(1.65f, 1.65f, 1.65f);
             float iconSelY = 97f;
             float iconDesY = 67f;
+
 
 
             while (elapsed < duration)
