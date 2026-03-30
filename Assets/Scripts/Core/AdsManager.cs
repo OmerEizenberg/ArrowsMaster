@@ -15,7 +15,9 @@ namespace Assets.Scripts.Core
         private LevelPlayRewardedAd coinsRewardedAd;
         private LevelPlayRewardedAd multiplyRewardedAd;
         private LevelPlayBannerAd settingsBannerAd;
+        public bool IsInitialized => isInitialized;
         private bool isInitialized = false;
+
         private bool isInitializing = false;
         private int sdkInitRetryCount = 0;
         private float lastAdShowTime = -30f;

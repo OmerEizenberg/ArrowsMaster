@@ -814,7 +814,7 @@ namespace Assets.Scripts.Lobby
 
         public void OnShopButtonClicked()
         {
-            if (m_ShopLayer.activeInHierarchy)
+            if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy)
             {
                 HideShop();
             }
@@ -824,23 +824,42 @@ namespace Assets.Scripts.Lobby
             }
         }
 
+
+        public void OnCloseShopButtonClicked()
+        {
+            HideShop();
+        }
+
         public void ShowShop()
         {
             SoundManager.Instance.PlayShop();
             CleanupFireAnimation();
-            m_SettingsLayer.SetActive(false);
-            m_DonateLayer.SetActive(false);
-            m_NoAdsLayer.SetActive(false);
+            
+            // Explicitly deactivate other overlapping layers
+            if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
+            if (m_CalanderLayer != null) m_CalanderLayer.SetActive(false);
+            if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
+            if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+            
             m_ShopLayer.SetActive(true);
             SlideTabBackground(m_ShopTab);
+            
+            // Ensure we are in progression mode if returning to lobby features
+            if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
+            RefreshLobbyUI();
         }
+
 
         public void HideShop()
         {
             SoundManager.Instance.PlayClick();
             m_ShopLayer.SetActive(false);
             SlideTabBackground(m_HomeTab);
+            
+            if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
+            RefreshLobbyUI();
         }
+
        
         public void OnBuyProductButtonClicked(string productId)
         {
@@ -1210,6 +1229,7 @@ namespace Assets.Scripts.Lobby
             Vector3 iconSelectedScale = new Vector3(1.65f, 1.65f, 1.65f);
             float iconSelectedY = 97f;
             float iconDeselectedY = 67f;
+
             
             UpdateTabImmediate(m_HomeIcon, m_HomeText, targetTab == m_HomeTab, iconSelectedScale, textSelectedScale, iconSelectedY, iconDeselectedY);
             UpdateTabImmediate(m_CalendarIcon, m_CalendarText, targetTab == m_CalendarTab, iconSelectedScale, textSelectedScale, iconSelectedY, iconDeselectedY);
@@ -1243,10 +1263,15 @@ namespace Assets.Scripts.Lobby
 
         private IEnumerator AnimateTabBackground(RectTransform targetTab)
         {
+            // IMPORTANT: Wait for end of frame to ensure layout groups have updated 
+            // the positions of the tabs if a layer was just activated/deactivated.
+            yield return new WaitForEndOfFrame();
+            
             float duration = 0.25f;
             float elapsed = 0f;
             Vector3 startPos = m_SelectedTabBg.position;
             Vector3 targetWorldPosition = targetTab.position;
+
 
             // Capture start states
             Vector3 hIconScaleS = m_HomeIcon != null ? m_HomeIcon.localScale : Vector3.one;
@@ -1262,9 +1287,10 @@ namespace Assets.Scripts.Lobby
             Vector3 sTextScaleS = m_ShopText != null ? m_ShopText.localScale : Vector3.one;
 
             Vector3 textSelScale = new Vector3(1.2f, 1.2f, 1.2f);
-            Vector3 iconSelScale = new Vector3(1.5f, 1.5f, 1.5f);
-            float iconSelY = 87f;
+            Vector3 iconSelScale = new Vector3(1.65f, 1.65f, 1.65f);
+            float iconSelY = 97f;
             float iconDesY = 67f;
+
 
             while (elapsed < duration)
             {

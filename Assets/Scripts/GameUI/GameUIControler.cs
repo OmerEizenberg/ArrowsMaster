@@ -28,6 +28,8 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private Image m_RestartButtonImage;
     [SerializeField] private TextMeshProUGUI m_RestartButtonText;
     private Coroutine m_RestartButtonFadeCoroutine;
+    private Coroutine m_AdButtonRefreshCoroutine;
+
     
     [Header("Timer Colors")]
     [SerializeField] private Color m_TimerDefaultColor = Color.white; // Default timer color
@@ -218,6 +220,8 @@ public class GameUIContoleer : MonoBehaviour
     private void OnLevelStarted()
     {
         StopFailureFadeCoroutine();
+        StopAdButtonRefreshCoroutine();
+
         UpdateTimerVisibility();
         int minutes = Mathf.FloorToInt(GameManager.Instance.CurrentTime / 60f);
         int seconds = Mathf.FloorToInt(GameManager.Instance.CurrentTime % 60f);
@@ -283,7 +287,15 @@ public class GameUIContoleer : MonoBehaviour
         
         if (m_RestartButtonFadeCoroutine != null) StopCoroutine(m_RestartButtonFadeCoroutine);
         m_RestartButtonFadeCoroutine = StartCoroutine(RestartButtonFadeRoutine());
+
+        if (m_AdButtonRefreshCoroutine != null) StopCoroutine(m_AdButtonRefreshCoroutine);
+        
+        // Initial state before starting the loop
+        UpdateAdButtonStatus();
+        m_AdButtonRefreshCoroutine = StartCoroutine(AdButtonRefreshRoutine());
     }
+
+
 
     public void StopFailureFadeCoroutine()
     {
@@ -292,6 +304,9 @@ public class GameUIContoleer : MonoBehaviour
             StopCoroutine(m_RestartButtonFadeCoroutine);
             m_RestartButtonFadeCoroutine = null;
         }
+
+        StopAdButtonRefreshCoroutine();
+
         
         // Ensure button is reset to a visible state if needed, or hidden if we are starting a level
         // For now, let's just make sure it's not stuck in a half-faded state if we exit failure screen
@@ -324,7 +339,58 @@ public class GameUIContoleer : MonoBehaviour
         m_RestartButtonFadeCoroutine = null;
     }
 
+    public void StopAdButtonRefreshCoroutine()
+    {
+        if (m_AdButtonRefreshCoroutine != null)
+        {
+            StopCoroutine(m_AdButtonRefreshCoroutine);
+            m_AdButtonRefreshCoroutine = null;
+        }
+    }
+
+    private IEnumerator AdButtonRefreshRoutine()
+    {
+        // Periodic check while on failure screen
+        while (true)
+        {
+            yield return new WaitForSeconds(1.5f); // Check every 1.5 seconds for better responsiveness
+            
+            // Bullet-proof: Check if scene/manager still exists
+            if (AdsManager.Instance == null) yield break;
+            
+            UpdateAdButtonStatus();
+            
+            // Optimistically stop if both ads are ready and we are shown already
+            // since we don't expect them to go "unready" usually once they are
+            // But let's keep polling for 30s max for extreme corner cases? No, let's keep it simple.
+        }
+    }
+
+    private void UpdateAdButtonStatus()
+    {
+        // Guard against destroyed button or missing instance
+        if (m_PlayOnAdButton == null || AdsManager.Instance == null) return;
+        
+        // If not initialized yet, don't show but don't stop (might initialize soon)
+        if (!AdsManager.Instance.IsInitialized)
+        {
+            if (m_PlayOnAdButton.activeSelf) m_PlayOnAdButton.SetActive(false);
+            return;
+        }
+
+        bool isAdReady = AdsManager.Instance.IsRewardedReady || AdsManager.Instance.IsInterstitialReady;
+        
+        // Only call SetActive if state actually changed to avoid overhead
+        if (m_PlayOnAdButton.activeSelf != isAdReady)
+        {
+            Debug.Log($"[GameUIContoleer] Ad availability updated. Play-On Reward Ad Ready: {isAdReady}");
+            m_PlayOnAdButton.SetActive(isAdReady);
+        }
+    }
+
+
     private void SetRestartButtonAlpha(float alpha)
+
     {
         if (m_RestartButtonImage != null)
         {
