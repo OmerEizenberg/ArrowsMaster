@@ -118,10 +118,14 @@ public class MonthlyChallengeController : MonoBehaviour
                      // Active day
                     dayImages[i].GetComponent<Button>().interactable = true;
                     dayImages[i].gameObject.SetActive(true);
-                    if(m_dayTexts[i] == null) m_dayTexts[i] = dayImages[i].transform.GetChild(0).GetComponent<TextMeshProUGUI>();
-                    m_dayTexts[i].text = dateNumber.ToString();
+                    if(i < m_dayTexts.Length && m_dayTexts[i] == null) m_dayTexts[i] = dayImages[i].transform.GetChild(0).GetComponent<TextMeshProUGUI>();
+                    if(i < m_dayTexts.Length)
+                    {
+                        m_dayTexts[i].text = dateNumber.ToString();
+                        m_dayTexts[i].color = m_NormalColorTxt;
+                    }
+                    
                     dayImages[i].color = m_NormalColor;
-                    m_dayTexts[i].color = m_NormalColorTxt;
 
                     if (UserDataManager.Instance.IsDayCompleted(year, month, dateNumber))
                     {
@@ -167,8 +171,12 @@ public class MonthlyChallengeController : MonoBehaviour
         {
             if (!UserDataManager.Instance.IsDayCompleted(year, month, d))
             {
-                selectedDayIndex = d + dayOffset - 1;
-                break;
+                int potentialIndex = d + dayOffset - 1;
+                if (potentialIndex >= 0 && potentialIndex < dayImages.Length)
+                {
+                    selectedDayIndex = potentialIndex;
+                    break;
+                }
             }
         }
         
@@ -280,6 +288,7 @@ public class MonthlyChallengeController : MonoBehaviour
 
     public void MarkAsPassed(Image dateBg)
     {
+        if (dateBg == null) return;
         dateBg.color = m_PassedColor;
         TextMeshProUGUI txt = dateBg.GetComponentInChildren<TextMeshProUGUI>();
         if (txt != null)
