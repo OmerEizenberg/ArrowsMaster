@@ -171,7 +171,10 @@ namespace Assets.Scripts.Lobby
 
             if(GameManager.Instance != null && !GameManager.Instance.p_isLevelProgression)
             {
-                OnCalanderButtonClicked();
+                if (m_CalanderLayer != null && !m_CalanderLayer.activeSelf)
+                {
+                    OnCalanderButtonClicked();
+                }
             }
 
             if (RemoteConfigManager.Instance != null)
@@ -242,12 +245,17 @@ namespace Assets.Scripts.Lobby
 
         private void HandleSwipeNavigation()
         {
+            // Reset swiping state if mouse is up
+            if (Input.GetMouseButtonUp(0))
+            {
+                m_IsSwiping = false;
+            }
+
             // If sub-overlays are open (Settings, Donate, NoAds), block swiping to avoid accidental transitions
             if ((m_SettingsLayer != null && m_SettingsLayer.activeInHierarchy) ||
                 (m_DonateLayer != null && m_DonateLayer.activeInHierarchy) ||
                 (m_NoAdsLayer != null && m_NoAdsLayer.activeInHierarchy))
             {
-                m_IsSwiping = false;
                 return;
             }
 
@@ -256,82 +264,79 @@ namespace Assets.Scripts.Lobby
                 m_SwipeStartPos = Input.mousePosition;
                 m_IsSwiping = true;
             }
-            else if (Input.GetMouseButtonUp(0))
+            else if (Input.GetMouseButtonUp(0) && m_IsSwiping)
             {
-                if (m_IsSwiping)
-                {
-                    m_IsSwiping = false;
-                    Vector2 swipeEndPos = Input.mousePosition;
-                    Vector2 delta = swipeEndPos - m_SwipeStartPos;
+                m_IsSwiping = false;
 
-                    if (Mathf.Abs(delta.x) > m_SwipeThreshold && Mathf.Abs(delta.y) < Mathf.Abs(delta.x))
+                Vector2 swipeEndPos = Input.mousePosition;
+                Vector2 delta = swipeEndPos - m_SwipeStartPos;
+
+                if (Mathf.Abs(delta.x) > m_SwipeThreshold && Mathf.Abs(delta.y) < Mathf.Abs(delta.x))
+                {
+                    if (delta.x > 0)
                     {
-                        if (delta.x > 0)
-                        {
-                            // Finger moves towards Right
-                            OnSwipeLeft(swipeEndPos);
-                        }
-                        else
-                        {
-                            // Finger moves towards Left
-                            OnSwipeRight(swipeEndPos);
-                        }
+                        // Finger moves towards Right
+                        OnSwipeLeft(swipeEndPos);
+                    }
+                    else
+                    {
+                        // Finger moves towards Left
+                        OnSwipeRight(swipeEndPos);
                     }
                 }
             }
         }
 
-
         private void OnSwipeRight(Vector2 endPos)
-
         {
-            // Finger moves towards Left: Calendar (Left) -> Home (Middle) -> Shop (Right)
-
+            // Calendar (left) -> Swipe Right (finger moves left) -> Home
+            // Home (middle) -> Swipe Right (finger moves left) -> Shop
+            
             if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
             {
-                // We are in Calendar (Leftmost), swiping Left -> return to Home
                  if (endPos.y > Screen.height * 0.33f)
                 {
-                    if (m_MonthlyChallengeController != null) m_MonthlyChallengeController.NextMonth();
-                }
-                else
-                {
-                    OnCalanderButtonClicked(); // Returns to Home
+                    if (m_MonthlyChallengeController != null)
+                    {
+                        m_MonthlyChallengeController.NextMonth();
+                    }
+                }else{
+                    // We are in Calendar, go to Home
+                    OnCalanderButtonClicked(); // Toggles Calendar off, showing Home
                 }
             }
             else if (m_ShopLayer != null && !m_ShopLayer.activeInHierarchy)
             {
-                // We are in Home (Middle), swiping Left -> go to Shop
+                // We are in Home (since Shop is off and Calendar was checked above), go to Shop
                 ShowShop();
             }
         }
 
         private void OnSwipeLeft(Vector2 endPos)
         {
-            // Finger moves towards Right: Calendar (Left) <- Home (Middle) <- Shop (Right)
+            // Home (middle) -> Swipe Left (finger moves right) -> Calendar
+            // Calendar (left) -> Swipe Left (finger moves right) -> Prev Month (if top 2/3 of screen)
+            
 
-            if (m_ShopLayer != null && m_ShopLayer.activeInHierarchy)
+
+            if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
             {
-                // We are in Shop (Rightmost), swiping Right -> return to Home
-                HideShop();
-            }
-            else if (m_CalanderLayer != null && m_CalanderLayer.activeInHierarchy)
-            {
-                // We are in Calendar (Leftmost), swiping Right -> Month Navigation
+                // We are in Calendar and swiping finger to the right.
+                // User wants to move to previous month if finger is above 0.33 of screen height.
                 if (endPos.y > Screen.height * 0.33f)
                 {
-                    if (m_MonthlyChallengeController != null) m_MonthlyChallengeController.PrevMonth();
+                    if (m_MonthlyChallengeController != null)
+                    {
+                        m_MonthlyChallengeController.PrevMonth();
+                    }
                 }
             }
             else if (m_CalanderLayer != null && !m_CalanderLayer.activeInHierarchy)
             {
-                // We are in Home (Middle), swiping Right -> go to Calendar
-                OnCalanderButtonClicked();
+                // We are in Home, go to Calendar
+                OnCalanderButtonClicked(); // Toggles Calendar on
             }
         }
-
-
-
 
         private void UpdateRewardedAdAmount()
         {
@@ -1321,8 +1326,6 @@ namespace Assets.Scripts.Lobby
             Vector3 iconSelScale = new Vector3(1.65f, 1.65f, 1.65f);
             float iconSelY = 97f;
             float iconDesY = 67f;
-
-
 
             while (elapsed < duration)
             {

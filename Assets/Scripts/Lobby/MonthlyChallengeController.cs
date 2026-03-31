@@ -35,7 +35,8 @@ public class MonthlyChallengeController : MonoBehaviour
     [SerializeField] private Slider m_monthlyProgress;
     [SerializeField] private TextMeshProUGUI m_monthlyProgressGoalTxt;
     [SerializeField] private TextMeshProUGUI m_monthlyActualProgressText;
-
+    [SerializeField] private GameObject m_CompletedIndication;
+    [SerializeField] private GameObject m_PlayButton;
     public Image m_SelectedDateBg;
     public TextMeshProUGUI m_SelectedDateTxt;
 
@@ -158,6 +159,10 @@ public class MonthlyChallengeController : MonoBehaviour
             m_monthlyActualProgressText.text = ""+passedCount;
             m_monthlyProgress.value = passedCount;
         }
+
+        if (m_monthlyActualProgressText != null) m_monthlyActualProgressText.gameObject.SetActive(passedCount < daysInMonth);
+        if (m_CompletedIndication != null) m_CompletedIndication.SetActive(passedCount >= daysInMonth);
+        if (m_PlayButton != null) m_PlayButton.SetActive(passedCount < daysInMonth);
         
         // Auto-select latest available day that is NOT yet passed
         int latestDay = daysInMonth;
