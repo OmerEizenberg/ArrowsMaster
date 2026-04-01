@@ -51,9 +51,9 @@ public class MonthlyChallengeController : MonoBehaviour
 
     private void OnEnable()
     {
-        // Automatically initialize to the current month and year
-        p_CurrentMonth = DateTime.Now.Month;
-        p_CurrentYear = DateTime.Now.Year;
+        // Return to the last viewed month to assist with completed "missions"
+        p_CurrentMonth = UserDataManager.Instance.LastViewedChallengeMonth;
+        p_CurrentYear = UserDataManager.Instance.LastViewedChallengeYear;
         p_CurrentDay = DateTime.Now.Day;
         
         Init(p_CurrentMonth, p_CurrentYear);
@@ -97,6 +97,10 @@ public class MonthlyChallengeController : MonoBehaviour
         m_challengeMonthTitle.text = titleText;
         p_CurrentYear = year;
         p_CurrentMonth = month;
+        
+        // Persist the last viewed month
+        UserDataManager.Instance.SetLastViewedChallengeMonth(year, month);
+        
         // 2. Calculate the starting offset
         // DayOfWeek enum: Sunday = 0, Monday = 1 ... Saturday = 6
         // Your calendar starts on Monday, so we adjust the offset:
@@ -193,7 +197,6 @@ public class MonthlyChallengeController : MonoBehaviour
 
         if (m_monthlyActualProgressText != null) m_monthlyActualProgressText.gameObject.SetActive(passedCount < daysInMonth);
         if (m_CompletedIndication != null) m_CompletedIndication.SetActive(passedCount >= daysInMonth);
-        if (m_PlayButton != null) m_PlayButton.SetActive(passedCount < daysInMonth);
         
         // Auto-select latest available day that is NOT yet passed
         int latestDay = daysInMonth;
@@ -225,6 +228,8 @@ public class MonthlyChallengeController : MonoBehaviour
             // All available days are completed
             ClearSelection();
         }
+
+        if (m_PlayButton != null) m_PlayButton.SetActive(selectedDayIndex != -1);
         
         UpdateNavButtons();
     }

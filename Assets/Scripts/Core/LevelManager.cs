@@ -369,7 +369,7 @@ namespace Assets.Scripts.Core
             if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
 
             Color targetColor = new Color(0.373f, 0.153f, 0.804f); // #5f27cd
-            float rippleSpeed = 4.0f; 
+            float rippleSpeed = 9.0f; 
             float maxDist = 0;
             
             foreach(var info in m_BackgroundCircleInfos)
@@ -393,7 +393,7 @@ namespace Assets.Scripts.Core
                         if (info.transform == null || info.renderer == null) continue;
 
                         float dist = info.distanceFromCenter;
-                        float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveFront) / 2.0f);
+                        float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveFront) / 4.5f);
                         
                         if (proximity > 0)
                         {

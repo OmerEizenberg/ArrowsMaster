@@ -69,6 +69,9 @@ namespace Assets.Scripts.Core
         public System.DateTime LastRateUsDate { get; private set; }
         public bool IsRateUsCheckPending { get; set; } = false;
 
+        public int LastViewedChallengeYear { get; private set; }
+        public int LastViewedChallengeMonth { get; private set; }
+
 
         private Dictionary<string, int> m_MonthlyCache = new Dictionary<string, int>();
 
@@ -113,6 +116,9 @@ namespace Assets.Scripts.Core
                     LastRateUsDate = System.DateTime.FromBinary(binaryDate);
                 }
             }
+
+            LastViewedChallengeYear = PlayerPrefs.GetInt("LastViewedChallengeYear", System.DateTime.Now.Year);
+            LastViewedChallengeMonth = PlayerPrefs.GetInt("LastViewedChallengeMonth", System.DateTime.Now.Month);
         }
 
         public void IncrementLevel()
@@ -321,6 +327,15 @@ namespace Assets.Scripts.Core
         {
             int mask = GetMonthlyChallengeBitmask(year, month);
             return (mask & (1 << (day - 1))) != 0;
+        }
+
+        public void SetLastViewedChallengeMonth(int year, int month)
+        {
+            LastViewedChallengeYear = year;
+            LastViewedChallengeMonth = month;
+            PlayerPrefs.SetInt("LastViewedChallengeYear", year);
+            PlayerPrefs.SetInt("LastViewedChallengeMonth", month);
+            PlayerPrefs.Save();
         }
 
         public void SaveLevelProgress(LevelProgress progress)

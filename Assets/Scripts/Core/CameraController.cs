@@ -486,17 +486,13 @@ namespace Assets.Scripts.Core
             float startZoom = cam.orthographicSize;
             Vector3 startPos = transform.position;
             
-            float padding    = 2f;
-            float cellSize   = ArrowController.CellSize;
-            float aspectRatio = cachedAspect;
-
-            float fitVertical   = (gridSize.y * cellSize + padding * 2) / 2f;
-            float fitHorizontal = (gridSize.x * cellSize + padding * 2) / (2f * aspectRatio);
+            // Target exactly 10% more zoom out than the default "fit" zoom
+            float targetZoom = defaultZoom * 1.1f;
             
-            // Only zoom out: targetZoom must be at least startZoom
-            float targetZoom    = Mathf.Max(fitVertical, fitHorizontal) ;
-            targetZoom = Mathf.Max(targetZoom, startZoom)* winZoomMultiplier;
-                
+            // Ensure we don't zoom IN if the player was already zoomed out further
+            targetZoom = Mathf.Max(targetZoom, startZoom);
+            
+            float cellSize = ArrowController.CellSize;
             Vector3 gridCenter = new Vector3((gridSize.x - 1) * cellSize / 2f, (gridSize.y - 1) * cellSize / 2f, transform.position.z);
             Vector3 targetPos  = gridCenter;
 
