@@ -24,6 +24,11 @@ public class MonthlyChallengeController : MonoBehaviour
     [SerializeField] private Color m_NormalColorTxt;
     [SerializeField] private Color m_PassedColorTxt;
     [SerializeField] private Color m_SelectedDateTxtColor;
+    [Header("Special Day Colors")]
+    [SerializeField] private Color m_FutureDayColor;
+    [SerializeField] private Color m_FutureDayColorTxt;
+    [SerializeField] private Color m_PaddingDayColor;
+    [SerializeField] private Color m_PaddingDayColorTxt;
     
     [Tooltip("Assign all 35 day text components here")]
     [SerializeField] private TextMeshProUGUI[] m_dayTexts;
@@ -46,13 +51,6 @@ public class MonthlyChallengeController : MonoBehaviour
 
     private void OnEnable()
     {
-        m_NormalColor.a = 1f;
-        m_PassedColor.a = 1f;
-        m_SelectedDateColor.a = 1f;
-        m_NormalColorTxt.a = 1f;
-        m_PassedColorTxt.a = 1f;
-        m_SelectedDateTxtColor.a = 1f;
-
         // Automatically initialize to the current month and year
         p_CurrentMonth = DateTime.Now.Month;
         p_CurrentYear = DateTime.Now.Year;
@@ -64,6 +62,12 @@ public class MonthlyChallengeController : MonoBehaviour
         {
             UserDataManager.Instance.OnMonthlyProgressChanged += HandleMonthlyProgressChanged;
         }
+    }
+
+    private void Start()
+    {
+        // Double check initialization after all objects are ready
+        Init(p_CurrentMonth, p_CurrentYear);
     }
 
     private void OnDisable()
@@ -105,24 +109,45 @@ public class MonthlyChallengeController : MonoBehaviour
         int passedCount = 0;
 
         // 4. Loop through all 35 slots
+        if (m_dayTexts == null || m_dayTexts.Length < dayImages.Length)
+        {
+            var oldTexts = m_dayTexts;
+            m_dayTexts = new TextMeshProUGUI[dayImages.Length];
+            if (oldTexts != null) Array.Copy(oldTexts, m_dayTexts, oldTexts.Length);
+        }
+
         for (int i = 0; i < dayImages.Length; i++)
         {
             // Calculate the actual date number for this cell
             int dateNumber = i - dayOffset + 1;
+            DateTime cellDate = firstDayOfMonth.AddDays(dateNumber - 1);
+            int displayDay = cellDate.Day;
+
+            dayImages[i].gameObject.SetActive(true);
+            if (m_dayTexts[i] == null) m_dayTexts[i] = dayImages[i].GetComponentInChildren<TextMeshProUGUI>(true);
 
             if (dateNumber >= 1 && dateNumber <= daysInMonth)
             {
-                if(year == DateTime.Now.Year && month == DateTime.Now.Month && DateTime.Now.Day < dateNumber)
+                bool isFuture = (year == DateTime.Now.Year && month == DateTime.Now.Month && dateNumber > DateTime.Now.Day);
+
+                if (isFuture)
                 {
-                    dayImages[i].gameObject.SetActive(false);
-                }else{
-                     // Active day
-                    dayImages[i].GetComponent<Button>().interactable = true;
-                    dayImages[i].gameObject.SetActive(true);
-                    if(i < m_dayTexts.Length && m_dayTexts[i] == null) m_dayTexts[i] = dayImages[i].transform.GetChild(0).GetComponent<TextMeshProUGUI>();
-                    if(i < m_dayTexts.Length)
+                    // Visible but non-interactable and in future day color
+                    dayImages[i].GetComponent<Button>().interactable = false;
+                    dayImages[i].color = m_FutureDayColor;
+                    if (i < m_dayTexts.Length)
                     {
-                        m_dayTexts[i].text = dateNumber.ToString();
+                        m_dayTexts[i].text = displayDay.ToString();
+                        m_dayTexts[i].color = m_FutureDayColorTxt;
+                    }
+                }
+                else
+                {
+                    // Active day
+                    dayImages[i].GetComponent<Button>().interactable = true;
+                    if (i < m_dayTexts.Length)
+                    {
+                        m_dayTexts[i].text = displayDay.ToString();
                         m_dayTexts[i].color = m_NormalColorTxt;
                     }
                     
@@ -137,8 +162,14 @@ public class MonthlyChallengeController : MonoBehaviour
             }
             else
             {
-                // Hide day (before start or after end of month)
-                dayImages[i].gameObject.SetActive(false);
+                // Day from last month or next month (padding)
+                dayImages[i].GetComponent<Button>().interactable = false;
+                dayImages[i].color = m_PaddingDayColor;
+                if (i < m_dayTexts.Length)
+                {
+                    m_dayTexts[i].text = displayDay.ToString();
+                    m_dayTexts[i].color = m_PaddingDayColorTxt;
+                }
             }
         }
 
