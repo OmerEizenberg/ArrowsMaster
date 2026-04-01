@@ -369,7 +369,7 @@ namespace Assets.Scripts.Core
             if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
 
             Color targetColor = new Color(0.373f, 0.153f, 0.804f); // #5f27cd
-            float rippleSpeed = 9.0f; 
+            float rippleSpeed = 12.0f; 
             float maxDist = 0;
             
             foreach(var info in m_BackgroundCircleInfos)
@@ -431,7 +431,7 @@ namespace Assets.Scripts.Core
                     }
                     yield return null;
                 }
-                if (repeat == 0) yield return new WaitForSeconds(0.2f);
+                if (repeat == 0) yield return new WaitForSeconds(0.1f);
             }
 
             foreach (var info in m_BackgroundCircleInfos)
