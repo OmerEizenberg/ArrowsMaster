@@ -377,6 +377,21 @@ namespace Assets.Scripts.Core
                 if (info.distanceFromCenter > maxDist) maxDist = info.distanceFromCenter;
             }
 
+            // 1. Initial Growth: Scale all circles to 1.5x before starting the wave
+            float startGrowthDuration = 0.4f;
+            float gElapsed = 0f;
+            while (gElapsed < startGrowthDuration)
+            {
+                gElapsed += Time.deltaTime;
+                float t = gElapsed / startGrowthDuration;
+                float currentScale = Mathf.Lerp(1.0f, 1.5f, t);
+                foreach (var info in m_BackgroundCircleInfos)
+                {
+                    if (info.transform != null) info.transform.localScale = Vector3.one * currentScale;
+                }
+                yield return null;
+            }
+
             for (int repeat = 0; repeat < 2; repeat++)
             {
                 float duration = (maxDist / rippleSpeed) + 0.5f; 
@@ -385,7 +400,7 @@ namespace Assets.Scripts.Core
                 while (elapsed < duration)
                 {
                     elapsed += Time.deltaTime;
-                    float waveFront = elapsed * rippleSpeed;
+                    float waveFront = maxDist - (elapsed * rippleSpeed);
 
                     foreach (var info in m_BackgroundCircleInfos)
                     {
@@ -397,23 +412,21 @@ namespace Assets.Scripts.Core
                         
                         if (proximity > 0)
                         {
-                            float scale = 1.0f;
-                            if (proximity > 0.5f)
-                                scale = Mathf.Lerp(1.0f, 1.3f, (proximity - 0.5f) * 2f);
-                            else
-                                scale = Mathf.Lerp(0.5f, 1.0f, proximity * 2f);
+                            // Ahead of wave (closer to center) = 1.5, Behind wave (further out) = 2.0
+                            float baseScale = (dist < waveFront) ? 1.5f : 2.0f;
+                            float peakScale = 2.5f;
+                            float scale = Mathf.Lerp(baseScale, peakScale, proximity);
 
                             info.transform.localScale = Vector3.one * scale;
                             Color c = Color.Lerp(m_CircleColor, targetColor, proximity);
-                            //c.a *= m_WinCirclesAlpha;
                             info.renderer.color = c;
                         }
-                        else if (waveFront > dist)
+                        else
                         {
-                            info.transform.localScale = Vector3.one;
-                            Color c = m_CircleColor;
-                            //c.a *= m_WinCirclesAlpha;
-                            info.renderer.color = c;
+                            // If reached, stay at 2.0. If not reached yet, stay at 1.5
+                            float finalScale = (dist < waveFront) ? 1.5f : 2.0f;
+                            info.transform.localScale = Vector3.one * finalScale;
+                            info.renderer.color = m_CircleColor;
                         }
                     }
                     yield return null;
@@ -425,7 +438,7 @@ namespace Assets.Scripts.Core
             {
                 if (info.renderer != null && info.transform != null)
                 {
-                    info.transform.localScale = Vector3.one;
+                    info.transform.localScale = Vector3.one * 2.0f; // Settle at 2.0x
                     Color c = m_CircleColor;
                     c.a = m_WinCirclesAlpha;
                     info.renderer.color = c;
