@@ -8,6 +8,7 @@ using Assets.Scripts.Core;
 using Assets.Scripts.Data;
 
 using Assets.Scripts.Utils;
+using Assets.Scripts.LiveOps;
 
 namespace Assets.Scripts.Lobby
 {
@@ -68,6 +69,8 @@ namespace Assets.Scripts.Lobby
         
         [SerializeField] private Color m_LevelColor;
         [SerializeField] private MonthlyChallengeController m_MonthlyChallengeController;
+        [SerializeField] private Transform m_LiveOpIconsContainer;
+        public Transform LiveOpIconsContainer => m_LiveOpIconsContainer;
 
         [Header("Bottom Bar Tabs")]
         [SerializeField] private RectTransform m_SelectedTabBg;
@@ -197,6 +200,11 @@ namespace Assets.Scripts.Lobby
             CheckForNoAdsOffer();
 
             SnapTabBackground();
+            
+            if (LiveOpManager.Instance != null)
+            {
+                LiveOpManager.Instance.CheckLiveOps();
+            }
         }
 
         private void OnDisable()
@@ -576,49 +584,41 @@ namespace Assets.Scripts.Lobby
                 }
             }
 
-            if (UserDataManager.Instance.CurrentLevel >= 25)
+            if (m_LevelStreakIcon != null) 
             {
-                if (m_LevelStreakIcon != null) 
+                m_LevelStreakIcon.SetActive(true);
+                
+                bool showAnimation = UserDataManager.Instance.NeedsLevelStreakAnimation;
+                int displayStreak = UserDataManager.Instance.LevelStreak;
+                if (showAnimation) displayStreak--;
+
+                bool isStreakActive = displayStreak >= 6;
+                
+                var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
+                if (iconImage != null && m_LevelStreakActiveSprite != null && m_LevelStreakInactiveSprite != null)
                 {
-                    m_LevelStreakIcon.SetActive(true);
-                    
-                    bool showAnimation = UserDataManager.Instance.NeedsLevelStreakAnimation;
-                    int displayStreak = UserDataManager.Instance.LevelStreak;
-                    if (showAnimation) displayStreak--;
+                    iconImage.sprite = isStreakActive ? m_LevelStreakActiveSprite : m_LevelStreakInactiveSprite;
+                }
 
-                    bool isStreakActive = displayStreak >= 6;
-                    
-                    var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
-                    if (iconImage != null && m_LevelStreakActiveSprite != null && m_LevelStreakInactiveSprite != null)
+                var fireSkew = m_LevelStreakIcon.GetComponent<Assets.Scripts.GameUI.UIFireSkew>();
+                if (fireSkew != null)
+                {
+                    if (fireSkew.enabled != isStreakActive)
                     {
-                        iconImage.sprite = isStreakActive ? m_LevelStreakActiveSprite : m_LevelStreakInactiveSprite;
-                    }
-
-                    var fireSkew = m_LevelStreakIcon.GetComponent<Assets.Scripts.GameUI.UIFireSkew>();
-                    if (fireSkew != null)
-                    {
-                        if (fireSkew.enabled != isStreakActive)
-                        {
-                            fireSkew.enabled = isStreakActive;
-                            // Ensure the graphic resets to standard un-skewed mesh if disabled
-                            m_LevelStreakIcon.GetComponent<UnityEngine.UI.Graphic>()?.SetVerticesDirty();
-                        }
-                    }
-
-                    if (m_LevelStreakText != null) m_LevelStreakText.text = displayStreak.ToString();
-                    if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = displayStreak.ToString();
-
-                    if (showAnimation)
-                    {
-                        CleanupFireAnimation();
-                        m_FireAnimationCoroutine = StartCoroutine(AnimateStreakFire(displayStreak + 1));
+                        fireSkew.enabled = isStreakActive;
+                        // Ensure the graphic resets to standard un-skewed mesh if disabled
+                        m_LevelStreakIcon.GetComponent<UnityEngine.UI.Graphic>()?.SetVerticesDirty();
                     }
                 }
-            }
-            else
-            {
-                CleanupFireAnimation();
-                if (m_LevelStreakIcon != null) m_LevelStreakIcon.SetActive(false);
+
+                if (m_LevelStreakText != null) m_LevelStreakText.text = displayStreak.ToString();
+                if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = displayStreak.ToString();
+
+                if (showAnimation)
+                {
+                    CleanupFireAnimation();
+                    m_FireAnimationCoroutine = StartCoroutine(AnimateStreakFire(displayStreak + 1));
+                }
             }
 
             UpdateLobbyAdReadyImage();
@@ -990,6 +990,13 @@ namespace Assets.Scripts.Lobby
 
         public void OnLevelStreakButtonClicked()
         {
+            var unlockView = m_LevelStreakIcon?.GetComponent<FeatureUnlockView>();
+            if (unlockView != null && unlockView.IsLocked())
+            {
+                // FeatureUnlockView handles its own tooltip
+                return;
+            }
+
             if (SoundManager.Instance != null) 
             {
                 SoundManager.Instance.PlayClick();

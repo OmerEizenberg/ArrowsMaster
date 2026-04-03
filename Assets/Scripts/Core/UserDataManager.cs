@@ -49,6 +49,8 @@ namespace Assets.Scripts.Core
         private const string LevelProgressKey = "LevelProgress";
         private const string LastRateUsDateKey = "LastRateUsDate";
         private const string LevelStreakKey = "LevelStreak";
+        private const string LiveOpDataPrefix = "LiveOpData_";
+        private const string LiveOpCurrentIDPrefix = "LiveOpCurrentID_";
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
@@ -374,5 +376,38 @@ namespace Assets.Scripts.Core
             PlayerPrefs.DeleteKey(LevelProgressKey);
             PlayerPrefs.Save();
         }
+
+        #region LiveOps Persistence
+        
+        public string GetLiveOpData(string uniqueID)
+        {
+            return PlayerPrefs.GetString(LiveOpDataPrefix + uniqueID, string.Empty);
+        }
+
+        public void SaveLiveOpData(string uniqueID, string json)
+        {
+            PlayerPrefs.SetString(LiveOpDataPrefix + uniqueID, json);
+            PlayerPrefs.Save();
+        }
+
+        public void CleanupLiveOpData(string eventID, string currentUniqueID)
+        {
+            string key = LiveOpCurrentIDPrefix + eventID;
+            string lastID = PlayerPrefs.GetString(key, string.Empty);
+            
+            if (lastID != currentUniqueID)
+            {
+                if (!string.IsNullOrEmpty(lastID))
+                {
+                    Debug.Log($"[UserDataManager] Cleaning up old LiveOp data: {lastID}");
+                    PlayerPrefs.DeleteKey(LiveOpDataPrefix + lastID);
+                }
+                
+                PlayerPrefs.SetString(key, currentUniqueID);
+                PlayerPrefs.Save();
+            }
+        }
+        
+        #endregion
     }
 }
