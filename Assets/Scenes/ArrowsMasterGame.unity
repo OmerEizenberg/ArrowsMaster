@@ -29452,6 +29452,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   AllLiveOps:
   - {fileID: 11400000, guid: ef728368a249443e4b101ec29fe09a2c, type: 2}
+  - {fileID: 11400000, guid: 09e1c2f865ed640efb9646922ef111bd, type: 2}
 --- !u!1 &1420815247
 GameObject:
   m_ObjectHideFlags: 0
