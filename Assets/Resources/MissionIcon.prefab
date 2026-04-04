@@ -770,7 +770,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Royal Tasks
+  m_text: Daily Tasks
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
@@ -1082,7 +1082,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Royal Tasks
+  m_text: Daily Tasks
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}

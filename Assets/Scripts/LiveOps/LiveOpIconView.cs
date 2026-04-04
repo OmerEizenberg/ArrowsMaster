@@ -143,7 +143,7 @@ namespace Assets.Scripts.LiveOps
                 Canvas canvas = GetComponentInParent<Canvas>();
                 if (canvas != null)
                 {
-                    GameObject popup = Instantiate(popupPrefab, canvas.transform);
+                    GameObject popup = Instantiate(popupPrefab, null);
                     popup.SetActive(true);
                     popup.transform.SetAsLastSibling();
                 }
