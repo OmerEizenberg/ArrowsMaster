@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: DailyMissions
   m_EditorClassIdentifier: 
   EventID: DM
-  ActiveDays: 00000000020000000400000006000000
+  ActiveDays: 
   ActivationHour: 0
   DurationHours: 24
   UnlockLevel: 25

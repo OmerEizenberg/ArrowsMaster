@@ -13,7 +13,7 @@ namespace Assets.Scripts.Core
 
         [Header("References")]
         public LevelManager levelManager;
-        public const int ADS_START_LEVEL = 12;
+        public const int ADS_START_LEVEL = 9;
         public const int COINS_START_LEVEL = 5;
 
 

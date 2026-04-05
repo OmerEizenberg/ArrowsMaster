@@ -205,6 +205,7 @@ namespace Assets.Scripts.Lobby
             {
                 LiveOpManager.Instance.CheckLiveOps();
             }
+
         }
 
         private void OnDisable()
