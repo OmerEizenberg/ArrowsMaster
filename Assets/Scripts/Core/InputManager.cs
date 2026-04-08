@@ -48,7 +48,7 @@ namespace Assets.Scripts.Core
                 // Provide immediate feedback on what is being pressed
                 if (pendingSegment != null)
                 {
-                    highlightedArrow = pendingSegment.GetComponentInParent<ArrowController>();
+                    highlightedArrow = pendingSegment.ParentArrow;
                 }
                 else 
                 {
@@ -70,7 +70,7 @@ namespace Assets.Scripts.Core
                     if (Time.time - mouseDownTime > holdThreshold)
                     {
                         hasTriggeredHold = true;
-                        activePreviewArrow = pendingSegment.GetComponentInParent<ArrowController>();
+                        activePreviewArrow = pendingSegment.ParentArrow;
                         if (activePreviewArrow != null)
                         {
                             activePreviewArrow.ShowPreview();
@@ -123,25 +123,29 @@ namespace Assets.Scripts.Core
                     }
 
                     Segment upSegment = GetHitSegment();
-                    if (upSegment != null && upSegment == pendingSegment)
+                    ArrowController downArrow = pendingSegment != null ? pendingSegment.ParentArrow : null;
+                    ArrowController upArrow = upSegment != null ? upSegment.ParentArrow : null;
+
+                    // UPDATED: Most forgiving condition for mobile
+                    // 1. If start and end are the same arrow -> Success
+                    // 2. If start was an arrow and release was empty space -> Success (slight slide off)
+                    if (downArrow != null && (downArrow == upArrow || upArrow == null))
                     {
-                        // Find the parent ArrowController
-                        ArrowController arrow = upSegment.GetComponentInParent<ArrowController>();
-                        if (arrow != null)
+                        // Start timer on first touch (if it's a timed level)
+                        if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
                         {
-                            // Start timer on first touch (if it's a timed level)
-                            if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
-                            {
-                                GameManager.Instance.StartTimer();
-                            }
-                            
-                            arrow.OnArrowClicked(upSegment, endTouchPos);
+                            GameManager.Instance.StartTimer();
                         }
+                        
+                        downArrow.OnArrowClicked(pendingSegment, endTouchPos);
                     }
-                    else if (upSegment == null && pendingSegment == null)
+                    else if (!TryRatioBasedSelection(endTouchPos, dist))
                     {
-                        // If we missed both at start and end, try closest arrow selection
-                        TrySelectClosestArrow(endTouchPos);
+                        // Final Fallback: If both missed and ratio check failed, try the old closest selection
+                        if (upSegment == null && pendingSegment == null)
+                        {
+                            TrySelectClosestArrow(endTouchPos);
+                        }
                     }
                 }
                 
@@ -162,6 +166,77 @@ namespace Assets.Scripts.Core
                 return hit.collider.GetComponent<Segment>();
             }
             return null;
+        }
+
+        private bool TryRatioBasedSelection(Vector2 endScreenPos, float travelDistPixels)
+        {
+            Vector3 worldEndPos = m_Camera.ScreenToWorldPoint(endScreenPos);
+            worldEndPos.z = 0;
+
+            // Convert 5x pixel travel to world units
+            Vector3 worldRefPos = m_Camera.ScreenToWorldPoint(endScreenPos + new Vector2(travelDistPixels * 5f, 0));
+            worldRefPos.z = 0;
+            float searchRadius = Vector3.Distance(worldEndPos, worldRefPos);
+            
+            // Minimum search floor for reliability on extremely small movements
+            if (searchRadius < 4.0f) searchRadius = 4.0f;
+            float sqrSearchRadius = searchRadius * searchRadius;
+
+            int gridX = Mathf.RoundToInt(worldEndPos.x);
+            int gridY = Mathf.RoundToInt(worldEndPos.y);
+
+            // Candidate tracking: (SqrDist, Arrow, Segment)
+            List<(float dist, ArrowController arrow, Segment segment)> candidates = new List<(float, ArrowController, Segment)>();
+            HashSet<ArrowController> uniqueArrows = new HashSet<ArrowController>();
+
+            // Scan area based on search radius
+            int cellRadius = Mathf.CeilToInt(searchRadius);
+            for (int x = gridX - cellRadius; x <= gridX + cellRadius; x++)
+            {
+                for (int y = gridY - cellRadius; y <= gridY + cellRadius; y++)
+                {
+                    ArrowController occupant = GridManager.Instance.GetOccupant(new Vector2Int(x, y));
+                    if (occupant != null && !uniqueArrows.Contains(occupant))
+                    {
+                        // Find closest segment within this arrow
+                        float minSqrDist = float.MaxValue;
+                        Segment bestSeg = null;
+                        foreach (var seg in occupant.segments)
+                        {
+                            float d = Vector3.SqrMagnitude(worldEndPos - seg.transform.position);
+                            if (d < minSqrDist) { minSqrDist = d; bestSeg = seg; }
+                        }
+
+                        if (minSqrDist <= sqrSearchRadius)
+                        {
+                            candidates.Add((minSqrDist, occupant, bestSeg));
+                            uniqueArrows.Add(occupant);
+                        }
+                    }
+                }
+            }
+
+            if (candidates.Count == 0) return false;
+
+            // Sort by distance
+            candidates.Sort((a, b) => a.dist.CompareTo(b.dist));
+
+            // Rule logic:
+            // 1. Only one arrow in radius -> Success
+            // 2. Nearest is 2x closer than next nearest -> Success (comparing raw distance, so 4x sqrDist)
+            bool isRatioValid = candidates.Count == 1 || (candidates[0].dist * 4f <= candidates[1].dist);
+
+            if (isRatioValid)
+            {
+                if (GameManager.Instance != null && GameManager.Instance.IsTimedLevel)
+                {
+                    GameManager.Instance.StartTimer();
+                }
+                candidates[0].arrow.OnArrowClicked(candidates[0].segment, endScreenPos);
+                return true;
+            }
+
+            return false;
         }
 
         private void TrySelectClosestArrow(Vector2 screenPos)
@@ -190,7 +265,7 @@ namespace Assets.Scripts.Core
             // Rule 2: 0.9f threshold for movable arrows
             float worldThreshold = 0.9f; 
             // Rule 3: 0.15f threshold for blocked arrows
-            float wrongArrowThreshold = 0.15f; 
+            float wrongArrowThreshold = 0.30f; 
             // Rule 4: 2.5f threshold for "all movable" logic
             float worldAnyArrowThreshold = 2.5f; 
 
@@ -212,8 +287,23 @@ namespace Assets.Scripts.Core
             Vector3 worldClickPos = m_Camera.ScreenToWorldPoint(screenPos);
             worldClickPos.z = 0;
 
-            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
-            foreach (var arrow in allArrows)
+            // PERFORMANCE: Instead of iterating ALL segments of ALL arrows (O(N*M)),
+            // check only arrows in the grid cells near the touch point (O(1) search area).
+            int centerGridX = Mathf.RoundToInt(worldClickPos.x);
+            int centerGridY = Mathf.RoundToInt(worldClickPos.y);
+
+            HashSet<ArrowController> candidateArrows = new HashSet<ArrowController>();
+            // Search radius of 3 covers the maximum 2.5 unit threshold rule
+            for (int x = centerGridX - 3; x <= centerGridX + 3; x++)
+            {
+                for (int y = centerGridY - 3; y <= centerGridY + 3; y++)
+                {
+                    ArrowController occupant = GridManager.Instance.GetOccupant(new Vector2Int(x, y));
+                    if (occupant != null) candidateArrows.Add(occupant);
+                }
+            }
+
+            foreach (var arrow in candidateArrows)
             {
                 if (arrow == null || arrow.segments == null) continue;
                 bool canMove = arrow.CanMoveForward();

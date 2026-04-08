@@ -112,5 +112,18 @@ namespace Assets.Scripts.Core
             }
             return null;
         }
+        public List<ArrowController> GetNonBlockedArrows(int count)
+        {
+            List<ArrowController> result = new List<ArrowController>();
+            foreach (var arrow in allArrows)
+            {
+                if (arrow != null && arrow.CanMoveForward())
+                {
+                    result.Add(arrow);
+                    if (result.Count >= count) break;
+                }
+            }
+            return result;
+        }
     }
 }

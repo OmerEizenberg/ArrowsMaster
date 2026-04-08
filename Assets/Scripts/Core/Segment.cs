@@ -7,9 +7,12 @@ namespace Assets.Scripts.Core
     {
         public Vector2Int GridPosition { get; set; }
         public SpriteRenderer Renderer;
+        public ArrowController ParentArrow { get; set; }
+        public Transform CachedTransform { get; private set; }
 
         private void Awake()
         {
+            CachedTransform = transform;
             if (Renderer == null) Renderer = GetComponent<SpriteRenderer>();
         }
 

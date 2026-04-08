@@ -15,6 +15,7 @@ namespace Assets.Scripts.Core
         public LevelManager levelManager;
         public const int ADS_START_LEVEL = 9;
         public const int COINS_START_LEVEL = 5;
+        public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;
 
 
         public GameObject failureScreen;
@@ -151,6 +152,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnRewardReceived += HandleRewardReceived;
                 AdsManager.Instance.OnHintRewardReceived += ShowHint;
                 AdsManager.Instance.OnPlayOnRewardReceived += ExecutePlayOn;
+                AdsManager.Instance.OnMagicRewardReceived += HandleMagicRewardReceived;
                 AdsManager.Instance.OnAdOpened += HandleAdOpened;
                 AdsManager.Instance.OnAdClosed += HandleAdClosed;
             }
@@ -207,6 +209,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnRewardReceived -= HandleRewardReceived;
                 AdsManager.Instance.OnHintRewardReceived -= ShowHint;
                 AdsManager.Instance.OnPlayOnRewardReceived -= ExecutePlayOn;
+                AdsManager.Instance.OnMagicRewardReceived -= HandleMagicRewardReceived;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
                 AdsManager.Instance.OnAdClosed -= HandleAdClosed;
             }
@@ -302,6 +305,39 @@ namespace Assets.Scripts.Core
             }
 
             ResetHintTimer(false);
+        }
+
+        private void HandleMagicRewardReceived()
+        {
+            UserDataManager.Instance.AddMagicBooster(1);
+            UserDataManager.Instance.UseMagicBooster(1);
+            ExecuteMagicBooster();
+        }
+
+        public void ExecuteMagicBooster()
+        {
+            StartCoroutine(ExecuteMagicBoosterRoutine());
+        }
+
+        private System.Collections.IEnumerator ExecuteMagicBoosterRoutine()
+        {
+            if (GridManager.Instance == null) yield break;
+
+            List<ArrowController> nonBlocked = GridManager.Instance.GetNonBlockedArrows(1);
+            for (int i = 0; i < nonBlocked.Count; i++)
+            {
+                ArrowController arrow = nonBlocked[i];
+                if (arrow != null && arrow.segments.Count > 0)
+                {
+                    // Select from the tail (segments[0]) to mimic a user click
+                    arrow.OnArrowClicked(arrow.segments[0], Vector2.zero);
+                    
+                    if (i < nonBlocked.Count - 1)
+                    {
+                        yield return new WaitForSeconds(0.15f);
+                    }
+                }
+            }
         }
 
         public void PlayOn()

@@ -17,6 +17,8 @@ namespace Assets.Scripts.Core
         [SerializeField] private GameObject m_ComboPrefab;
         [SerializeField] private GameObject m_VoicePrefab;
         private List<GameObject> instantiatedEffects = new List<GameObject>();
+        private Segment m_LastHeadSegment;
+        private bool forceVisualsUpdate = true;
         
         // Grid Step size (Standard 1 unit)
         public const float CellSize = 1.0f;
@@ -155,6 +157,7 @@ namespace Assets.Scripts.Core
             GameObject segObj = Instantiate(segmentPrefab.gameObject, worldSpawnPos, Quaternion.identity, transform);
             segObj.transform.localScale = Vector3.one;
             Segment newSeg = segObj.GetComponent<Segment>();
+            newSeg.ParentArrow = this;
             
             segments.Insert(0, newSeg);
 
@@ -214,7 +217,7 @@ namespace Assets.Scripts.Core
         public Vector3 GetHeadPosition()
         {
             if (segments.Count == 0) return transform.position;
-            return segments[segments.Count - 1].transform.position;
+            return segments[segments.Count - 1].CachedTransform.position;
         }
 
         private void UpdateVisuals()
@@ -247,7 +250,7 @@ namespace Assets.Scripts.Core
             }
 
             // Performance: Only update if the head has moved significantly or update is forced
-            Vector3 currentHeadPos = segments[segCount - 1].transform.position;
+            Vector3 currentHeadPos = segments[segCount - 1].CachedTransform.position;
             if (!forceLineUpdate && (currentHeadPos - lastHeadPos).sqrMagnitude < 0.000001f)
             {
                 return;
@@ -261,8 +264,8 @@ namespace Assets.Scripts.Core
 
             for (int i = 0; i < segCount - 1; i++)
             {
-                Vector3 p1 = segments[i].transform.position;
-                Vector3 p2 = segments[i+1].transform.position;
+                Vector3 p1 = segments[i].CachedTransform.position;
+                Vector3 p2 = segments[i+1].CachedTransform.position;
                 
                 // Snap points to grid if they are very close
                 Vector3 target1 = new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, z);
@@ -806,7 +809,7 @@ namespace Assets.Scripts.Core
             if (count == 0 || targets.Count != count) yield break;
 
             if (_animationStarts.Length < count) _animationStarts = new Vector3[count + 8];
-            for (int i = 0; i < count; i++) _animationStarts[i] = segments[i].transform.position;
+            for (int i = 0; i < count; i++) _animationStarts[i] = segments[i].CachedTransform.position;
 
             // Slow animations (entrance, ~0.04s): update every frame for smoothness
             // Fast movement: update every 2 frames (barely noticeable, saves CPU)
@@ -821,7 +824,7 @@ namespace Assets.Scripts.Core
                 for (int i = 0; i < count; i++)
                 {
                     if (segments[i] != null)
-                        segments[i].transform.position = Vector3.Lerp(_animationStarts[i], targets[i], t);
+                        segments[i].CachedTransform.position = Vector3.Lerp(_animationStarts[i], targets[i], t);
                 }
                 
                 animationFrameCounter++;
@@ -839,7 +842,7 @@ namespace Assets.Scripts.Core
 
             for (int i = 0; i < count; i++)
             {
-                if (segments[i] != null) segments[i].transform.position = targets[i];
+                if (segments[i] != null) segments[i].CachedTransform.position = targets[i];
             }
             UpdateVisuals(); // Final sync
         }
@@ -848,6 +851,13 @@ namespace Assets.Scripts.Core
         {
             int count = segments.Count;
             if (count == 0) return;
+            
+            Segment headSegment = segments[count - 1];
+            
+            // Optimization: If the head segment is the same and visuals aren't forced, skip updates
+            if (m_LastHeadSegment == headSegment && !forceVisualsUpdate) return;
+            m_LastHeadSegment = headSegment;
+            forceVisualsUpdate = false;
             
             for (int i = 0; i < count; i++)
             {
@@ -861,10 +871,10 @@ namespace Assets.Scripts.Core
                         seg.Renderer.sprite = HeadSprite;
                         seg.Renderer.color = currentArrowColor;
                         seg.Renderer.sortingOrder = 10;
-                        seg.transform.localScale = HeadScale;
+                        seg.CachedTransform.localScale = HeadScale;
                         
                         float angle = Mathf.Atan2(m_CurrentVisualDirection.y, m_CurrentVisualDirection.x) * Mathf.Rad2Deg - 90f;
-                        seg.transform.rotation = Quaternion.Euler(0, 0, angle);
+                        seg.CachedTransform.rotation = Quaternion.Euler(0, 0, angle);
                     }
                 }
                 else

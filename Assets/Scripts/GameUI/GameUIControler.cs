@@ -22,6 +22,13 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_FailureDescription; // Description text
     [SerializeField] private GameObject m_NoAdsOfferImage; // Image for the special offer (coins + no ads)
     [SerializeField] private GameObject m_PlayOnAdButton; // Button to watch ad for PlayOn
+    [SerializeField] private TextMeshProUGUI m_MagicBoosterText; // Display magic booster count
+    [SerializeField] private GameObject m_MagicBalance;
+    [SerializeField] private GameObject m_MagicIcon;
+    [SerializeField] private GameObject m_MagicAd;
+    [SerializeField] private GameObject m_MagicLockIcon;
+    [SerializeField] private GameObject m_MagicTooltip;
+    private Coroutine m_MagicTooltipCoroutine;
     
     [Header("Restart Button Fade")]
     [SerializeField] private GameObject m_RestartButton;
@@ -64,7 +71,14 @@ public class GameUIContoleer : MonoBehaviour
             ToggleHintButton(false); // Hide by default
             UpdateTimerVisibility();
             UpdateLevelHeaderText();
+            UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
+            UserDataManager.Instance.OnMagicBoosterChanged += UpdateMagicBoosterUI;
         }
+    }
+
+    private void OnEnabled()
+    {
+        UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
     }
 
     private void OnDestroy()
@@ -75,6 +89,11 @@ public class GameUIContoleer : MonoBehaviour
             GameManager.Instance.OnHintVisibilityChanged -= ToggleHintButton;
             GameManager.Instance.OnLevelStarted -= OnLevelStarted;
             GameManager.Instance.OnGameOver -= OnGameOver;
+        }
+
+        if (UserDataManager.Instance != null)
+        {
+            UserDataManager.Instance.OnMagicBoosterChanged -= UpdateMagicBoosterUI;
         }
     }
 
@@ -501,5 +520,80 @@ public class GameUIContoleer : MonoBehaviour
         {
             AdsManager.Instance.ShowRewardedForHint();
         }
+    }
+
+    private void UpdateMagicBoosterUI(int count)
+    {
+        bool isLocked = UserDataManager.Instance.CurrentLevel < GameManager.MAGIC_BOOSTER_UNLOCK_LEVEL;
+
+        if (m_MagicLockIcon != null)
+        {
+            m_MagicLockIcon.SetActive(isLocked);
+        }
+
+        if (isLocked)
+        {
+            m_MagicBoosterText.gameObject.SetActive(false);
+            m_MagicAd.SetActive(true);
+            m_MagicBalance.SetActive(false);
+            m_MagicIcon.SetActive(false);
+        }
+        else
+        {
+            m_MagicIcon.SetActive(true);
+            m_MagicLockIcon.SetActive(false);
+            if (count > 0)
+            {
+                if (m_MagicBoosterText != null)
+                {
+                    m_MagicBoosterText.gameObject.SetActive(true);
+                    m_MagicBoosterText.text = count.ToString();
+                }
+                 m_MagicBalance.SetActive(true);
+                 m_MagicAd.SetActive(false);
+            }
+            else
+            {
+                if (m_MagicBoosterText != null) m_MagicBoosterText.gameObject.SetActive(false);
+                 m_MagicBalance.SetActive(false);
+                 m_MagicAd.SetActive(true);
+            }
+        }
+    }
+
+    public void OnMagicButtonClicked()
+    {
+        if (UserDataManager.Instance.CurrentLevel < GameManager.MAGIC_BOOSTER_UNLOCK_LEVEL)
+        {
+            if (m_MagicTooltipCoroutine != null) StopCoroutine(m_MagicTooltipCoroutine);
+            m_MagicTooltipCoroutine = StartCoroutine(ShowMagicTooltipCoroutine());
+            return;
+        }
+
+        if (UserDataManager.Instance.MagicBoosterCount > 0)
+        {
+            if (UserDataManager.Instance.UseMagicBooster(1))
+            {
+                GameManager.Instance.ExecuteMagicBooster();
+            }
+        }
+        else
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowRewardedForMagic();
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator ShowMagicTooltipCoroutine()
+    {
+        if (m_MagicTooltip != null)
+        {
+            m_MagicTooltip.SetActive(true);
+            yield return new WaitForSeconds(3f);
+            m_MagicTooltip.SetActive(false);
+        }
+        m_MagicTooltipCoroutine = null;
     }
 }

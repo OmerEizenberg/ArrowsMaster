@@ -195,6 +195,16 @@ namespace Assets.Scripts.Core
             OnLevelInputChanged("100");
         }
 
+        [ContextMenu("Cheat: Add 5 Magic Boosters")]
+        private void CheatAddMagicBooster()
+        {
+            if (UserDataManager.Instance != null)
+            {
+                UserDataManager.Instance.AddMagicBooster(5);
+                Debug.Log($"[CHEAT] Added 5 Magic Boosters. New balance: {UserDataManager.Instance.MagicBoosterCount}");
+            }
+        }
+
         #endregion
     }
 }
