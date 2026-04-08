@@ -52,6 +52,8 @@ namespace Assets.Scripts.Core
         private const string LiveOpDataPrefix = "LiveOpData_";
         private const string LiveOpCurrentIDPrefix = "LiveOpCurrentID_";
         private const string MagicBoosterKey = "MagicBoosterBalance";
+        private const string HintBoosterKey = "HintBoosterBalance";
+        private const string BoostersInitializedKey = "BoostersInitialized";
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
@@ -72,7 +74,9 @@ namespace Assets.Scripts.Core
         public System.DateTime LastRateUsDate { get; private set; }
         public bool IsRateUsCheckPending { get; set; } = false;
         public int MagicBoosterCount { get; private set; } = 0;
+        public int HintBoosterCount { get; private set; } = 0;
         public event System.Action<int> OnMagicBoosterChanged;
+        public event System.Action<int> OnHintBoosterChanged;
 
         public int LastViewedChallengeYear { get; private set; }
         public int LastViewedChallengeMonth { get; private set; }
@@ -125,6 +129,16 @@ namespace Assets.Scripts.Core
             LastViewedChallengeYear = PlayerPrefs.GetInt("LastViewedChallengeYear", System.DateTime.Now.Year);
             LastViewedChallengeMonth = PlayerPrefs.GetInt("LastViewedChallengeMonth", System.DateTime.Now.Month);
             MagicBoosterCount = PlayerPrefs.GetInt(MagicBoosterKey, 0);
+            HintBoosterCount = PlayerPrefs.GetInt(HintBoosterKey, 0);
+
+            if (PlayerPrefs.GetInt(BoostersInitializedKey, 0) == 0)
+            {
+                MagicBoosterCount = 1;
+                HintBoosterCount = 1;
+                PlayerPrefs.SetInt(BoostersInitializedKey, 1);
+                SaveMagicBooster();
+                SaveHintBooster();
+            }
         }
 
         public void IncrementLevel()
@@ -190,6 +204,32 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(MagicBoosterKey, MagicBoosterCount);
             PlayerPrefs.Save();
             OnMagicBoosterChanged?.Invoke(MagicBoosterCount);
+        }
+
+        public void AddHintBooster(int amount)
+        {
+            if (amount < 0) return;
+            HintBoosterCount += amount;
+            SaveHintBooster();
+        }
+
+        public bool UseHintBooster(int amount)
+        {
+            if (amount < 0) return false;
+            if (HintBoosterCount >= amount)
+            {
+                HintBoosterCount -= amount;
+                SaveHintBooster();
+                return true;
+            }
+            return false;
+        }
+
+        private void SaveHintBooster()
+        {
+            PlayerPrefs.SetInt(HintBoosterKey, HintBoosterCount);
+            PlayerPrefs.Save();
+            OnHintBoosterChanged?.Invoke(HintBoosterCount);
         }
 
         public void MarkRateUsSeen()

@@ -14,6 +14,7 @@ namespace Assets.Scripts.Core
         [Header("References")]
         public LevelManager levelManager;
         public const int ADS_START_LEVEL = 9;
+        public const int HINT_BOOSTER_UNLOCK_LEVEL = 9;
         public const int COINS_START_LEVEL = 5;
         public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;
 
@@ -150,7 +151,7 @@ namespace Assets.Scripts.Core
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnRewardReceived += HandleRewardReceived;
-                AdsManager.Instance.OnHintRewardReceived += ShowHint;
+                AdsManager.Instance.OnHintRewardReceived += HandleHintRewardReceived;
                 AdsManager.Instance.OnPlayOnRewardReceived += ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived += HandleMagicRewardReceived;
                 AdsManager.Instance.OnAdOpened += HandleAdOpened;
@@ -207,7 +208,7 @@ namespace Assets.Scripts.Core
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnRewardReceived -= HandleRewardReceived;
-                AdsManager.Instance.OnHintRewardReceived -= ShowHint;
+                AdsManager.Instance.OnHintRewardReceived -= HandleHintRewardReceived;
                 AdsManager.Instance.OnPlayOnRewardReceived -= ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived -= HandleMagicRewardReceived;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
@@ -269,7 +270,7 @@ namespace Assets.Scripts.Core
             }
         }
 
-        private void ShowHint()
+        public void ShowHint()
         {
             // Optimization: Use cached arrow list from GridManager instead of FindObjectsOfType
             if (GridManager.Instance == null) return;
@@ -305,6 +306,13 @@ namespace Assets.Scripts.Core
             }
 
             ResetHintTimer(false);
+        }
+
+        private void HandleHintRewardReceived()
+        {
+            UserDataManager.Instance.AddHintBooster(1);
+            UserDataManager.Instance.UseHintBooster(1);
+            ShowHint();
         }
 
         private void HandleMagicRewardReceived()

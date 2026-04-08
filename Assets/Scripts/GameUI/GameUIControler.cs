@@ -11,10 +11,17 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
     public Transform GameUIParent => m_GameUI != null ? m_GameUI.transform : transform;
+    [SerializeField] private GameObject m_HeartsContainer; // For organization
     [SerializeField] private LevelManager m_LevelManager;
     [SerializeField] private Animator m_XIndicatAnim;
     [SerializeField] private Image[] m_Hearts;
-    [SerializeField] private GameObject m_HintButton;
+    [SerializeField] private TextMeshProUGUI m_HintBoosterText;
+    [SerializeField] private GameObject m_HintBalance;
+    [SerializeField] private GameObject m_HintIcon;
+    [SerializeField] private GameObject m_HintAd;
+    [SerializeField] private GameObject m_HintLockIcon;
+    [SerializeField] private GameObject m_HintTooltip;
+    private Coroutine m_HintTooltipCoroutine;
     [SerializeField] private GameObject m_TimerContainer; // Container for timer UI
     [SerializeField] private TextMeshProUGUI m_TimerText; // Timer display (MM:SS)
     [SerializeField] private TextMeshProUGUI m_FailureTitle; // "Out of Lives!" or "Time's Up!"
@@ -64,7 +71,6 @@ public class GameUIContoleer : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnLivesChanged += UpdateLivesUI;
-            GameManager.Instance.OnHintVisibilityChanged += ToggleHintButton;
             GameManager.Instance.OnLevelStarted += OnLevelStarted;
             GameManager.Instance.OnGameOver += OnGameOver;
             UpdateLivesUI(GameManager.Instance.CurrentLives);
@@ -73,12 +79,15 @@ public class GameUIContoleer : MonoBehaviour
             UpdateLevelHeaderText();
             UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
             UserDataManager.Instance.OnMagicBoosterChanged += UpdateMagicBoosterUI;
+            UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
+            UserDataManager.Instance.OnHintBoosterChanged += UpdateHintBoosterUI;
         }
     }
 
     private void OnEnabled()
     {
         UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
+        UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
     }
 
     private void OnDestroy()
@@ -86,7 +95,6 @@ public class GameUIContoleer : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnLivesChanged -= UpdateLivesUI;
-            GameManager.Instance.OnHintVisibilityChanged -= ToggleHintButton;
             GameManager.Instance.OnLevelStarted -= OnLevelStarted;
             GameManager.Instance.OnGameOver -= OnGameOver;
         }
@@ -94,6 +102,7 @@ public class GameUIContoleer : MonoBehaviour
         if (UserDataManager.Instance != null)
         {
             UserDataManager.Instance.OnMagicBoosterChanged -= UpdateMagicBoosterUI;
+            UserDataManager.Instance.OnHintBoosterChanged -= UpdateHintBoosterUI;
         }
     }
 
@@ -253,6 +262,9 @@ public class GameUIContoleer : MonoBehaviour
         {
             m_TimerText.color = m_TimerDefaultColor;
         }
+
+        UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
+        UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
 
         UpdateLevelHeaderText();
 
@@ -508,18 +520,82 @@ public class GameUIContoleer : MonoBehaviour
 
     private void ToggleHintButton(bool visible)
     {
-        if (m_HintButton != null)
-        {
-            m_HintButton.SetActive(visible);
-        }
     }
 
     public void OnHintButtonClicked()
     {
-        if (AdsManager.Instance != null)
+        if (UserDataManager.Instance.CurrentLevel < GameManager.HINT_BOOSTER_UNLOCK_LEVEL)
         {
-            AdsManager.Instance.ShowRewardedForHint();
+            if (m_HintTooltipCoroutine != null) StopCoroutine(m_HintTooltipCoroutine);
+            m_HintTooltipCoroutine = StartCoroutine(ShowHintTooltipCoroutine());
+            return;
         }
+
+        if (UserDataManager.Instance.HintBoosterCount > 0)
+        {
+            if (UserDataManager.Instance.UseHintBooster(1))
+            {
+                GameManager.Instance.ShowHint();
+            }
+        }
+        else
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowRewardedForHint();
+            }
+        }
+    }
+
+    private void UpdateHintBoosterUI(int count)
+    {
+        bool isLocked = UserDataManager.Instance.CurrentLevel < GameManager.HINT_BOOSTER_UNLOCK_LEVEL;
+
+        if (m_HintLockIcon != null)
+        {
+            m_HintLockIcon.SetActive(isLocked);
+        }
+
+        if (isLocked)
+        {
+            if (m_HintBoosterText != null) m_HintBoosterText.gameObject.SetActive(false);
+            if (m_HintAd != null) m_HintAd.SetActive(true);
+            if (m_HintBalance != null) m_HintBalance.SetActive(false);
+            if (m_HintIcon != null) m_HintIcon.SetActive(false);
+        }
+        else
+        {
+            if (m_HintIcon != null) m_HintIcon.SetActive(true);
+            if (m_HintLockIcon != null) m_HintLockIcon.SetActive(false);
+            
+            if (count > 0)
+            {
+                if (m_HintBoosterText != null)
+                {
+                    m_HintBoosterText.gameObject.SetActive(true);
+                    m_HintBoosterText.text = count.ToString();
+                }
+                if (m_HintBalance != null) m_HintBalance.SetActive(true);
+                if (m_HintAd != null) m_HintAd.SetActive(false);
+            }
+            else
+            {
+                if (m_HintBoosterText != null) m_HintBoosterText.gameObject.SetActive(false);
+                if (m_HintBalance != null) m_HintBalance.SetActive(false);
+                if (m_HintAd != null) m_HintAd.SetActive(true);
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator ShowHintTooltipCoroutine()
+    {
+        if (m_HintTooltip != null)
+        {
+            m_HintTooltip.SetActive(true);
+            yield return new WaitForSeconds(3f);
+            m_HintTooltip.SetActive(false);
+        }
+        m_HintTooltipCoroutine = null;
     }
 
     private void UpdateMagicBoosterUI(int count)
