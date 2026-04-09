@@ -24,7 +24,7 @@ namespace Assets.Scripts.Core
         private const float AD_COOLDOWN = 120f;
 
         // Track which rewarded ad type is currently being shown
-        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward }
+        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward, LifeReward }
         private RewardAdType pendingRewardType = RewardAdType.None;
 
         private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _mainThreadQueue = new System.Collections.Concurrent.ConcurrentQueue<Action>();
@@ -35,6 +35,7 @@ namespace Assets.Scripts.Core
         public event Action OnHintRewardReceived;
         public event Action OnPlayOnRewardReceived;
         public event Action OnMagicRewardReceived;
+        public event Action OnLifeRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
         public bool IsRewardedReady => RewardedAd != null && RewardedAd.IsAdReady();
@@ -576,6 +577,11 @@ namespace Assets.Scripts.Core
                     Debug.Log("[AdsManager] ProcessPendingReward: MagicReward → firing OnMagicRewardReceived.");
                     OnMagicRewardReceived?.Invoke();
                     break;
+                
+                case RewardAdType.LifeReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: LifeReward → firing OnLifeRewardReceived.");
+                    OnLifeRewardReceived?.Invoke();
+                    break;
 
                 default:
                     Debug.Log("[AdsManager] ProcessPendingReward: No pending reward (None). Ignoring.");
@@ -873,6 +879,34 @@ namespace Assets.Scripts.Core
             else
             {
                 Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for Magic. Initialized: {isInitialized}");
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                else
+                {
+                    LoadRewarded();
+                    LoadInterstitial();
+                }
+            }
+        }
+
+        public void ShowRewardedForLife()
+        {
+            if (RewardedAd != null && RewardedAd.IsAdReady())
+            {
+                Debug.Log("[AdsManager] Showing Rewarded Ad for Life (LifeReward).");
+                pendingRewardType = RewardAdType.LifeReward;
+                OnAdOpened?.Invoke();
+                RewardedAd.ShowAd();
+            }
+            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            {
+                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for life. Falling back to Interstitial.");
+                pendingRewardType = RewardAdType.LifeReward;
+                OnAdOpened?.Invoke();
+                interstitialAd.ShowAd();
+            }
+            else
+            {
+                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for Life. Initialized: {isInitialized}");
                 if (!isInitialized && !isInitializing) _ = InitializeSDK();
                 else
                 {

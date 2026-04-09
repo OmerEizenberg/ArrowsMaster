@@ -12,6 +12,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_GameUI;
     public Transform GameUIParent => m_GameUI != null ? m_GameUI.transform : transform;
     [SerializeField] private GameObject m_HeartsContainer; // For organization
+    [SerializeField] private GameObject m_BoostersPanel;
     [SerializeField] private LevelManager m_LevelManager;
     [SerializeField] private Animator m_XIndicatAnim;
     [SerializeField] private Image[] m_Hearts;
@@ -35,6 +36,23 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_MagicAd;
     [SerializeField] private GameObject m_MagicLockIcon;
     [SerializeField] private GameObject m_MagicTooltip;
+    [SerializeField] private TextMeshProUGUI m_RefillBoosterText;
+    [SerializeField] private GameObject m_RefillBalance;
+    [SerializeField] private GameObject m_RefillIcon;
+    [SerializeField] private GameObject m_RefillAd;
+    [SerializeField] private GameObject m_RefillLockIcon;
+    [SerializeField] private GameObject m_RefillTooltip;
+    [SerializeField] private GameObject m_RefillFullLivesTooltip;
+    
+    [Header("Booster Visual Feedback")]
+    [SerializeField] private RectTransform m_BoosterOverlayParent;
+    [SerializeField] private GameObject m_BoosterImagePrefab; // Prefab with Image component
+    [SerializeField] private Sprite m_MagicBoosterFeedbackSprite;
+    [SerializeField] private Sprite m_HintBoosterFeedbackSprite;
+    [SerializeField] private Sprite m_RefillBoosterFeedbackSprite;
+
+    private Coroutine m_RefillTooltipCoroutine;
+    private Coroutine m_RefillFullTooltipCoroutine;
     private Coroutine m_MagicTooltipCoroutine;
     
     [Header("Restart Button Fade")]
@@ -77,10 +95,13 @@ public class GameUIContoleer : MonoBehaviour
             ToggleHintButton(false); // Hide by default
             UpdateTimerVisibility();
             UpdateLevelHeaderText();
+            UpdateBoostersPanelVisibility();
             UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
             UserDataManager.Instance.OnMagicBoosterChanged += UpdateMagicBoosterUI;
             UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
             UserDataManager.Instance.OnHintBoosterChanged += UpdateHintBoosterUI;
+            UpdateRefillBoosterUI(UserDataManager.Instance.RefillBoosterCount);
+            UserDataManager.Instance.OnRefillBoosterChanged += UpdateRefillBoosterUI;
         }
     }
 
@@ -88,6 +109,7 @@ public class GameUIContoleer : MonoBehaviour
     {
         UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
         UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
+        UpdateRefillBoosterUI(UserDataManager.Instance.RefillBoosterCount);
     }
 
     private void OnDestroy()
@@ -103,6 +125,7 @@ public class GameUIContoleer : MonoBehaviour
         {
             UserDataManager.Instance.OnMagicBoosterChanged -= UpdateMagicBoosterUI;
             UserDataManager.Instance.OnHintBoosterChanged -= UpdateHintBoosterUI;
+            UserDataManager.Instance.OnRefillBoosterChanged -= UpdateRefillBoosterUI;
         }
     }
 
@@ -265,7 +288,8 @@ public class GameUIContoleer : MonoBehaviour
 
         UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
         UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
-
+        UpdateRefillBoosterUI(UserDataManager.Instance.RefillBoosterCount);
+        UpdateBoostersPanelVisibility();
         UpdateLevelHeaderText();
 
         ResetComboIndication();
@@ -526,7 +550,7 @@ public class GameUIContoleer : MonoBehaviour
     {
         if (UserDataManager.Instance.CurrentLevel < GameManager.HINT_BOOSTER_UNLOCK_LEVEL)
         {
-            if (m_HintTooltipCoroutine != null) StopCoroutine(m_HintTooltipCoroutine);
+            HideAllBoosterTooltips();
             m_HintTooltipCoroutine = StartCoroutine(ShowHintTooltipCoroutine());
             return;
         }
@@ -535,7 +559,9 @@ public class GameUIContoleer : MonoBehaviour
         {
             if (UserDataManager.Instance.UseHintBooster(1))
             {
-                GameManager.Instance.ShowHint();
+                StartCoroutine(BoosterSequence(m_HintBoosterFeedbackSprite, () => {
+                    GameManager.Instance.ShowHint();
+                }));
             }
         }
         else
@@ -545,6 +571,13 @@ public class GameUIContoleer : MonoBehaviour
                 AdsManager.Instance.ShowRewardedForHint();
             }
         }
+    }
+
+    public void HandleHintRewardReceived()
+    {
+        StartCoroutine(BoosterSequence(m_HintBoosterFeedbackSprite, () => {
+            GameManager.Instance.ShowHint();
+        }));
     }
 
     private void UpdateHintBoosterUI(int count)
@@ -585,6 +618,23 @@ public class GameUIContoleer : MonoBehaviour
                 if (m_HintAd != null) m_HintAd.SetActive(true);
             }
         }
+    }
+    private void HideAllBoosterTooltips()
+    {
+        if (m_MagicTooltipCoroutine != null) StopCoroutine(m_MagicTooltipCoroutine);
+        if (m_HintTooltipCoroutine != null) StopCoroutine(m_HintTooltipCoroutine);
+        if (m_RefillTooltipCoroutine != null) StopCoroutine(m_RefillTooltipCoroutine);
+        if (m_RefillFullTooltipCoroutine != null) StopCoroutine(m_RefillFullTooltipCoroutine);
+
+        if (m_MagicTooltip != null) m_MagicTooltip.SetActive(false);
+        if (m_HintTooltip != null) m_HintTooltip.SetActive(false);
+        if (m_RefillTooltip != null) m_RefillTooltip.SetActive(false);
+        if (m_RefillFullLivesTooltip != null) m_RefillFullLivesTooltip.SetActive(false);
+
+        m_MagicTooltipCoroutine = null;
+        m_HintTooltipCoroutine = null;
+        m_RefillTooltipCoroutine = null;
+        m_RefillFullTooltipCoroutine = null;
     }
 
     private System.Collections.IEnumerator ShowHintTooltipCoroutine()
@@ -641,7 +691,7 @@ public class GameUIContoleer : MonoBehaviour
     {
         if (UserDataManager.Instance.CurrentLevel < GameManager.MAGIC_BOOSTER_UNLOCK_LEVEL)
         {
-            if (m_MagicTooltipCoroutine != null) StopCoroutine(m_MagicTooltipCoroutine);
+            HideAllBoosterTooltips();
             m_MagicTooltipCoroutine = StartCoroutine(ShowMagicTooltipCoroutine());
             return;
         }
@@ -650,7 +700,9 @@ public class GameUIContoleer : MonoBehaviour
         {
             if (UserDataManager.Instance.UseMagicBooster(1))
             {
-                GameManager.Instance.ExecuteMagicBooster();
+                StartCoroutine(BoosterSequence(m_MagicBoosterFeedbackSprite, () => {
+                    GameManager.Instance.ExecuteMagicBooster();
+                }));
             }
         }
         else
@@ -662,6 +714,13 @@ public class GameUIContoleer : MonoBehaviour
         }
     }
 
+    public void HandleMagicRewardReceived()
+    {
+        StartCoroutine(BoosterSequence(m_MagicBoosterFeedbackSprite, () => {
+            GameManager.Instance.ExecuteMagicBooster();
+        }));
+    }
+
     private System.Collections.IEnumerator ShowMagicTooltipCoroutine()
     {
         if (m_MagicTooltip != null)
@@ -671,5 +730,181 @@ public class GameUIContoleer : MonoBehaviour
             m_MagicTooltip.SetActive(false);
         }
         m_MagicTooltipCoroutine = null;
+    }
+
+    public void OnRefillButtonClicked()
+    {
+        if (UserDataManager.Instance.CurrentLevel < GameManager.REFILL_BOOSTER_UNLOCK_LEVEL)
+        {
+            HideAllBoosterTooltips();
+            m_RefillTooltipCoroutine = StartCoroutine(ShowRefillTooltipCoroutine());
+            return;
+        }
+
+        if (GameManager.Instance.CurrentLives >= 3)
+        {
+            HideAllBoosterTooltips();
+            m_RefillFullTooltipCoroutine = StartCoroutine(ShowRefillFullTooltipCoroutine());
+            return;
+        }
+
+        if (UserDataManager.Instance.RefillBoosterCount > 0)
+        {
+            if (UserDataManager.Instance.UseRefillBooster(1))
+            {
+                StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, () => {
+                    GameManager.Instance.ExecuteRefillLife();
+                }));
+            }
+        }
+        else
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowRewardedForLife();
+            }
+        }
+    }
+
+    public void HandleRefillRewardReceived()
+    {
+        StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, () => {
+                   GameManager.Instance.ExecuteRefillLife();
+               }));
+    }
+
+    private void UpdateRefillBoosterUI(int count)
+    {
+        bool isLocked = UserDataManager.Instance.CurrentLevel < GameManager.REFILL_BOOSTER_UNLOCK_LEVEL;
+
+        if (m_RefillLockIcon != null)
+        {
+            m_RefillLockIcon.SetActive(isLocked);
+        }
+
+        if (isLocked)
+        {
+            if (m_RefillBoosterText != null) m_RefillBoosterText.gameObject.SetActive(false);
+            if (m_RefillAd != null) m_RefillAd.SetActive(true);
+            if (m_RefillBalance != null) m_RefillBalance.SetActive(false);
+            if (m_RefillIcon != null) m_RefillIcon.SetActive(false);
+        }
+        else
+        {
+            if (m_RefillIcon != null) m_RefillIcon.SetActive(true);
+            if (m_RefillLockIcon != null) m_RefillLockIcon.SetActive(false);
+            
+            if (count > 0)
+            {
+                if (m_RefillBoosterText != null)
+                {
+                    m_RefillBoosterText.gameObject.SetActive(true);
+                    m_RefillBoosterText.text = count.ToString();
+                }
+                if (m_RefillBalance != null) m_RefillBalance.SetActive(true);
+                if (m_RefillAd != null) m_RefillAd.SetActive(false);
+            }
+            else
+            {
+                if (m_RefillBoosterText != null) m_RefillBoosterText.gameObject.SetActive(false);
+                if (m_RefillBalance != null) m_RefillBalance.SetActive(false);
+                if (m_RefillAd != null) m_RefillAd.SetActive(true);
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator ShowRefillTooltipCoroutine()
+    {
+        if (m_RefillTooltip != null)
+        {
+            m_RefillTooltip.SetActive(true);
+            yield return new WaitForSeconds(3f);
+            m_RefillTooltip.SetActive(false);
+        }
+        m_RefillTooltipCoroutine = null;
+    }
+
+    private void UpdateBoostersPanelVisibility()
+    {
+        if (m_BoostersPanel != null)
+        {
+            m_BoostersPanel.SetActive(UserDataManager.Instance.CurrentLevel >= 7);
+        }
+    }
+
+    private System.Collections.IEnumerator ShowRefillFullTooltipCoroutine()
+    {
+        if (m_RefillFullLivesTooltip != null)
+        {
+            m_RefillFullLivesTooltip.SetActive(true);
+            yield return new WaitForSeconds(3f);
+            m_RefillFullLivesTooltip.SetActive(false);
+        }
+        m_RefillFullTooltipCoroutine = null;
+    }
+
+    private IEnumerator BoosterSequence(Sprite boosterSprite, System.Action onComplete)
+    {
+        if (m_BoosterOverlayParent == null || m_BoosterImagePrefab == null || boosterSprite == null)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        GameObject boosterGO = Instantiate(m_BoosterImagePrefab, m_BoosterOverlayParent);
+        Image boosterImage = boosterGO.GetComponent<Image>();
+        if (boosterImage != null) boosterImage.sprite = boosterSprite;
+
+        RectTransform rt = boosterGO.GetComponent<RectTransform>();
+        rt.anchoredPosition = Vector2.zero; // Center of overlay
+        rt.localScale = Vector3.zero;
+
+        CanvasGroup cg = boosterGO.GetComponent<CanvasGroup>();
+        if (cg == null) cg = boosterGO.AddComponent<CanvasGroup>();
+
+        // 1. Punch Scale Up
+        float elapsed = 0f;
+        float punchDuration = 0.3f;
+        while (elapsed < punchDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / punchDuration;
+            // Ease out elastic-like punch
+            float scale = Mathf.Lerp(0f, 1.2f, t);
+            rt.localScale = new Vector3(scale, scale, 1f);
+            yield return null;
+        }
+        rt.localScale = new Vector3(1.2f, 1.2f, 1f);
+
+        // 2. Settle Down
+        elapsed = 0f;
+        float settleDuration = 0.15f;
+        while (elapsed < settleDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / settleDuration;
+            float scale = Mathf.Lerp(1.2f, 1.0f, t);
+            rt.localScale = new Vector3(scale, scale, 1f);
+            yield return null;
+        }
+        rt.localScale = Vector3.one;
+
+        // 3. Short Pause
+        yield return new WaitForSeconds(0.4f);
+
+        // 4. Fade and Out
+        elapsed = 0f;
+        float fadeDuration = 0.25f;
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / fadeDuration;
+            cg.alpha = 1f - t;
+            rt.localScale = Vector3.one * (1f + t * 0.2f); // Slight scale up while fading
+            yield return null;
+        }
+
+        Destroy(boosterGO);
+        onComplete?.Invoke();
     }
 }

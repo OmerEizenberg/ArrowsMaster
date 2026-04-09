@@ -17,6 +17,7 @@ namespace Assets.Scripts.Core
         public const int HINT_BOOSTER_UNLOCK_LEVEL = 9;
         public const int COINS_START_LEVEL = 5;
         public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;
+        public const int REFILL_BOOSTER_UNLOCK_LEVEL = 9;
 
 
         public GameObject failureScreen;
@@ -154,6 +155,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnHintRewardReceived += HandleHintRewardReceived;
                 AdsManager.Instance.OnPlayOnRewardReceived += ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived += HandleMagicRewardReceived;
+                AdsManager.Instance.OnLifeRewardReceived += HandleLifeRewardReceived;
                 AdsManager.Instance.OnAdOpened += HandleAdOpened;
                 AdsManager.Instance.OnAdClosed += HandleAdClosed;
             }
@@ -211,6 +213,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnHintRewardReceived -= HandleHintRewardReceived;
                 AdsManager.Instance.OnPlayOnRewardReceived -= ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived -= HandleMagicRewardReceived;
+                AdsManager.Instance.OnLifeRewardReceived -= HandleLifeRewardReceived;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
                 AdsManager.Instance.OnAdClosed -= HandleAdClosed;
             }
@@ -312,14 +315,29 @@ namespace Assets.Scripts.Core
         {
             UserDataManager.Instance.AddHintBooster(1);
             UserDataManager.Instance.UseHintBooster(1);
-            ShowHint();
+            if (m_GameUI != null) m_GameUI.HandleHintRewardReceived();
+            else ShowHint();
         }
 
         private void HandleMagicRewardReceived()
         {
             UserDataManager.Instance.AddMagicBooster(1);
             UserDataManager.Instance.UseMagicBooster(1);
-            ExecuteMagicBooster();
+            if (m_GameUI != null) m_GameUI.HandleMagicRewardReceived();
+            else ExecuteMagicBooster();
+        }
+
+        private void HandleLifeRewardReceived()
+        {
+            UserDataManager.Instance.AddRefillBooster(1);
+            UserDataManager.Instance.UseRefillBooster(1);
+            if (m_GameUI != null) m_GameUI.HandleRefillRewardReceived();
+            else ExecuteRefillLife();
+        }
+
+        public void ExecuteRefillLife()
+        {
+            ResetLives();
         }
 
         public void ExecuteMagicBooster()

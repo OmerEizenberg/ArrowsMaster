@@ -53,6 +53,7 @@ namespace Assets.Scripts.Core
         private const string LiveOpCurrentIDPrefix = "LiveOpCurrentID_";
         private const string MagicBoosterKey = "MagicBoosterBalance";
         private const string HintBoosterKey = "HintBoosterBalance";
+        private const string RefillBoosterKey = "RefillBoosterBalance";
         private const string BoostersInitializedKey = "BoostersInitialized";
 
         public int CurrentLevel { get; private set; } = 1;
@@ -75,8 +76,10 @@ namespace Assets.Scripts.Core
         public bool IsRateUsCheckPending { get; set; } = false;
         public int MagicBoosterCount { get; private set; } = 0;
         public int HintBoosterCount { get; private set; } = 0;
+        public int RefillBoosterCount { get; private set; } = 0;
         public event System.Action<int> OnMagicBoosterChanged;
         public event System.Action<int> OnHintBoosterChanged;
+        public event System.Action<int> OnRefillBoosterChanged;
 
         public int LastViewedChallengeYear { get; private set; }
         public int LastViewedChallengeMonth { get; private set; }
@@ -130,14 +133,17 @@ namespace Assets.Scripts.Core
             LastViewedChallengeMonth = PlayerPrefs.GetInt("LastViewedChallengeMonth", System.DateTime.Now.Month);
             MagicBoosterCount = PlayerPrefs.GetInt(MagicBoosterKey, 0);
             HintBoosterCount = PlayerPrefs.GetInt(HintBoosterKey, 0);
+            RefillBoosterCount = PlayerPrefs.GetInt(RefillBoosterKey, 0);
 
             if (PlayerPrefs.GetInt(BoostersInitializedKey, 0) == 0)
             {
                 MagicBoosterCount = 1;
                 HintBoosterCount = 1;
+                RefillBoosterCount = 1;
                 PlayerPrefs.SetInt(BoostersInitializedKey, 1);
                 SaveMagicBooster();
                 SaveHintBooster();
+                SaveRefillBooster();
             }
         }
 
@@ -230,6 +236,32 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(HintBoosterKey, HintBoosterCount);
             PlayerPrefs.Save();
             OnHintBoosterChanged?.Invoke(HintBoosterCount);
+        }
+
+        public void AddRefillBooster(int amount)
+        {
+            if (amount < 0) return;
+            RefillBoosterCount += amount;
+            SaveRefillBooster();
+        }
+
+        public bool UseRefillBooster(int amount)
+        {
+            if (amount < 0) return false;
+            if (RefillBoosterCount >= amount)
+            {
+                RefillBoosterCount -= amount;
+                SaveRefillBooster();
+                return true;
+            }
+            return false;
+        }
+
+        private void SaveRefillBooster()
+        {
+            PlayerPrefs.SetInt(RefillBoosterKey, RefillBoosterCount);
+            PlayerPrefs.Save();
+            OnRefillBoosterChanged?.Invoke(RefillBoosterCount);
         }
 
         public void MarkRateUsSeen()
