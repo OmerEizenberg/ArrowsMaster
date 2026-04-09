@@ -31,6 +31,9 @@ namespace Assets.Scripts.Core
         public AudioClip[] streakSounds;
         public AudioClip ShopSound;
         public AudioClip NewRecordSound;
+        public AudioClip MagicBoosterSound;
+        public AudioClip HintBoosterSound;
+        public AudioClip RefillBoosterSound;
 
         private float m_LastNewRecordSoundTime = -30f;
 
@@ -177,6 +180,21 @@ namespace Assets.Scripts.Core
         public void PlayBigCheer()
         {
             PlaySound(BigCheer);
+        }
+
+        public void PlayMagicBooster()
+        {
+            PlaySound(MagicBoosterSound);
+        }
+
+        public void PlayHintBooster()
+        {
+            PlaySound(HintBoosterSound);
+        }
+
+        public void PlayRefillBooster()
+        {
+            PlaySound(RefillBoosterSound);
         }
 
         public void SetMute(bool mute)

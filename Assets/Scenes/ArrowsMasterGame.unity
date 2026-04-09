@@ -19916,6 +19916,9 @@ MonoBehaviour:
   - {fileID: 8300000, guid: a6212c03d85514f46ada012ca4d563e1, type: 3}
   ShopSound: {fileID: 8300000, guid: 98d10627ccbf24ec4890968b75f979f1, type: 3}
   NewRecordSound: {fileID: 8300000, guid: 9d01a7c18cb0d4c0dbf84aea0bb30805, type: 3}
+  MagicBoosterSound: {fileID: 8300000, guid: ab25027bee74f49c9ab4158591c94033, type: 3}
+  HintBoosterSound: {fileID: 8300000, guid: b873ee57d65204275af76049ea6b615e, type: 3}
+  RefillBoosterSound: {fileID: 8300000, guid: e58c3c25ae89b4d5c8b29f9553e90799, type: 3}
   musicSource: {fileID: 0}
 --- !u!1 &985538275
 GameObject:

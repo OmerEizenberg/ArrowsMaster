@@ -8,6 +8,7 @@ using TMPro;
 
 public class GameUIContoleer : MonoBehaviour
 {
+    public enum BoosterType { Magic, Hint, Refill }
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
     public Transform GameUIParent => m_GameUI != null ? m_GameUI.transform : transform;
@@ -559,7 +560,7 @@ public class GameUIContoleer : MonoBehaviour
         {
             if (UserDataManager.Instance.UseHintBooster(1))
             {
-                StartCoroutine(BoosterSequence(m_HintBoosterFeedbackSprite, () => {
+                StartCoroutine(BoosterSequence(m_HintBoosterFeedbackSprite, BoosterType.Hint, () => {
                     GameManager.Instance.ShowHint();
                 }));
             }
@@ -575,7 +576,7 @@ public class GameUIContoleer : MonoBehaviour
 
     public void HandleHintRewardReceived()
     {
-        StartCoroutine(BoosterSequence(m_HintBoosterFeedbackSprite, () => {
+        StartCoroutine(BoosterSequence(m_HintBoosterFeedbackSprite, BoosterType.Hint, () => {
             GameManager.Instance.ShowHint();
         }));
     }
@@ -700,7 +701,7 @@ public class GameUIContoleer : MonoBehaviour
         {
             if (UserDataManager.Instance.UseMagicBooster(1))
             {
-                StartCoroutine(BoosterSequence(m_MagicBoosterFeedbackSprite, () => {
+                StartCoroutine(BoosterSequence(m_MagicBoosterFeedbackSprite, BoosterType.Magic, () => {
                     GameManager.Instance.ExecuteMagicBooster();
                 }));
             }
@@ -716,7 +717,7 @@ public class GameUIContoleer : MonoBehaviour
 
     public void HandleMagicRewardReceived()
     {
-        StartCoroutine(BoosterSequence(m_MagicBoosterFeedbackSprite, () => {
+        StartCoroutine(BoosterSequence(m_MagicBoosterFeedbackSprite, BoosterType.Magic, () => {
             GameManager.Instance.ExecuteMagicBooster();
         }));
     }
@@ -752,7 +753,7 @@ public class GameUIContoleer : MonoBehaviour
         {
             if (UserDataManager.Instance.UseRefillBooster(1))
             {
-                StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, () => {
+                StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, BoosterType.Refill, () => {
                     GameManager.Instance.ExecuteRefillLife();
                 }));
             }
@@ -768,7 +769,7 @@ public class GameUIContoleer : MonoBehaviour
 
     public void HandleRefillRewardReceived()
     {
-        StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, () => {
+        StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, BoosterType.Refill, () => {
                    GameManager.Instance.ExecuteRefillLife();
                }));
     }
@@ -843,12 +844,22 @@ public class GameUIContoleer : MonoBehaviour
         m_RefillFullTooltipCoroutine = null;
     }
 
-    private IEnumerator BoosterSequence(Sprite boosterSprite, System.Action onComplete)
+    private IEnumerator BoosterSequence(Sprite boosterSprite, BoosterType type, System.Action onComplete)
     {
         if (m_BoosterOverlayParent == null || m_BoosterImagePrefab == null || boosterSprite == null)
         {
             onComplete?.Invoke();
             yield break;
+        }
+
+        if (SoundManager.Instance != null)
+        {
+            switch (type)
+            {
+                case BoosterType.Magic: SoundManager.Instance.PlayMagicBooster(); break;
+                case BoosterType.Hint: SoundManager.Instance.PlayHintBooster(); break;
+                case BoosterType.Refill: SoundManager.Instance.PlayRefillBooster(); break;
+            }
         }
 
         GameObject boosterGO = Instantiate(m_BoosterImagePrefab, m_BoosterOverlayParent);
@@ -864,7 +875,7 @@ public class GameUIContoleer : MonoBehaviour
 
         // 1. Punch Scale Up
         float elapsed = 0f;
-        float punchDuration = 0.3f;
+        float punchDuration = 0.25f;
         while (elapsed < punchDuration)
         {
             elapsed += Time.deltaTime;
@@ -878,7 +889,7 @@ public class GameUIContoleer : MonoBehaviour
 
         // 2. Settle Down
         elapsed = 0f;
-        float settleDuration = 0.15f;
+        float settleDuration = 0.12f;
         while (elapsed < settleDuration)
         {
             elapsed += Time.deltaTime;
@@ -890,11 +901,11 @@ public class GameUIContoleer : MonoBehaviour
         rt.localScale = Vector3.one;
 
         // 3. Short Pause
-        yield return new WaitForSeconds(0.4f);
+        yield return new WaitForSeconds(0.34f);
 
         // 4. Fade and Out
         elapsed = 0f;
-        float fadeDuration = 0.25f;
+        float fadeDuration = 0.21f;
         while (elapsed < fadeDuration)
         {
             elapsed += Time.deltaTime;
