@@ -33,6 +33,9 @@ dependencyResolutionManagement {
         maven {
             url "https://maven.google.com/" // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:12, Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml:8
         }
+        maven {
+            url "https://maven.singular.net" // Packages/singular-unity-package/SingularSDK/Editor/SingularSDKDependencies.xml:7
+        }
         mavenLocal()
 // Android Resolver Repos End
         flatDir {

@@ -12275,6 +12275,87 @@ MonoBehaviour:
   winZoomMultiplier: 1.5
   zoomReturnDuration: 0.3
   returnStartDelay: 0.15
+--- !u!1001 &521385559
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2659026201844013572, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_Name
+      value: SingularSDKObject
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: SingularAPIKey
+      value: levelupmedia_b500707d
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: autoIAPComplete
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: SingularAPISecret
+      value: 723c3d6412eb65f9e8fa90d22e985f7c
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: brandedDomains.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: brandedDomains.Array.data[0]
+      value: https://levelupmedia.online/
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: waitForTrackingAuthorizationWithTimeoutInterval
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
 --- !u!1 &535885400
 GameObject:
   m_ObjectHideFlags: 0
@@ -48968,3 +49049,4 @@ SceneRoots:
   - {fileID: 334562610}
   - {fileID: 5701306423920167923}
   - {fileID: 1135043303}
+  - {fileID: 521385559}

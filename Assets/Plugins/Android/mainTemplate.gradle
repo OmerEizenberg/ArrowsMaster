@@ -7,8 +7,11 @@ dependencies {
     implementation 'com.unity3d.ads-mediation:mediation-sdk:9.3.0'
 // Android Resolver Dependencies Start
     implementation 'com.android.billingclient:billing:6.0.1' // Assets/Plugins/Android/Editor/BillingDependencies.xml:4
+    implementation 'com.android.installreferrer:installreferrer:2.2' // Packages/singular-unity-package/SingularSDK/Editor/SingularSDKDependencies.xml:8
     implementation 'com.google.android.gms:play-services-ads:25.1.0' // Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml:8
+    // implementation 'com.google.android.gms:play-services-ads-identifier:18.0.1' // Packages/singular-unity-package/SingularSDK/Editor/SingularSDKDependencies.xml:10
     implementation 'com.google.android.gms:play-services-ads-identifier:18.1.0' // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:12
+    implementation 'com.google.android.gms:play-services-appset:16.0.0' // Packages/singular-unity-package/SingularSDK/Editor/SingularSDKDependencies.xml:9
     implementation 'com.google.android.gms:play-services-base:18.10.0' // Assets/Firebase/Editor/AppDependencies.xml:20
     implementation 'com.google.firebase:firebase-analytics:23.0.0' // Assets/Firebase/Editor/RemoteConfigDependencies.xml:18
     implementation 'com.google.firebase:firebase-analytics-unity:13.7.0' // Assets/Firebase/Editor/AnalyticsDependencies.xml:21
@@ -23,6 +26,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-messaging-unity:13.7.0' // Assets/Firebase/Editor/MessagingDependencies.xml:27
     implementation 'com.google.flatbuffers:flatbuffers-java:1.12.0' // Assets/Firebase/Editor/MessagingDependencies.xml:22
     implementation 'com.google.games:gpgs-plugin-support:2.1.0' // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:11
+    implementation 'com.singular.sdk:singular_sdk:12.11.0' // Packages/singular-unity-package/SingularSDK/Editor/SingularSDKDependencies.xml:7
     implementation 'com.unity3d.ads:unity-ads:4.17.0' // Assets/LevelPlay/Editor/ISUnityAdsAdapterDependencies.xml:9
     implementation 'com.unity3d.ads-mediation:admob-adapter:5.7.0' // Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml:12
     implementation 'com.unity3d.ads-mediation:mediation-sdk:9.3.0' // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:5

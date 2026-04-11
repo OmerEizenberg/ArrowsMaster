@@ -268,6 +268,15 @@
       },
       "url": "https://packages.unity.com"
     },
+    "singular-unity-package": {
+      "version": "https://github.com/singular-labs/Singular-Unity-SDK.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
+      },
+      "hash": "39a2cf572a5cab11c97f58e094beb4fd4304a0e6"
+    },
     "com.unity.modules.ai": {
       "version": "1.0.0",
       "depth": 0,
