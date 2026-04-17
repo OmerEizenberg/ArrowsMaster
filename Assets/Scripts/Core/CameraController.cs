@@ -60,6 +60,13 @@ namespace Assets.Scripts.Core
         private bool boundsSet = false;
         public bool HasPannedSinceLastReset { get; private set; }
 
+        // ── Performance Optimization Caches ──────────────
+        private Transform m_Transform;
+        private float m_ViewportYFactor;
+        private float m_CurrentOrthoSize;
+        private Vector3 m_CurrentMousePos;
+        private int m_CurrentTouchCount;
+
         // ── Cached screen/camera values (refreshed in OnEnable) ──────────────
         private float cachedScreenWidth;
         private float cachedScreenHeight;
@@ -75,9 +82,13 @@ namespace Assets.Scripts.Core
             }
             Instance = this;
 
+            m_Transform = transform;
             cam = GetComponent<Camera>();
             defaultZoom = cam.orthographicSize;
             absoluteMaxZoom = maxZoom;
+            
+            // Precalculate Y-offset factor: (0.5 - target) * 2
+            m_ViewportYFactor = (0.5f - targetViewportCenterY) * 2f;
 
             // Disable VSync to allow targetFrameRate to take effect
             QualitySettings.vSyncCount = 0;
@@ -110,39 +121,48 @@ namespace Assets.Scripts.Core
         private void LateUpdate()
         {
             // Restore position from previous frame's shake
-            transform.position -= lastShakeOffset;
+            m_Transform.position -= lastShakeOffset;
             lastShakeOffset = Vector3.zero;
 
             isZoomingInteraction = false;
 
-            // Read touchCount once per frame
-            int touchCount = Input.touchCount;
+            // Refresh cached values if resolution changed
+            if (Screen.width != (int)cachedScreenWidth || Screen.height != (int)cachedScreenHeight)
+            {
+                RefreshCachedScreenValues();
+            }
+
+            // Cache frame-level inputs and properties
+            m_CurrentTouchCount = Input.touchCount;
+            m_CurrentMousePos   = Input.mousePosition;
+            m_CurrentOrthoSize  = cam.orthographicSize;
 
             HandleDesktopZoom();
-            HandleMobileZoom(touchCount);
-            HandlePanning(touchCount);
+            HandleMobileZoom(m_CurrentTouchCount);
+            HandlePanning(m_CurrentTouchCount);
 
             // Handle smooth return to maxZoom if over-zoomed and not interacting
-            bool isInteracting = isZoomingInteraction || isTouching || touchCount > 0 || Input.GetMouseButton(0);
+            bool isInteracting = isZoomingInteraction || isTouching || m_CurrentTouchCount > 0 || Input.GetMouseButton(0);
             
             if (isInteracting)
             {
                 lastInteractionTime = Time.time;
             }
 
-            if (isLevelStarted && !isInternalAnimation && !isInteracting && cam.orthographicSize > maxZoom)
+            if (isLevelStarted && !isInternalAnimation && !isInteracting && m_CurrentOrthoSize > maxZoom)
             {
                 if (Time.time - lastInteractionTime >= returnStartDelay)
                 {
                     float overZoomRange = Mathf.Max(0.1f, absoluteMaxZoom - maxZoom);
                     float returnSpeed = overZoomRange / zoomReturnDuration;
-                    cam.orthographicSize = Mathf.MoveTowards(cam.orthographicSize, maxZoom, returnSpeed * Time.deltaTime);
+                    m_CurrentOrthoSize = Mathf.MoveTowards(m_CurrentOrthoSize, maxZoom, returnSpeed * Time.deltaTime);
+                    cam.orthographicSize = m_CurrentOrthoSize;
                 }
             }
 
             // Apply current shake offset
             lastShakeOffset = shakeOffset;
-            transform.position += lastShakeOffset;
+            m_Transform.position += lastShakeOffset;
         }
 
         private Coroutine shakeCoroutine;
@@ -213,7 +233,7 @@ namespace Assets.Scripts.Core
                     return;
                 }
 
-                touchStartPosition = Input.mousePosition;
+                touchStartPosition = m_CurrentMousePos;
                 prevMousePos = touchStartPosition;
                 isTouching = true;
                 isPanningActive = false;
@@ -229,7 +249,7 @@ namespace Assets.Scripts.Core
                     return;
                 }
 
-                Vector3 currentPos = Input.mousePosition;
+                Vector3 currentPos = m_CurrentMousePos;
 
                 if (!isPanningActive)
                 {
@@ -250,7 +270,7 @@ namespace Assets.Scripts.Core
                     float deltaY = currentPos.y - prevMousePos.y;
                     
                     // Use cached screen/aspect values — no native calls per frame
-                    float worldHeight = cam.orthographicSize * 2f;
+                    float worldHeight = m_CurrentOrthoSize * 2f;
                     float worldWidth  = worldHeight * cachedAspect;
                     
                     float worldDeltaX = -(deltaX / cachedScreenWidth)  * worldWidth;
@@ -265,12 +285,12 @@ namespace Assets.Scripts.Core
                         smoothedVelocity = Vector3.Lerp(smoothedVelocity, frameVelocity, Time.deltaTime * velocitySmoothFactor);
                     }
 
-                    cachedPosition = transform.position;
+                    cachedPosition = m_Transform.position;
                     cachedPosition += worldDelta;
                     
                     cachedPosition = ClampToBounds(cachedPosition);
                     
-                    transform.position = cachedPosition;
+                    m_Transform.position = cachedPosition;
                     prevMousePos = currentPos;
                 }
             }
@@ -304,7 +324,7 @@ namespace Assets.Scripts.Core
 
             // Apply movement
             Vector3 movement = inertiaVelocity * Time.deltaTime;
-            Vector3 newPos = transform.position + movement;
+            Vector3 newPos = m_Transform.position + movement;
             
             // Clamp and check if we hit boundaries
             Vector3 clampedPos = ClampToBounds(newPos);
@@ -313,7 +333,7 @@ namespace Assets.Scripts.Core
             if (Mathf.Abs(clampedPos.x - newPos.x) > 0.001f) inertiaVelocity.x = 0;
             if (Mathf.Abs(clampedPos.y - newPos.y) > 0.001f) inertiaVelocity.y = 0;
 
-            transform.position = clampedPos;
+            m_Transform.position = clampedPos;
 
             // Apply friction (frame-rate independent)
             inertiaVelocity *= Mathf.Pow(inertiaDeceleration, Time.deltaTime * 60f);
@@ -328,7 +348,7 @@ namespace Assets.Scripts.Core
 
         private Vector3 ClampToBounds(Vector3 targetPos)
         {
-            float currentYOffset = (0.5f - targetViewportCenterY) * 2f * cam.orthographicSize;
+            float currentYOffset = m_ViewportYFactor * m_CurrentOrthoSize;
             float minLimitY = minBounds.y + currentYOffset;
             float maxLimitY = maxBounds.y + currentYOffset;
 
@@ -347,8 +367,8 @@ namespace Assets.Scripts.Core
             {
                 isZoomingInteraction = true;
                 isRollingInertia = false; // Stop inertia when zooming
-                float newSize = cam.orthographicSize - scroll * zoomSpeed;
-                cam.orthographicSize = Mathf.Clamp(newSize, minZoom, absoluteMaxZoom);
+                m_CurrentOrthoSize = Mathf.Clamp(m_CurrentOrthoSize - scroll * zoomSpeed, minZoom, absoluteMaxZoom);
+                cam.orthographicSize = m_CurrentOrthoSize;
             }
         }
 
@@ -371,8 +391,8 @@ namespace Assets.Scripts.Core
 
                 float deltaMagnitudeDiff = prevTouchDeltaMag - touchDeltaMag;
 
-                float newSize = cam.orthographicSize + deltaMagnitudeDiff * (cam.orthographicSize / 500f) * mobileZoomSpeed;
-                cam.orthographicSize = Mathf.Clamp(newSize, minZoom, absoluteMaxZoom);
+                m_CurrentOrthoSize = Mathf.Clamp(m_CurrentOrthoSize + deltaMagnitudeDiff * (m_CurrentOrthoSize / 500f) * mobileZoomSpeed, minZoom, absoluteMaxZoom);
+                cam.orthographicSize = m_CurrentOrthoSize;
             }
         }
 
@@ -426,7 +446,8 @@ namespace Assets.Scripts.Core
 
             // Instantly snap to initial zoomed-in view
             cam.orthographicSize = startZoom;
-            transform.position   = centerPos;
+            m_CurrentOrthoSize   = startZoom;
+            m_Transform.position = centerPos;
 
             yield return null;
             isInternalAnimation = false;
@@ -457,16 +478,18 @@ namespace Assets.Scripts.Core
 
                 float currentZoom = Mathf.Lerp(startZoom, targetZoom, smoothT);
                 cam.orthographicSize = currentZoom;
+                m_CurrentOrthoSize   = currentZoom;
                 
                 // Recalculate targetPos with current zoom to keep centering consistent during zoom
                 Vector3 currentTargetPos = GetViewportOffsetPos(focusPosition, currentZoom);
-                transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
+                m_Transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
 
                 yield return null;
             }
 
             cam.orthographicSize = targetZoom;
-            transform.position   = GetViewportOffsetPos(focusPosition, targetZoom);
+            m_CurrentOrthoSize   = targetZoom;
+            m_Transform.position = GetViewportOffsetPos(focusPosition, targetZoom);
             isInternalAnimation  = false;
             isLevelStarted       = true;
         }
@@ -487,14 +510,19 @@ namespace Assets.Scripts.Core
             Vector3 startPos = transform.position;
             
             // Target exactly 10% more zoom out than the default "fit" zoom
-            float targetZoom = defaultZoom * 1.1f;
+            float multiplier = 1.1f;
+            if (gridSize.x < 20 && gridSize.y < 20)
+            {
+                multiplier *= 1.5f; // Zoom out 1.5x more for small levels
+            }
+            float targetZoom = defaultZoom * multiplier;
             
             // Ensure we don't zoom IN if the player was already zoomed out further
             targetZoom = Mathf.Max(targetZoom, startZoom);
             
-            float cellSize = ArrowController.CellSize;
-            Vector3 gridCenter = new Vector3((gridSize.x - 1) * cellSize / 2f, (gridSize.y - 1) * cellSize / 2f, transform.position.z);
-            Vector3 targetPos  = gridCenter;
+            // Use the provided focusPosition instead of recalculating based on gridSize
+            // (gridSize might be larger than the actual area occupied by arrows)
+            Vector3 targetCenter = new Vector3(focusPosition.x, focusPosition.y, transform.position.z);
 
             while (elapsed < duration)
             {
@@ -503,15 +531,19 @@ namespace Assets.Scripts.Core
                 
                 float currentZoom = Mathf.Lerp(startZoom, targetZoom, smoothT);
                 cam.orthographicSize = currentZoom;
+                m_CurrentOrthoSize   = currentZoom;
                 
-                Vector3 currentTargetPos = GetViewportOffsetPos(gridCenter, currentZoom);
-                transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
+                // Keep the viewport offset consistent with gameplay (0.43 shift)
+                // but focused on the actual level center
+                Vector3 currentTargetPos = GetViewportOffsetPos(targetCenter, currentZoom);
+                m_Transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
                 
                 yield return null;
             }
 
             cam.orthographicSize = targetZoom;
-            transform.position   = GetViewportOffsetPos(gridCenter, targetZoom);
+            m_CurrentOrthoSize   = targetZoom;
+            m_Transform.position = GetViewportOffsetPos(targetCenter, targetZoom);
             isInternalAnimation  = false;
         }
 
@@ -533,18 +565,18 @@ namespace Assets.Scripts.Core
                 float smoothT = Mathf.SmoothStep(0f, 1f, elapsed / duration);
                 
                 Vector3 currentTargetPos = GetViewportOffsetPos(worldPosition, cam.orthographicSize);
-                transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
+                m_Transform.position = Vector3.Lerp(startPos, currentTargetPos, smoothT);
                 yield return null;
             }
 
-            transform.position  = GetViewportOffsetPos(worldPosition, cam.orthographicSize);
+            m_Transform.position = GetViewportOffsetPos(worldPosition, cam.orthographicSize);
             isInternalAnimation = false;
         }
 
         private Vector3 GetViewportOffsetPos(Vector3 worldPos, float orthoSize)
         {
-            float yOffset = (0.5f - targetViewportCenterY) * 2f * orthoSize;
-            return new Vector3(worldPos.x, worldPos.y + yOffset, transform.position.z);
+            float yOffset = m_ViewportYFactor * orthoSize;
+            return new Vector3(worldPos.x, worldPos.y + yOffset, m_Transform.position.z);
         }
     }
 }

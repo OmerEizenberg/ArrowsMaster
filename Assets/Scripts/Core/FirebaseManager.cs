@@ -8,6 +8,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using Singular;
+
 
 public class FirebaseManager : MonoBehaviour
 {
@@ -59,6 +61,17 @@ public class FirebaseManager : MonoBehaviour
 
     void Start()
     {
+        // --- Singular: Set ATT timeout for iOS (Recommended: 300s) ---
+        #if UNITY_IOS && !UNITY_EDITOR
+        var singular = FindFirstObjectByType<SingularSDK>();
+        if (singular != null && singular.waitForTrackingAuthorizationWithTimeoutInterval == 0)
+        {
+            singular.waitForTrackingAuthorizationWithTimeoutInterval = 300;
+            Debug.Log("[FirebaseManager] Set Singular ATT timeout to 300s.");
+        }
+        #endif
+        // -------------------------------------------------------------
+
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task => {
             DependencyStatus dependencyStatus = task.Result;
             
@@ -165,30 +178,38 @@ public class FirebaseManager : MonoBehaviour
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName);
+        SingularSDK.Event(eventName);
     }
 
     public void LogEvent(string eventName, string parameterName, string parameterValue)
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameterName, parameterValue);
+        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, eventName);
     }
 
     public void LogEvent(string eventName, string parameterName, long parameterValue)
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameterName, parameterValue);
+        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, eventName);
     }
 
     public void LogEvent(string eventName, string parameterName, double parameterValue)
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameterName, parameterValue);
+        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, eventName);
     }
 
     public void LogEvent(string eventName, params Parameter[] parameters)
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameters);
+
+        // --- Singular: Log the same event (without params for now due to Parameter being write-only) ---
+        SingularSDK.Event(eventName);
+        // ------------------------------------
     }
 
     public void SetUserProperty(string propertyName, string propertyValue)
@@ -201,6 +222,7 @@ public class FirebaseManager : MonoBehaviour
     {
         if (!isInitialized) return;
         FirebaseAnalytics.SetUserId(userId);
+        SingularSDK.SetCustomUserId(userId);
     }
     #endregion
 }

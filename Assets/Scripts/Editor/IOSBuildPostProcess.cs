@@ -2,6 +2,7 @@
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEditor.iOS.Xcode;
+using UnityEditor.iOS.Xcode.Extensions;
 using System.IO;
 using System.Text.RegularExpressions;
 using UnityEngine;
@@ -35,8 +36,8 @@ public class IOSBuildPostProcess
     {
         if (target != BuildTarget.iOS) return;
 
-        UpdateXcodeProject(pathToBuiltProject);
         UpdatePodfile(pathToBuiltProject);
+        UpdateXcodeProject(pathToBuiltProject);
         FixFBLPromisesPrivacyBundle(pathToBuiltProject);
     }
 
@@ -100,6 +101,9 @@ public class IOSBuildPostProcess
 
         PlistElementArray backgroundModes = rootDict.CreateArray("UIBackgroundModes");
         backgroundModes.AddString("remote-notification");
+
+        // 3. Add SKAdNetwork IDs for Attribution
+        AddSKAdNetworkIds(rootDict);
         
         plist.WriteToFile(plistPath);
 
@@ -110,10 +114,89 @@ public class IOSBuildPostProcess
             project.SetBuildProperty(targetGuid, "IPHONEOS_DEPLOYMENT_TARGET", "15.0");
             project.SetBuildProperty(targetGuid, "ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES", "YES");
             project.AddBuildProperty(targetGuid, "OTHER_LDFLAGS", "-ObjC");
+            project.AddBuildProperty(targetGuid, "LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks");
         }
 
+        EmbedFramework(project, mainTargetGuid, "FBAudienceNetwork", pathToBuiltProject);
+
+        // Add the user's manual shell script fix as a Build Phase
+        string scriptBody = "find \"${TARGET_BUILD_DIR}\" -name \"Info.plist\" | while read -r PLIST; do\n" +
+                            "    if [[ \"$PLIST\" == *\"IronSource\"* || \"$PLIST\" == *\"UnityAds\"* ]]; then\n" +
+                            "        /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" || true\n" +
+                            "        /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" || true\n" +
+                            "    fi\n" +
+                            "done";
+        project.AddShellScriptBuildPhase(mainTargetGuid, "Fix IronSource Plists", "/bin/sh", scriptBody);
+
         project.WriteToFile(projectPath);
+        
+        // --- START SURGERY ---
+        // Since the Unity API for "Embed & Sign" is failing, we manually patch the pbxproj file.
+        FixCodeSigningInPbxproj(projectPath);
+        // --- END SURGERY ---
+
         Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully.");
+    }
+
+    private static void AddSKAdNetworkIds(PlistElementDict rootDict)
+    {
+        PlistElementArray skanItems;
+        if (rootDict.values.ContainsKey("SKAdNetworkItems"))
+        {
+            skanItems = rootDict.values["SKAdNetworkItems"].AsArray();
+        }
+        else
+        {
+            skanItems = rootDict.CreateArray("SKAdNetworkItems");
+        }
+
+        // List of essential SKAdNetwork IDs (Singular, ironSource, and common networks)
+        string[] skanIds = new string[] {
+            "v72qych5uu.skadnetwork", // Singular
+            "su67r6k2v3.skadnetwork", // ironSource
+            "4pfyvq9l8r.skadnetwork", // ironSource
+            "ludvb6z3bs.skadnetwork", // ironSource
+            "mlmmfth3ar.skadnetwork", // ironSource
+            "5lm9lj6jb7.skadnetwork", // ironSource
+            "9rd848q2sf.skadnetwork", // ironSource
+            "7ug5zh24hu.skadnetwork", // ironSource
+            "hs6bdukanm.skadnetwork", // ironSource
+            "m8dbw4sv7c.skadnetwork", // ironSource
+            "9nlqeag3gk.skadnetwork", // ironSource
+            "cj5566h2ga.skadnetwork", // ironSource
+            "v9wttpbfk9.skadnetwork", // ironSource
+            "n38lu8286q.skadnetwork", // ironSource
+            "cstr6suwn9.skadnetwork", // ironSource/LifeStreet
+            "wzmmz9fp6w.skadnetwork", // InMobi
+            "f38h382jlk.skadnetwork", // Unity Ads
+            "2u9pt9hc89.skadnetwork", // Unity Ads
+            "3rd42ekr43.skadnetwork", // Unity Ads
+            "4468km3ulz.skadnetwork", // Apple Search Ads
+            "4fzdc2evr5.skadnetwork", // AppLovin
+            "t38b2kh725.skadnetwork", // AppLovin
+            "7rz5w94nxq.skadnetwork", // AppLovin
+            "9t245vhm4d.skadnetwork"  // AppLovin
+        };
+
+        foreach (string id in skanIds)
+        {
+            bool exists = false;
+            foreach (var item in skanItems.values)
+            {
+                if (item.AsDict().values.ContainsKey("SKAdNetworkIdentifier") &&
+                    item.AsDict().values["SKAdNetworkIdentifier"].AsString() == id)
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists)
+            {
+                PlistElementDict dict = skanItems.AddDict();
+                dict.SetString("SKAdNetworkIdentifier", id);
+            }
+        }
     }
 
     private static void UpdatePodfile(string pathToBuiltProject)
@@ -137,6 +220,7 @@ public class IOSBuildPostProcess
         // Refined post_install block that is extremely aggressive
         // Using concatenation to avoid '#' at the start of lines which can confuse some C# compilers
         string postInstallBlock = "\n# FIX_FB12_S6\n" +
+                                  "use_frameworks! :linkage => :static\n" +
                                   "post_install do |installer|\n" +
                                   "  installer.pods_project.targets.each do |target|\n" +
                                   "    target.build_configurations.each do |config|\n" +
@@ -145,8 +229,10 @@ public class IOSBuildPostProcess
                                   "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'\n" +
                                   "      config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'\n" +
                                   "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'\n" +
+                                  "      config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'\n" +
                                   "      flags = '$(inherited) -enable-experimental-feature AccessLevelOnImport -enable-experimental-feature RegionBasedIsolation -Xfrontend -enable-upcoming-feature -Xfrontend RegionBasedIsolation'\n" +
                                   "      config.build_settings['OTHER_SWIFT_FLAGS'] = flags\n" +
+                                  "      config.build_settings['CODE_SIGN_ON_COPY'] = 'YES'\n" +
                                   "    end\n" +
                                   "  end\n" +
                                   "end\n";
@@ -285,6 +371,119 @@ public class IOSBuildPostProcess
         catch (System.Exception e)
         {
             Debug.LogError("[IOSBuildPostProcess] Failed to patch plist at " + plistPath + ": " + e.Message);
+        }
+    }
+
+    private static void EmbedFramework(PBXProject project, string mainTargetGuid, string frameworkName, string pathToBuiltProject)
+    {
+        // Start with a recursive search for the framework/xcframework
+        string foundPath = null;
+        try
+        {
+            // Debug: Log what folders exist in Pods to help us find the right name/path
+            string podsPath = Path.Combine(pathToBuiltProject, "Pods");
+            if (Directory.Exists(podsPath))
+            {
+                string[] allDirs = Directory.GetDirectories(podsPath, "*", SearchOption.AllDirectories);
+                Debug.Log("[IOSBuildPostProcess] Found " + allDirs.Length + " directories in Pods.");
+                foreach (var d in allDirs)
+                {
+                    if (d.ToLower().Contains("audience")) Debug.Log("[IOSBuildPostProcess]   Checking Pod Dir: " + d);
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[IOSBuildPostProcess] Pods directory does NOT exist yet at: " + podsPath);
+            }
+
+            string[] dirs = Directory.GetDirectories(pathToBuiltProject, frameworkName + ".*", SearchOption.AllDirectories);
+            foreach (var dir in dirs)
+            {
+                if (dir.EndsWith(".framework") || dir.EndsWith(".xcframework"))
+                {
+                    foundPath = dir.Replace(pathToBuiltProject, "").TrimStart(Path.DirectorySeparatorChar, '/');
+                    break;
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Error searching for " + frameworkName + ": " + e.Message);
+        }
+
+        if (string.IsNullOrEmpty(foundPath))
+        {
+            // Fallback to common locations if search failed
+            string[] possiblePaths = {
+                "Pods/" + frameworkName + "/" + frameworkName + ".xcframework",
+                "Pods/FBAudienceNetwork/" + frameworkName + ".xcframework",
+                "Frameworks/" + frameworkName + ".framework"
+            };
+            foreach (var path in possiblePaths)
+            {
+                if (Directory.Exists(Path.Combine(pathToBuiltProject, path)))
+                {
+                    foundPath = path;
+                    break;
+                }
+            }
+        }
+
+        if (!string.IsNullOrEmpty(foundPath))
+        {
+            Debug.Log("[IOSBuildPostProcess] Found " + frameworkName + " on disk at: " + foundPath);
+            
+            // 2. Try to find the GUID in the project. If not found, add it.
+            string fileGuid = project.FindFileGuidByProjectPath(foundPath);
+            if (string.IsNullOrEmpty(fileGuid))
+            {
+                Debug.Log("[IOSBuildPostProcess] Adding " + frameworkName + " reference to Xcode project.");
+                fileGuid = project.AddFile(foundPath, foundPath, PBXSourceTree.Source);
+            }
+
+            // 3. Embed it with "Embed & Sign"
+            if (!string.IsNullOrEmpty(fileGuid))
+            {
+                Debug.Log("[IOSBuildPostProcess] Embedding FBAudienceNetwork (GUID: " + fileGuid + ")");
+                project.AddFileToEmbedFrameworks(mainTargetGuid, fileGuid);
+                // Note: Code signing is now handled via the Podfile post_install block to avoid API compatibility issues.
+            }
+        }
+        else
+        {
+            Debug.LogError("[IOSBuildPostProcess] CRITICAL: Could not find " + frameworkName + " on disk in the exported project!");
+        }
+    }
+
+    private static void FixCodeSigningInPbxproj(string projectPath)
+    {
+        string pbxprojText = File.ReadAllText(projectPath);
+        // More robust search for FBAudienceNetwork in any build file block
+        string searchLabel = "FBAudienceNetwork.xcframework";
+        
+        if (pbxprojText.Contains(searchLabel))
+        {
+            Debug.Log("[IOSBuildPostProcess] Manually patching pbxproj for FBAudienceNetwork signing...");
+            // Regex to find the PBXBuildFile entry for FBAudienceNetwork and inject settings = {ATTRIBUTES = (CodeSignOnCopy, ); }
+            // We look for any instance that ends in }; and doesn't already have attributes.
+            string pattern = "(/\\* " + searchLabel + ".* \\*/ = {isa = PBXBuildFile; fileRef = [A-Z0-9]+; )};";
+            string replacement = "$1settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };";
+            pbxprojText = Regex.Replace(pbxprojText, pattern, replacement);
+            
+            File.WriteAllText(projectPath, pbxprojText);
+        }
+        else
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Could not find FBAudienceNetwork entry in pbxproj for manual signing patch. Checking for .framework variant...");
+            // Try again with .framework just in case
+            searchLabel = "FBAudienceNetwork.framework";
+            if (pbxprojText.Contains(searchLabel))
+            {
+                 string pattern = "(/\\* " + searchLabel + ".* \\*/ = {isa = PBXBuildFile; fileRef = [A-Z0-9]+; )};";
+                 string replacement = "$1settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };";
+                 pbxprojText = Regex.Replace(pbxprojText, pattern, replacement);
+                 File.WriteAllText(projectPath, pbxprojText);
+            }
         }
     }
 }

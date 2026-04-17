@@ -1,9 +1,9 @@
 pluginManagement {
     repositories {
-        **ARTIFACTORYREPOSITORY**
-        gradlePluginPortal()
-        google()
         mavenCentral()
+        **ARTIFACTORYREPOSITORY**
+        google()
+        gradlePluginPortal()
         maven { url "https://android-sdk.is.com/" }
         maven { url "https://unity3d.jfrog.io/artifactory/unity-ads-sdk-local/" }
         maven { url "https://jitpack.io" }
@@ -16,9 +16,9 @@ include ':launcher', ':unityLibrary'
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
+        mavenCentral()
         **ARTIFACTORYREPOSITORY**
         google()
-        mavenCentral()
         maven { url "https://android-sdk.is.com/" }
         maven { url "https://unity3d.jfrog.io/artifactory/unity-ads-sdk-local/" }
         maven { url "https://jitpack.io" }

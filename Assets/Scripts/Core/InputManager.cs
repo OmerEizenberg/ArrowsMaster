@@ -359,7 +359,7 @@ namespace Assets.Scripts.Core
         private bool IsScreenPositionBlocked(Vector2 screenPos)
         {
             float normalizedY = screenPos.y / Screen.height;
-            return normalizedY > 0.85f;
+            return normalizedY > 0.85f || normalizedY < 0.11f;
         }
     }
 }

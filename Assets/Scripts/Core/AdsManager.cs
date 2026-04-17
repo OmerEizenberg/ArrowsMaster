@@ -3,6 +3,8 @@ using Unity.Services.Core;
 using UnityEngine;
 using System;
 using System.Threading.Tasks;
+using Singular;
+using System.Collections.Generic;
 
 namespace Assets.Scripts.Core
 {
@@ -290,6 +292,14 @@ namespace Assets.Scripts.Core
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD")); // Revenue is in USD
                 }
+                
+                // --- Singular: Ad Revenue tracking ---
+                SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
+                singularAdData.WithNetworkName(info.AdNetwork)
+                              .WithAdUnitName(info.AdUnitName)
+                              .WithAdType("interstitial");
+                SingularSDK.AdRevenue(singularAdData);
+                // -------------------------------------
                 // --------------------------------
             };
             interstitialAd.OnAdClicked += (info) => Debug.Log($"[AdsManager] Interstitial Ad Clicked: {info}");
@@ -450,6 +460,22 @@ namespace Assets.Scripts.Core
                             new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
                             new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
                     }
+
+                    // --- Singular: Ad Revenue tracking ---
+                    SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
+                    singularAdData.WithNetworkName(info.AdNetwork)
+                                  .WithAdUnitName(info.AdUnitName)
+                                  .WithAdType("rewarded_multiply");
+                    SingularSDK.AdRevenue(singularAdData);
+                    // -------------------------------------
+                    
+                    // --- Singular: Ad Revenue tracking ---
+                    singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
+                    singularAdData.WithNetworkName(info.AdNetwork)
+                                  .WithAdUnitName(info.AdUnitName)
+                                  .WithAdType("rewarded");
+                    SingularSDK.AdRevenue(singularAdData);
+                    // -------------------------------------
                     // --------------------------------
                 });
             };
@@ -628,6 +654,14 @@ namespace Assets.Scripts.Core
                             new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
                             new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
                     }
+
+                    // --- Singular: Ad Revenue tracking ---
+                    SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
+                    singularAdData.WithNetworkName(info.AdNetwork)
+                                  .WithAdUnitName(info.AdUnitName)
+                                  .WithAdType("rewarded_coins");
+                    SingularSDK.AdRevenue(singularAdData);
+                    // -------------------------------------
                     // --------------------------------
                 });
             };
@@ -736,6 +770,14 @@ namespace Assets.Scripts.Core
                             new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
                             new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
                     }
+
+                    // --- Singular: Ad Revenue tracking ---
+                    SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
+                    singularAdData.WithNetworkName(info.AdNetwork)
+                                  .WithAdUnitName(info.AdUnitName)
+                                  .WithAdType("rewarded_multiply");
+                    SingularSDK.AdRevenue(singularAdData);
+                    // -------------------------------------
                 });
             };
 

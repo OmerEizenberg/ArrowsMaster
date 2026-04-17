@@ -6,6 +6,7 @@ using UnityEngine.Purchasing.Extension;
 using Unity.Services.Core;
 using Unity.Services.Core.Environments;
 using System.Threading.Tasks;
+using Singular;
 
 namespace Assets.Scripts.Core
 {
@@ -349,6 +350,11 @@ namespace Assets.Scripts.Core
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, metadata.isoCurrencyCode),
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_ITEM_ID, id));
             }
+
+            // --- Singular: IAP revenue tracking ---
+            var purchaseMetadata = args.purchasedProduct.metadata;
+            SingularSDK.CustomRevenue("Purchase", purchaseMetadata.isoCurrencyCode, (double)purchaseMetadata.localizedPrice);
+            // ------------------------------------------------
 
             OnPurchaseSuccess?.Invoke(id);
             SpawnCoinsExplosion();
