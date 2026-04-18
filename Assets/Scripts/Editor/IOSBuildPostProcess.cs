@@ -120,13 +120,16 @@ public class IOSBuildPostProcess
         EmbedFramework(project, mainTargetGuid, "FBAudienceNetwork", pathToBuiltProject);
 
         // Add the user's manual shell script fix as a Build Phase
-        string scriptBody = "find \"${TARGET_BUILD_DIR}\" -name \"Info.plist\" | while read -r PLIST; do\n" +
-                            "    if [[ \"$PLIST\" == *\"IronSource\"* || \"$PLIST\" == *\"UnityAds\"* ]]; then\n" +
+        // Updated to find ALL .bundle folders and remove invalid executable keys (fixes FBAudienceNetwork.bundle error)
+        string scriptBody = "find \"${TARGET_BUILD_DIR}\" -name \"*.bundle\" -type d | while read -r BUNDLE; do\n" +
+                            "    PLIST=\"$BUNDLE/Info.plist\"\n" +
+                            "    if [ -f \"$PLIST\" ]; then\n" +
+                            "        echo \"Checking bundle: $BUNDLE\"\n" +
                             "        /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" || true\n" +
                             "        /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" || true\n" +
                             "    fi\n" +
                             "done";
-        project.AddShellScriptBuildPhase(mainTargetGuid, "Fix IronSource Plists", "/bin/sh", scriptBody);
+        project.AddShellScriptBuildPhase(mainTargetGuid, "Fix ALL Resource Bundles", "/bin/sh", scriptBody);
 
         project.WriteToFile(projectPath);
         
@@ -230,9 +233,19 @@ public class IOSBuildPostProcess
                                   "      config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'\n" +
                                   "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'\n" +
                                   "      config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'\n" +
+                                  "      config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'\n" +
                                   "      flags = '$(inherited) -enable-experimental-feature AccessLevelOnImport -enable-experimental-feature RegionBasedIsolation -Xfrontend -enable-upcoming-feature -Xfrontend RegionBasedIsolation'\n" +
                                   "      config.build_settings['OTHER_SWIFT_FLAGS'] = flags\n" +
                                   "      config.build_settings['CODE_SIGN_ON_COPY'] = 'YES'\n" +
+                                  "    end\n" +
+                                  "  end\n" +
+                                  "  \n" +
+                                  "  # Ensure the Main Target and UnityFramework also generate dSYMs\n" +
+                                  "  installer.aggregate_targets.each do |aggregate_target|\n" +
+                                  "    aggregate_target.user_project.targets.each do |target|\n" +
+                                  "      target.build_configurations.each do |config|\n" +
+                                  "        config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'\n" +
+                                  "      end\n" +
                                   "    end\n" +
                                   "  end\n" +
                                   "end\n";
