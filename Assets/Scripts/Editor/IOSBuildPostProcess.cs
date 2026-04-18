@@ -87,6 +87,7 @@ public class IOSBuildPostProcess
         var entitlementsPath = "Unity-iPhone/Unity-iPhone.entitlements";
         var entitlements = new ProjectCapabilityManager(projectPath, entitlementsPath, "Unity-iPhone");
         entitlements.AddPushNotifications(true);
+        entitlements.AddAssociatedDomains(new string[] { "applinks:levelupmedia.singular.com", "applinks:levelupmedia.online" });
         entitlements.WriteToFile();
 
         // 2. Add Background Modes (Remote Notifications)

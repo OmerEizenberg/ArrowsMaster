@@ -12288,6 +12288,10 @@ PrefabInstance:
       value: SingularSDKObject
       objectReference: {fileID: 0}
     - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: ddlTimeoutSec
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
       propertyPath: SingularAPIKey
       value: levelupmedia_b500707d
       objectReference: {fileID: 0}

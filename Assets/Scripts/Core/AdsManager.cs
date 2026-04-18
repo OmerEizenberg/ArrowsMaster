@@ -997,7 +997,14 @@ namespace Assets.Scripts.Core
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
                 }
-                // --------------------------------
+
+                // --- Singular: ad_revenue Tracking ---
+                SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
+                singularAdData.WithNetworkName(info.AdNetwork)
+                              .WithAdUnitName(info.AdUnitName)
+                              .WithAdType("banner");
+                SingularSDK.AdRevenue(singularAdData);
+                // ------------------------------------
             };
 
             Debug.Log("[AdsManager] Pre-loading Settings Banner Ad (Hidden).");

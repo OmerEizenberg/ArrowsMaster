@@ -352,8 +352,8 @@ namespace Assets.Scripts.Core
             }
 
             // --- Singular: IAP revenue tracking ---
-            var purchaseMetadata = args.purchasedProduct.metadata;
-            SingularSDK.CustomRevenue("Purchase", purchaseMetadata.isoCurrencyCode, (double)purchaseMetadata.localizedPrice);
+            var metadataSingular = args.purchasedProduct.metadata;
+            SingularSDK.CustomRevenue("Purchase", metadataSingular.isoCurrencyCode, (double)metadataSingular.localizedPrice);
             // ------------------------------------------------
 
             OnPurchaseSuccess?.Invoke(id);

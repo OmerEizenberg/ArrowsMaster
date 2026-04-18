@@ -11,7 +11,7 @@ using System;
 using Singular;
 
 
-public class FirebaseManager : MonoBehaviour
+public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDeferredDeepLinkHandler
 {
     public static FirebaseManager Instance { get; private set; }
     private bool isInitialized = false;
@@ -57,20 +57,27 @@ public class FirebaseManager : MonoBehaviour
         }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        // --- Singular: Initialize and Configure early for iOS support ---
+        #if !UNITY_EDITOR
+        SingularSDK.registeredSingularLinkHandler = this;
+        SingularSDK.registeredDDLHandler = this;
+        #endif
+
+        #if UNITY_IOS && !UNITY_EDITOR
+        var singular = FindFirstObjectByType<SingularSDK>();
+        if (singular != null)
+        {
+            // Set ATT timeout BEFORE initialization
+            singular.waitForTrackingAuthorizationWithTimeoutInterval = 300;
+            Debug.Log("[FirebaseManager] Configured Singular ATT timeout (300s) in Awake.");
+        }
+        #endif
+        // -----------------------------------------------------------------
     }
 
     void Start()
     {
-        // --- Singular: Set ATT timeout for iOS (Recommended: 300s) ---
-        #if UNITY_IOS && !UNITY_EDITOR
-        var singular = FindFirstObjectByType<SingularSDK>();
-        if (singular != null && singular.waitForTrackingAuthorizationWithTimeoutInterval == 0)
-        {
-            singular.waitForTrackingAuthorizationWithTimeoutInterval = 300;
-            Debug.Log("[FirebaseManager] Set Singular ATT timeout to 300s.");
-        }
-        #endif
-        // -------------------------------------------------------------
 
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task => {
             DependencyStatus dependencyStatus = task.Result;
@@ -104,6 +111,10 @@ public class FirebaseManager : MonoBehaviour
 
                 // Initialize Remote Config
                 RemoteConfigManager.Instance.Initialize();
+
+                // --- Singular: Track standard login event on startup ---
+                LogEvent(Events.sngLogin);
+                // --------------------------------------------------------
 
                 // Request notification permission for Android 13+
                 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -178,28 +189,41 @@ public class FirebaseManager : MonoBehaviour
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName);
-        SingularSDK.Event(eventName);
+        
+        // --- Singular: Standard Event Mapping ---
+        string singularEvent = MapToSingularEvent(eventName);
+        if (!string.IsNullOrEmpty(singularEvent)) {
+            SingularSDK.Event(singularEvent);
+        }
     }
 
     public void LogEvent(string eventName, string parameterName, string parameterValue)
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameterName, parameterValue);
-        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, eventName);
+        
+        string singularEvent = MapToSingularEvent(eventName);
+        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, singularEvent);
     }
 
     public void LogEvent(string eventName, string parameterName, long parameterValue)
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameterName, parameterValue);
-        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, eventName);
+        
+        string singularEvent = MapToSingularEvent(eventName);
+        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, singularEvent);
     }
 
     public void LogEvent(string eventName, string parameterName, double parameterValue)
     {
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameterName, parameterValue);
-        SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, eventName);
+        
+        string singularEvent = MapToSingularEvent(eventName);
+        if (!string.IsNullOrEmpty(singularEvent)) {
+            SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, singularEvent);
+        }
     }
 
     public void LogEvent(string eventName, params Parameter[] parameters)
@@ -207,9 +231,25 @@ public class FirebaseManager : MonoBehaviour
         if (!isInitialized) return;
         FirebaseAnalytics.LogEvent(eventName, parameters);
 
-        // --- Singular: Log the same event (without params for now due to Parameter being write-only) ---
-        SingularSDK.Event(eventName);
-        // ------------------------------------
+        string singularEvent = MapToSingularEvent(eventName);
+        
+        if (!string.IsNullOrEmpty(singularEvent)) {
+            SingularSDK.Event(singularEvent);
+        }
+    }
+
+    private string MapToSingularEvent(string eventName)
+    {
+        // Skip these events for Singular logging via wrapper because they are handled specifically 
+        // with Revenue tracking elsewhere (IAPManager/AdsManager)
+        if (eventName == EVENT_PURCHASE || eventName == EVENT_AD_IMPRESSION) return null;
+
+        return eventName switch
+        {
+            EVENT_TUTORIAL_COMPLETE => Events.sngTutorialComplete,
+            EVENT_TUTORIAL_BEGIN => "sng_tutorial_begin",
+            _ => eventName
+        };
     }
 
     public void SetUserProperty(string propertyName, string propertyValue)
@@ -223,6 +263,23 @@ public class FirebaseManager : MonoBehaviour
         if (!isInitialized) return;
         FirebaseAnalytics.SetUserId(userId);
         SingularSDK.SetCustomUserId(userId);
+        
+        // --- Singular: Track standard login event ---
+        SingularSDK.Event(Events.sngLogin);
     }
+
+    // --- Singular Link Handlers ---
+    public void OnSingularLinkResolved(SingularLinkParams linkParams)
+    {
+        Debug.Log($"[Singular] Deep Link Resolved: {linkParams.Deeplink}");
+        // Add your custom logic here (e.g., navigate to a specific level)
+    }
+
+    public void OnDeferredDeepLink(string deepLink)
+    {
+        Debug.Log($"[Singular] Deferred Deep Link Received: {deepLink}");
+        // Add your custom logic here (e.g., show a welcome reward)
+    }
+    // ----------------------------
     #endregion
 }
