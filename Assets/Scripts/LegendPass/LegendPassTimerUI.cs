@@ -3,6 +3,7 @@ using TMPro;
 
 /// <summary>
 /// Updates the lobby icon with the seasonal timer and unclaimed reward notification (Red Dot + Count).
+/// The notification state is explicitly driven by events from LegendPassManager.
 /// </summary>
 public class LegendPassTimerUI : MonoBehaviour
 {
@@ -12,51 +13,59 @@ public class LegendPassTimerUI : MonoBehaviour
     [SerializeField] private GameObject m_NotificationDot;
     [SerializeField] private TextMeshProUGUI m_NotificationCountText;
     
-    [SerializeField] private float m_UpdateInterval = 30f;
+    [SerializeField] private float m_TimerUpdateInterval = 60f;
 
-    private float m_Timer;
+    private float m_UpdateTimer;
 
     private void OnEnable()
     {
-        RefreshLobbyState();
-        m_Timer = m_UpdateInterval;
-        
+        // Initial state sync
+        UpdateTimerUI();
         if (LegendPassManager.Instance != null)
         {
-            LegendPassManager.Instance.OnProgressChanged += RefreshLobbyState;
+            UpdateNotificationUI(LegendPassManager.Instance.GetUnclaimedRewardsCount());
+            
+            // Subscribe to explicit manager events
+            LegendPassManager.Instance.OnUnclaimedCountChanged += UpdateNotificationUI;
+            LegendPassManager.Instance.OnProgressChanged += UpdateTimerUI; // For reset/rotation cases
         }
+        
+        m_UpdateTimer = m_TimerUpdateInterval;
     }
 
     private void OnDisable()
     {
         if (LegendPassManager.Instance != null)
         {
-            LegendPassManager.Instance.OnProgressChanged -= RefreshLobbyState;
+            LegendPassManager.Instance.OnUnclaimedCountChanged -= UpdateNotificationUI;
+            LegendPassManager.Instance.OnProgressChanged -= UpdateTimerUI;
         }
     }
 
     private void Update()
     {
-        m_Timer -= Time.deltaTime;
-        if (m_Timer <= 0)
+        // Only the seasonal timer uses a periodic update
+        m_UpdateTimer -= Time.deltaTime;
+        if (m_UpdateTimer <= 0)
         {
-            RefreshLobbyState();
-            m_Timer = m_UpdateInterval;
+            UpdateTimerUI();
+            m_UpdateTimer = m_TimerUpdateInterval;
         }
     }
 
-    private void RefreshLobbyState()
+    private void UpdateTimerUI()
     {
-        if (LegendPassManager.Instance == null) return;
-
-        // 1. Update Timer
-        if (m_TimerText != null)
+        if (m_TimerText != null && LegendPassManager.Instance != null)
         {
             m_TimerText.text = LegendPassManager.Instance.GetTimerString();
         }
+    }
 
-        // 2. Update Red Dot and Count
-        int unclaimedCount = LegendPassManager.Instance.GetUnclaimedRewardsCount();
+    /// <summary>
+    /// This is now explicitly "controlled" by LegendPassManager via event.
+    /// </summary>
+    private void UpdateNotificationUI(int unclaimedCount)
+    {
         bool hasUnclaimed = unclaimedCount > 0;
 
         if (m_NotificationDot != null)
@@ -68,5 +77,7 @@ public class LegendPassTimerUI : MonoBehaviour
         {
             m_NotificationCountText.text = unclaimedCount.ToString();
         }
+        
+        Debug.Log($"[LegendPassLobbyUI] Notification Updated via Manager: {unclaimedCount} unclaimed.");
     }
 }

@@ -32,6 +32,7 @@ public class LegendPassManager : MonoBehaviour
     public bool isPremiumUnlocked => UserDataManager.Instance.IsLegendPassPremiumUnlocked;
 
     public System.Action OnProgressChanged;
+    public System.Action<int> OnUnclaimedCountChanged;
     public System.Action<Reward> OnRewardClaimed;
 
     private const int PASS_DURATION_DAYS = 28;
@@ -55,6 +56,7 @@ public class LegendPassManager : MonoBehaviour
     {
         CheckRoundRotation();
         Debug.Log($"[LegendPassManager] Data Synced from UserDataManager. Step: {currentStep}, Premium: {isPremiumUnlocked}");
+        NotifyStateChanged();
     }
 
     private void CheckRoundRotation()
@@ -87,7 +89,7 @@ public class LegendPassManager : MonoBehaviour
         UserDataManager.Instance.SetLegendPassClaimedMasks(0, 0);
         UserDataManager.Instance.SetLegendPassStartDate(System.DateTime.Now.ToBinary().ToString());
         
-        OnProgressChanged?.Invoke();
+        NotifyStateChanged();
     }
 
     /// <summary>
@@ -129,10 +131,9 @@ public class LegendPassManager : MonoBehaviour
             GrantReward(reward);
             
             OnRewardClaimed?.Invoke(reward);
-            Debug.Log($"[LegendPassManager] Claimed {(isPremium ? "Premium" : "Free")} reward step {step}");
         }
 
-        OnProgressChanged?.Invoke();
+        NotifyStateChanged();
     }
 
     private void GrantReward(Reward reward)
@@ -145,12 +146,6 @@ public class LegendPassManager : MonoBehaviour
             case RewardType.MagicWand: userData.AddMagicBooster(reward.amount); break;
             case RewardType.RefillLife: userData.AddRefillBooster(reward.amount); break;
         }
-    }
-
-    public void UnlockPremium()
-    {
-        UserDataManager.Instance.SetLegendPassPremiumUnlocked(true);
-        OnProgressChanged?.Invoke();
     }
 
     /// <summary>
@@ -197,12 +192,24 @@ public class LegendPassManager : MonoBehaviour
         return "0s";
     }
 
+    private void NotifyStateChanged()
+    {
+        OnProgressChanged?.Invoke();
+        OnUnclaimedCountChanged?.Invoke(GetUnclaimedRewardsCount());
+    }
+
+    public void UnlockPremium()
+    {
+        UserDataManager.Instance.SetLegendPassPremiumUnlocked(true);
+        NotifyStateChanged();
+    }
+
     public void OnLevelComplete()
     {
         if (currentStep < 29)
         {
             UserDataManager.Instance.SetLegendPassStep(currentStep + 1);
-            OnProgressChanged?.Invoke();
+            NotifyStateChanged();
         }
     }
 }

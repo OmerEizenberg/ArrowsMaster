@@ -3,10 +3,8 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 
-/// <summary>
-/// Controls the UI representation of a single step in the Legend's Pass.
-/// Now features separate claim buttons for free and premium reward tracks.
-/// </summary>
+/// Mounts the UI representation of a single step in the Legend's Pass.
+/// Updated to hide empty rewards (Amount = 0).
 public class LegendPassStepUI : MonoBehaviour
 {
     [Header("General")]
@@ -18,6 +16,7 @@ public class LegendPassStepUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_FreeAmountText;
     [SerializeField] private GameObject m_FreeClaimedIndicator;
     [SerializeField] private Button m_FreeClaimButton;
+    [SerializeField] private GameObject m_FreeContentHolder; // Parent of icon/text
 
     [Header("Premium Reward Track")]
     public Image premiumIcon;
@@ -25,6 +24,7 @@ public class LegendPassStepUI : MonoBehaviour
     [SerializeField] private GameObject m_PremiumClaimedIndicator;
     [SerializeField] private GameObject m_PremiumLockedOverlay;
     [SerializeField] private Button m_PremiumClaimButton;
+    [SerializeField] private GameObject m_PremiumContentHolder; // Parent of icon/text
 
     [Header("Generic Notifiers")]
     [SerializeField] private GameObject m_FreeClaimNotification;
@@ -32,9 +32,6 @@ public class LegendPassStepUI : MonoBehaviour
 
     private int _stepIndex;
 
-    /// <summary>
-    /// Populates the step UI with data and sets up separate button listeners.
-    /// </summary>
     public void Setup(int index, Reward free, Reward premium, bool isReached, bool isPremiumUnlocked, bool isFreeClaimed, bool isPremiumClaimed)
     {
         _stepIndex = index;
@@ -42,26 +39,34 @@ public class LegendPassStepUI : MonoBehaviour
         if (m_StepIndexText != null) m_StepIndexText.text = (index + 1).ToString();
         
         // Setup Free Reward UI
+        bool hasFree = free.amount > 0;
+        if (m_FreeContentHolder != null) m_FreeContentHolder.SetActive(hasFree);
         if (m_FreeAmountText != null) m_FreeAmountText.text = free.amount.ToString();
         if (m_FreeClaimedIndicator != null) m_FreeClaimedIndicator.SetActive(isFreeClaimed);
         
         // Setup Premium Reward UI
+        bool hasPremium = premium.amount > 0;
+        if (m_PremiumContentHolder != null) m_PremiumContentHolder.SetActive(hasPremium);
         if (m_PremiumAmountText != null) m_PremiumAmountText.text = premium.amount.ToString();
         if (m_PremiumClaimedIndicator != null) m_PremiumClaimedIndicator.SetActive(isPremiumClaimed);
         
-        // Current Step Highlight
+        // Highlight logic
         if (m_Highlight != null) m_Highlight.SetActive(isReached && index == LegendPassManager.Instance.currentStep);
 
-        // Premium Selection Visuals
+        // Premium Section Visuals
         if (premiumIcon != null)
         {
             premiumIcon.color = isPremiumUnlocked ? Color.white : new Color(0.5f, 0.5f, 0.5f, 0.8f);
         }
-        if (m_PremiumLockedOverlay != null) m_PremiumLockedOverlay.SetActive(!isPremiumUnlocked);
+        if (m_PremiumLockedOverlay != null)
+        {
+            // Only show lock if there IS a reward
+            m_PremiumLockedOverlay.SetActive(!isPremiumUnlocked && hasPremium);
+        }
 
-        // Separate Button Logic
-        SetupClaimButton(m_FreeClaimButton, m_FreeClaimNotification, isReached && !isFreeClaimed, false);
-        SetupClaimButton(m_PremiumClaimButton, m_PremiumClaimNotification, isReached && isPremiumUnlocked && !isPremiumClaimed, true);
+        // Button Logic (Only show if there IS a reward to claim)
+        SetupClaimButton(m_FreeClaimButton, m_FreeClaimNotification, isReached && !isFreeClaimed && hasFree, false);
+        SetupClaimButton(m_PremiumClaimButton, m_PremiumClaimNotification, isReached && isPremiumUnlocked && !isPremiumClaimed && hasPremium, true);
     }
 
     private void SetupClaimButton(Button button, GameObject notification, bool canClaim, bool isPremium)
@@ -80,9 +85,6 @@ public class LegendPassStepUI : MonoBehaviour
 
     private void OnClaimButtonClicked(bool isPremium)
     {
-        // Manager handles validation and granting
         LegendPassManager.Instance.ClaimReward(_stepIndex, isPremium);
-        
-        // No need for explicit refresh here as LegendPassUI listens to OnProgressChanged event
     }
 }
