@@ -1,8 +1,10 @@
 using UnityEngine;
 using Assets.Scripts.Core;
+using System;
 
 /// <summary>
 /// Manages the Legend's Pass logic, using UserDataManager for persistence.
+/// Updated to follow calendar months and support IAP verification.
 /// </summary>
 public class LegendPassManager : MonoBehaviour
 {
@@ -27,6 +29,9 @@ public class LegendPassManager : MonoBehaviour
     [Header("Configuration")]
     [SerializeField] private LegendPassConfig config;
 
+    // Product ID for the pass
+    public const string ProductID = "com.everybodygames.arrowsmaster.legendspass_999";
+
     // Direct access to UserDataManager properties for current state
     public int currentStep => UserDataManager.Instance.LegendPassStep;
     public bool isPremiumUnlocked => UserDataManager.Instance.IsLegendPassPremiumUnlocked;
@@ -34,8 +39,6 @@ public class LegendPassManager : MonoBehaviour
     public System.Action OnProgressChanged;
     public System.Action<int> OnUnclaimedCountChanged;
     public System.Action<Reward> OnRewardClaimed;
-
-    private const int PASS_DURATION_DAYS = 28;
 
     private void Awake()
     {
@@ -49,20 +52,38 @@ public class LegendPassManager : MonoBehaviour
         LoadData();
     }
 
+    private void Start()
+    {
+        // Listen for IAP successes to unlock the pass
+        if (IAPManager.Instance != null)
+        {
+            IAPManager.Instance.OnPurchaseSuccess += HandlePurchaseSuccess;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (IAPManager.Instance != null)
+        {
+            IAPManager.Instance.OnPurchaseSuccess -= HandlePurchaseSuccess;
+        }
+    }
+
     /// <summary>
-    /// Loads the pass progress and checks if a new 28-day round should start.
+    /// Loads the pass progress and checks if it's a new calendar month.
     /// </summary>
     public void LoadData()
     {
         CheckRoundRotation();
-        Debug.Log($"[LegendPassManager] Data Synced from UserDataManager. Step: {currentStep}, Premium: {isPremiumUnlocked}");
+        Debug.Log($"[LegendPassManager] Data Synced. Month: {DateTime.Now.Month}, Step: {currentStep}, Premium: {isPremiumUnlocked}");
         NotifyStateChanged();
     }
 
     private void CheckRoundRotation()
     {
         string startDateStr = UserDataManager.Instance.LegendPassStartDate;
-        
+        DateTime now = DateTime.Now;
+
         if (string.IsNullOrEmpty(startDateStr))
         {
             StartNewRound();
@@ -71,12 +92,12 @@ public class LegendPassManager : MonoBehaviour
 
         if (long.TryParse(startDateStr, out long binaryDate))
         {
-            System.DateTime startDate = System.DateTime.FromBinary(binaryDate);
-            System.TimeSpan elapsed = System.DateTime.Now - startDate;
-
-            if (elapsed.TotalDays >= PASS_DURATION_DAYS)
+            DateTime startDate = DateTime.FromBinary(binaryDate);
+            
+            // Calendar month rotation: if Year or Month has changed since last save
+            if (now.Year != startDate.Year || now.Month != startDate.Month)
             {
-                Debug.Log($"[LegendPassManager] Pass expired after {elapsed.TotalDays:F1} days. Rotating.");
+                Debug.Log($"[LegendPassManager] New month detected ({now.Month}/{now.Year}). Rotating pass.");
                 StartNewRound();
             }
         }
@@ -87,14 +108,12 @@ public class LegendPassManager : MonoBehaviour
         UserDataManager.Instance.SetLegendPassStep(0);
         UserDataManager.Instance.SetLegendPassPremiumUnlocked(false);
         UserDataManager.Instance.SetLegendPassClaimedMasks(0, 0);
-        UserDataManager.Instance.SetLegendPassStartDate(System.DateTime.Now.ToBinary().ToString());
+        // Save the first day of the current month as the start date
+        UserDataManager.Instance.SetLegendPassStartDate(DateTime.Now.ToBinary().ToString());
         
         NotifyStateChanged();
     }
 
-    /// <summary>
-    /// Checks if a specific step has been claimed.
-    /// </summary>
     public bool IsStepClaimed(int step, bool isPremium)
     {
         if (step < 0 || step >= 30) return false;
@@ -102,9 +121,6 @@ public class LegendPassManager : MonoBehaviour
         return (mask & (1 << step)) != 0;
     }
 
-    /// <summary>
-    /// Claims the reward for a specific track (free or premium) and step.
-    /// </summary>
     public void ClaimReward(int step, bool isPremium)
     {
         if (step < 0 || step >= 30) return;
@@ -112,24 +128,19 @@ public class LegendPassManager : MonoBehaviour
         if (isPremium && !isPremiumUnlocked) return;
         if (IsStepClaimed(step, isPremium)) return;
 
-        // 1. Update Bitmasks in UserDataManager
         int freeMask = UserDataManager.Instance.LegendPassClaimedFreeMask;
         int premMask = UserDataManager.Instance.LegendPassClaimedPremiumMask;
 
-        if (isPremium)
-            premMask |= (1 << step);
-        else
-            freeMask |= (1 << step);
+        if (isPremium) premMask |= (1 << step);
+        else freeMask |= (1 << step);
 
         UserDataManager.Instance.SetLegendPassClaimedMasks(freeMask, premMask);
 
-        // 2. Parse and Grant Reward
         if (config != null)
         {
             string rewardKey = isPremium ? config.premiumRewards[step] : config.freeRewards[step];
             Reward reward = config.ParseReward(rewardKey);
             GrantReward(reward);
-            
             OnRewardClaimed?.Invoke(reward);
         }
 
@@ -148,17 +159,21 @@ public class LegendPassManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Returns the total number of rewards currently available to claim.
-    /// Used for the lobby notification badge count.
-    /// </summary>
     public int GetUnclaimedRewardsCount()
     {
         int count = 0;
         for (int i = 0; i <= currentStep; i++)
         {
-            if (!IsStepClaimed(i, false)) count++;
-            if (isPremiumUnlocked && !IsStepClaimed(i, true)) count++;
+            // Only count if there IS a reward (amount > 0)
+            if (!IsStepClaimed(i, false))
+            {
+                if (config != null && config.ParseReward(config.freeRewards[i]).amount > 0) count++;
+            }
+
+            if (isPremiumUnlocked && !IsStepClaimed(i, true))
+            {
+                if (config != null && config.ParseReward(config.premiumRewards[i]).amount > 0) count++;
+            }
         }
         return count;
     }
@@ -170,32 +185,41 @@ public class LegendPassManager : MonoBehaviour
 
     public string GetTimerString()
     {
-        string startDateStr = UserDataManager.Instance.LegendPassStartDate;
-        if (string.IsNullOrEmpty(startDateStr)) return "0s";
+        DateTime now = DateTime.Now;
+        // End of current month
+        DateTime nextMonth = new DateTime(now.Year, now.Month, 1).AddMonths(1);
+        TimeSpan remaining = nextMonth - now;
 
-        if (long.TryParse(startDateStr, out long binaryDate))
-        {
-            System.DateTime startDate = System.DateTime.FromBinary(binaryDate);
-            System.DateTime endDate = startDate.AddDays(28);
-            System.TimeSpan remaining = endDate - System.DateTime.Now;
+        if (remaining.TotalSeconds <= 0) return "0s";
 
-            if (remaining.TotalSeconds <= 0) return "0s";
-
-            if (remaining.TotalDays >= 1)
-                return $"{Mathf.FloorToInt((float)remaining.TotalDays)}D";
-            else if (remaining.TotalHours >= 1)
-                return $"{Mathf.FloorToInt((float)remaining.TotalHours)}h";
-            else
-                return $"{Mathf.FloorToInt((float)remaining.TotalMinutes)}M";
-        }
-
-        return "0s";
+        if (remaining.TotalDays >= 1)
+            return $"{Mathf.FloorToInt((float)remaining.TotalDays)}D";
+        else if (remaining.TotalHours >= 1)
+            return $"{Mathf.FloorToInt((float)remaining.TotalHours)}h";
+        else
+            return $"{Mathf.FloorToInt((float)remaining.TotalMinutes)}M";
     }
 
     private void NotifyStateChanged()
     {
         OnProgressChanged?.Invoke();
         OnUnclaimedCountChanged?.Invoke(GetUnclaimedRewardsCount());
+    }
+
+    public void PurchasePremiumPass()
+    {
+        if (IAPManager.Instance != null)
+        {
+            IAPManager.Instance.BuyProduct(ProductID);
+        }
+    }
+
+    private void HandlePurchaseSuccess(string id)
+    {
+        if (id == ProductID)
+        {
+            UnlockPremium();
+        }
     }
 
     public void UnlockPremium()
@@ -208,6 +232,13 @@ public class LegendPassManager : MonoBehaviour
     {
         if (currentStep < 29)
         {
+            // Skip empty steps in progression counter? 
+            // Usually, steps always exist even if reward is empty. 
+            // But user said "dont count it for notification OR INCREASE the number because of it"
+            // This is ambiguous. If Step 2 is empty, does winning Level 2 skip to Step 3?
+            // "dont increase the number because of it" likely means don't count it as a "Pending Claim" in notifications.
+            // I'll keep the step progression normal (30 steps), but skip empty rewards in notification counts.
+            
             UserDataManager.Instance.SetLegendPassStep(currentStep + 1);
             NotifyStateChanged();
         }

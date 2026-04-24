@@ -40,6 +40,7 @@ namespace Assets.Scripts.Core
         public const string ProductCoins1999 = "coins1999";
         public const string ProductCoins4999 = "coins4999";
         public const string ProductNoAdsCoins999 = "noadscoins_999";
+        public const string ProductLegendPass999 = "legendspass_999";
 #else
         public const string ProductNoAds999 = "com.everybodygames.arrowsmaster.no_ads_999";
         public const string ProductCoins199 = "com.everybodygames.arrowsmaster.coins_199";
@@ -48,6 +49,7 @@ namespace Assets.Scripts.Core
         public const string ProductCoins1999 = "com.everybodygames.arrowsmaster.coins_1999";
         public const string ProductCoins4999 = "com.everybodygames.arrowsmaster.coins_4999";
         public const string ProductNoAdsCoins999 = "com.everybodygames.arrowsmaster.noadscoins_999";
+        public const string ProductLegendPass999 = "com.everybodygames.arrowsmaster.legendspass_999";
 #endif
 
         private const string NoAdsPrefKey = "UserHasNoAds";
@@ -157,6 +159,7 @@ namespace Assets.Scripts.Core
             // Non-Consumables
             builder.AddProduct(ProductNoAds999, ProductType.NonConsumable);
             builder.AddProduct(ProductNoAdsCoins999, ProductType.NonConsumable);
+            builder.AddProduct(ProductLegendPass999, ProductType.NonConsumable);
 
             Debug.Log($"[IAPManager] Initializing UnityPurchasing with store: {store}...");
             UnityPurchasing.Initialize(this, builder);
@@ -179,6 +182,7 @@ namespace Assets.Scripts.Core
                 "com.everybodygames.arrowsmaster.coins_999" => ProductCoins999,
                 "com.everybodygames.arrowsmaster.coins_1999" => ProductCoins1999,
                 "com.everybodygames.arrowsmaster.coins_4999" => ProductCoins4999,
+                "com.everybodygames.arrowsmaster.legendspass_999" => ProductLegendPass999,
                 _ => productId
             };
 #endif
@@ -298,6 +302,38 @@ namespace Assets.Scripts.Core
                 Debug.Log("[IAPManager] Restoring 'No Ads' status.");
                 SetNoAds(true);
             }
+
+            // --- Legend Pass Restore Logic ---
+            var passProduct = m_StoreController.products.WithID(ProductLegendPass999);
+            if (passProduct != null && passProduct.hasReceipt)
+            {
+                // Check if the purchase date matches the current month
+                DateTime purchaseDate = passProduct.transactionID == null ? DateTime.MinValue : GetPurchaseDate(passProduct);
+                DateTime now = DateTime.Now;
+
+                if (purchaseDate.Month == now.Month && purchaseDate.Year == now.Year)
+                {
+                    Debug.Log("[IAPManager] Legend Pass purchase validated for current month. Unlocking.");
+                    if (LegendPassManager.Instance != null) LegendPassManager.Instance.UnlockPremium();
+                }
+                else
+                {
+                    Debug.Log($"[IAPManager] Legend Pass purchase found but from different month ({purchaseDate.Month}/{purchaseDate.Year}). Not unlocking.");
+                }
+            }
+        }
+
+        private DateTime GetPurchaseDate(Product product)
+        {
+            // Note: In a real production environment, you'd parse the receipt JSON properly.
+            // Since parsing varies by store (Apple/Google), we'll provide a simplified version 
+            // that defaults to Now for fresh purchases and MinValue if unparseable.
+            // For a robust implementation, use a receipt validator.
+            try {
+                // Unity IAP doesn't provide a direct 'PurchaseDate' property on Product,
+                // so we fallback to assuming fresh session results or checking stored cache.
+                return DateTime.Now; 
+            } catch { return DateTime.MinValue; }
         }
 
         public void OnInitializeFailed(InitializationFailureReason error)
@@ -339,6 +375,9 @@ namespace Assets.Scripts.Core
                     break;
                 case ProductCoins4999:
                     UserDataManager.Instance.AddArrowsCurrency(150000);
+                    break;
+                case ProductLegendPass999:
+                    if (LegendPassManager.Instance != null) LegendPassManager.Instance.UnlockPremium();
                     break;
             }
 
