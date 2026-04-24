@@ -69,6 +69,7 @@ namespace Assets.Scripts.Lobby
         
         [SerializeField] private Color m_LevelColor;
         [SerializeField] private MonthlyChallengeController m_MonthlyChallengeController;
+        [SerializeField] private LegendPassUI m_LegendPassUI;
         [SerializeField] private Transform m_LiveOpIconsContainer;
         public Transform LiveOpIconsContainer => m_LiveOpIconsContainer;
 
@@ -659,6 +660,18 @@ namespace Assets.Scripts.Lobby
             }
 
             UpdateChallengeNotification();
+        }
+
+        public void OnLegendPassClicked()
+        {
+            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+            
+            if (UserDataManager.Instance.CurrentLevel < 40) return;
+
+            if (m_LegendPassUI != null)
+            {
+                m_LegendPassUI.gameObject.SetActive(true);
+            }
         }
 
         private void UpdateChallengeNotification()

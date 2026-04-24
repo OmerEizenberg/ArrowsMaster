@@ -81,6 +81,18 @@ namespace Assets.Scripts.Core
         public event System.Action<int> OnHintBoosterChanged;
         public event System.Action<int> OnRefillBoosterChanged;
 
+        private const string LegendPassStepKey = "LegendPass_CurrentStep";
+        private const string LegendPassPremiumKey = "LegendPass_PremiumUnlocked";
+        private const string LegendPassClaimedFreeKey = "LegendPass_ClaimedFree";
+        private const string LegendPassClaimedPremiumKey = "LegendPass_ClaimedPremium";
+        private const string LegendPassStartDateKey = "LegendPass_StartDate";
+
+        public int LegendPassStep { get; private set; } = 0;
+        public bool IsLegendPassPremiumUnlocked { get; private set; } = false;
+        public int LegendPassClaimedFreeMask { get; private set; } = 0;
+        public int LegendPassClaimedPremiumMask { get; private set; } = 0;
+        public string LegendPassStartDate { get; private set; } = string.Empty;
+
         public int LastViewedChallengeYear { get; private set; }
         public int LastViewedChallengeMonth { get; private set; }
 
@@ -145,6 +157,12 @@ namespace Assets.Scripts.Core
                 SaveHintBooster();
                 SaveRefillBooster();
             }
+
+            LegendPassStep = PlayerPrefs.GetInt(LegendPassStepKey, 0);
+            IsLegendPassPremiumUnlocked = PlayerPrefs.GetInt(LegendPassPremiumKey, 0) == 1;
+            LegendPassClaimedFreeMask = PlayerPrefs.GetInt(LegendPassClaimedFreeKey, 0);
+            LegendPassClaimedPremiumMask = PlayerPrefs.GetInt(LegendPassClaimedPremiumKey, 0);
+            LegendPassStartDate = PlayerPrefs.GetString(LegendPassStartDateKey, string.Empty);
         }
 
         public void IncrementLevel()
@@ -509,7 +527,40 @@ namespace Assets.Scripts.Core
                 PlayerPrefs.Save();
             }
         }
-        
+        #endregion
+
+        #region Legend Pass Persistence
+
+        public void SetLegendPassStep(int step)
+        {
+            LegendPassStep = step;
+            PlayerPrefs.SetInt(LegendPassStepKey, LegendPassStep);
+            PlayerPrefs.Save();
+        }
+
+        public void SetLegendPassPremiumUnlocked(bool unlocked)
+        {
+            IsLegendPassPremiumUnlocked = unlocked;
+            PlayerPrefs.SetInt(LegendPassPremiumKey, IsLegendPassPremiumUnlocked ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+
+        public void SetLegendPassClaimedMasks(int freeMask, int premiumMask)
+        {
+            LegendPassClaimedFreeMask = freeMask;
+            LegendPassClaimedPremiumMask = premiumMask;
+            PlayerPrefs.SetInt(LegendPassClaimedFreeKey, LegendPassClaimedFreeMask);
+            PlayerPrefs.SetInt(LegendPassClaimedPremiumKey, LegendPassClaimedPremiumMask);
+            PlayerPrefs.Save();
+        }
+
+        public void SetLegendPassStartDate(string dateStr)
+        {
+            LegendPassStartDate = dateStr;
+            PlayerPrefs.SetString(LegendPassStartDateKey, LegendPassStartDate);
+            PlayerPrefs.Save();
+        }
+
         #endregion
     }
 }

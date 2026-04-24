@@ -768,6 +768,13 @@ namespace Assets.Scripts.Core
                 UserDataManager.Instance.ClearCurrentLevelAttempts();
                 UserDataManager.Instance.IsRateUsCheckPending = true;
 
+                // --- Legend Pass Progression ---
+                if (LegendPassManager.Instance != null)
+                {
+                    LegendPassManager.Instance.OnLevelComplete();
+                }
+                // -----------------------------
+
                 // --- Social Platform Achievements (Android/iOS) ---
                 CheckAchievements(completedLevel);
                 // --------------------------------------------------
