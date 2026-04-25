@@ -193,11 +193,17 @@ public class LegendPassManager : MonoBehaviour
         if (remaining.TotalSeconds <= 0) return "0s";
 
         if (remaining.TotalDays >= 1)
-            return $"{Mathf.FloorToInt((float)remaining.TotalDays)}D";
+        {
+            return $"{remaining.Days}D {remaining.Hours}h";
+        }
         else if (remaining.TotalHours >= 1)
-            return $"{Mathf.FloorToInt((float)remaining.TotalHours)}h";
+        {
+            return $"{remaining.Hours}h {remaining.Minutes}m";
+        }
         else
-            return $"{Mathf.FloorToInt((float)remaining.TotalMinutes)}M";
+        {
+            return $"{remaining.Minutes}m";
+        }
     }
 
     private void NotifyStateChanged()

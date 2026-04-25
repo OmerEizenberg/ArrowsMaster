@@ -53,11 +53,6 @@ public class LegendPassStepUI : MonoBehaviour
 
         if (m_FreeClaimedIndicator != null && m_FreeClaimedIndicator.activeSelf != isFreeClaimed) m_FreeClaimedIndicator.SetActive(isFreeClaimed);
         
-        if(isFreeClaimed){
-           if (m_FreeAmountText != null && m_FreeAmountText.gameObject.activeSelf) m_FreeAmountText.gameObject.SetActive(false); 
-           if (m_FreeAmountText2 != null && m_FreeAmountText2.gameObject.activeSelf) m_FreeAmountText2.gameObject.SetActive(false); 
-        }
-
         // Setup Premium Reward UI
         bool hasPremium = premium.amount > 0;
         if (m_PremiumContentHolder != null && m_PremiumContentHolder.activeSelf != hasPremium) m_PremiumContentHolder.SetActive(hasPremium);
@@ -68,10 +63,6 @@ public class LegendPassStepUI : MonoBehaviour
 
         if (m_PremiumClaimedIndicator != null && m_PremiumClaimedIndicator.activeSelf != isPremiumClaimed) m_PremiumClaimedIndicator.SetActive(isPremiumClaimed);
 
-        if(isPremiumClaimed){
-           if (m_PremiumAmountText != null && m_PremiumAmountText.gameObject.activeSelf) m_PremiumAmountText.gameObject.SetActive(false); 
-           if (m_PremiumAmountText2 != null && m_PremiumAmountText2.gameObject.activeSelf) m_PremiumAmountText2.gameObject.SetActive(false); 
-        }
         // Highlight logic
         if (m_Highlight != null) m_Highlight.SetActive(isReached && index == LegendPassManager.Instance.currentStep);
 
