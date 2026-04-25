@@ -39,28 +39,38 @@ public class LegendPassStepUI : MonoBehaviour
     {
         _stepIndex = index;
 
-        if (m_StepIndexText != null) m_StepIndexText.text = (index + 1).ToString();
-        if (m_StepIndexText2 != null) m_StepIndexText2.text = m_StepIndexText.text;
+        string indexStr = (index + 1).ToString();
+        if (m_StepIndexText != null && m_StepIndexText.text != indexStr) m_StepIndexText.text = indexStr;
+        if (m_StepIndexText2 != null && m_StepIndexText2.text != indexStr) m_StepIndexText2.text = indexStr;
         
         // Setup Free Reward UI
         bool hasFree = free.amount > 0;
-        if (m_FreeContentHolder != null) m_FreeContentHolder.SetActive(hasFree);
-        if (m_FreeAmountText != null) m_FreeAmountText.text = free.amount.ToString();
-        if (m_FreeAmountText2 != null) m_FreeAmountText2.text = free.amount.ToString();
-        if (m_FreeClaimedIndicator != null) m_FreeClaimedIndicator.SetActive(isFreeClaimed);
+        if (m_FreeContentHolder != null && m_FreeContentHolder.activeSelf != hasFree) m_FreeContentHolder.SetActive(hasFree);
+
+        string freeAmountStr = free.amount.ToString();
+        if (m_FreeAmountText != null && m_FreeAmountText.text != freeAmountStr) m_FreeAmountText.text = freeAmountStr;
+        if (m_FreeAmountText2 != null && m_FreeAmountText2.text != freeAmountStr) m_FreeAmountText2.text = freeAmountStr;
+
+        if (m_FreeClaimedIndicator != null && m_FreeClaimedIndicator.activeSelf != isFreeClaimed) m_FreeClaimedIndicator.SetActive(isFreeClaimed);
+        
         if(isFreeClaimed){
-           m_FreeAmountText.gameObject.SetActive(false); 
-           m_FreeAmountText2.gameObject.SetActive(false); 
+           if (m_FreeAmountText != null && m_FreeAmountText.gameObject.activeSelf) m_FreeAmountText.gameObject.SetActive(false); 
+           if (m_FreeAmountText2 != null && m_FreeAmountText2.gameObject.activeSelf) m_FreeAmountText2.gameObject.SetActive(false); 
         }
+
         // Setup Premium Reward UI
         bool hasPremium = premium.amount > 0;
-        if (m_PremiumContentHolder != null) m_PremiumContentHolder.SetActive(hasPremium);
-        if (m_PremiumAmountText != null) m_PremiumAmountText.text = premium.amount.ToString();
-        if (m_PremiumAmountText2 != null) m_PremiumAmountText2.text = premium.amount.ToString();
-        if (m_PremiumClaimedIndicator != null) m_PremiumClaimedIndicator.SetActive(isPremiumClaimed);
+        if (m_PremiumContentHolder != null && m_PremiumContentHolder.activeSelf != hasPremium) m_PremiumContentHolder.SetActive(hasPremium);
+
+        string premAmountStr = premium.amount.ToString();
+        if (m_PremiumAmountText != null && m_PremiumAmountText.text != premAmountStr) m_PremiumAmountText.text = premAmountStr;
+        if (m_PremiumAmountText2 != null && m_PremiumAmountText2.text != premAmountStr) m_PremiumAmountText2.text = premAmountStr;
+
+        if (m_PremiumClaimedIndicator != null && m_PremiumClaimedIndicator.activeSelf != isPremiumClaimed) m_PremiumClaimedIndicator.SetActive(isPremiumClaimed);
+
         if(isPremiumClaimed){
-           m_PremiumAmountText.gameObject.SetActive(false); 
-           m_PremiumAmountText2.gameObject.SetActive(false); 
+           if (m_PremiumAmountText != null && m_PremiumAmountText.gameObject.activeSelf) m_PremiumAmountText.gameObject.SetActive(false); 
+           if (m_PremiumAmountText2 != null && m_PremiumAmountText2.gameObject.activeSelf) m_PremiumAmountText2.gameObject.SetActive(false); 
         }
         // Highlight logic
         if (m_Highlight != null) m_Highlight.SetActive(isReached && index == LegendPassManager.Instance.currentStep);

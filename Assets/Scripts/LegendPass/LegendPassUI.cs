@@ -50,6 +50,7 @@ public class LegendPassUI : MonoBehaviour
 
     /// <summary>
     /// Populates/Updates the full scrollable rewards track.
+    /// Reuses existing children to avoid memory allocation and layout leaks.
     /// </summary>
     [ContextMenu("Refresh Pass UI")]
     public void RefreshUI()
@@ -60,16 +61,31 @@ public class LegendPassUI : MonoBehaviour
             return;
         }
 
-        // Simple cleanup - in a high performance scenario, could use pooling
-        foreach (Transform child in m_ContentTransform)
+        int targetCount = 30;
+        int currentChildCount = m_ContentTransform.childCount;
+
+        // 1. Ensure we have exactly 30 children
+        if (currentChildCount < targetCount)
         {
-            Destroy(child.gameObject);
+            for (int i = currentChildCount; i < targetCount; i++)
+            {
+                Instantiate(m_StepPrefab, m_ContentTransform);
+            }
+        }
+        else if (currentChildCount > targetCount)
+        {
+            for (int i = currentChildCount - 1; i >= targetCount; i--)
+            {
+                DestroyImmediate(m_ContentTransform.GetChild(i).gameObject);
+            }
         }
 
-        for (int i = 0; i < 30; i++)
+        // 2. Update each child
+        for (int i = 0; i < targetCount; i++)
         {
-            LegendPassStepUI stepInstance = Instantiate(m_StepPrefab, m_ContentTransform);
-            
+            LegendPassStepUI stepInstance = m_ContentTransform.GetChild(i).GetComponent<LegendPassStepUI>();
+            if (stepInstance == null) continue;
+
             Reward freeReward = m_Config.ParseReward(m_Config.freeRewards[i]);
             Reward premiumReward = m_Config.ParseReward(m_Config.premiumRewards[i]);
 
@@ -106,23 +122,49 @@ public class LegendPassUI : MonoBehaviour
         // Force layout rebuild to ensure ScrollRect handles the new content size
         LayoutRebuilder.ForceRebuildLayoutImmediate(m_ContentTransform);
         
-        // Optional: Auto-scroll to the current unlocked step
-        ScrollToCurrentStep();
+        // Auto-scroll to the current unlocked step with a slight delay to ensure layout is ready
+        if (m_ScrollCoroutine != null) StopCoroutine(m_ScrollCoroutine);
+        m_ScrollCoroutine = StartCoroutine(ScrollToCurrentStepRoutine());
     }
 
-    /// <summary>
-    /// Centers the ScrollRect on the user's current progress step.
-    /// </summary>
-    private void ScrollToCurrentStep()
+    private Coroutine m_ScrollCoroutine;
+
+    private System.Collections.IEnumerator ScrollToCurrentStepRoutine()
     {
-        if (m_ScrollRect == null || m_ContentTransform == null || m_ContentTransform.childCount == 0) return;
+        // Wait a few frames to let the UI system settle and LayoutGroups finish their first pass
+        yield return null;
+        yield return null;
+        yield return new WaitForEndOfFrame();
 
-        int current = LegendPassManager.Instance.currentStep;
-        float progress = (float)current / 29f; // 30 steps total (0 to 29)
-        
-        // Horizontal scroll normalization (0 = left, 1 = right)
-        m_ScrollRect.horizontalNormalizedPosition = Mathf.Clamp01(progress);
+        if (m_ScrollRect != null && m_ContentTransform != null && LegendPassManager.Instance != null)
+        {
+            int current = LegendPassManager.Instance.currentStep;
+            if (current < 0) current = 0;
+            if (current >= m_ContentTransform.childCount) current = m_ContentTransform.childCount - 1;
+
+            if (m_ContentTransform.childCount > 0)
+            {
+                RectTransform targetChild = m_ContentTransform.GetChild(current) as RectTransform;
+                if (targetChild != null)
+                {
+                    // Calculate Y based on the child's anchored position
+                    float targetY = Mathf.Abs(targetChild.anchoredPosition.y);
+
+                    float contentHeight = m_ContentTransform.rect.height;
+                    float viewportHeight = m_ScrollRect.viewport != null ? m_ScrollRect.viewport.rect.height : m_ScrollRect.GetComponent<RectTransform>().rect.height;
+                    float maxScroll = Mathf.Max(0, contentHeight - viewportHeight);
+
+                    Vector2 newPos = m_ContentTransform.anchoredPosition;
+                    newPos.y = Mathf.Clamp(targetY, 0, maxScroll);
+                    
+                    m_ContentTransform.anchoredPosition = newPos;
+                    // Debug.Log eliminated to reduce console noise during high-churn operations
+                }
+            }
+        }
+        m_ScrollCoroutine = null;
     }
+
 
     private Sprite GetRewardSprite(RewardType type)
     {
