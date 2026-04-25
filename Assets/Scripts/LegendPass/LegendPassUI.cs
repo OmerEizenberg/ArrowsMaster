@@ -23,6 +23,7 @@ public class LegendPassUI : MonoBehaviour
 
     [Header("Purchase")]
     [SerializeField] private Button m_PurchaseButton;
+    [SerializeField] private GameObject m_PassCrown;
 
     private void OnEnable()
     {
@@ -91,10 +92,15 @@ public class LegendPassUI : MonoBehaviour
             if (stepInstance.premiumIcon != null) stepInstance.premiumIcon.sprite = GetRewardSprite(premiumReward.type);
         }
 
-        // Toggle Purchase Button
+        // Toggle Purchase Button & Crown
+        bool isUnlocked = LegendPassManager.Instance.isPremiumUnlocked;
         if (m_PurchaseButton != null)
         {
-            m_PurchaseButton.gameObject.SetActive(!LegendPassManager.Instance.isPremiumUnlocked);
+            m_PurchaseButton.gameObject.SetActive(!isUnlocked);
+        }
+        if (m_PassCrown != null)
+        {
+            m_PassCrown.SetActive(isUnlocked);
         }
 
         // Force layout rebuild to ensure ScrollRect handles the new content size

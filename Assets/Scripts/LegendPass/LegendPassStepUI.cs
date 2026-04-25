@@ -93,6 +93,10 @@ public class LegendPassStepUI : MonoBehaviour
 
     private void OnClaimButtonClicked(bool isPremium)
     {
+        if (Assets.Scripts.Core.SoundManager.Instance != null)
+        {
+            Assets.Scripts.Core.SoundManager.Instance.PlayShop();
+        }
         LegendPassManager.Instance.ClaimReward(_stepIndex, isPremium);
     }
 }
