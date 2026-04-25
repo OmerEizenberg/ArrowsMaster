@@ -21,6 +21,9 @@ public class LegendPassUI : MonoBehaviour
     [SerializeField] private Sprite m_WandSprite;
     [SerializeField] private Sprite m_LifeSprite;
 
+    [Header("Purchase")]
+    [SerializeField] private Button m_PurchaseButton;
+
     private void OnEnable()
     {
         RefreshUI();
@@ -84,9 +87,14 @@ public class LegendPassUI : MonoBehaviour
                 isPremiumClaimed
             );
             
-            // Map sprites to icons
             if (stepInstance.freeIcon != null) stepInstance.freeIcon.sprite = GetRewardSprite(freeReward.type);
             if (stepInstance.premiumIcon != null) stepInstance.premiumIcon.sprite = GetRewardSprite(premiumReward.type);
+        }
+
+        // Toggle Purchase Button
+        if (m_PurchaseButton != null)
+        {
+            m_PurchaseButton.gameObject.SetActive(!LegendPassManager.Instance.isPremiumUnlocked);
         }
 
         // Force layout rebuild to ensure ScrollRect handles the new content size
@@ -129,5 +137,14 @@ public class LegendPassUI : MonoBehaviour
     {
         LegendPassManager.Instance.OnLevelComplete();
         RefreshUI();
+    }
+
+    /// <summary>
+    /// Invoked by the Activate/Purchase button.
+    /// </summary>
+    public void PurchasePass()
+    {
+        if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+        LegendPassManager.Instance.PurchasePremiumPass();
     }
 }
