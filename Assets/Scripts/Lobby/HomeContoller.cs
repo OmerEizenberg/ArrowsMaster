@@ -666,7 +666,7 @@ namespace Assets.Scripts.Lobby
         {
             if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
             
-            if (UserDataManager.Instance.CurrentLevel < 40) return;
+            if (UserDataManager.Instance.CurrentLevel < 30) return;
 
             if (m_LegendPassUI != null)
             {

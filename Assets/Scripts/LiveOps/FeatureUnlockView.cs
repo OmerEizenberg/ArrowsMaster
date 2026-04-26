@@ -10,7 +10,9 @@ namespace Assets.Scripts.LiveOps
 {
     public class FeatureUnlockView : MonoBehaviour
     {
+        [SerializeField] private int m_ShowLevel;
         [SerializeField] private int m_UnlockLevel;
+        [SerializeField] private GameObject m_ContentRoot;
         [SerializeField] private List<Image> m_ImagesToFade;
         [SerializeField] private List<TextMeshProUGUI> m_TextsToFade;
         [SerializeField] private GameObject m_LockIcon;
@@ -23,9 +25,31 @@ namespace Assets.Scripts.LiveOps
         private Coroutine tooltipCoroutine;
         private Button m_Button;
 
+        private void OnEnable()
+        {
+            if (UserDataManager.Instance != null)
+            {
+                UserDataManager.Instance.OnLevelChanged += CheckUnlockState;
+            }
+            CheckUnlockState();
+        }
+
+        private void OnDisable()
+        {
+            if (UserDataManager.Instance != null)
+            {
+                UserDataManager.Instance.OnLevelChanged -= CheckUnlockState;
+            }
+        }
+
         private void Start()
         {
             m_Button = GetComponent<Button>();
+            if (m_Button == null && m_ContentRoot != null)
+            {
+                m_Button = m_ContentRoot.GetComponent<Button>();
+            }
+
             if (m_Button != null)
             {
                 m_Button.onClick.AddListener(OnButtonClicked);
@@ -36,14 +60,23 @@ namespace Assets.Scripts.LiveOps
             CheckUnlockState();
         }
 
-        private void Update()
-        {
-            CheckUnlockState();
-        }
-
         private void CheckUnlockState()
         {
+            if (UserDataManager.Instance == null) return;
+
             int currentLevel = UserDataManager.Instance.CurrentLevel;
+            
+            // 1. Visibility Check
+            bool shouldShow = currentLevel >= m_ShowLevel;
+            if (m_ContentRoot != null)
+            {
+                if (m_ContentRoot.activeSelf != shouldShow)
+                    m_ContentRoot.SetActive(shouldShow);
+            }
+
+            if (!shouldShow) return;
+
+            // 2. Lock Check
             isLocked = currentLevel < m_UnlockLevel;
 
             if (m_LockIcon != null) m_LockIcon.SetActive(isLocked);

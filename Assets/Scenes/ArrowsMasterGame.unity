@@ -52719,6 +52719,22 @@ PrefabInstance:
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
       objectReference: {fileID: 28547073}
+    - target: {fileID: 1217434924190177959, guid: 18bb6ce18dd8b4215bb89c190a1afafb, type: 3}
+      propertyPath: m_ShowLevel
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 1217434924190177959, guid: 18bb6ce18dd8b4215bb89c190a1afafb, type: 3}
+      propertyPath: m_ContentRoot
+      value: 
+      objectReference: {fileID: 951063264}
+    - target: {fileID: 1217434924190177959, guid: 18bb6ce18dd8b4215bb89c190a1afafb, type: 3}
+      propertyPath: m_UnlockLevel
+      value: 24
+      objectReference: {fileID: 0}
+    - target: {fileID: 1751623749123191644, guid: 18bb6ce18dd8b4215bb89c190a1afafb, type: 3}
+      propertyPath: m_text
+      value: Unlocked at Level 24
+      objectReference: {fileID: 0}
     - target: {fileID: 8216700554287997981, guid: 18bb6ce18dd8b4215bb89c190a1afafb, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -53158,7 +53174,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 1.2699585, y: -164}
-  m_SizeDelta: {x: 100, y: 70}
+  m_SizeDelta: {x: 215, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &5131058127748264512
 MonoBehaviour:
@@ -53180,7 +53196,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Unlocked at Level 40
+  m_text: Unlocked at Level 30
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
@@ -53421,7 +53437,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d8f89ce9d49e40a09ec9b39d4feef21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_UnlockLevel: 40
+  m_ShowLevel: 15
+  m_UnlockLevel: 30
+  m_ContentRoot: {fileID: 2923222191544274032}
   m_ImagesToFade:
   - {fileID: 2389334705752948908}
   - {fileID: 1158287362129152930}

@@ -374,7 +374,7 @@ namespace Assets.Scripts.Core
 
         public void IncrementLevelStreak()
         {
-            if (CurrentLevel >= 25)
+            if (CurrentLevel >= 24)
             {
                 LevelStreak++;
                 NeedsLevelStreakAnimation = true;

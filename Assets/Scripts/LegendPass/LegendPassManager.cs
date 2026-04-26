@@ -236,6 +236,8 @@ public class LegendPassManager : MonoBehaviour
 
     public void OnLevelComplete()
     {
+        if (UserDataManager.Instance.CurrentLevel < 30) return;
+
         if (currentStep < 29)
         {
             // Skip empty steps in progression counter? 

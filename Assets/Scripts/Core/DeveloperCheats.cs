@@ -23,6 +23,10 @@ namespace Assets.Scripts.Core
                 levelInputField.onValueChanged.AddListener(OnLevelInputChanged);
             }
         }
+          public void DeleteAll()
+        {
+            PlayerPrefs.DeleteAll();
+        }
 
         /// <summary>
         /// Cheat function to instantly win the level by destroying all arrows.
