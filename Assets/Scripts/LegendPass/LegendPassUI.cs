@@ -155,10 +155,13 @@ public class LegendPassUI : MonoBehaviour
                     float maxScroll = Mathf.Max(0, contentHeight - viewportHeight);
 
                     Vector2 newPos = m_ContentTransform.anchoredPosition;
-                    newPos.y = Mathf.Clamp(targetY, 0, maxScroll);
+                    
+                    // We want the targetChild's center to be at the center of the viewport.
+                    // Subtraction because we want to scroll "less" than the top.
+                    float centerOffset = (viewportHeight * 0.35f) - (targetChild.rect.height * 0.35f);
+                    newPos.y = Mathf.Clamp(targetY - centerOffset, 0, maxScroll);
                     
                     m_ContentTransform.anchoredPosition = newPos;
-                    // Debug.Log eliminated to reduce console noise during high-churn operations
                 }
             }
         }
