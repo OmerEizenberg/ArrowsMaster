@@ -887,6 +887,9 @@ public class GameUIContoleer : MonoBehaviour
         }
         rt.localScale = new Vector3(1.2f, 1.2f, 1f);
 
+        // Trigger action in parallel after initial punch
+        onComplete?.Invoke();
+
         // 2. Settle Down
         elapsed = 0f;
         float settleDuration = 0.12f;
@@ -916,6 +919,5 @@ public class GameUIContoleer : MonoBehaviour
         }
 
         Destroy(boosterGO);
-        onComplete?.Invoke();
     }
 }
