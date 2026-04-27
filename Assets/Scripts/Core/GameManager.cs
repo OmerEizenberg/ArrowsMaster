@@ -355,6 +355,12 @@ namespace Assets.Scripts.Core
                 ArrowController arrow = nonBlocked[i];
                 if (arrow != null && arrow.segments.Count > 0)
                 {
+                    // Focus camera on the arrow being activated
+                    if (CameraController.Instance != null)
+                    {
+                        CameraController.Instance.FocusOn(arrow.GetHeadPosition(), 0.5f);
+                    }
+
                     // Select from the tail (segments[0]) to mimic a user click
                     arrow.OnArrowClicked(arrow.segments[0], Vector2.zero);
                     
