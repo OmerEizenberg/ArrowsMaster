@@ -874,7 +874,7 @@ namespace Assets.Scripts.Core
                 if (AdsManager.Instance != null)
             {
                 // Show ad only if we are past the first entry level to the lobby
-                if(UserDataManager.Instance.CurrentLevel > ADS_START_LEVEL && UserDataManager.Instance.CurrentLevel%2 == 0)
+                if(UserDataManager.Instance.CurrentLevel > ADS_START_LEVEL)// && UserDataManager.Instance.CurrentLevel%2 == 0)
                 {
                     AdsManager.Instance.ShowInterstitial(true);
                 }
