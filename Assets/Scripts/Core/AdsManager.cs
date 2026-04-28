@@ -23,7 +23,7 @@ namespace Assets.Scripts.Core
         private bool isInitializing = false;
         private int sdkInitRetryCount = 0;
         private float lastAdShowTime = -30f;
-        private const float AD_COOLDOWN = 120f;
+        private const float AD_COOLDOWN = 60f;
 
         // Track which rewarded ad type is currently being shown
         private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward, LifeReward }
