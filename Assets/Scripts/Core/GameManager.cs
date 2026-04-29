@@ -309,6 +309,9 @@ namespace Assets.Scripts.Core
                 bestArrow.ShowPreview();
                 // We'll reset hint active state via a delayed call or coroutine
                 StartCoroutine(ClearHintActive(45.0f, bestArrow));
+
+                // Save level state (including timer) when hint is used
+                SaveCurrentProgress();
             }
 
             ResetHintTimer(false);
@@ -373,6 +376,9 @@ namespace Assets.Scripts.Core
                     }
                 }
             }
+            
+            // Save progress after Magic Wand removes arrows
+            SaveCurrentProgress();
         }
 
         public void PlayOn()
@@ -628,6 +634,7 @@ namespace Assets.Scripts.Core
         {
             CurrentLives = maxLives;
             OnLivesChanged?.Invoke(CurrentLives);
+            SaveCurrentProgress(); // Save restored lives to level state
         }
 
         public void RegisterArrow()
@@ -1419,6 +1426,7 @@ namespace Assets.Scripts.Core
 
             m_LastSavedProgress = progress;
             m_LastSaveTime = Time.time;
+            m_SuccessSaveCounter = 0; // Reset counter whenever a real disk save occurs
             UserDataManager.Instance.SaveLevelProgress(progress);
             Debug.Log($"[GameManager] Progress saved for level {progress.levelId}. Picked arrows: {progress.pickedArrowIds.Count}, Time={currentTime}/{levelDuration}, Active={isTimerActive}");
         }
@@ -1464,7 +1472,6 @@ namespace Assets.Scripts.Core
                     if (Time.time - m_LastSaveTime >= 4.5f)
                     {
                         SaveCurrentProgress();
-                        m_SuccessSaveCounter = 0;
                     }
                 }
             }
