@@ -48,6 +48,25 @@ namespace Assets.Scripts.Core
         // Cached WaitForSeconds to avoid per-frame allocation in blocked animation
         private static readonly WaitForSeconds s_BlockedPause = new WaitForSeconds(0.07f);
 
+        // Pre-allocated buffers for blocked animation history (to avoid GC)
+        private readonly List<Vector2Int[]> m_ForwardHistoryBuffer = new List<Vector2Int[]>();
+        private static readonly Stack<Vector2Int[]> s_ArrayPool = new Stack<Vector2Int[]>();
+
+        private Vector2Int[] GetArrayFromPool(int size)
+        {
+            if (s_ArrayPool.Count > 0)
+            {
+                var arr = s_ArrayPool.Pop();
+                if (arr.Length >= size) return arr;
+            }
+            return new Vector2Int[Mathf.Max(size, 16)];
+        }
+
+        private void ReturnArrayToPool(Vector2Int[] arr)
+        {
+            s_ArrayPool.Push(arr);
+        }
+
         // --- Speed & Acceleration Constants ---
         private const float K_LegacyStepDuration = 0.027f; // "What it is today"
         private const float K_InitialSpeedMultiplier = 1.0f; // Starts at 80%
@@ -398,7 +417,8 @@ namespace Assets.Scripts.Core
                                 if (m_ComboPrefab != null)
                                 {
                                     Transform uiParent = gameManager.m_GameUI.transform.parent;
-                                    GameObject comboObj = Instantiate(m_ComboPrefab, uiParent);
+                                    // OPTIMIZATION #6: Use object pooling for effects
+                                    GameObject comboObj = GameManager.Instance.SpawnEffect(m_ComboPrefab, Vector3.zero, Quaternion.identity, uiParent);
                                     RectTransform comboRect = comboObj.GetComponent<RectTransform>();
                                     // 1. Setup Combo Position
                                     if (comboRect != null)
@@ -414,7 +434,7 @@ namespace Assets.Scripts.Core
 
                                     if(gameManager.p_StreakCount-1 == 3 || gameManager.p_StreakCount-1 == 7 || gameManager.p_StreakCount-1 == 11)
                                     {
-                                        GameObject voiceObj = Instantiate(m_VoicePrefab, uiParent);
+                                        GameObject voiceObj = GameManager.Instance.SpawnEffect(m_VoicePrefab, Vector3.zero, Quaternion.identity, uiParent);
                                         GameManager.Instance.RegisterVoice(voiceObj);
                                         RectTransform voiceRect = voiceObj.GetComponent<RectTransform>();
                                         if (voiceRect != null)
@@ -449,7 +469,8 @@ namespace Assets.Scripts.Core
                             {
                                 foreach (var seg in segments)
                                 {
-                                    GameObject effect = Instantiate(pointEffectPrefab, seg.transform.position, Quaternion.identity);
+                                    // OPTIMIZATION #6: Use object pooling for point effects
+                                    GameObject effect = GameManager.Instance.SpawnEffect(pointEffectPrefab, seg.transform.position, Quaternion.identity, null);
                                     instantiatedEffects.Add(effect);
                                 }
                             }
@@ -581,9 +602,11 @@ namespace Assets.Scripts.Core
                 lineRenderer.endColor = color;
             }
 
-            foreach (var seg in segments)
+            for (int i = 0; i < segments.Count; i++)
             {
-                if (seg.Renderer.enabled) // Usually just the head
+                var seg = segments[i];
+                // OPTIMIZATION #3: Only update enabled renderers (heads)
+                if (seg.Renderer != null && seg.Renderer.enabled)
                 {
                     seg.Renderer.color = color;
                 }
@@ -596,7 +619,7 @@ namespace Assets.Scripts.Core
             // Destroy all instantiated effects
             foreach (var effect in instantiatedEffects)
             {
-                if (effect != null) Destroy(effect);
+                if (effect != null) GameManager.Instance.ReturnEffect(effect);
             }
             instantiatedEffects.Clear();
             Destroy(gameObject, 0.5f);
@@ -607,7 +630,7 @@ namespace Assets.Scripts.Core
             // Fallback cleanup if destroyed by other means
             foreach (var effect in instantiatedEffects)
             {
-                if (effect != null) Destroy(effect);
+                if (effect != null) GameManager.Instance.ReturnEffect(effect);
             }
             instantiatedEffects.Clear();
         }
@@ -916,14 +939,13 @@ namespace Assets.Scripts.Core
 
         // ===== Blocked Arrow Animation System =====
 
-        private List<Vector2Int> SaveCurrentPositions()
+        private void SaveCurrentPositions(List<Vector2Int> targetList)
         {
-            List<Vector2Int> positions = new List<Vector2Int>();
-            foreach (var seg in segments)
+            targetList.Clear();
+            for (int i = 0; i < segments.Count; i++)
             {
-                positions.Add(seg.GridPosition);
+                targetList.Add(segments[i].GridPosition);
             }
-            return positions;
         }
 
         private void RestorePositions(List<Vector2Int> positions)
@@ -967,7 +989,8 @@ namespace Assets.Scripts.Core
             const int MAX_SIMULATION_STEPS = 50; // Safety limit
             
             // Save current state
-            List<Vector2Int> originalPositions = SaveCurrentPositions();
+            SaveCurrentPositions(_savedPositions);
+            List<Vector2Int> originalPositions = new List<Vector2Int>(_savedPositions);
             
             // Simulate forward movement until blocked
             while (steps < MAX_SIMULATION_STEPS)
@@ -1046,22 +1069,30 @@ namespace Assets.Scripts.Core
         private IEnumerator BlockedArrowAnimation()
         {
             // CRITICAL: Save original positions BEFORE any simulation
-            List<Vector2Int> originalPositions = SaveCurrentPositions();
+            // OPTIMIZATION #2: Reuse _savedPositions buffer
+            SaveCurrentPositions(_savedPositions);
+            List<Vector2Int> originalPositionsSnapshot = new List<Vector2Int>(_savedPositions);
             
             // Calculate how many steps we can move before hitting the blocking arrow
             int stepsUntilBlocked = CalculateStepsUntilBlocked();
             
-            // Save ALL intermediate positions during forward movement
-            List<List<Vector2Int>> forwardPositionHistory = new List<List<Vector2Int>>();
-            forwardPositionHistory.Add(new List<Vector2Int>(originalPositions)); // Add starting position
+            // Clear history and store starting position
+            foreach (var arr in m_ForwardHistoryBuffer) ReturnArrayToPool(arr);
+            m_ForwardHistoryBuffer.Clear();
+
+            Vector2Int[] startArr = GetArrayFromPool(segments.Count);
+            for (int i = 0; i < segments.Count; i++) startArr[i] = segments[i].GridPosition;
+            m_ForwardHistoryBuffer.Add(startArr);
             
             // Phase 1: Forward animation (simulate moving until blocked)
             for (int i = 0; i < stepsUntilBlocked; i++)
             {
                 yield return StartCoroutine(SimulateForwardStep());
                 
-                // Save current positions after this step
-                forwardPositionHistory.Add(SaveCurrentPositions());
+                // Save current positions after this step into history pool
+                Vector2Int[] stepArr = GetArrayFromPool(segments.Count);
+                for (int j = 0; j < segments.Count; j++) stepArr[j] = segments[j].GridPosition;
+                m_ForwardHistoryBuffer.Add(stepArr);
             }
             
             // Phase 2: Half-step impact toward the blocker
@@ -1087,13 +1118,13 @@ namespace Assets.Scripts.Core
             yield return s_BlockedPause;
             
             // Phase 4: Reverse animation - replay positions in reverse order
-            for (int step = forwardPositionHistory.Count - 2; step >= 0; step--)
+            for (int step = m_ForwardHistoryBuffer.Count - 2; step >= 0; step--)
             {
-                List<Vector2Int> targetPositions = forwardPositionHistory[step];
+                Vector2Int[] targetPositions = m_ForwardHistoryBuffer[step];
                 // Reuse shared buffer
                 _targetWorldPos.Clear();
                 
-                for (int i = 0; i < segments.Count && i < targetPositions.Count; i++)
+                for (int i = 0; i < segments.Count; i++)
                 {
                     segments[i].GridPosition = targetPositions[i];
                     _targetWorldPos.Add(new Vector3(targetPositions[i].x * CellSize, targetPositions[i].y * CellSize, 0));
@@ -1102,17 +1133,18 @@ namespace Assets.Scripts.Core
                 yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, K_BaseMoveDuration));
             }
             
-            RestorePositions(originalPositions);
+            RestorePositions(originalPositionsSnapshot);
             for (int i = 0; i < segments.Count; i++)
             {
-                Vector3 originalWorldPos = new Vector3(originalPositions[i].x * CellSize, originalPositions[i].y * CellSize, 0);
+                Vector3 originalWorldPos = new Vector3(originalPositionsSnapshot[i].x * CellSize, originalPositionsSnapshot[i].y * CellSize, 0);
                 segments[i].transform.position = originalWorldPos;
             }
             forceLineUpdate = true;
             UpdateVisuals();
             
-            // Keep the arrow colored red after animation completes
-            // Color is already set, no need to reset
+            // Cleanup history pool
+            foreach (var arr in m_ForwardHistoryBuffer) ReturnArrayToPool(arr);
+            m_ForwardHistoryBuffer.Clear();
         }
 
     }

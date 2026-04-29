@@ -98,6 +98,7 @@ namespace Assets.Scripts.Core
 
         private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
         private List<GameObject> m_ActiveVoices = new List<GameObject>();
+        private Dictionary<string, Queue<GameObject>> m_EffectPools = new Dictionary<string, Queue<GameObject>>();
         private bool wasTimerActiveBeforeAd = false;
         private List<int> p_pickedArrowIds = new List<int>();
         private Coroutine m_PeriodicSaveCoroutine;
@@ -1187,7 +1188,8 @@ namespace Assets.Scripts.Core
             {
                 if (combo != null && combo.gameObject != null)
                 {
-                    Destroy(combo.gameObject);
+                    // OPTIMIZATION #6: Return to pool
+                    ReturnEffect(combo.gameObject);
                 }
             }
             m_ActiveCombos.Clear();
@@ -1207,7 +1209,8 @@ namespace Assets.Scripts.Core
             {
                 if (voice != null)
                 {
-                    Destroy(voice);
+                    // OPTIMIZATION #6: Return to pool
+                    ReturnEffect(voice);
                 }
             }
             m_ActiveVoices.Clear();
@@ -1223,6 +1226,56 @@ namespace Assets.Scripts.Core
             // Return center of a random quarter for combo feedback
             return m_QuarterCenters[UnityEngine.Random.Range(0, 4)];
         }
+
+        #region Object Pooling
+        public GameObject SpawnEffect(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent)
+        {
+            if (prefab == null) return null;
+            string poolKey = prefab.name;
+            if (!m_EffectPools.ContainsKey(poolKey)) m_EffectPools[poolKey] = new Queue<GameObject>();
+
+            GameObject obj;
+            if (m_EffectPools[poolKey].Count > 0)
+            {
+                obj = m_EffectPools[poolKey].Dequeue();
+                if (obj == null) return SpawnEffect(prefab, position, rotation, parent); // Handle destroyed objects
+                
+                obj.transform.SetParent(parent);
+                obj.transform.position = position;
+                obj.transform.rotation = rotation;
+                obj.SetActive(true);
+            }
+            else
+            {
+                obj = Instantiate(prefab, position, rotation, parent);
+                // Tag the object with its pool key so we know where to return it
+                EffectPoolTag tag = obj.AddComponent<EffectPoolTag>();
+                tag.PoolKey = poolKey;
+            }
+            return obj;
+        }
+
+        public void ReturnEffect(GameObject obj)
+        {
+            if (obj == null) return;
+            EffectPoolTag tag = obj.GetComponent<EffectPoolTag>();
+            if (tag != null)
+            {
+                obj.SetActive(false);
+                if (!m_EffectPools.ContainsKey(tag.PoolKey)) m_EffectPools[tag.PoolKey] = new Queue<GameObject>();
+                m_EffectPools[tag.PoolKey].Enqueue(obj);
+            }
+            else
+            {
+                Destroy(obj);
+            }
+        }
+
+        private class EffectPoolTag : MonoBehaviour
+        {
+            public string PoolKey;
+        }
+        #endregion
 
         private void CheckAndRestoreProgress()
         {
