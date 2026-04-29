@@ -77,4 +77,17 @@ public class VoiceVibeController : MonoBehaviour
         SoundManager.Instance.PlayNice();
 
     }
+
+    public void DestroyME()
+    {
+        // OPTIMIZATION #6: Return to pool instead of destroying
+        if (Assets.Scripts.Core.GameManager.Instance != null)
+        {
+            Assets.Scripts.Core.GameManager.Instance.ReturnEffect(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
 }

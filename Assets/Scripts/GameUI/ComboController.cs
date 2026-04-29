@@ -26,6 +26,14 @@ public class ComboController : MonoBehaviour
     }
     public void DestroyME()
     {
-        Destroy(gameObject);
+        // OPTIMIZATION #6: Return to pool instead of destroying
+        if (Assets.Scripts.Core.GameManager.Instance != null)
+        {
+            Assets.Scripts.Core.GameManager.Instance.ReturnEffect(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 }
