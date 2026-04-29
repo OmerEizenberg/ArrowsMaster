@@ -98,6 +98,8 @@ namespace Assets.Scripts.Core
 
         private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
         private List<GameObject> m_ActiveVoices = new List<GameObject>();
+        private int m_SuccessSaveCounter = 0;
+        private float m_LastSaveTime = 0f;
         private bool wasTimerActiveBeforeAd = false;
         private List<int> p_pickedArrowIds = new List<int>();
         private Coroutine m_PeriodicSaveCoroutine;
@@ -662,7 +664,14 @@ namespace Assets.Scripts.Core
                     SetHintVisibility(false);
                     StartCoroutine(WinSequence());
                 }
-                SaveCurrentProgress();
+                
+                // OPTIMIZATION: Only save every 10th arrow success to reduce disk I/O hits
+                m_SuccessSaveCounter++;
+                if (m_SuccessSaveCounter >= 10)
+                {
+                    m_SuccessSaveCounter = 0;
+                    SaveCurrentProgress();
+                }
             }
         }
 
@@ -1356,6 +1365,7 @@ namespace Assets.Scripts.Core
             progress.hasProgress = true;
 
             m_LastSavedProgress = progress;
+            m_LastSaveTime = Time.time;
             UserDataManager.Instance.SaveLevelProgress(progress);
             Debug.Log($"[GameManager] Progress saved for level {progress.levelId}. Picked arrows: {progress.pickedArrowIds.Count}, Time={currentTime}/{levelDuration}, Active={isTimerActive}");
         }
@@ -1397,7 +1407,12 @@ namespace Assets.Scripts.Core
                 yield return new WaitForSeconds(5.0f);
                 if (isEntranceFinished && !isWinning && !isTimeUp)
                 {
-                    SaveCurrentProgress();
+                    // OPTIMIZATION: Skip periodic save if a save was recently triggered (e.g. by 10th arrow or life loss)
+                    if (Time.time - m_LastSaveTime >= 4.5f)
+                    {
+                        SaveCurrentProgress();
+                        m_SuccessSaveCounter = 0;
+                    }
                 }
             }
         }
