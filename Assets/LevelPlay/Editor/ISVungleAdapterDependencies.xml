@@ -1,11 +1,11 @@
 <dependencies>
-  <unityversion>5.11.0.0</unityversion>
+  <unityversion>5.12.0.0</unityversion>
   <androidPackages>
-    <androidPackage spec="com.vungle:vungle-ads:7.7.2">
+    <androidPackage spec="com.vungle:vungle-ads:7.7.3">
     </androidPackage>
   </androidPackages>
   <androidPackages>
-    <androidPackage spec="com.unity3d.ads-mediation:vungle-adapter:5.7.0">
+    <androidPackage spec="com.unity3d.ads-mediation:vungle-adapter:5.8.0">
     </androidPackage>
   </androidPackages>
   <iosPods>

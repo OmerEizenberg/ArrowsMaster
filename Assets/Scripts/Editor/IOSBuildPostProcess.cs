@@ -114,11 +114,15 @@ public class IOSBuildPostProcess
             project.SetBuildProperty(targetGuid, "ENABLE_BITCODE", "NO");
             project.SetBuildProperty(targetGuid, "IPHONEOS_DEPLOYMENT_TARGET", "15.0");
             project.SetBuildProperty(targetGuid, "ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES", "YES");
+            project.SetBuildProperty(targetGuid, "ENABLE_USER_SCRIPT_SANDBOXING", "NO");
             project.AddBuildProperty(targetGuid, "OTHER_LDFLAGS", "-ObjC");
             project.AddBuildProperty(targetGuid, "LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks");
         }
 
         EmbedFramework(project, mainTargetGuid, "FBAudienceNetwork", pathToBuiltProject);
+        
+        // --- NEW FIX: Clean up existing signatures that cause builtin-collectSignature to fail ---
+        CleanFBAudienceNetworkSignatures(pathToBuiltProject);
 
         // Add the user's manual shell script fix as a Build Phase
         // Updated to find ALL .bundle folders and remove invalid executable keys (fixes FBAudienceNetwork.bundle error)
@@ -140,6 +144,30 @@ public class IOSBuildPostProcess
         // --- END SURGERY ---
 
         Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully.");
+    }
+
+    private static void CleanFBAudienceNetworkSignatures(string pathToBuiltProject)
+    {
+        try
+        {
+            // Search for FBAudienceNetwork.xcframework
+            string[] xcframeworks = Directory.GetDirectories(pathToBuiltProject, "FBAudienceNetwork.xcframework", SearchOption.AllDirectories);
+            foreach (var xcframework in xcframeworks)
+            {
+                Debug.Log("[IOSBuildPostProcess] Cleaning internal signatures in: " + xcframework);
+                // Find all _CodeSignature folders within the xcframework and delete them
+                string[] codeSignatures = Directory.GetDirectories(xcframework, "_CodeSignature", SearchOption.AllDirectories);
+                foreach (var sig in codeSignatures)
+                {
+                    Debug.Log("[IOSBuildPostProcess]   Deleting signature folder: " + sig);
+                    Directory.Delete(sig, true);
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Failed to clean FBAudienceNetwork signatures: " + e.Message);
+        }
     }
 
     private static void AddSKAdNetworkIds(PlistElementDict rootDict)
@@ -214,16 +242,16 @@ public class IOSBuildPostProcess
 
         string podfileContent = File.ReadAllText(podfilePath);
 
-        // Check for our ultimate fix signature
-        if (podfileContent.Contains("FIX_FB12_S6"))
+        // Check for our ultimate fix signature (Updated to S7 for new fixes)
+        if (podfileContent.Contains("FIX_FB12_S7"))
         {
-            Debug.Log("[IOSBuildPostProcess] Podfile already contains the FB12 fixes.");
+            Debug.Log("[IOSBuildPostProcess] Podfile already contains the latest FB12/S7 fixes.");
             return;
         }
 
         // Refined post_install block that is extremely aggressive
         // Using concatenation to avoid '#' at the start of lines which can confuse some C# compilers
-        string postInstallBlock = "\n# FIX_FB12_S6\n" +
+        string postInstallBlock = "\n# FIX_FB12_S7\n" +
                                   "use_frameworks! :linkage => :static\n" +
                                   "post_install do |installer|\n" +
                                   "  installer.pods_project.targets.each do |target|\n" +
@@ -232,9 +260,16 @@ public class IOSBuildPostProcess
                                   "      config.build_settings['ENABLE_BITCODE'] = 'NO'\n" +
                                   "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'\n" +
                                   "      config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'\n" +
+                                  "      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'\n" +
                                   "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'\n" +
                                   "      config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'\n" +
                                   "      config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'\n" +
+                                  "      \n" +
+                                  "      # FBAudienceNetwork specific fix for builtin-collectSignature error\n" +
+                                  "      if target.name.include? 'FBAudienceNetwork'\n" +
+                                  "        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'\n" +
+                                  "      end\n" +
+                                  "      \n" +
                                   "      flags = '$(inherited) -enable-experimental-feature AccessLevelOnImport -enable-experimental-feature RegionBasedIsolation -Xfrontend -enable-upcoming-feature -Xfrontend RegionBasedIsolation'\n" +
                                   "      config.build_settings['OTHER_SWIFT_FLAGS'] = flags\n" +
                                   "      config.build_settings['CODE_SIGN_ON_COPY'] = 'YES'\n" +
@@ -246,6 +281,7 @@ public class IOSBuildPostProcess
                                   "    aggregate_target.user_project.targets.each do |target|\n" +
                                   "      target.build_configurations.each do |config|\n" +
                                   "        config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'\n" +
+                                  "        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'\n" +
                                   "      end\n" +
                                   "    end\n" +
                                   "  end\n" +
@@ -255,7 +291,7 @@ public class IOSBuildPostProcess
         podfileContent += "\n" + postInstallBlock;
 
         File.WriteAllText(podfilePath, podfileContent);
-        Debug.Log("[IOSBuildPostProcess] Podfile updated with aggressive Firebase 12 compatibility fixes.");
+        Debug.Log("[IOSBuildPostProcess] Podfile updated with aggressive FBAudienceNetwork signature fixes.");
         
         RunPodInstall(pathToBuiltProject);
     }
