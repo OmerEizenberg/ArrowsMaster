@@ -117,7 +117,7 @@ namespace Assets.Scripts.Core
             List<ArrowController> result = new List<ArrowController>();
             foreach (var arrow in allArrows)
             {
-                if (arrow != null && arrow.CanMoveForward())
+                if (arrow != null && !arrow.IsMoving && arrow.CanMoveForward())
                 {
                     result.Add(arrow);
                     if (result.Count >= count) break;

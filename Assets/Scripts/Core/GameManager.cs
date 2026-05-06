@@ -286,7 +286,7 @@ namespace Assets.Scripts.Core
 
             foreach (var arrow in arrows)
             {
-                if (arrow != null && arrow.gameObject.activeInHierarchy && arrow.CanMoveForward())
+                if (arrow != null && arrow.gameObject.activeInHierarchy && !arrow.IsMoving && arrow.CanMoveForward())
                 {
                     bestArrow = arrow;
                     break;

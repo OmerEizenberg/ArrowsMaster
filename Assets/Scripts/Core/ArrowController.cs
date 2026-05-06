@@ -25,6 +25,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private float segmentScale = 1.0f; 
 
         private bool isMoving = false;
+        public bool IsMoving => isMoving;
         private Coroutine moveCoroutine;
         
         public int ArrowId { get; private set; }
