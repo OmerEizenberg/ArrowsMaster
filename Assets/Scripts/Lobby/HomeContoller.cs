@@ -467,6 +467,8 @@ namespace Assets.Scripts.Lobby
 
         public void RefreshLobbyUI()
         {
+            if (m_LobbyUI != null && !m_LobbyUI.activeInHierarchy) return;
+
             // Ensure GameUI is hidden when refreshing lobby (returning to lobby)
             if (m_GameUI != null) m_GameUI.SetActive(false);
             else if (GameManager.Instance != null && GameManager.Instance.m_GameUI != null)
@@ -894,10 +896,13 @@ namespace Assets.Scripts.Lobby
             if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
             
             if (m_ShopLayer != null) m_ShopLayer.SetActive(true);
-            SlideTabBackground(m_ShopTab);
-            
-            if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
-            RefreshLobbyUI();
+
+            if (m_LobbyUI != null && m_LobbyUI.activeInHierarchy)
+            {
+                SlideTabBackground(m_ShopTab);
+                if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
+                RefreshLobbyUI();
+            }
         }
 
         public void HideShop()
@@ -906,10 +911,13 @@ namespace Assets.Scripts.Lobby
             m_IsSwiping = false;
             
             if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
-            SlideTabBackground(m_HomeTab);
-            
-            if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
-            RefreshLobbyUI();
+
+            if (m_LobbyUI != null && m_LobbyUI.activeInHierarchy)
+            {
+                SlideTabBackground(m_HomeTab);
+                if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
+                RefreshLobbyUI();
+            }
         }
 
         public void OnBuyProductButtonClicked(string productId)

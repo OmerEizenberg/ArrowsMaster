@@ -510,7 +510,7 @@ public class GameUIContoleer : MonoBehaviour
     {
         if (AdsManager.Instance != null && GameManager.Instance != null && GameManager.Instance.PickedArrowsCount > 0)
         {
-            AdsManager.Instance.ShowInterstitial(true);
+           //TEMPNOINTERSTITIAL AdsManager.Instance.ShowInterstitial(true);
         }
         
         UserDataManager.Instance.ClearLevelProgress();
