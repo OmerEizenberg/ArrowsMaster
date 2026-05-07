@@ -31,6 +31,7 @@ namespace Assets.Scripts.Core
         public int ArrowId { get; private set; }
         private ArrowData cachedData;
         private bool hasReducedLife = false;
+        public Vector2Int LookDirection => m_LookDirection;
         private Vector2Int m_LookDirection = Vector2Int.up;
         
         private static Material s_SharedLineMaterial;
@@ -234,6 +235,12 @@ namespace Assets.Scripts.Core
             yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, duration));
         }
 
+        public Vector2Int GetHeadGridPosition()
+        {
+            if (segments.Count == 0) return Vector2Int.zero;
+            return segments[segments.Count - 1].GridPosition;
+        }
+
         public Vector3 GetHeadPosition()
         {
             if (segments.Count == 0) return transform.position;
@@ -405,6 +412,10 @@ namespace Assets.Scripts.Core
 
                         if (CameraController.Instance != null && GameManager.Instance != null)
                         {
+                            if (GridManager.Instance.DependencyTree != null)
+                            {
+                                GridManager.Instance.DependencyTree.OnArrowStartedMoving(this);
+                            }
                             var gameManager = GameManager.Instance;
                             bool timeCondition = (Time.time - gameManager.LastArrowSelectionTime) <= GameUIContoleer.StreakTimeThreshold;
                             //bool panCondition = !CameraController.Instance.HasPannedSinceLastReset;
@@ -671,18 +682,23 @@ namespace Assets.Scripts.Core
         {
             if (segments.Count == 0) return false;
             
+            // OPTIMIZATION: Use Dependency Tree for O(1) check
+            if (GridManager.Instance != null && GridManager.Instance.DependencyTree != null)
+            {
+                return GridManager.Instance.DependencyTree.IsArrowFree(this);
+            }
+
+            // Fallback to legacy O(RayLength) check if tree is not built yet
             Segment head = segments[segments.Count - 1];
             Vector2Int currentDir = m_LookDirection;
             Vector2Int checkPos = head.GridPosition + currentDir;
 
-            // PERFORMANCE: Instead of iterating all arrows, check grid occupancy along movement line
-            // This is O(GridSize) instead of O(Arrows * Segments)
             while (!GridManager.Instance.IsOutOfBounds(checkPos))
             {
                 ArrowController occupant = GridManager.Instance.GetOccupant(checkPos);
                 if (occupant != null && occupant != this && !occupant.isMoving)
                 {
-                    return false; // Path is blocked by a static arrow
+                    return false; 
                 }
                 checkPos += currentDir;
             }

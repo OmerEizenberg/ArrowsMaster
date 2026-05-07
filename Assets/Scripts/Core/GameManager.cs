@@ -281,20 +281,15 @@ namespace Assets.Scripts.Core
             // Optimization: Use cached arrow list from GridManager instead of FindObjectsOfType
             if (GridManager.Instance == null) return;
             
-            List<ArrowController> arrows = GridManager.Instance.GetAllArrows();
-            ArrowController bestArrow = null;
+            List<ArrowController> nonBlocked = GridManager.Instance.GetNonBlockedArrows(1);
+            ArrowController bestArrow = (nonBlocked.Count > 0) ? nonBlocked[0] : null;
 
-            foreach (var arrow in arrows)
+            // Fallback to any arrow if none are "clear" (e.g. if the level is actually stuck)
+            if (bestArrow == null)
             {
-                if (arrow != null && arrow.gameObject.activeInHierarchy && !arrow.IsMoving && arrow.CanMoveForward())
-                {
-                    bestArrow = arrow;
-                    break;
-                }
+                List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+                if (allArrows.Count > 0) bestArrow = allArrows[0];
             }
-
-            // Fallback to any arrow if none are "clear"
-            if (bestArrow == null && arrows.Count > 0) bestArrow = arrows[0];
 
             if (bestArrow != null)
             {

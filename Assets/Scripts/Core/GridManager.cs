@@ -12,6 +12,7 @@ namespace Assets.Scripts.Core
         // HashSet for O(1) Contains checks — List kept for ordered iteration
         private HashSet<ArrowController> allArrowsSet = new HashSet<ArrowController>();
         private Vector2Int gridSize;
+        public ArrowDependencyTree DependencyTree { get; private set; }
 
         private void Awake()
         {
@@ -29,6 +30,24 @@ namespace Assets.Scripts.Core
             occupancyMap.Clear();
             allArrows.Clear();
             allArrowsSet.Clear();
+            if (DependencyTree == null) DependencyTree = new ArrowDependencyTree();
+            else DependencyTree.Clear();
+        }
+
+        public System.Collections.IEnumerator RebuildDependencyTreeAsync()
+        {
+            if (DependencyTree != null)
+            {
+                yield return DependencyTree.BuildAsync(allArrows);
+            }
+        }
+
+        public void RebuildDependencyTree()
+        {
+            if (DependencyTree != null)
+            {
+                DependencyTree.Build(allArrows);
+            }
         }
 
         public bool IsOutOfBounds(Vector2Int coord)
@@ -52,6 +71,8 @@ namespace Assets.Scripts.Core
 
         public void UnregisterArrow(ArrowController arrow)
         {
+            if (DependencyTree != null) DependencyTree.OnArrowStartedMoving(arrow);
+
             if (allArrowsSet.Contains(arrow))
             {
                 allArrows.Remove(arrow);
@@ -114,6 +135,14 @@ namespace Assets.Scripts.Core
         }
         public List<ArrowController> GetNonBlockedArrows(int count)
         {
+            if (DependencyTree != null)
+            {
+                List<ArrowController> free = DependencyTree.GetAllFreeArrows();
+                if (free.Count > count) return free.GetRange(0, count);
+                return free;
+            }
+
+            // Fallback
             List<ArrowController> result = new List<ArrowController>();
             foreach (var arrow in allArrows)
             {

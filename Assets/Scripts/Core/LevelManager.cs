@@ -310,6 +310,10 @@ namespace Assets.Scripts.Core
                 }
             }
 
+            // 5. Build Dependency Tree for O(1) performance
+            // We use the Async version to avoid frame spikes on large levels
+            yield return StartCoroutine(GridManager.Instance.RebuildDependencyTreeAsync());
+
             OnEntranceAnimationFinished?.Invoke();
         }
 
