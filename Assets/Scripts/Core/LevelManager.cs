@@ -152,6 +152,16 @@ namespace Assets.Scripts.Core
             // Stop all running coroutines (including win animations) before clearing
             StopAllCoroutines();
             
+            foreach (var arrow in arrows)
+            {
+                if (arrow != null)
+                {
+                    if (ArrowPoolManager.Instance != null) ArrowPoolManager.Instance.ReturnArrow(arrow);
+                    else Destroy(arrow.gameObject);
+                }
+            }
+            arrows.Clear();
+
             foreach (GameObject obj in currentLevelObjects)
             {
                 if (obj != null)
@@ -195,9 +205,17 @@ namespace Assets.Scripts.Core
             {
                 if (pickedArrows != null && pickedArrows.Contains(arrowData.id)) continue;
 
-                ArrowController arrow = Instantiate(arrowPrefab, Vector3.zero, Quaternion.identity);
+                ArrowController arrow;
+                if (ArrowPoolManager.Instance != null)
+                {
+                    arrow = ArrowPoolManager.Instance.GetArrow(Vector3.zero, Quaternion.identity, null);
+                }
+                else
+                {
+                    arrow = Instantiate(arrowPrefab, Vector3.zero, Quaternion.identity);
+                }
+                
                 arrow.PrepareIncrementalInit(arrowData);
-                currentLevelObjects.Add(arrow.gameObject);
                 arrows.Add(arrow);
             }
             

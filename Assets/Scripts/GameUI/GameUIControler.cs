@@ -378,7 +378,7 @@ public class GameUIContoleer : MonoBehaviour
         SetRestartButtonAlpha(0f);
 
         // Wait 3 seconds
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(2f);
 
         // Fade in
         m_RestartButton.SetActive(true);

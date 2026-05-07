@@ -175,9 +175,18 @@ namespace Assets.Scripts.Core
             Vector2Int spawnPos = cachedData.path[0].ToVector2Int();
             Vector3 worldSpawnPos = new Vector3(spawnPos.x * CellSize, spawnPos.y * CellSize, 0);
 
-            GameObject segObj = Instantiate(segmentPrefab.gameObject, worldSpawnPos, Quaternion.identity, transform);
-            segObj.transform.localScale = Vector3.one;
-            Segment newSeg = segObj.GetComponent<Segment>();
+            Segment newSeg;
+            if (ArrowPoolManager.Instance != null)
+            {
+                newSeg = ArrowPoolManager.Instance.GetSegment(worldSpawnPos, Quaternion.identity, transform);
+            }
+            else
+            {
+                GameObject segObj = Instantiate(segmentPrefab.gameObject, worldSpawnPos, Quaternion.identity, transform);
+                newSeg = segObj.GetComponent<Segment>();
+            }
+            
+            newSeg.transform.localScale = Vector3.one;
             newSeg.ParentArrow = this;
             
             segments.Insert(0, newSeg);
@@ -634,7 +643,17 @@ namespace Assets.Scripts.Core
                 if (effect != null) GameManager.Instance.ReturnEffect(effect);
             }
             instantiatedEffects.Clear();
-            Destroy(gameObject, 0.5f);
+            
+            // Clean up segments first
+            while (segments.Count > 0)
+            {
+                if (ArrowPoolManager.Instance != null) ArrowPoolManager.Instance.ReturnSegment(segments[0]);
+                else Destroy(segments[0].gameObject);
+                segments.RemoveAt(0);
+            }
+
+            if (ArrowPoolManager.Instance != null) ArrowPoolManager.Instance.ReturnArrow(this);
+            else Destroy(gameObject, 0.5f);
         }
 
         private void OnDestroy()
