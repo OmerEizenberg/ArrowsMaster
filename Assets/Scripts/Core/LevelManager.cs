@@ -34,6 +34,13 @@ namespace Assets.Scripts.Core
 
         private void Awake()
         {
+            if (ArrowPoolManager.Instance == null)
+            {
+                var pool = gameObject.AddComponent<ArrowPoolManager>();
+                pool.arrowPrefab = arrowPrefab;
+                if (arrowPrefab != null) pool.segmentPrefab = arrowPrefab.segmentPrefab;
+            }
+            
             InitializeLevelCount();
         }
 

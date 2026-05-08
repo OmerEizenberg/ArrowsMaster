@@ -20714,6 +20714,7 @@ GameObject:
   - component: {fileID: 946353437}
   - component: {fileID: 946353436}
   - component: {fileID: 946353439}
+  - component: {fileID: 946353440}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -21062,6 +21063,23 @@ MonoBehaviour:
   m_WinParticles: {fileID: 1054648608}
   m_WinLevelText: {fileID: 1127372420}
   p_lastWinAmount: 0
+--- !u!114 &946353440
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 946353435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f99c4112e9b344bfaf69f807a7325b3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  arrowPrefab: {fileID: 1425679990901610123, guid: da5b46f06c0a545bfb84bdcd8120b716, type: 3}
+  segmentPrefab: {fileID: 1122043530654661600, guid: fceef0829fcfd4f559a5179ba102fed0, type: 3}
+  targetArrowCount: 500
+  targetSegmentCount: 3000
+  arrowsCount: 0
 --- !u!1 &951063264 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8641129717782138220, guid: 18bb6ce18dd8b4215bb89c190a1afafb, type: 3}

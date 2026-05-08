@@ -16,6 +16,7 @@ namespace Assets.Scripts.Core
         public int targetArrowCount = 500;
         public int targetSegmentCount = 3000;
 
+        [SerializeField] private int arrowsCount=0;
         private Queue<ArrowController> arrowPool = new Queue<ArrowController>();
         private Queue<Segment> segmentPool = new Queue<Segment>();
 
@@ -28,7 +29,18 @@ namespace Assets.Scripts.Core
             }
             Instance = this;
             
-            // Pre-warm the pool gradually
+            // If prefabs are already assigned (via LevelManager auto-add), start pre-warming
+            if (arrowPrefab != null && segmentPrefab != null)
+            {
+                StartCoroutine(InitialPreWarmRoutine());
+            }
+        }
+
+        public void Initialize(ArrowController arrow, Segment segment)
+        {
+            arrowPrefab = arrow;
+            segmentPrefab = segment;
+            StopAllCoroutines();
             StartCoroutine(InitialPreWarmRoutine());
         }
 
@@ -58,6 +70,7 @@ namespace Assets.Scripts.Core
             arrow.gameObject.SetActive(false);
             arrow.transform.SetParent(this.transform);
             arrowPool.Enqueue(arrow);
+            arrowsCount = arrowPool.Count;
         }
 
         private void ReplenishSegment()
