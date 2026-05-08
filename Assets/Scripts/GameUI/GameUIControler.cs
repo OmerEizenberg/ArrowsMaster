@@ -107,7 +107,20 @@ public class GameUIContoleer : MonoBehaviour
         }
     }
 
-    private void OnEnabled()
+    private void Update()
+    {
+        #if UNITY_ANDROID
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            if (m_GameUI != null && m_GameUI.activeSelf)
+            {
+                BackToLobby();
+            }
+        }
+        #endif
+    }
+
+    private void OnEnable()
     {
         UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
         UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);

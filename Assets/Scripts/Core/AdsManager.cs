@@ -40,10 +40,38 @@ namespace Assets.Scripts.Core
         public event Action OnLifeRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
-        public bool IsRewardedReady => RewardedAd != null && RewardedAd.IsAdReady();
-        public bool IsMultiplyRewardedReady => multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady();
-        public bool IsCoinsRewardedReady => coinsRewardedAd != null && coinsRewardedAd.IsAdReady();
-        public bool IsInterstitialReady => interstitialAd != null && interstitialAd.IsAdReady();
+        public bool IsRewardedReady 
+        {
+            get 
+            {
+                try { return RewardedAd != null && RewardedAd.IsAdReady(); }
+                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking RewardedAd readiness: {e.Message}"); return false; }
+            }
+        }
+        public bool IsMultiplyRewardedReady 
+        {
+            get 
+            {
+                try { return multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady(); }
+                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking MultiplyRewardedAd readiness: {e.Message}"); return false; }
+            }
+        }
+        public bool IsCoinsRewardedReady 
+        {
+            get 
+            {
+                try { return coinsRewardedAd != null && coinsRewardedAd.IsAdReady(); }
+                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking CoinsRewardedAd readiness: {e.Message}"); return false; }
+            }
+        }
+        public bool IsInterstitialReady 
+        {
+            get 
+            {
+                try { return interstitialAd != null && interstitialAd.IsAdReady(); }
+                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking InterstitialAd readiness: {e.Message}"); return false; }
+            }
+        }
 
         private string AppKey
         {
@@ -351,7 +379,7 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            if (interstitialAd != null && interstitialAd.IsAdReady())
+            if (IsInterstitialReady)
             {
                 Debug.Log("[AdsManager] Showing Interstitial Ad.");
                 OnAdOpened?.Invoke();
@@ -383,7 +411,7 @@ namespace Assets.Scripts.Core
         private async Task RetryLoadInterstitial(int delayMs)
         {
             await Task.Delay(delayMs);
-            if (this != null && !interstitialAd.IsAdReady())
+            if (this != null && !IsInterstitialReady)
             {
                 EnqueueAction(LoadInterstitial);
             }
@@ -501,7 +529,7 @@ namespace Assets.Scripts.Core
         private async Task RetryLoadRewarded(int delayMs)
         {
             await Task.Delay(delayMs);
-            if (this != null && !RewardedAd.IsAdReady())
+            if (this != null && !IsRewardedReady)
             {
                 EnqueueAction(LoadRewarded);
             }
@@ -519,14 +547,14 @@ namespace Assets.Scripts.Core
 
         public void ShowRewarded()
         {
-            if (RewardedAd != null && RewardedAd.IsAdReady())
+            if (IsRewardedReady)
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad (GameReward).");
                 pendingRewardType = RewardAdType.GameReward;
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
-            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Rewarded Ad is not ready. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.GameReward;
@@ -687,7 +715,7 @@ namespace Assets.Scripts.Core
         private async Task RetryLoadCoinsRewarded(int delayMs)
         {
             await Task.Delay(delayMs);
-            if (this != null && coinsRewardedAd != null && !coinsRewardedAd.IsAdReady())
+            if (this != null && !IsCoinsRewardedReady)
             {
                 EnqueueAction(LoadCoinsRewarded);
             }
@@ -705,14 +733,14 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForCoins()
         {
-            if (coinsRewardedAd != null && coinsRewardedAd.IsAdReady())
+            if (IsCoinsRewardedReady)
             {
                 Debug.Log("[AdsManager] Showing Coins Rewarded Ad (CoinsReward).");
                 pendingRewardType = RewardAdType.CoinsReward;
                 OnAdOpened?.Invoke();
                 coinsRewardedAd.ShowAd();
             }
-            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Coins Rewarded Ad is not ready. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.CoinsReward;
@@ -802,7 +830,7 @@ namespace Assets.Scripts.Core
         private async Task RetryLoadMultiplyRewarded(int delayMs)
         {
             await Task.Delay(delayMs);
-            if (this != null && multiplyRewardedAd != null && !multiplyRewardedAd.IsAdReady())
+            if (this != null && !IsMultiplyRewardedReady)
             {
                 EnqueueAction(LoadMultiplyRewarded);
             }
@@ -820,14 +848,14 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForMultiply()
         {
-            if (multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady())
+            if (IsMultiplyRewardedReady)
             {
                 Debug.Log("[AdsManager] Showing Multiply Rewarded Ad (MultiplyReward).");
                 pendingRewardType = RewardAdType.MultiplyReward;
                 OnAdOpened?.Invoke();
                 multiplyRewardedAd.ShowAd();
             }
-            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Multiply Rewarded Ad is not ready. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.MultiplyReward;
@@ -848,14 +876,14 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForHint()
         {
-            if (RewardedAd != null && RewardedAd.IsAdReady())
+            if (IsRewardedReady)
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad for Hint (HintReward).");
                 pendingRewardType = RewardAdType.HintReward;
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
-            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for hint. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.HintReward;
@@ -876,14 +904,14 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForPlayOn()
         {
-            if (RewardedAd != null && RewardedAd.IsAdReady())
+            if (IsRewardedReady)
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad for PlayOn (PlayOnReward).");
                 pendingRewardType = RewardAdType.PlayOnReward;
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
-            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for playon. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.PlayOnReward;
@@ -904,14 +932,14 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForMagic()
         {
-            if (RewardedAd != null && RewardedAd.IsAdReady())
+            if (IsRewardedReady)
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad for Magic (MagicReward).");
                 pendingRewardType = RewardAdType.MagicReward;
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
-            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for magic. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.MagicReward;
@@ -932,14 +960,14 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForLife()
         {
-            if (RewardedAd != null && RewardedAd.IsAdReady())
+            if (IsRewardedReady)
             {
                 Debug.Log("[AdsManager] Showing Rewarded Ad for Life (LifeReward).");
                 pendingRewardType = RewardAdType.LifeReward;
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
-            else if (interstitialAd != null && interstitialAd.IsAdReady())
+            else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for life. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.LifeReward;

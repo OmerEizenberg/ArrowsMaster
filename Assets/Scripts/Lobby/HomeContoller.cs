@@ -108,6 +108,8 @@ namespace Assets.Scripts.Lobby
         private Coroutine m_ShopScaleCoroutine;
         private Coroutine m_TooltipCoroutine;
         private int m_LastToggleFrame = -1;
+        private float m_NextAdCheckTime = 0f;
+        private const float AD_CHECK_INTERVAL = 0.7f;
 
 
         private void Awake()
@@ -252,7 +254,11 @@ namespace Assets.Scripts.Lobby
 
         private void Update()
         {
-            UpdateLobbyAdReadyImage();
+            if (Time.time >= m_NextAdCheckTime)
+            {
+                m_NextAdCheckTime = Time.time + AD_CHECK_INTERVAL;
+                UpdateLobbyAdReadyImage();
+            }
             HandleSwipeNavigation();
         }
 
