@@ -86,6 +86,8 @@ namespace Assets.Scripts.Core
             // Trace the path of the arrow until it hits a boundary
             // Any arrow encountered along this path is a blocker
             Vector2Int currentDir = arrow.LookDirection;
+            if (currentDir == Vector2Int.zero) return;
+
             Vector2Int checkPos = arrow.GetHeadGridPosition() + currentDir;
 
             while (!GridManager.Instance.IsOutOfBounds(checkPos))

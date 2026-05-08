@@ -34,12 +34,15 @@ namespace Assets.Scripts.Core
 
         private void Awake()
         {
-            if (ArrowPoolManager.Instance == null)
+            ArrowPoolManager pool = ArrowPoolManager.Instance;
+            if (pool == null)
             {
-                var pool = gameObject.AddComponent<ArrowPoolManager>();
-                pool.arrowPrefab = arrowPrefab;
-                if (arrowPrefab != null) pool.segmentPrefab = arrowPrefab.segmentPrefab;
+                pool = gameObject.AddComponent<ArrowPoolManager>();
             }
+            
+            // ALWAYS sync prefabs to handle stale singleton instances from previous scenes
+            pool.ArrowPrefab = arrowPrefab;
+            if (arrowPrefab != null) pool.SegmentPrefab = arrowPrefab.segmentPrefab;
             
             InitializeLevelCount();
         }
@@ -74,6 +77,16 @@ namespace Assets.Scripts.Core
             if (m_MaxLevelIndex == -1) InitializeLevelCount();
 
             TextAsset jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
+            
+            // Case-insensitive fallback
+            if (jsonFile == null)
+            {
+                if (levelId.StartsWith("level")) 
+                    jsonFile = Resources.Load<TextAsset>($"Levels/{levelId.Replace("level", "Level")}");
+                else if (levelId.StartsWith("Level"))
+                    jsonFile = Resources.Load<TextAsset>($"Levels/{levelId.Replace("Level", "level")}");
+            }
+
             if (jsonFile == null)
             {
                 int currentIdx = ExtractNumber(levelId);
@@ -123,7 +136,7 @@ namespace Assets.Scripts.Core
             }
             else
             {
-                Debug.LogError($"Level with ID {levelId} not found in Resources (Max Level: {m_MaxLevelIndex}).");
+                Debug.LogError($"jsonFile NOT FOUND for levelId: {levelId}");
             }
         }
 
@@ -156,6 +169,8 @@ namespace Assets.Scripts.Core
 
         public void ClearLevel()
         {
+            if (GameManager.Instance != null) GameManager.Instance.ResetLevelState();
+            
             // Stop all running coroutines (including win animations) before clearing
             StopAllCoroutines();
             
@@ -185,7 +200,14 @@ namespace Assets.Scripts.Core
 
         public void LoadLevel(string json, List<int> pickedArrows = null)
         {
-            LevelData data = JsonUtility.FromJson<LevelData>(json);
+            try
+            {
+                LevelData data = JsonUtility.FromJson<LevelData>(json);
+                if (data == null)
+                {
+                    Debug.LogError("Failed to deserialize LevelData.");
+                    return;
+                }
             // Initialize timer if level has duration
             if (GameManager.Instance != null && data.duration > 0)
             {
@@ -228,7 +250,12 @@ namespace Assets.Scripts.Core
             
           
 
-            StartCoroutine(CoordinatedLevelInitialization(arrows, data));
+                StartCoroutine(CoordinatedLevelInitialization(arrows, data));
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"CRITICAL ERROR during LoadLevel: {e.Message}\n{e.StackTrace}");
+            }
         }
 
         private struct BackgroundCircleInfo
@@ -241,6 +268,7 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator CoordinatedLevelInitialization(List<ArrowController> arrows, LevelData data)
         {
+            Debug.Log($"[DIAGNOSTIC] CoordinatedLevelInitialization started. Arrows: {arrows.Count}");
             // 1. Calculate Bounding Box of all arrows for Camera Focus
             Vector3 levelCenter = Vector3.zero;
             if (data.arrows != null && data.arrows.Count > 0)
@@ -267,7 +295,13 @@ namespace Assets.Scripts.Core
             // 1. Set camera to zoomed in position (half max zoom)
             if (CameraController.Instance != null)
             {
+                Debug.Log("[DIAGNOSTIC] Playing Camera Zoom Animation...");
                 yield return StartCoroutine(CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), levelCenter));
+                Debug.Log("[DIAGNOSTIC] Camera Zoom Animation finished.");
+            }
+            else
+            {
+                Debug.LogError("[DIAGNOSTIC] CameraController.Instance is NULL!");
             }
 
             if (SoundManager.Instance != null)
@@ -288,6 +322,7 @@ namespace Assets.Scripts.Core
                 zoomCoroutine = StartCoroutine(CameraController.Instance.AnimateToDefaultZoom(levelCenter, growthDuration));
             }
 
+            Debug.Log($"[DIAGNOSTIC] Starting Arrow Growth Animation loop. maxPath: {maxPath}");
             for (int i = 0; i < maxPath; i++)
             {
                 foreach (var arrow in arrows)
@@ -299,6 +334,7 @@ namespace Assets.Scripts.Core
 
             // 3. Ensure camera finishing zoom before spawning background circles
             if (zoomCoroutine != null) yield return zoomCoroutine;
+            Debug.Log("[DIAGNOSTIC] Arrow Growth Animation finished.");
 
             // 4. Spawn Background Circles AFTER animation
             m_BackgroundCircleInfos.Clear();
@@ -334,10 +370,12 @@ namespace Assets.Scripts.Core
                     }
                 }
             }
+            Debug.Log($"[DIAGNOSTIC] Spawned {spawnCount} background circles. Rebuilding Dependency Tree...");
 
             // 5. Build Dependency Tree for O(1) performance
             // We use the Async version to avoid frame spikes on large levels
             yield return StartCoroutine(GridManager.Instance.RebuildDependencyTreeAsync());
+            Debug.Log("[DIAGNOSTIC] Dependency Tree rebuilt. Entrance Sequence COMPLETE.");
 
             OnEntranceAnimationFinished?.Invoke();
         }

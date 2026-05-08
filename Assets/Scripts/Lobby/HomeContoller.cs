@@ -42,7 +42,10 @@ namespace Assets.Scripts.Lobby
         [SerializeField] private TextMeshProUGUI m_RewardedAdAmountText;
         [SerializeField] private GameObject m_WatchAdForCoinsButton;
 
-        [Header("Level Streak")]
+        [Header("Manager References")]
+        public GameManager gameManager;
+        
+        [Header("UI Panels")]
         [SerializeField] private GameObject m_LevelStreakIcon;
         [SerializeField] private TextMeshProUGUI m_LevelStreakText;
         [SerializeField] private TextMeshProUGUI m_LevelStreakTextShade;
@@ -465,6 +468,7 @@ namespace Assets.Scripts.Lobby
             RefreshLobbyUI();
         }
 
+
         public void RefreshLobbyUI()
         {
             if (m_LobbyUI != null && !m_LobbyUI.activeInHierarchy) return;
@@ -485,7 +489,7 @@ namespace Assets.Scripts.Lobby
                 int month = m_MonthlyChallengeController.p_CurrentMonth;
                 int day = m_MonthlyChallengeController.p_CurrentDay;
                 int year = m_MonthlyChallengeController.p_CurrentYear;
-                levelId = $"level{month + day + (year % 10)}";
+                levelId = $"Level{month + day + (year % 10)}";
                 folder = "ChallengeLevels";
             }
             else
@@ -523,7 +527,7 @@ namespace Assets.Scripts.Lobby
                     }
                 }
 
-                levelId = $"level{currentLevel}";
+                levelId = $"Level{currentLevel}";
                 folder = "Levels";
             }
 
@@ -536,6 +540,15 @@ namespace Assets.Scripts.Lobby
             else
             {
                 jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId}");
+            
+                // Case-insensitive fallback
+                if (jsonFile == null)
+                {
+                    if (levelId.StartsWith("level")) 
+                        jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId.Replace("level", "Level")}");
+                    else if (levelId.StartsWith("Level"))
+                        jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId.Replace("Level", "level")}");
+                }
             }
             
             if (jsonFile != null)
@@ -972,16 +985,28 @@ namespace Assets.Scripts.Lobby
 
         public void OnPlayButtonClicked()
         {
-            if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
-            
-            string levelName = $"level{UserDataManager.Instance.CurrentLevel}";
-            Debug.Log($"[HomeContoller] Play clicked. Starting Level: {levelName}");
-            
-            SwitchToGameUI();
-            
-            if (GameManager.Instance != null)
+            try
             {
-                GameManager.Instance.StartLevel(levelName);
+                if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+                
+                string levelName = $"Level{UserDataManager.Instance.CurrentLevel}";
+                
+                SwitchToGameUI();
+                
+                GameManager manager = (gameManager != null) ? gameManager : GameManager.Instance;
+                
+                if (manager != null)
+                {
+                    manager.StartLevel(levelName);
+                }
+                else
+                {
+                    Debug.LogError("[HomeContoller] GameManager reference missing! Please link it in the Inspector.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[HomeContoller] Play Button Error: {ex.Message}");
             }
         }
 
@@ -999,14 +1024,19 @@ namespace Assets.Scripts.Lobby
             int day = m_MonthlyChallengeController.p_CurrentDay;
             int year = m_MonthlyChallengeController.p_CurrentYear;
 
-            string levelName = $"level{165-(month + day + (year % 10))}";
+            string levelName = $"Level{165-(month + day + (year % 10))}";
             Debug.Log($"[HomeContoller] Calendar Play clicked. Starting Challenge: {levelName}");
 
             SwitchToGameUI();
 
-            if (GameManager.Instance != null)
+            GameManager manager = (gameManager != null) ? gameManager : GameManager.Instance;
+            if (manager != null)
             {
-                GameManager.Instance.StartChallengeLevel(levelName, year, month, day);
+                manager.StartChallengeLevel(levelName, year, month, day);
+            }
+            else
+            {
+                Debug.LogError("[HomeContoller] GameManager reference missing for Challenge Level!");
             }
         }
 

@@ -92,8 +92,11 @@ namespace Assets.Scripts.Core
             ArrowId = data.id;
             
             // Setup LineRenderer
-            lineRenderer = GetComponent<LineRenderer>();
-            if (lineRenderer == null) lineRenderer = gameObject.AddComponent<LineRenderer>();
+            if (lineRenderer == null)
+            {
+                lineRenderer = GetComponent<LineRenderer>();
+                if (lineRenderer == null) lineRenderer = gameObject.AddComponent<LineRenderer>();
+            }
             
             // arrowWidth of 0 (or absent from JSON) means use the default width.
             float lineWidth = (data.arrowWidth > 0f) ? data.arrowWidth : 0.2f;
@@ -125,17 +128,32 @@ namespace Assets.Scripts.Core
             SetArrowColor(m_OriginalColor);
 
             // Setup Preview LineRenderer
-            GameObject previewObj = new GameObject("PreviewLine");
-            previewObj.transform.SetParent(this.transform);
-            previewLineRenderer = previewObj.AddComponent<LineRenderer>();
-            previewLineRenderer.startWidth = 0.1f;
-            previewLineRenderer.endWidth = 0.1f;
-            previewLineRenderer.material = s_SharedLineMaterial; // Share here too
-            previewLineRenderer.startColor = new Color(0.5f, 0.5f, 0.5f, 0.5f); // Grey Transparent
-            previewLineRenderer.endColor = new Color(0.5f, 0.5f, 0.5f, 0.2f); // Fading
-            previewLineRenderer.useWorldSpace = true;
+            if (previewLineRenderer == null)
+            {
+                Transform existingPreview = transform.Find("PreviewLine");
+                GameObject previewObj;
+                if (existingPreview != null)
+                {
+                    previewObj = existingPreview.gameObject;
+                    previewLineRenderer = previewObj.GetComponent<LineRenderer>();
+                }
+                else
+                {
+                    previewObj = new GameObject("PreviewLine");
+                    previewObj.transform.SetParent(this.transform);
+                    previewLineRenderer = previewObj.AddComponent<LineRenderer>();
+                }
+                
+                previewLineRenderer.startWidth = 0.1f;
+                previewLineRenderer.endWidth = 0.1f;
+                previewLineRenderer.material = s_SharedLineMaterial; // Share here too
+                previewLineRenderer.startColor = new Color(0.5f, 0.5f, 0.5f, 0.5f); // Grey Transparent
+                previewLineRenderer.endColor = new Color(0.5f, 0.5f, 0.5f, 0.2f); // Fading
+                previewLineRenderer.useWorldSpace = true;
+                previewLineRenderer.sortingOrder = -1; // Behind head
+            }
             previewLineRenderer.positionCount = 0;
-            previewLineRenderer.sortingOrder = -1; // Behind head
+            previewLineRenderer.gameObject.SetActive(false);
 
             segments.Clear();
 

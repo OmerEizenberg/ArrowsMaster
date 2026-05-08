@@ -11,6 +11,7 @@ public class GameUIContoleer : MonoBehaviour
     public enum BoosterType { Magic, Hint, Refill }
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
+    public GameManager gameManager;
     public Transform GameUIParent => m_GameUI != null ? m_GameUI.transform : transform;
     [SerializeField] private GameObject m_HeartsContainer; // For organization
     [SerializeField] private GameObject m_BoostersPanel;

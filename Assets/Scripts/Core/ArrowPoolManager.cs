@@ -16,6 +16,9 @@ namespace Assets.Scripts.Core
         public int targetArrowCount = 500;
         public int targetSegmentCount = 3000;
 
+        public ArrowController ArrowPrefab { get => arrowPrefab; set { arrowPrefab = value; CheckPreWarm(); } }
+        public Segment SegmentPrefab { get => segmentPrefab; set { segmentPrefab = value; CheckPreWarm(); } }
+
         [SerializeField] private int arrowsCount=0;
         private Queue<ArrowController> arrowPool = new Queue<ArrowController>();
         private Queue<Segment> segmentPool = new Queue<Segment>();
@@ -24,14 +27,19 @@ namespace Assets.Scripts.Core
         {
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
                 return;
             }
             Instance = this;
             
-            // If prefabs are already assigned (via LevelManager auto-add), start pre-warming
-            if (arrowPrefab != null && segmentPrefab != null)
+            CheckPreWarm();
+        }
+
+        private void CheckPreWarm()
+        {
+            if (arrowPrefab != null && segmentPrefab != null && arrowPool.Count == 0)
             {
+                StopAllCoroutines();
                 StartCoroutine(InitialPreWarmRoutine());
             }
         }
@@ -66,6 +74,8 @@ namespace Assets.Scripts.Core
 
         private void ReplenishArrow()
         {
+            if (arrowPrefab == null) return;
+            Debug.Log("[DIAGNOSTIC] ArrowPoolManager.ReplenishArrow: Instantiating new arrow.");
             ArrowController arrow = Instantiate(arrowPrefab);
             arrow.gameObject.SetActive(false);
             arrow.transform.SetParent(this.transform);
@@ -75,6 +85,7 @@ namespace Assets.Scripts.Core
 
         private void ReplenishSegment()
         {
+            if (segmentPrefab == null) return;
             Segment seg = Instantiate(segmentPrefab);
             seg.gameObject.SetActive(false);
             seg.transform.SetParent(this.transform);
@@ -87,6 +98,7 @@ namespace Assets.Scripts.Core
             if (arrowPool.Count > 0)
             {
                 arrow = arrowPool.Dequeue();
+                Debug.Log($"[DIAGNOSTIC] GetArrow: Dequeued from pool. Pool size remaining: {arrowPool.Count}");
                 arrow.transform.SetParent(parent);
                 arrow.transform.position = position;
                 arrow.transform.rotation = rotation;
@@ -94,6 +106,11 @@ namespace Assets.Scripts.Core
             }
             else
             {
+                if (arrowPrefab == null)
+                {
+                    Debug.LogError("[ArrowPoolManager] Cannot GetArrow: arrowPrefab is NULL!");
+                    return null;
+                }
                 arrow = Instantiate(arrowPrefab, position, rotation, parent);
             }
             return arrow;
@@ -124,6 +141,11 @@ namespace Assets.Scripts.Core
             }
             else
             {
+                if (segmentPrefab == null)
+                {
+                    Debug.LogError("[ArrowPoolManager] Cannot GetSegment: segmentPrefab is NULL!");
+                    return null;
+                }
                 seg = Instantiate(segmentPrefab, position, rotation, parent);
             }
             return seg;

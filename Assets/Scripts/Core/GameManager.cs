@@ -9,7 +9,19 @@ namespace Assets.Scripts.Core
 {
     public class GameManager : MonoBehaviour
     {
-        public static GameManager Instance { get; private set; }
+        private static GameManager _instance;
+        public static GameManager Instance 
+        { 
+            get 
+            {
+                if (_instance == null)
+                {
+                    _instance = FindObjectOfType<GameManager>();
+                }
+                return _instance;
+            }
+            private set => _instance = value;
+        }
 
         [Header("References")]
         public LevelManager levelManager;
@@ -123,9 +135,9 @@ namespace Assets.Scripts.Core
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (_instance != null && _instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this); // Destroy the component, not the gameObject
                 return;
             }
             Instance = this;
@@ -135,6 +147,7 @@ namespace Assets.Scripts.Core
 
             InitializeScreenPositions();
         }
+
 
         private void InitializeScreenPositions()
         {
@@ -208,6 +221,11 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
+            if (_instance == this)
+            {
+                _instance = null;
+            }
+
             if (m_PeriodicSaveCoroutine != null) StopCoroutine(m_PeriodicSaveCoroutine);
             
             if (AdsManager.Instance != null)
@@ -494,38 +512,22 @@ namespace Assets.Scripts.Core
 
         public void StartLevel(string levelId)
         {
+            if (m_LobbyUI != null) m_LobbyUI.SetActive(false);
             g_IsFromGame = true;
-            if (UserDataManager.Instance.LastAttemptLevelId != levelId || UserDataManager.Instance.CurrentLevelAttempts == 0)
-            {
-                UserDataManager.Instance.ResetCurrentLevelAttempts(levelId);
-            }
-
+            
+            ResetLevelState();
+            
             ResetLives();
             HideScreens();
-            if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
             
-            p_isLevelProgression = true;
-            // Reset arrow count before loading new level
-            activeArrowsCount = 0;
-            UpdateArrowsLeftUI(false);
-            collectedLevelCurrency = 0; // Reset currency for new level attempt
-            
-            // Reset timer state
-            isTimerActive = false;
-            isTimeUp = false;
-            currentTime = 0f;
-            lastDisplayedSecond = -1;
-            levelDuration = 0f;
-            playOnPurchaseCount = 0;
-            m_LastSavedProgress = null;
-            m_SavedStreakBeforeGameOver = 0;
+            m_GameUI.SetGameUIVisible(true);
+            UpdateUIVisibility();
 
             if (levelManager != null)
             {
                 p_pickedArrowIds.Clear();
                 levelManager.LoadLevelFromResources(levelId);
             }
-
             // --- Analytics: level_start ---
             int attemptCount = PlayerPrefs.GetInt("AttemptCount_" + levelId, 0) + 1;
             PlayerPrefs.SetInt("AttemptCount_" + levelId, attemptCount);
@@ -554,9 +556,6 @@ namespace Assets.Scripts.Core
             if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
-
-            m_GameUI.SetGameUIVisible(true);
-            UpdateUIVisibility();
 
             if (m_PeriodicSaveCoroutine != null) StopCoroutine(m_PeriodicSaveCoroutine);
             m_PeriodicSaveCoroutine = StartCoroutine(PeriodicSaveCoroutine());
@@ -589,6 +588,9 @@ namespace Assets.Scripts.Core
             m_LastSavedProgress = null;
             m_SavedStreakBeforeGameOver = 0;
 
+            m_GameUI.SetGameUIVisible(true);
+            UpdateUIVisibility();
+
             if (levelManager != null)
             {
                 p_pickedArrowIds.Clear();
@@ -612,14 +614,8 @@ namespace Assets.Scripts.Core
             // Reset UI for level currency
             OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
 
-            isEntranceFinished = false;
-            isWinning = false;
             ResetHintTimer();
             ResetSelectionStates();
-
-            m_GameUI.SetGameUIVisible(true);
-            if (m_FunFact != null) m_FunFact.SetActive(false);
-            UpdateUIVisibility();
 
             if (m_PeriodicSaveCoroutine != null) StopCoroutine(m_PeriodicSaveCoroutine);
             m_PeriodicSaveCoroutine = StartCoroutine(PeriodicSaveCoroutine());
@@ -630,6 +626,16 @@ namespace Assets.Scripts.Core
             CurrentLives = maxLives;
             OnLivesChanged?.Invoke(CurrentLives);
             SaveCurrentProgress(); // Save restored lives to level state
+        }
+
+        public void ResetLevelState()
+        {
+            activeArrowsCount = 0;
+            p_StreakCount = 0;
+            collectedLevelCurrency = 0;
+            isWinning = false;
+            isEntranceFinished = false;
+            UpdateArrowsLeftUI(false);
         }
 
         public void RegisterArrow()
@@ -650,7 +656,6 @@ namespace Assets.Scripts.Core
                     coinsEarned = 2;
                 }
                 collectedLevelCurrency += coinsEarned;
-                Debug.Log($"[GameManager] Arrow Success! Streak: {p_StreakCount}, Earned: {coinsEarned}, Total Collected: {collectedLevelCurrency}");
                 
                 // Notify UI
                 OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency, clickPosition);
@@ -769,13 +774,11 @@ namespace Assets.Scripts.Core
             if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
             ClearActiveVoices();
-            Debug.Log("Level Complete! Waiting for win screen...");
             
             // Award Collected Currency
             if (collectedLevelCurrency > 0)
             {
                 UserDataManager.Instance.AddArrowsCurrency(collectedLevelCurrency);
-                Debug.Log($"[GameManager] Level Won! Awarded {collectedLevelCurrency} ArrowsCurrency.");
             }
 
             if(p_isLevelProgression)
@@ -1324,6 +1327,8 @@ namespace Assets.Scripts.Core
 
             if (levelManager != null)
             {
+                m_GameUI.SetGameUIVisible(true);
+                UpdateUIVisibility();
                 if (progress.isChallenge)
                 {
                     levelManager.LoadChallengeLevelFromResources(progress.levelId, p_pickedArrowIds);
