@@ -119,56 +119,33 @@ public class IOSBuildPostProcess
             project.AddBuildProperty(targetGuid, "LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks");
         }
 
-        EmbedFramework(project, mainTargetGuid, "FBAudienceNetwork", pathToBuiltProject);
-        
-        // --- NEW FIX: Clean up existing signatures that cause builtin-collectSignature to fail ---
-        CleanFBAudienceNetworkSignatures(pathToBuiltProject);
+        // --- NEW FIX: Removed manual embedding of FBAudienceNetwork ---
+        // Apple does not permit static libraries in the Frameworks folder. 
+        // Since we use 'use_frameworks! :linkage => :static' in the Podfile, 
+        // CocoaPods will link FBAudienceNetwork correctly into the main binary.
+        // Embedding it manually was causing the "binary file is not permitted" validation error.
 
-        // Add the user's manual shell script fix as a Build Phase
-        // Updated to find ALL .bundle folders and remove invalid executable keys (fixes FBAudienceNetwork.bundle error)
-        string scriptBody = "find \"${TARGET_BUILD_DIR}\" -name \"*.bundle\" -type d | while read -r BUNDLE; do\n" +
-                            "    PLIST=\"$BUNDLE/Info.plist\"\n" +
-                            "    if [ -f \"$PLIST\" ]; then\n" +
-                            "        echo \"Checking bundle: $BUNDLE\"\n" +
-                            "        /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" || true\n" +
-                            "        /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" || true\n" +
+        // Add a selective Build Phase to fix invalid executable keys in Resource Bundles only.
+        // This targets only 'BNDL' types to avoid breaking actual frameworks.
+        string scriptBody = "# Search for ALL Info.plist files inside the built app\n" +
+                            "find \"${TARGET_BUILD_DIR}\" -name \"Info.plist\" | while read -r PLIST; do\n" +
+                            "    # Check if it is a Resource Bundle (BNDL)\n" +
+                            "    PACKAGE_TYPE=$(/usr/libexec/PlistBuddy -c \"Print :CFBundlePackageType\" \"$PLIST\" 2>/dev/null)\n" +
+                            "    if [[ \"$PACKAGE_TYPE\" == \"BNDL\" || \"$PLIST\" == *\"PrivacyInfo.bundle\"* || \"$PLIST\" == *\"Resources.bundle\"* ]]; then\n" +
+                            "        if /usr/libexec/PlistBuddy -c \"Print :CFBundleExecutable\" \"$PLIST\" > /dev/null 2>&1; then\n" +
+                            "            echo \"Fixing invalid executable key in Resource Bundle: $PLIST\"\n" +
+                            "            /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" || true\n" +
+                            "            /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" || true\n" +
+                            "        fi\n" +
                             "    fi\n" +
                             "done";
-        project.AddShellScriptBuildPhase(mainTargetGuid, "Fix ALL Resource Bundles", "/bin/sh", scriptBody);
+        project.AddShellScriptBuildPhase(mainTargetGuid, "Fix Resource Bundles", "/bin/sh", scriptBody);
 
         project.WriteToFile(projectPath);
-        
-        // --- START SURGERY ---
-        // Since the Unity API for "Embed & Sign" is failing, we manually patch the pbxproj file.
-        FixCodeSigningInPbxproj(projectPath);
-        // --- END SURGERY ---
 
         Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully.");
     }
 
-    private static void CleanFBAudienceNetworkSignatures(string pathToBuiltProject)
-    {
-        try
-        {
-            // Search for FBAudienceNetwork.xcframework
-            string[] xcframeworks = Directory.GetDirectories(pathToBuiltProject, "FBAudienceNetwork.xcframework", SearchOption.AllDirectories);
-            foreach (var xcframework in xcframeworks)
-            {
-                Debug.Log("[IOSBuildPostProcess] Cleaning internal signatures in: " + xcframework);
-                // Find all _CodeSignature folders within the xcframework and delete them
-                string[] codeSignatures = Directory.GetDirectories(xcframework, "_CodeSignature", SearchOption.AllDirectories);
-                foreach (var sig in codeSignatures)
-                {
-                    Debug.Log("[IOSBuildPostProcess]   Deleting signature folder: " + sig);
-                    Directory.Delete(sig, true);
-                }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning("[IOSBuildPostProcess] Failed to clean FBAudienceNetwork signatures: " + e.Message);
-        }
-    }
 
     private static void AddSKAdNetworkIds(PlistElementDict rootDict)
     {
@@ -424,118 +401,6 @@ public class IOSBuildPostProcess
         }
     }
 
-    private static void EmbedFramework(PBXProject project, string mainTargetGuid, string frameworkName, string pathToBuiltProject)
-    {
-        // Start with a recursive search for the framework/xcframework
-        string foundPath = null;
-        try
-        {
-            // Debug: Log what folders exist in Pods to help us find the right name/path
-            string podsPath = Path.Combine(pathToBuiltProject, "Pods");
-            if (Directory.Exists(podsPath))
-            {
-                string[] allDirs = Directory.GetDirectories(podsPath, "*", SearchOption.AllDirectories);
-                Debug.Log("[IOSBuildPostProcess] Found " + allDirs.Length + " directories in Pods.");
-                foreach (var d in allDirs)
-                {
-                    if (d.ToLower().Contains("audience")) Debug.Log("[IOSBuildPostProcess]   Checking Pod Dir: " + d);
-                }
-            }
-            else
-            {
-                Debug.LogWarning("[IOSBuildPostProcess] Pods directory does NOT exist yet at: " + podsPath);
-            }
-
-            string[] dirs = Directory.GetDirectories(pathToBuiltProject, frameworkName + ".*", SearchOption.AllDirectories);
-            foreach (var dir in dirs)
-            {
-                if (dir.EndsWith(".framework") || dir.EndsWith(".xcframework"))
-                {
-                    foundPath = dir.Replace(pathToBuiltProject, "").TrimStart(Path.DirectorySeparatorChar, '/');
-                    break;
-                }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning("[IOSBuildPostProcess] Error searching for " + frameworkName + ": " + e.Message);
-        }
-
-        if (string.IsNullOrEmpty(foundPath))
-        {
-            // Fallback to common locations if search failed
-            string[] possiblePaths = {
-                "Pods/" + frameworkName + "/" + frameworkName + ".xcframework",
-                "Pods/FBAudienceNetwork/" + frameworkName + ".xcframework",
-                "Frameworks/" + frameworkName + ".framework"
-            };
-            foreach (var path in possiblePaths)
-            {
-                if (Directory.Exists(Path.Combine(pathToBuiltProject, path)))
-                {
-                    foundPath = path;
-                    break;
-                }
-            }
-        }
-
-        if (!string.IsNullOrEmpty(foundPath))
-        {
-            Debug.Log("[IOSBuildPostProcess] Found " + frameworkName + " on disk at: " + foundPath);
-            
-            // 2. Try to find the GUID in the project. If not found, add it.
-            string fileGuid = project.FindFileGuidByProjectPath(foundPath);
-            if (string.IsNullOrEmpty(fileGuid))
-            {
-                Debug.Log("[IOSBuildPostProcess] Adding " + frameworkName + " reference to Xcode project.");
-                fileGuid = project.AddFile(foundPath, foundPath, PBXSourceTree.Source);
-            }
-
-            // 3. Embed it with "Embed & Sign"
-            if (!string.IsNullOrEmpty(fileGuid))
-            {
-                Debug.Log("[IOSBuildPostProcess] Embedding FBAudienceNetwork (GUID: " + fileGuid + ")");
-                project.AddFileToEmbedFrameworks(mainTargetGuid, fileGuid);
-                // Note: Code signing is now handled via the Podfile post_install block to avoid API compatibility issues.
-            }
-        }
-        else
-        {
-            Debug.LogError("[IOSBuildPostProcess] CRITICAL: Could not find " + frameworkName + " on disk in the exported project!");
-        }
-    }
-
-    private static void FixCodeSigningInPbxproj(string projectPath)
-    {
-        string pbxprojText = File.ReadAllText(projectPath);
-        // More robust search for FBAudienceNetwork in any build file block
-        string searchLabel = "FBAudienceNetwork.xcframework";
-        
-        if (pbxprojText.Contains(searchLabel))
-        {
-            Debug.Log("[IOSBuildPostProcess] Manually patching pbxproj for FBAudienceNetwork signing...");
-            // Regex to find the PBXBuildFile entry for FBAudienceNetwork and inject settings = {ATTRIBUTES = (CodeSignOnCopy, ); }
-            // We look for any instance that ends in }; and doesn't already have attributes.
-            string pattern = "(/\\* " + searchLabel + ".* \\*/ = {isa = PBXBuildFile; fileRef = [A-Z0-9]+; )};";
-            string replacement = "$1settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };";
-            pbxprojText = Regex.Replace(pbxprojText, pattern, replacement);
-            
-            File.WriteAllText(projectPath, pbxprojText);
-        }
-        else
-        {
-            Debug.LogWarning("[IOSBuildPostProcess] Could not find FBAudienceNetwork entry in pbxproj for manual signing patch. Checking for .framework variant...");
-            // Try again with .framework just in case
-            searchLabel = "FBAudienceNetwork.framework";
-            if (pbxprojText.Contains(searchLabel))
-            {
-                 string pattern = "(/\\* " + searchLabel + ".* \\*/ = {isa = PBXBuildFile; fileRef = [A-Z0-9]+; )};";
-                 string replacement = "$1settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };";
-                 pbxprojText = Regex.Replace(pbxprojText, pattern, replacement);
-                 File.WriteAllText(projectPath, pbxprojText);
-            }
-        }
-    }
 }
 #endif
 
