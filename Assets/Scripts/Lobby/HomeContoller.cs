@@ -557,9 +557,8 @@ namespace Assets.Scripts.Lobby
                 }
             }
             
-            if (jsonFile != null)
-            {
-                int lastDifit = int.Parse(levelId.Substring(levelId.Length - 1));
+
+                int lastDifit = UserDataManager.Instance.CurrentLevel % 10;
                 
                 if (lastDifit == 4 || lastDifit == 9 || UserDataManager.Instance.CurrentLevel < 7)
                 {
@@ -585,13 +584,6 @@ namespace Assets.Scripts.Lobby
                     Color c = m_NightmareColor; c.a = 1f;
                     m_DifficultyText.color = c;
                 }
-            }
-            else
-            {
-                m_DifficultyText.text = "Level Info Unavailable";
-                Color c = m_EasyColor; c.a = 1f;
-                m_DifficultyText.color = c;
-            }
 
             m_LevelText.color = m_LevelColor;
 
