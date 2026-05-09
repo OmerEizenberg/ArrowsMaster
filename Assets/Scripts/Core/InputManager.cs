@@ -54,6 +54,7 @@ namespace Assets.Scripts.Core
                 {
                     Segment closest;
                     highlightedArrow = GetClosestArrow(startTouchPos, out closest);
+                    pendingSegment = closest;
                 }
 
                 if (highlightedArrow != null)

@@ -883,10 +883,14 @@ namespace Assets.Scripts.Core
         private IEnumerator AnimateAllSegments(List<Vector3> targets, float duration)
         {
             int count = segments.Count;
-            if (count == 0 || targets.Count != count) yield break;
+            if (count == 0 || targets == null || targets.Count != count) yield break;
 
             if (_animationStarts.Length < count) _animationStarts = new Vector3[count + 8];
-            for (int i = 0; i < count; i++) _animationStarts[i] = segments[i].CachedTransform.position;
+            for (int i = 0; i < count; i++)
+            {
+                if (i < segments.Count && segments[i] != null)
+                    _animationStarts[i] = segments[i].CachedTransform.position;
+            }
 
             // Slow animations (entrance, ~0.04s): update every frame for smoothness
             // Fast movement: update every 2 frames (barely noticeable, saves CPU)
@@ -900,8 +904,12 @@ namespace Assets.Scripts.Core
                 float t = elapsed / duration;
                 for (int i = 0; i < count; i++)
                 {
-                    if (segments[i] != null)
-                        segments[i].CachedTransform.position = Vector3.Lerp(_animationStarts[i], targets[i], t);
+                    // CRITICAL: Check bounds as segments or targets might change during yield (e.g. DestroySelf)
+                    if (i < segments.Count && i < targets.Count)
+                    {
+                        if (segments[i] != null)
+                            segments[i].CachedTransform.position = Vector3.Lerp(_animationStarts[i], targets[i], t);
+                    }
                 }
                 
                 animationFrameCounter++;
@@ -919,7 +927,10 @@ namespace Assets.Scripts.Core
 
             for (int i = 0; i < count; i++)
             {
-                if (segments[i] != null) segments[i].CachedTransform.position = targets[i];
+                if (i < segments.Count && i < targets.Count)
+                {
+                    if (segments[i] != null) segments[i].CachedTransform.position = targets[i];
+                }
             }
             UpdateVisuals(); // Final sync
         }
@@ -978,6 +989,7 @@ namespace Assets.Scripts.Core
             Vector3 startPos = head.transform.position;
             Vector3 endPos = startPos + new Vector3(currentDir.x, currentDir.y, 0) * 60f * CellSize;
 
+            previewLineRenderer.gameObject.SetActive(true);
             previewLineRenderer.positionCount = 2;
             previewLineRenderer.SetPosition(0, startPos);
             previewLineRenderer.SetPosition(1, endPos);
@@ -988,6 +1000,7 @@ namespace Assets.Scripts.Core
             if (previewLineRenderer != null)
             {
                 previewLineRenderer.positionCount = 0;
+                previewLineRenderer.gameObject.SetActive(false);
             }
         }
 
