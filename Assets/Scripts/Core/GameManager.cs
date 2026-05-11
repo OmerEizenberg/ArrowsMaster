@@ -431,7 +431,6 @@ namespace Assets.Scripts.Core
             if (UserDataManager.Instance.ReduceArrowsCurrency(cost))
             {
                 Debug.Log($"[GameManager] Bought PlayOn for {cost}.");
-                playOnPurchaseCount++;
                 UpdateUserBalanceUI(UserDataManager.Instance.ArrowsCurrency);
                 ExecutePlayOn();
             }
@@ -452,6 +451,7 @@ namespace Assets.Scripts.Core
         private void ExecutePlayOn()
         {
              Debug.Log("[GameManager] PlayOn Executing! Refilling lives or adding time.");
+             playOnPurchaseCount++;
                 
             if (isTimeUp)
             {
@@ -481,6 +481,7 @@ namespace Assets.Scripts.Core
 
             HideFailureScreen();
             ResetHintTimer();
+            SaveCurrentProgress();
         }
 
         public void RestartCurrentLevel()
@@ -633,6 +634,7 @@ namespace Assets.Scripts.Core
             activeArrowsCount = 0;
             p_StreakCount = 0;
             collectedLevelCurrency = 0;
+            playOnPurchaseCount = 0;
             isWinning = false;
             isEntranceFinished = false;
             UpdateArrowsLeftUI(false);
@@ -1317,13 +1319,11 @@ namespace Assets.Scripts.Core
             // Reset arrow count before loading
             activeArrowsCount = 0;
             UpdateArrowsLeftUI(false);
-            collectedLevelCurrency = progress.collectedCoins;
 
             isTimerActive = false;
             isTimeUp = false;
             lastDisplayedSecond = -1;
             levelDuration = 0f; // Will be set by LoadLevel
-            playOnPurchaseCount = 0;
 
             if (levelManager != null)
             {
@@ -1338,6 +1338,10 @@ namespace Assets.Scripts.Core
                     levelManager.LoadLevelFromResources(progress.levelId, p_pickedArrowIds);
                 }
             }
+
+            // Restore state AFTER level loading to avoid it being overwritten by ClearLevel/ResetLevelState
+            collectedLevelCurrency = progress.collectedCoins;
+            playOnPurchaseCount = progress.playOnPurchaseCount;
 
             // Restore time AFTER level loading to avoid it being overwritten by InitializeTimer
             currentTime = progress.remainingTime;
@@ -1398,6 +1402,7 @@ namespace Assets.Scripts.Core
                 else if (m_LastSavedProgress.isTimerActive != isTimerActive) changed = true;
                 else if (m_LastSavedProgress.pickedArrowIds.Count != p_pickedArrowIds.Count) changed = true;
                 else if (m_LastSavedProgress.collectedCoins != collectedLevelCurrency) changed = true;
+                else if (m_LastSavedProgress.playOnPurchaseCount != playOnPurchaseCount) changed = true;
                 else if (isTimerActive && Mathf.Abs(m_LastSavedProgress.remainingTime - currentTime) >= 1.0f) changed = true;
                 else if (!p_isLevelProgression) // Challenge-specific checks
                 {
@@ -1422,6 +1427,7 @@ namespace Assets.Scripts.Core
             progress.challengeMonth = currentChallengeMonth;
             progress.challengeDay = currentChallengeDay;
             progress.collectedCoins = collectedLevelCurrency;
+            progress.playOnPurchaseCount = playOnPurchaseCount;
             progress.hasProgress = true;
 
             m_LastSavedProgress = progress;

@@ -7286,7 +7286,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_LobbyUI: {fileID: 823707117}
   m_GameUI: {fileID: 937078174}
-  gameManager: {fileID: 0}
+  gameManager: {fileID: 946353439}
   m_HeartsContainer: {fileID: 33321434}
   m_BoostersPanel: {fileID: 232951347}
   m_LevelManager: {fileID: 946353436}
