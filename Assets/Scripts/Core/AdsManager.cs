@@ -351,7 +351,13 @@ namespace Assets.Scripts.Core
                 Debug.Log("[AdsManager] Skipping Interstitial Load: User has No Ads."+IAPManager.Instance.HasNoAds);
                 return;
             }
+            if (UserDataManager.Instance != null && !UserDataManager.Instance.IsInterstitialActive)
+            {
+                Debug.Log("[AdsManager] Skipping Interstitial Load: IsInterstitialActive is false (Remote Config).");
+                return;
+            }
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
+
             interstitialAd.LoadAd();
         }
 
@@ -361,6 +367,11 @@ namespace Assets.Scripts.Core
             if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < GameManager.ADS_START_LEVEL)
             {
                 Debug.Log($"[AdsManager] Skipping Interstitial Show: User Level {UserDataManager.Instance.CurrentLevel} < {GameManager.ADS_START_LEVEL}.");
+                return;
+            }
+            if (UserDataManager.Instance != null && !UserDataManager.Instance.IsInterstitialActive)
+            {
+                Debug.Log("[AdsManager] Skipping Interstitial Show: IsInterstitialActive is false (Remote Config).");
                 return;
             }
 

@@ -488,7 +488,8 @@ namespace Assets.Scripts.Core
         {
             if (AdsManager.Instance != null)
             {
-              //TEMPNOINTERSTITIAL   AdsManager.Instance.ShowInterstitial(true);
+                if (UserDataManager.Instance != null && UserDataManager.Instance.IsInterstitialActive) AdsManager.Instance.ShowInterstitial(true);
+
             }
 
             if (p_isLevelProgression && (failureScreen == null || !failureScreen.activeInHierarchy))
@@ -893,7 +894,8 @@ namespace Assets.Scripts.Core
                 // Show ad only if we are past the first entry level to the lobby
                 if(UserDataManager.Instance.CurrentLevel > ADS_START_LEVEL)// && UserDataManager.Instance.CurrentLevel%2 == 0)
                 {
-                    //TEMPNOINTERSTITIAL AdsManager.Instance.ShowInterstitial(true);
+                    if (UserDataManager.Instance != null && UserDataManager.Instance.IsInterstitialActive) AdsManager.Instance.ShowInterstitial(true);
+
                 }
                 AdsManager.Instance.SpawnCoinsSmallExplosion();
             }

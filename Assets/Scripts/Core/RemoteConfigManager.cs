@@ -21,6 +21,8 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_REWARDED_AD_COINS_COOLDOWN = "RewardedAdCoinsCooldown";
     public const string KEY_SHARE_TEXT = "ShareText";
     public const string KEY_SHARE_URL = "ShareUrl";
+    public const string KEY_IS_INTERSTITIAL_ACTIVE = "isInterstitialActive";
+
 
     private bool isConfigReady = false;
     public bool IsConfigReady => isConfigReady;
@@ -65,8 +67,10 @@ public class RemoteConfigManager : MonoBehaviour
             { KEY_COINS_REWARDED_AD, 2000 },
             { KEY_REWARDED_AD_COINS_COOLDOWN, 240 },
             { KEY_SHARE_TEXT, "Check out Arrows Legend! Can you beat my level?" },
-            { KEY_SHARE_URL, "https://play.google.com/store/apps/details?id=com.Arrows.Master" }
+            { KEY_SHARE_URL, "https://play.google.com/store/apps/details?id=com.Arrows.Master" },
+            { KEY_IS_INTERSTITIAL_ACTIVE, true }
         };
+
 
         FirebaseRemoteConfig.DefaultInstance.SetDefaultsAsync(defaults).ContinueWithOnMainThread(task =>
         {
@@ -104,7 +108,11 @@ public class RemoteConfigManager : MonoBehaviour
             if (activateTask.IsCompleted && !activateTask.IsFaulted)
             {
                 Debug.Log($"[RemoteConfigManager] Activate completed. Result: {activateTask.Result}");
+                
+                // Update UserDataManager with the latest value
+                Assets.Scripts.Core.UserDataManager.Instance.IsInterstitialActive = IsInterstitialActive;
             }
+
             else
             {
                 Debug.LogError($"[RemoteConfigManager] Activate failed: {activateTask.Exception}");
@@ -128,6 +136,8 @@ public class RemoteConfigManager : MonoBehaviour
     public string SoftUpdateVersionIOS => GetString(KEY_SOFT_UPDATE_VERSION_IOS);
     public string ShareText => GetString(KEY_SHARE_TEXT);
     public string ShareUrl => GetString(KEY_SHARE_URL);
+    public bool IsInterstitialActive => FirebaseRemoteConfig.DefaultInstance.GetValue(KEY_IS_INTERSTITIAL_ACTIVE).BooleanValue;
+
 
     public long GetLong(string key)
     {
