@@ -22,6 +22,8 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_SHARE_TEXT = "ShareText";
     public const string KEY_SHARE_URL = "ShareUrl";
     public const string KEY_IS_INTERSTITIAL_ACTIVE = "isInterstitialActive";
+    public const string KEY_IS_DYNAMIC_MAX_ZOOM = "isDynamicMaxZoom";
+
 
 
     private bool isConfigReady = false;
@@ -68,8 +70,10 @@ public class RemoteConfigManager : MonoBehaviour
             { KEY_REWARDED_AD_COINS_COOLDOWN, 240 },
             { KEY_SHARE_TEXT, "Check out Arrows Legend! Can you beat my level?" },
             { KEY_SHARE_URL, "https://play.google.com/store/apps/details?id=com.Arrows.Master" },
-            { KEY_IS_INTERSTITIAL_ACTIVE, true }
+            { KEY_IS_INTERSTITIAL_ACTIVE, true },
+            { KEY_IS_DYNAMIC_MAX_ZOOM, true }
         };
+
 
 
         FirebaseRemoteConfig.DefaultInstance.SetDefaultsAsync(defaults).ContinueWithOnMainThread(task =>
@@ -111,7 +115,9 @@ public class RemoteConfigManager : MonoBehaviour
                 
                 // Update UserDataManager with the latest value
                 Assets.Scripts.Core.UserDataManager.Instance.IsInterstitialActive = IsInterstitialActive;
+                Assets.Scripts.Core.UserDataManager.Instance.IsDynamicMaxZoom = IsDynamicMaxZoom;
             }
+
 
             else
             {
@@ -137,6 +143,8 @@ public class RemoteConfigManager : MonoBehaviour
     public string ShareText => GetString(KEY_SHARE_TEXT);
     public string ShareUrl => GetString(KEY_SHARE_URL);
     public bool IsInterstitialActive => FirebaseRemoteConfig.DefaultInstance.GetValue(KEY_IS_INTERSTITIAL_ACTIVE).BooleanValue;
+    public bool IsDynamicMaxZoom => FirebaseRemoteConfig.DefaultInstance.GetValue(KEY_IS_DYNAMIC_MAX_ZOOM).BooleanValue;
+
 
 
     public long GetLong(string key)

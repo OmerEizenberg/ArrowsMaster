@@ -57,6 +57,8 @@ namespace Assets.Scripts.Core
         private const string RefillBoosterKey = "RefillBoosterBalance";
         private const string BoostersInitializedKey = "BoostersInitialized";
         private const string IsInterstitialActiveKey = "IsInterstitialActive";
+        private const string IsDynamicMaxZoomKey = "IsDynamicMaxZoom";
+
 
 
         public int CurrentLevel { get; private set; } = 1;
@@ -72,6 +74,19 @@ namespace Assets.Scripts.Core
                 PlayerPrefs.Save();
             }
         }
+
+        private bool _isDynamicMaxZoom = true;
+        public bool IsDynamicMaxZoom 
+        { 
+            get => _isDynamicMaxZoom; 
+            set 
+            {
+                _isDynamicMaxZoom = value;
+                PlayerPrefs.SetInt(IsDynamicMaxZoomKey, _isDynamicMaxZoom ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
 
 
         private int _currentLevelAttempts = 0;
@@ -180,7 +195,9 @@ namespace Assets.Scripts.Core
             LegendPassClaimedPremiumMask = PlayerPrefs.GetInt(LegendPassClaimedPremiumKey, 0);
             LegendPassStartDate = PlayerPrefs.GetString(LegendPassStartDateKey, string.Empty);
             _isInterstitialActive = PlayerPrefs.GetInt(IsInterstitialActiveKey, 1) == 1;
+            _isDynamicMaxZoom = PlayerPrefs.GetInt(IsDynamicMaxZoomKey, 1) == 1;
         }
+
 
 
         public void IncrementLevel()

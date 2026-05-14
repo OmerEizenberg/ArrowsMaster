@@ -53,6 +53,8 @@ namespace Assets.Scripts.Core
         private Vector3 smoothedVelocity;
         private bool isRollingInertia = false;
         private Vector3 inertiaVelocity;
+        private float zoomReturnVelocity;
+
         
         // Bounds
         private Vector2 minBounds;
@@ -153,12 +155,15 @@ namespace Assets.Scripts.Core
             {
                 if (Time.time - lastInteractionTime >= returnStartDelay)
                 {
-                    float overZoomRange = Mathf.Max(0.1f, absoluteMaxZoom - maxZoom);
-                    float returnSpeed = overZoomRange / zoomReturnDuration;
-                    m_CurrentOrthoSize = Mathf.MoveTowards(m_CurrentOrthoSize, maxZoom, returnSpeed * Time.deltaTime);
+                    m_CurrentOrthoSize = Mathf.SmoothDamp(m_CurrentOrthoSize, maxZoom, ref zoomReturnVelocity, zoomReturnDuration);
                     cam.orthographicSize = m_CurrentOrthoSize;
                 }
             }
+            else
+            {
+                zoomReturnVelocity = 0f;
+            }
+
 
             // Apply current shake offset
             lastShakeOffset = shakeOffset;
@@ -436,9 +441,14 @@ namespace Assets.Scripts.Core
             float startZoom = finalZoom * 0.5f;
 
             // Store zoom limits for gameplay
-            maxZoom         = finalZoom;
-            absoluteMaxZoom = Mathf.Max(25f, fitZoom + initExtraZoomBuffer);
+            if (UserDataManager.Instance.IsDynamicMaxZoom)
+            {
+                maxZoom         = finalZoom;
+                absoluteMaxZoom = Mathf.Max(25f, fitZoom + initExtraZoomBuffer);
+            }
+            
             defaultZoom     = finalZoom;
+
 
             SetBounds(gridSize);
 
