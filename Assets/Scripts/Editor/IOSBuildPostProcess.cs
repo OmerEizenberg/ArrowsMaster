@@ -116,34 +116,40 @@ public class IOSBuildPostProcess
             project.SetBuildProperty(targetGuid, "ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES", "YES");
             project.SetBuildProperty(targetGuid, "ENABLE_USER_SCRIPT_SANDBOXING", "NO");
             project.AddBuildProperty(targetGuid, "OTHER_LDFLAGS", "-ObjC");
-            project.AddBuildProperty(targetGuid, "LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks");
+            project.AddBuildProperty(targetGuid, "LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @loader_path/Frameworks");
         }
 
-        // --- NEW FIX: Removed manual embedding of FBAudienceNetwork ---
-        // Apple does not permit static libraries in the Frameworks folder. 
-        // Since we use 'use_frameworks! :linkage => :static' in the Podfile, 
-        // CocoaPods will link FBAudienceNetwork correctly into the main binary.
-        // Embedding it manually was causing the "binary file is not permitted" validation error.
-
+        // --- NEW FIX: S8 - Proper Static Linkage for FBAudienceNetwork ---
+        // We use static linkage to pass App Store validation (no static binaries in Frameworks).
+        // The crash was caused by dyld trying to load it as a dynamic library when it was missing or misconfigured.
+        
         // Add a selective Build Phase to fix invalid executable keys in Resource Bundles only.
-        // This targets only 'BNDL' types to avoid breaking actual frameworks.
-        string scriptBody = "# Search for ALL Info.plist files inside the built app\n" +
+        // We exclude .framework folders from being turned into BNDL to avoid breaking dynamic frameworks if any exist.
+        // --- NEW FIX: S10 - Robust Validation Fix ---
+        // Specifically targets FBAudienceNetwork and other static frameworks that might 
+        // incorrectly keep their executable key when bundled.
+        string scriptBody = "# Search for Info.plist files inside the app bundle\n" +
                             "find \"${TARGET_BUILD_DIR}\" -name \"Info.plist\" | while read -r PLIST; do\n" +
-                            "    # Check if it is a Resource Bundle (BNDL)\n" +
-                            "    PACKAGE_TYPE=$(/usr/libexec/PlistBuddy -c \"Print :CFBundlePackageType\" \"$PLIST\" 2>/dev/null)\n" +
-                            "    if [[ \"$PACKAGE_TYPE\" == \"BNDL\" || \"$PLIST\" == *\"PrivacyInfo.bundle\"* || \"$PLIST\" == *\"Resources.bundle\"* ]]; then\n" +
-                            "        if /usr/libexec/PlistBuddy -c \"Print :CFBundleExecutable\" \"$PLIST\" > /dev/null 2>&1; then\n" +
-                            "            echo \"Fixing invalid executable key in Resource Bundle: $PLIST\"\n" +
-                            "            /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" || true\n" +
-                            "            /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" || true\n" +
-                            "        fi\n" +
+                            "    # 1. Always fix Resource Bundles (.bundle folders)\n" +
+                            "    if [[ \"$PLIST\" == *.bundle/* ]]; then\n" +
+                            "        echo \"Fixing Resource Bundle: $PLIST\"\n" +
+                            "        /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
+                            "        /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
+                            "    fi\n" +
+                            "    \n" +
+                            "    # 2. Specific fix for FBAudienceNetwork and other known offenders\n" +
+                            "    if [[ \"$PLIST\" == *\"FBAudienceNetwork.framework/Info.plist\" || \"$PLIST\" == *\"FBLPromises\"* ]]; then\n" +
+                            "        echo \"Fixing Static Framework Bundle: $PLIST\"\n" +
+                            "        /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
+                            "        # We also set it to BNDL so Apple treats it as a resource bundle instead of a dynamic library\n" +
+                            "        /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
                             "    fi\n" +
                             "done";
         project.AddShellScriptBuildPhase(mainTargetGuid, "Fix Resource Bundles", "/bin/sh", scriptBody);
 
         project.WriteToFile(projectPath);
 
-        Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully.");
+        Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully (Version S10).");
     }
 
 
@@ -159,30 +165,91 @@ public class IOSBuildPostProcess
             skanItems = rootDict.CreateArray("SKAdNetworkItems");
         }
 
-        // List of essential SKAdNetwork IDs (Singular, ironSource, and common networks)
+        // List of essential SKAdNetwork IDs (Updated May 2026)
         string[] skanIds = new string[] {
-            "v72qych5uu.skadnetwork", // Singular
-            "su67r6k2v3.skadnetwork", // ironSource
-            "4pfyvq9l8r.skadnetwork", // ironSource
+            "mj797d8u6f.skadnetwork",
+            "238da6jt44.skadnetwork",
+            "8s468mfl3y.skadnetwork",
+            "cstr6suwn9.skadnetwork",
+            "9t245vhmpl.skadnetwork",
+            "tl55sbb4fm.skadnetwork",
+            "w9q455wk68.skadnetwork",
+            "97r2b46745.skadnetwork",
+            "e5fvkxwrpn.skadnetwork",
+            "vhf287vqwu.skadnetwork",
+            "mqn7fxpca7.skadnetwork",
+            "v79kvwwj4g.skadnetwork",
+            "5tjdwbrq8w.skadnetwork",
+            "9nlqeag3gk.skadnetwork",
+            "v72qych5uu.skadnetwork",
+            "3qy4746246.skadnetwork",
+            "f7s53z58qe.skadnetwork",
+            "prcb7njmu6.skadnetwork",
+            "lr83yxwka7.skadnetwork",
+            "hs6bdukanm.skadnetwork",
+            "zmvfpc5aq8.skadnetwork",
+            "k674qkevps.skadnetwork",
+            "3sh42y64q3.skadnetwork",
+            "424m5254lk.skadnetwork",
+            "pwa73g5rt2.skadnetwork",
+            "6yxyv74ff7.skadnetwork",
+            "4dzt52r2t5.skadnetwork",
+            "yclnxrl5pm.skadnetwork",
+            "2fnua5tdw4.skadnetwork",
+            "wzmmz9fp6w.skadnetwork",
+            "5f5u5tfb26.skadnetwork",
+            "4w7y6s5ca2.skadnetwork",
+            "44jx6755aq.skadnetwork",
+            "5lm9lj6jb7.skadnetwork",
+            "4pfyvq9l8r.skadnetwork",
+            "f38h382jlk.skadnetwork",
+            "av6w8kgt66.skadnetwork",
+            "f73kdq92p3.skadnetwork",
+            "5a6flpkh64.skadnetwork",
+            "3rd42ekr43.skadnetwork",
+            "g6gcrrvk4p.skadnetwork",
+            "4fzdc2evr5.skadnetwork",
+            "c6k4g5qg8m.skadnetwork",
+            "9rd848q2bz.skadnetwork",
+            "m8dbw4sv7c.skadnetwork",
+            "wg4vff78zm.skadnetwork",
+            "glqzh8vgby.skadnetwork",
+            "2u9pt9hc89.skadnetwork",
+            "7ug5zh24hu.skadnetwork",
+            "n9x2a789qt.skadnetwork",
+            "s39g8k73mm.skadnetwork",
+            "zq492l623r.skadnetwork",
+            "mlmmfzh3r3.skadnetwork",
+            "klf5c3l5u5.skadnetwork",
+            "488r3q3dtq.skadnetwork",
+            "xga6mpmplv.skadnetwork",
+            "77y3x8wds4.skadnetwork",
+            "ppxm28t8ap.skadnetwork",
+            "4468km3ulz.skadnetwork",
+            "32z4fx6l9h.skadnetwork",
+            "a2p9lx4jpn.skadnetwork",
+            "a8cz6cu7e5.skadnetwork",
+            "22mmun2rn5.skadnetwork",
+            "mp6xlyr22a.skadnetwork",
+            "uw77j35x4d.skadnetwork",
+            "5l3tpt7t6e.skadnetwork",
+            "feyaarzu9v.skadnetwork",
+            "t38b2kh725.skadnetwork",
+            "578prtvx9j.skadnetwork",
+            "kbd757ywx3.skadnetwork",
+            "x44k69ngh6.skadnetwork",
+            "k6y4y55b64.skadnetwork",
+            "v9wttpbfk9.skadnetwork",
+            "294l99pt4k.skadnetwork",
+            "ydx93a7ass.skadnetwork",
+            "p78axxw29g.skadnetwork",
+            "su67r6k2v3.skadnetwork", // ironSource (added back as essential)
             "ludvb6z3bs.skadnetwork", // ironSource
             "mlmmfth3ar.skadnetwork", // ironSource
-            "5lm9lj6jb7.skadnetwork", // ironSource
             "9rd848q2sf.skadnetwork", // ironSource
-            "7ug5zh24hu.skadnetwork", // ironSource
-            "hs6bdukanm.skadnetwork", // ironSource
-            "m8dbw4sv7c.skadnetwork", // ironSource
-            "9nlqeag3gk.skadnetwork", // ironSource
             "cj5566h2ga.skadnetwork", // ironSource
             "v9wttpbfk9.skadnetwork", // ironSource
             "n38lu8286q.skadnetwork", // ironSource
-            "cstr6suwn9.skadnetwork", // ironSource/LifeStreet
-            "wzmmz9fp6w.skadnetwork", // InMobi
-            "f38h382jlk.skadnetwork", // Unity Ads
-            "2u9pt9hc89.skadnetwork", // Unity Ads
-            "3rd42ekr43.skadnetwork", // Unity Ads
-            "4468km3ulz.skadnetwork", // Apple Search Ads
-            "4fzdc2evr5.skadnetwork", // AppLovin
-            "t38b2kh725.skadnetwork", // AppLovin
             "7rz5w94nxq.skadnetwork", // AppLovin
             "9t245vhm4d.skadnetwork"  // AppLovin
         };
@@ -219,16 +286,13 @@ public class IOSBuildPostProcess
 
         string podfileContent = File.ReadAllText(podfilePath);
 
-        // Check for our ultimate fix signature (Updated to S7 for new fixes)
-        if (podfileContent.Contains("FIX_FB12_S7"))
-        {
-            Debug.Log("[IOSBuildPostProcess] Podfile already contains the latest FB12/S7 fixes.");
-            return;
-        }
+        // Clean up any previous versions of our fix blocks to avoid conflicts
+        podfileContent = Regex.Replace(podfileContent, @"\n# FIX_FB12_S\d+.*?\nend\n", "", RegexOptions.Singleline);
+        podfileContent = Regex.Replace(podfileContent, @"use_frameworks!.*?\n", "", RegexOptions.Singleline);
 
-        // Refined post_install block that is extremely aggressive
-        // Using concatenation to avoid '#' at the start of lines which can confuse some C# compilers
-        string postInstallBlock = "\n# FIX_FB12_S7\n" +
+        // Refined post_install block using static linkage
+        // This is the most robust way to handle mixed pods in Unity and passes App Store validation.
+        string postInstallBlock = "\n# FIX_FB12_S10\n" +
                                   "use_frameworks! :linkage => :static\n" +
                                   "post_install do |installer|\n" +
                                   "  installer.pods_project.targets.each do |target|\n" +
@@ -242,14 +306,8 @@ public class IOSBuildPostProcess
                                   "      config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'\n" +
                                   "      config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'\n" +
                                   "      \n" +
-                                  "      # FBAudienceNetwork specific fix for builtin-collectSignature error\n" +
-                                  "      if target.name.include? 'FBAudienceNetwork'\n" +
-                                  "        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'\n" +
-                                  "      end\n" +
-                                  "      \n" +
                                   "      flags = '$(inherited) -enable-experimental-feature AccessLevelOnImport -enable-experimental-feature RegionBasedIsolation -Xfrontend -enable-upcoming-feature -Xfrontend RegionBasedIsolation'\n" +
                                   "      config.build_settings['OTHER_SWIFT_FLAGS'] = flags\n" +
-                                  "      config.build_settings['CODE_SIGN_ON_COPY'] = 'YES'\n" +
                                   "    end\n" +
                                   "  end\n" +
                                   "  \n" +
@@ -268,7 +326,7 @@ public class IOSBuildPostProcess
         podfileContent += "\n" + postInstallBlock;
 
         File.WriteAllText(podfilePath, podfileContent);
-        Debug.Log("[IOSBuildPostProcess] Podfile updated with aggressive FBAudienceNetwork signature fixes.");
+        Debug.Log("[IOSBuildPostProcess] Podfile updated with static linkage for all frameworks (S10).");
         
         RunPodInstall(pathToBuiltProject);
     }
