@@ -197,11 +197,22 @@ namespace Assets.Scripts.Core
                     Debug.Log($"[AdsManager] ATT choice made: {authorized}. Continuing SDK Init.");
                 }));
 
-                // Wait for choice slightly to ensure IDFA is ready, but don't block indefinitely online
+                // Wait for choice slightly to ensure IDFA and privacy flags are ready.
+                // On iOS, we wait up to 30s for the user to respond to the ATT popup.
+                // On Android, PollATTStatus returns instantly.
+                float waitTimeout = 30.0f; 
+#if !UNITY_IOS
+                waitTimeout = 1.0f; // Very short wait for other platforms as it's usually instant
+#endif
                 float waitStart = Time.time;
-                while (!attChoiceMade && Time.time - waitStart < 1.0f) // Max 1s wait here if needed, but the init can continue
+                while (!attChoiceMade && Time.time - waitStart < waitTimeout) 
                 {
                     await Task.Yield();
+                }
+                
+                if (!attChoiceMade)
+                {
+                    Debug.LogWarning("[AdsManager] ATT choice not made within timeout. Proceeding with default privacy flags.");
                 }
 
                 string currentAppKey = AppKey;
@@ -263,22 +274,30 @@ namespace Assets.Scripts.Core
             _mainThreadQueue.Enqueue(action);
         }
 
-        private void OnSdkInitSuccess(LevelPlayConfiguration config)
+        private async void OnSdkInitSuccess(LevelPlayConfiguration config)
         {
-            EnqueueAction(() => {
+            // The success callback can fire on a background thread
+            // Enqueue to main thread for safety and to use async/await
+            EnqueueAction(async () => {
                 Debug.Log("[AdsManager] LevelPlay SDK Initialized Successfully.");
                 isInitialized = true;
                 isInitializing = false;
                 sdkInitRetryCount = 0;
                 
+                // Add a small delay after init success to give all adapters/bidders
+                // time to finish their own internal initialization before the first Load request.
+                // This improves fill rate for networks like Meta and Google that take a bit longer.
+                Debug.Log("[AdsManager] Waiting 2s for adapters to stabilize before pre-loading ads...");
+                await Task.Delay(2000);
+
+                if (this == null) return;
+
                 CreateInterstitialAd();
                 CreateRewardedAd();
                 CreateCoinsRewardedAd();
                 CreateMultiplyRewardedAd();
                 CreateSettingsBannerAd();
             });
-
-
         }
 
         private void OnSdkInitFailed(LevelPlayInitError error)

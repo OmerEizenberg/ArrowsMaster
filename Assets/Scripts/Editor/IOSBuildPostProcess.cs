@@ -119,29 +119,23 @@ public class IOSBuildPostProcess
             project.AddBuildProperty(targetGuid, "LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @loader_path/Frameworks");
         }
 
-        // --- NEW FIX: S8 - Proper Static Linkage for FBAudienceNetwork ---
-        // We use static linkage to pass App Store validation (no static binaries in Frameworks).
-        // The crash was caused by dyld trying to load it as a dynamic library when it was missing or misconfigured.
-        
-        // Add a selective Build Phase to fix invalid executable keys in Resource Bundles only.
-        // We exclude .framework folders from being turned into BNDL to avoid breaking dynamic frameworks if any exist.
-        // --- NEW FIX: S10 - Robust Validation Fix ---
-        // Specifically targets FBAudienceNetwork and other static frameworks that might 
-        // incorrectly keep their executable key when bundled.
+        // --- NEW FIX: S11 - Robust Validation & Runtime Fix ---
+        // We only strip executables from REAL resource bundles (.bundle).
+        // We DO NOT touch .framework folders (like FBAudienceNetwork) as they need their executables 
+        // to load correctly at runtime when using dynamic linkage.
         string scriptBody = "# Search for Info.plist files inside the app bundle\n" +
                             "find \"${TARGET_BUILD_DIR}\" -name \"Info.plist\" | while read -r PLIST; do\n" +
-                            "    # 1. Always fix Resource Bundles (.bundle folders)\n" +
+                            "    # 1. Fix Resource Bundles (.bundle folders)\n" +
                             "    if [[ \"$PLIST\" == *.bundle/* ]]; then\n" +
                             "        echo \"Fixing Resource Bundle: $PLIST\"\n" +
                             "        /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
                             "        /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
                             "    fi\n" +
                             "    \n" +
-                            "    # 2. Specific fix for FBAudienceNetwork and other known offenders\n" +
-                            "    if [[ \"$PLIST\" == *\"FBAudienceNetwork.framework/Info.plist\" || \"$PLIST\" == *\"FBLPromises\"* ]]; then\n" +
-                            "        echo \"Fixing Static Framework Bundle: $PLIST\"\n" +
+                            "    # 2. Specific fix for FBLPromises Privacy Bundle (often mispackaged)\n" +
+                            "    if [[ \"$PLIST\" == *\"FBLPromises_Privacy.bundle/Info.plist\" ]]; then\n" +
+                            "        echo \"Fixing FBLPromises Privacy Bundle: $PLIST\"\n" +
                             "        /usr/libexec/PlistBuddy -c \"Delete :CFBundleExecutable\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
-                            "        # We also set it to BNDL so Apple treats it as a resource bundle instead of a dynamic library\n" +
                             "        /usr/libexec/PlistBuddy -c \"Set :CFBundlePackageType BNDL\" \"$PLIST\" > /dev/null 2>&1 || true\n" +
                             "    fi\n" +
                             "done";
@@ -149,7 +143,7 @@ public class IOSBuildPostProcess
 
         project.WriteToFile(projectPath);
 
-        Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully (Version S10).");
+        Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully (Version S11).");
     }
 
 
@@ -290,10 +284,11 @@ public class IOSBuildPostProcess
         podfileContent = Regex.Replace(podfileContent, @"\n# FIX_FB12_S\d+.*?\nend\n", "", RegexOptions.Singleline);
         podfileContent = Regex.Replace(podfileContent, @"use_frameworks!.*?\n", "", RegexOptions.Singleline);
 
-        // Refined post_install block using static linkage
-        // This is the most robust way to handle mixed pods in Unity and passes App Store validation.
-        string postInstallBlock = "\n# FIX_FB12_S10\n" +
-                                  "use_frameworks! :linkage => :static\n" +
+        // Refined post_install block using dynamic linkage
+        // We revert to dynamic linkage to ensure vendored frameworks like FBAudienceNetwork 
+        // are correctly embedded and loaded at runtime.
+        string postInstallBlock = "\n# FIX_FB12_S11\n" +
+                                  "use_frameworks!\n" +
                                   "post_install do |installer|\n" +
                                   "  installer.pods_project.targets.each do |target|\n" +
                                   "    target.build_configurations.each do |config|\n" +
@@ -326,7 +321,7 @@ public class IOSBuildPostProcess
         podfileContent += "\n" + postInstallBlock;
 
         File.WriteAllText(podfilePath, podfileContent);
-        Debug.Log("[IOSBuildPostProcess] Podfile updated with static linkage for all frameworks (S10).");
+        Debug.Log("[IOSBuildPostProcess] Podfile updated with dynamic linkage for all frameworks (S11).");
         
         RunPodInstall(pathToBuiltProject);
     }

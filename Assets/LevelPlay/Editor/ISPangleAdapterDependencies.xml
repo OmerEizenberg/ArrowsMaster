@@ -1,7 +1,7 @@
 <dependencies>
-  <unityversion>5.23.0.0</unityversion>
+  <unityversion>5.24.0.0</unityversion>
   <androidPackages>
-    <androidPackage spec="com.unity3d.ads-mediation:pangle-adapter:5.15.0">
+    <androidPackage spec="com.unity3d.ads-mediation:pangle-adapter:5.16.0">
     </androidPackage>
   </androidPackages>
   <androidPackages>
@@ -12,7 +12,7 @@
     </androidPackage>
   </androidPackages>
   <iosPods>
-    <iosPod name="IronSourcePangleAdapter" version="5.22.0.0">
+    <iosPod name="IronSourcePangleAdapter" version="5.23.0.0">
       <sources>
         <source>https://github.com/CocoaPods/Specs</source>
       </sources>
