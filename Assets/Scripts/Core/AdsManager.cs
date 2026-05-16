@@ -22,7 +22,7 @@ namespace Assets.Scripts.Core
 
         private bool isInitializing = false;
         private int sdkInitRetryCount = 0;
-        private float lastAdShowTime = -30f;
+        private float lastAdShowTime = -60f;
         private const float AD_COOLDOWN = 60f;
 
         // Track which rewarded ad type is currently being shown
