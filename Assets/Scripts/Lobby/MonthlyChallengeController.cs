@@ -88,12 +88,8 @@ public class MonthlyChallengeController : MonoBehaviour
     {
         // 1. Get the first day of the month
         DateTime firstDayOfMonth = new DateTime(year, month, 1);
-        m_challengeMonthTitle.isRightToLeftText = CultureInfo.CurrentCulture.TextInfo.IsRightToLeft;
-        string titleText = firstDayOfMonth.ToString("Y", CultureInfo.CurrentCulture);
-        if (m_challengeMonthTitle.isRightToLeftText)
-        {
-            titleText = ReverseDigits(titleText);
-        }
+        m_challengeMonthTitle.isRightToLeftText = false;
+        string titleText = firstDayOfMonth.ToString("Y", CultureInfo.InvariantCulture);
         m_challengeMonthTitle.text = titleText;
         p_CurrentYear = year;
         p_CurrentMonth = month;

@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 using Singular;
+using Assets.Scripts.Core;
 
 
 public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDeferredDeepLinkHandler
@@ -23,6 +24,14 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string EVENT_AD_IMPRESSION = "ad_impression";
     public const string EVENT_TUTORIAL_BEGIN = "tutorial_begin";
     public const string EVENT_TUTORIAL_COMPLETE = "tutorial_complete";
+    public const string EVENT_SESSION_7 = "session7";
+    public const string EVENT_RET_2 = "Ret_2";
+    public const string EVENT_RET_7 = "Ret_7";
+    public const string EVENT_RET_14 = "Ret_14";
+    public const string EVENT_RET_21 = "Ret_21";
+    public const string EVENT_RET_30 = "Ret_30";
+    public const string EVENT_RET_60 = "Ret_60";
+    public const string EVENT_RET_90 = "Ret_90";
 
     // Parameter Names
     public const string PARAM_LEVEL_ID = "level_id";
@@ -115,6 +124,27 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
                 // --- Singular: Track standard login event on startup ---
                 LogEvent(Events.sngLogin);
                 // --------------------------------------------------------
+
+                // --- Track Session 7 Event (Send Once) ---
+                if (UserDataManager.Instance.SessionCount == 7 && !UserDataManager.Instance.HasSentSession7)
+                {
+                    LogEvent(EVENT_SESSION_7);
+                    UserDataManager.Instance.MarkSession7EventSent();
+                }
+                // -----------------------------------------
+
+                // --- Track Retention Events (Send Once per day) ---
+                int retDay = UserDataManager.Instance.GetRetentionDay();
+                int[] milestoneDays = { 2, 7, 14, 21, 30, 60, 90 };
+                foreach (int day in milestoneDays)
+                {
+                    if (retDay == day && !UserDataManager.Instance.HasSentRetentionEvent(day))
+                    {
+                        LogEvent("Ret_" + day);
+                        UserDataManager.Instance.MarkRetentionEventSent(day);
+                    }
+                }
+                // --------------------------------------------------
 
                 // Request notification permission for Android 13+
                 #if UNITY_ANDROID && !UNITY_EDITOR

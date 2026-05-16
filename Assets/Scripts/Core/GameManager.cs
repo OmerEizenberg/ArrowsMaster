@@ -517,9 +517,10 @@ namespace Assets.Scripts.Core
             if (m_LobbyUI != null) m_LobbyUI.SetActive(false);
             g_IsFromGame = true;
             
+            p_pickedArrowIds.Clear();
+            UserDataManager.Instance.ClearLevelProgress(); 
             ResetLevelState();
             
-            ResetLives();
             HideScreens();
             
             m_GameUI.SetGameUIVisible(true);
@@ -527,9 +528,10 @@ namespace Assets.Scripts.Core
 
             if (levelManager != null)
             {
-                p_pickedArrowIds.Clear();
                 levelManager.LoadLevelFromResources(levelId);
             }
+            
+            ResetLives(); // ResetLives calls SaveCurrentProgress, do it after level is loaded/cleared
             // --- Analytics: level_start ---
             int attemptCount = PlayerPrefs.GetInt("AttemptCount_" + levelId, 0) + 1;
             PlayerPrefs.SetInt("AttemptCount_" + levelId, attemptCount);
@@ -566,7 +568,9 @@ namespace Assets.Scripts.Core
         public void StartChallengeLevel(string levelId, int year, int month, int day)
         {
             g_IsFromGame = true;
-            ResetLives();
+            p_pickedArrowIds.Clear();
+            UserDataManager.Instance.ClearLevelProgress();
+            
             HideScreens();
             if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
             
@@ -595,9 +599,10 @@ namespace Assets.Scripts.Core
 
             if (levelManager != null)
             {
-                p_pickedArrowIds.Clear();
                 levelManager.LoadChallengeLevelFromResources(levelId);
             }
+
+            ResetLives(); // ResetLives calls SaveCurrentProgress, do it after level state is set
 
             // --- Analytics: level_start (Challenge) ---
             int attemptCount = PlayerPrefs.GetInt("AttemptCount_Challenge_" + levelId, 0) + 1;
@@ -774,6 +779,9 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator WinSequence()
         {
+            UserDataManager.Instance.ClearLevelProgress(); // Clear backup immediately on win
+            if (m_PeriodicSaveCoroutine != null) { StopCoroutine(m_PeriodicSaveCoroutine); m_PeriodicSaveCoroutine = null; }
+            
             if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
             ClearActiveVoices();
@@ -807,9 +815,6 @@ namespace Assets.Scripts.Core
             {
                 UserDataManager.Instance.SaveMonthlyChallengeProgress(currentChallengeYear, currentChallengeMonth, currentChallengeDay);
             }
-            
-            UserDataManager.Instance.ClearLevelProgress(); // Clear on win
-            if (m_PeriodicSaveCoroutine != null) { StopCoroutine(m_PeriodicSaveCoroutine); m_PeriodicSaveCoroutine = null; }
 
             // --- Analytics: level_end (Success) ---
             if (FirebaseManager.Instance != null && levelManager != null)
@@ -940,7 +945,7 @@ namespace Assets.Scripts.Core
 
             if (m_PlayOnPriceText != null)
             {
-                m_PlayOnPriceText.text = GetPlayOnCost().ToString("N0");
+                m_PlayOnPriceText.text = "Play on - " + GetPlayOnCost().ToString("N0");
             }
 
             if (m_UserBalanceText != null)
@@ -962,6 +967,7 @@ namespace Assets.Scripts.Core
             if (failureScreen != null)
             {
                 failureScreen.SetActive(true);
+                if (AdsManager.Instance != null) AdsManager.Instance.ShowSettingsBanner();
             }
 
             if (p_isLevelProgression)
@@ -990,6 +996,7 @@ namespace Assets.Scripts.Core
         public void HideScreens()
         {
             if (failureScreen != null) failureScreen.SetActive(false);
+            if (AdsManager.Instance != null) AdsManager.Instance.HideSettingsBanner();
             if (m_WinParticles != null) m_WinParticles.SetActive(false);
             if (m_WinLevelText != null) m_WinLevelText.gameObject.SetActive(false);
             if (m_GameUI != null) m_GameUI.StopFailureFadeCoroutine();
@@ -1001,6 +1008,7 @@ namespace Assets.Scripts.Core
             if (failureScreen != null)
             {
                 failureScreen.SetActive(false);
+                if (AdsManager.Instance != null) AdsManager.Instance.HideSettingsBanner();
             }
             if (m_GameUI != null) m_GameUI.StopFailureFadeCoroutine();
         }
@@ -1135,6 +1143,7 @@ namespace Assets.Scripts.Core
             if (failureScreen != null)
             {
                 failureScreen.SetActive(true);
+                if (AdsManager.Instance != null) AdsManager.Instance.ShowSettingsBanner();
             }
 
             if (p_isLevelProgression)
@@ -1155,7 +1164,7 @@ namespace Assets.Scripts.Core
 
             if (m_PlayOnPriceText != null)
             {
-                m_PlayOnPriceText.text = GetPlayOnCost().ToString("N0");
+                m_PlayOnPriceText.text = "Play on - " + GetPlayOnCost().ToString("N0");
             }
 
             if (m_UserBalanceText != null)
@@ -1168,7 +1177,7 @@ namespace Assets.Scripts.Core
         
         public string GetFailureTitle()
         {
-            return isTimeUp ? "Time's Up!" : "Out of Lives!";
+            return isTimeUp ? "Time's Up!" : "Continue?";
         }
         
         public string GetFailureSubtitle()

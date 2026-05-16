@@ -58,6 +58,8 @@ namespace Assets.Scripts.Core
         private const string BoostersInitializedKey = "BoostersInitialized";
         private const string IsInterstitialActiveKey = "IsInterstitialActive";
         private const string IsDynamicMaxZoomKey = "IsDynamicMaxZoom";
+        private const string SessionCountKey = "TotalSessionCount";
+        private const string HasSentSession7Key = "HasSentSession7Event";
 
 
 
@@ -108,6 +110,8 @@ namespace Assets.Scripts.Core
         public int MagicBoosterCount { get; private set; } = 0;
         public int HintBoosterCount { get; private set; } = 0;
         public int RefillBoosterCount { get; private set; } = 0;
+        public int SessionCount { get; private set; } = 0;
+        public bool HasSentSession7 { get; private set; } = false;
         public event System.Action<int> OnMagicBoosterChanged;
         public event System.Action<int> OnHintBoosterChanged;
         public event System.Action<int> OnRefillBoosterChanged;
@@ -196,6 +200,12 @@ namespace Assets.Scripts.Core
             LegendPassStartDate = PlayerPrefs.GetString(LegendPassStartDateKey, string.Empty);
             _isInterstitialActive = PlayerPrefs.GetInt(IsInterstitialActiveKey, 1) == 1;
             _isDynamicMaxZoom = PlayerPrefs.GetInt(IsDynamicMaxZoomKey, 1) == 1;
+
+            // Increment and save session count
+            SessionCount = PlayerPrefs.GetInt(SessionCountKey, 0) + 1;
+            PlayerPrefs.SetInt(SessionCountKey, SessionCount);
+            HasSentSession7 = PlayerPrefs.GetInt(HasSentSession7Key, 0) == 1;
+            PlayerPrefs.Save();
         }
 
 
@@ -597,5 +607,31 @@ namespace Assets.Scripts.Core
         }
 
         #endregion
+
+        public void MarkSession7EventSent()
+        {
+            HasSentSession7 = true;
+            PlayerPrefs.SetInt(HasSentSession7Key, 1);
+            PlayerPrefs.Save();
+            Debug.Log("[UserDataManager] Marked session7 event as sent.");
+        }
+
+        public int GetRetentionDay()
+        {
+            // Day 1 is the install day
+            return (System.DateTime.Today - InstallDate.Date).Days + 1;
+        }
+
+        public bool HasSentRetentionEvent(int day)
+        {
+            return PlayerPrefs.GetInt("HasSentRet_" + day, 0) == 1;
+        }
+
+        public void MarkRetentionEventSent(int day)
+        {
+            PlayerPrefs.SetInt("HasSentRet_" + day, 1);
+            PlayerPrefs.Save();
+            Debug.Log($"[UserDataManager] Marked Ret_{day} event as sent.");
+        }
     }
 }

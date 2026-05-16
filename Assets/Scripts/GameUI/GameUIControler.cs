@@ -314,6 +314,7 @@ public class GameUIContoleer : MonoBehaviour
     {
         if (m_LevelHeaderText == null || GameManager.Instance == null) return;
 
+        m_LevelHeaderText.isRightToLeftText = false;
         if (GameManager.Instance.p_isLevelProgression)
         {
             m_LevelHeaderText.text = $"Level {UserDataManager.Instance.CurrentLevel}";
@@ -328,7 +329,7 @@ public class GameUIContoleer : MonoBehaviour
             {
                 System.DateTime date = new System.DateTime(year, month, day);
                 string suffix = GetDaySuffix(day);
-                m_LevelHeaderText.text = $"{day}{suffix} {date:MMM}";
+                m_LevelHeaderText.text = $"{day}{suffix} {date.ToString("MMM", System.Globalization.CultureInfo.InvariantCulture)}";
             }
             catch (System.Exception e)
             {

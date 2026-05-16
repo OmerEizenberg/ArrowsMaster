@@ -485,6 +485,7 @@ namespace Assets.Scripts.Lobby
                 GameManager.Instance.m_GameUI.gameObject.SetActive(false);
 
             m_TitleText.text = "Arrows Master";
+            m_LevelText.isRightToLeftText = false;
             
             string levelId;
             string folder;
