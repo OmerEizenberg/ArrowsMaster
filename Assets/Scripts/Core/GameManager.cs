@@ -25,7 +25,7 @@ namespace Assets.Scripts.Core
 
         [Header("References")]
         public LevelManager levelManager;
-        public const int ADS_START_LEVEL = 9;
+        public const int ADS_START_LEVEL = 12;
         public const int HINT_BOOSTER_UNLOCK_LEVEL = 9;
         public const int COINS_START_LEVEL = 5;
         public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;
@@ -488,8 +488,7 @@ namespace Assets.Scripts.Core
         {
             if (AdsManager.Instance != null)
             {
-                if (UserDataManager.Instance != null && UserDataManager.Instance.IsInterstitialActive) AdsManager.Instance.ShowInterstitial(true);
-
+                AdsManager.Instance.ShowInterstitial(true);
             }
 
             if (p_isLevelProgression && (failureScreen == null || !failureScreen.activeInHierarchy))
@@ -895,15 +894,10 @@ namespace Assets.Scripts.Core
                 HideScreens();
                 
                 if (AdsManager.Instance != null)
-            {
-                // Show ad only if we are past the first entry level to the lobby
-                if(UserDataManager.Instance.CurrentLevel > ADS_START_LEVEL)// && UserDataManager.Instance.CurrentLevel%2 == 0)
                 {
-                    if (UserDataManager.Instance != null && UserDataManager.Instance.IsInterstitialActive) AdsManager.Instance.ShowInterstitial(true);
-
+                    AdsManager.Instance.ShowInterstitial(true);
+                    AdsManager.Instance.SpawnCoinsSmallExplosion();
                 }
-                AdsManager.Instance.SpawnCoinsSmallExplosion();
-            }
                 
                 CameraController.Instance.ResetZoom();
                 OnLevelWon?.Invoke();

@@ -380,21 +380,32 @@ namespace Assets.Scripts.Core
             interstitialAd.LoadAd();
         }
 
+        private bool _showNextInterstitial = true;
+
         public void ShowInterstitial(bool isAuto = false)
         {
-            // Allow showing ads from the unlock level
-            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < GameManager.ADS_START_LEVEL)
-            {
-                Debug.Log($"[AdsManager] Skipping Interstitial Show: User Level {UserDataManager.Instance.CurrentLevel} < {GameManager.ADS_START_LEVEL}.");
-                return;
-            }
             if (UserDataManager.Instance != null && !UserDataManager.Instance.IsInterstitialActive)
             {
                 Debug.Log("[AdsManager] Skipping Interstitial Show: IsInterstitialActive is false (Remote Config).");
                 return;
             }
 
+            // 50% Frequency Logic: Inverse the switch on every trigger (only if toggle is on)
+            bool shouldShowThisTime = _showNextInterstitial;
+            _showNextInterstitial = !_showNextInterstitial;
 
+            if (!shouldShowThisTime)
+            {
+                Debug.Log("[AdsManager] Skipping Interstitial due to 50% frequency rule.");
+                return;
+            }
+
+            // Allow showing ads from the unlock level
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < GameManager.ADS_START_LEVEL)
+            {
+                Debug.Log($"[AdsManager] Skipping Interstitial Show: User Level {UserDataManager.Instance.CurrentLevel} < {GameManager.ADS_START_LEVEL}.");
+                return;
+            }
 
             if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
             {
