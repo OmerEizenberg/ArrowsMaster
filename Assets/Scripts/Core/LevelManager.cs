@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Assets.Scripts.Data;
@@ -413,8 +414,19 @@ namespace Assets.Scripts.Core
                 }
             }
 
-            StartCoroutine(DoRippleEffect());
-            StartCoroutine(FadeOutCircles(3.0f));
+            // Randomly pick one of 5 animations
+            int animIndex = Random.Range(0, 5);
+            switch (animIndex)
+            {
+                case 0: StartCoroutine(DoRippleEffect()); break;
+                case 1: StartCoroutine(DoSpiralVortex()); break;
+                case 2: StartCoroutine(DoDiagonalCascade()); break;
+                case 3: StartCoroutine(DoExplosionEffect()); break;
+                case 4: StartCoroutine(DoRandomPopcorn()); break;
+                default: StartCoroutine(DoRippleEffect()); break;
+            }
+            
+            StartCoroutine(FadeOutCircles(10.0f)); // Further increased delay to support longer popcorn
         }
 
         private System.Collections.IEnumerator FadeOutCircles(float delay)
@@ -436,7 +448,7 @@ namespace Assets.Scripts.Core
             if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
 
             Color targetColor = new Color(0.373f, 0.153f, 0.804f); // #5f27cd
-            float rippleSpeed = 12.0f; 
+            float rippleSpeed = 24.0f; // 2x Faster
             float maxDist = 0;
             
             foreach(var info in m_BackgroundCircleInfos)
@@ -444,8 +456,8 @@ namespace Assets.Scripts.Core
                 if (info.distanceFromCenter > maxDist) maxDist = info.distanceFromCenter;
             }
 
-            // 1. Initial Growth: Scale all circles to 1.5x before starting the wave
-            float startGrowthDuration = 0.4f;
+            // 1. Initial Growth
+            float startGrowthDuration = 0.2f; // 2x Faster
             float gElapsed = 0f;
             while (gElapsed < startGrowthDuration)
             {
@@ -459,9 +471,9 @@ namespace Assets.Scripts.Core
                 yield return null;
             }
 
-            for (int repeat = 0; repeat < 2; repeat++)
+            for (int repeat = 0; repeat < 4; repeat++) // 2x Longer (4 repeats instead of 2)
             {
-                float duration = (maxDist / rippleSpeed) + 0.5f; 
+                float duration = (maxDist / rippleSpeed) + 0.25f; 
                 float elapsed = 0;
 
                 while (elapsed < duration)
@@ -471,7 +483,6 @@ namespace Assets.Scripts.Core
 
                     foreach (var info in m_BackgroundCircleInfos)
                     {
-                        // Check if objects still exist
                         if (info.transform == null || info.renderer == null) continue;
 
                         float dist = info.distanceFromCenter;
@@ -479,7 +490,6 @@ namespace Assets.Scripts.Core
                         
                         if (proximity > 0)
                         {
-                            // Ahead of wave (closer to center) = 1.5, Behind wave (further out) = 2.0
                             float baseScale = (dist < waveFront) ? 1.5f : 2.0f;
                             float peakScale = 2.5f;
                             float scale = Mathf.Lerp(baseScale, peakScale, proximity);
@@ -490,7 +500,6 @@ namespace Assets.Scripts.Core
                         }
                         else
                         {
-                            // If reached, stay at 2.0. If not reached yet, stay at 1.5
                             float finalScale = (dist < waveFront) ? 1.5f : 2.0f;
                             info.transform.localScale = Vector3.one * finalScale;
                             info.renderer.color = m_CircleColor;
@@ -498,21 +507,228 @@ namespace Assets.Scripts.Core
                     }
                     yield return null;
                 }
-                if (repeat == 0) yield return new WaitForSeconds(0.1f);
             }
 
+            FinishAnimation();
+            yield return new WaitForSeconds(0.5f);
+            HideArrows();
+        }
+
+        private System.Collections.IEnumerator DoSpiralVortex()
+        {
+            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+
+            Color targetColor = new Color(0.117f, 0.741f, 0.886f); // Cyan #1ecadb
+            float duration = 3.6f; // 2x Longer
+            float elapsed = 0;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                foreach (var info in m_BackgroundCircleInfos)
+                {
+                    if (info.transform == null || info.renderer == null) continue;
+
+                    Vector3 pos = info.transform.position - m_LevelCenter;
+                    float angle = Mathf.Atan2(pos.y, pos.x) * Mathf.Rad2Deg;
+                    float dist = info.distanceFromCenter;
+
+                    // Wave based on time, distance and angle (2x faster pulse frequency)
+                    float spiralFactor = Mathf.Sin(t * 16f - dist * 0.5f + angle * 0.05f);
+                    float proximity = Mathf.Clamp01((spiralFactor + 1f) / 2f);
+
+                    float scale = Mathf.Lerp(1.2f, 2.4f, proximity);
+                    info.transform.localScale = Vector3.one * scale;
+                    info.renderer.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                }
+                yield return null;
+            }
+
+            FinishAnimation();
+            yield return new WaitForSeconds(0.5f);
+            HideArrows();
+        }
+
+        private System.Collections.IEnumerator DoDiagonalCascade()
+        {
+            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+
+            Color targetColor = new Color(1f, 0.435f, 0.38f); // Coral #ff6f61
+            float cascadeSpeed = 40.0f; // Additional 10% faster (approx 40.0f)
+            float minVal = float.MaxValue, maxVal = float.MinValue;
+
+            foreach (var info in m_BackgroundCircleInfos)
+            {
+                float val = info.transform.position.x + info.transform.position.y;
+                if (val < minVal) minVal = val;
+                if (val > maxVal) maxVal = val;
+            }
+
+            float gap = 5.0f; // Gap between the 10 lines
+            int lineCount = 10;
+            
+            for (int repeat = 0; repeat < 2; repeat++) 
+            {
+                // Duration needs to account for all 10 lines clearing the maxVal
+                float duration = (maxVal - minVal + (gap * (lineCount + 1))) / cascadeSpeed + 0.5f;
+                float elapsed = 0;
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.deltaTime;
+                    float waveFront = minVal + (elapsed * cascadeSpeed);
+
+                    foreach (var info in m_BackgroundCircleInfos)
+                    {
+                        if (info.transform == null || info.renderer == null) continue;
+
+                        float val = info.transform.position.x + info.transform.position.y;
+                        
+                        // Calculate proximity to 10 different wave fronts
+                        float proximity = 0;
+                        for (int i = 0; i < lineCount; i++)
+                        {
+                            float p = Mathf.Clamp01(1.0f - Mathf.Abs(val - (waveFront - i * gap)) / 3.5f);
+                            if (p > proximity) proximity = p;
+                        }
+
+                        if (proximity > 0)
+                        {
+                            float scale = Mathf.Lerp(1.2f, 2.5f, proximity);
+                            info.transform.localScale = Vector3.one * scale;
+                            info.renderer.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                        }
+                    }
+                    yield return null;
+                }
+            }
+
+            FinishAnimation();
+            yield return new WaitForSeconds(0.5f);
+            HideArrows();
+        }
+
+        private System.Collections.IEnumerator DoExplosionEffect()
+        {
+            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+
+            Color targetColor = new Color(1f, 0.843f, 0f); // Gold #ffd700
+            float duration = 2.4f; // 2x Longer
+            float elapsed = 0;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                // Double the waves and speed
+                float waveRadius = (t * 50.0f) % 30.0f; 
+
+                foreach (var info in m_BackgroundCircleInfos)
+                {
+                    if (info.transform == null || info.renderer == null) continue;
+
+                    float dist = info.distanceFromCenter;
+                    float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveRadius) / 6.0f);
+
+                    if (proximity > 0)
+                    {
+                        float scale = Mathf.Lerp(1.5f, 3.5f, proximity);
+                        info.transform.localScale = Vector3.one * scale;
+                        info.renderer.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                    }
+                }
+                yield return null;
+            }
+
+            FinishAnimation();
+            yield return new WaitForSeconds(0.5f);
+            HideArrows();
+        }
+
+        private System.Collections.IEnumerator DoRandomPopcorn()
+        {
+            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+
+            Color targetColor = new Color(0.6f, 0.4f, 1f); // Purple-ish
+            float totalDuration = 8.0f; // 2x Longer (from 4s to 8s)
+            float elapsed = 0;
+
+            List<int> indices = new List<int>();
+            for (int i = 0; i < m_BackgroundCircleInfos.Count; i++) indices.Add(i);
+            
+            // Shuffle
+            for (int i = 0; i < indices.Count; i++)
+            {
+                int temp = indices[i];
+                int randomIndex = Random.Range(i, indices.Count);
+                indices[i] = indices[randomIndex];
+                indices[randomIndex] = temp;
+            }
+
+            int count = 0;
+            // Adjust batch size to spread across the 8 seconds
+            int circlesPerBatch = Mathf.Max(1, m_BackgroundCircleInfos.Count / 100); 
+
+            while (elapsed < totalDuration)
+            {
+                elapsed += Time.deltaTime;
+                
+                int toPop = Mathf.Min(circlesPerBatch, indices.Count - count);
+                for (int i = 0; i < toPop; i++)
+                {
+                    int idx = indices[count + i];
+                    StartCoroutine(PopSingleCircle(m_BackgroundCircleInfos[idx], targetColor));
+                }
+                count += toPop;
+
+                if (count >= indices.Count) break;
+                yield return new WaitForSeconds(0.04f); // Slightly slower interval to spread the effect
+            }
+
+            yield return new WaitForSeconds(2.0f);
+            FinishAnimation();
+            yield return new WaitForSeconds(0.5f);
+            HideArrows();
+        }
+
+        private IEnumerator PopSingleCircle(BackgroundCircleInfo info, Color popColor)
+        {
+            if (info.transform == null || info.renderer == null) yield break;
+
+            float duration = 0.2f; // 2x Faster
+            float elapsed = 0;
+            Vector3 startScale = info.transform.localScale;
+            Vector3 targetScale = Vector3.one * 2.8f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float curve = Mathf.Sin(t * Mathf.PI);
+
+                info.transform.localScale = Vector3.Lerp(startScale, targetScale, curve);
+                info.renderer.color = Color.Lerp(m_CircleColor, popColor, curve);
+                yield return null;
+            }
+            
+            if (info.transform != null) info.transform.localScale = Vector3.one * 2.0f;
+            if (info.renderer != null) info.renderer.color = m_CircleColor;
+        }
+
+        private void FinishAnimation()
+        {
             foreach (var info in m_BackgroundCircleInfos)
             {
                 if (info.renderer != null && info.transform != null)
                 {
-                    info.transform.localScale = Vector3.one * 2.0f; // Settle at 2.0x
+                    info.transform.localScale = Vector3.one * 2.0f; 
                     Color c = m_CircleColor;
                     c.a = m_WinCirclesAlpha;
                     info.renderer.color = c;
                 }
             }
-            yield return new WaitForSeconds(0.5f);
-            HideArrows();
         }
     }
 }
