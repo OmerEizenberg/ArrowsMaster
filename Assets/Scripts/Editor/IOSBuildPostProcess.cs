@@ -143,7 +143,7 @@ public class IOSBuildPostProcess
 
         project.WriteToFile(projectPath);
 
-        Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully (Version S11).");
+        Debug.Log("[IOSBuildPostProcess] Xcode project settings updated successfully (Version S13).");
     }
 
 
@@ -284,12 +284,20 @@ public class IOSBuildPostProcess
         podfileContent = Regex.Replace(podfileContent, @"\n# FIX_FB12_S\d+.*?\nend\n", "", RegexOptions.Singleline);
         podfileContent = Regex.Replace(podfileContent, @"use_frameworks!.*?\n", "", RegexOptions.Singleline);
 
-        // Refined post_install block using dynamic linkage
-        // We revert to dynamic linkage to ensure vendored frameworks like FBAudienceNetwork 
-        // are correctly embedded and loaded at runtime.
-        string postInstallBlock = "\n# FIX_FB12_S11\n" +
+        // Refined post_install block (Version S13)
+        // We use dynamic frameworks but force FBAudienceNetwork to be treated as a static framework.
+        // This ensures it is linked into the binary (fixing "Library not loaded")
+        // and NOT embedded in the Frameworks folder (fixing "Validation failed").
+        string postInstallBlock = "\n# FIX_FB12_S13\n" +
                                   "use_frameworks!\n" +
                                   "post_install do |installer|\n" +
+                                  "  installer.pod_targets.each do |pod|\n" +
+                                  "    if pod.name.include?('FBAudienceNetwork') || pod.name.include?('Facebook')\n" +
+                                  "      def pod.static_framework?; true end\n" +
+                                  "      puts \"[IOSBuildPostProcess] Forced #{pod.name} to be static framework.\"\n" +
+                                  "    end\n" +
+                                  "  end\n" +
+                                  "  \n" +
                                   "  installer.pods_project.targets.each do |target|\n" +
                                   "    target.build_configurations.each do |config|\n" +
                                   "      config.build_settings['SWIFT_VERSION'] = '5.10'\n" +
@@ -321,7 +329,7 @@ public class IOSBuildPostProcess
         podfileContent += "\n" + postInstallBlock;
 
         File.WriteAllText(podfilePath, podfileContent);
-        Debug.Log("[IOSBuildPostProcess] Podfile updated with dynamic linkage for all frameworks (S11).");
+        Debug.Log("[IOSBuildPostProcess] Podfile updated with surgical static fix for Facebook (S13).");
         
         RunPodInstall(pathToBuiltProject);
     }
