@@ -414,8 +414,20 @@ namespace Assets.Scripts.Core
                 }
             }
 
-            // Randomly pick one of 5 animations
-            int animIndex = Random.Range(0, 5);
+            int levelNum = ExtractNumber(currentLevelId);
+            int animIndex;
+            
+            if (levelNum > 0 && levelNum < 20)
+            {
+                // Under level 20: pick only ripple (0) or popcorn (4)
+                animIndex = Random.Range(0, 2) == 0 ? 0 : 4;
+            }
+            else
+            {
+                // 20 and forward: randomly select from all 5 options
+                animIndex = Random.Range(0, 5);
+            }
+
             switch (animIndex)
             {
                 case 0: StartCoroutine(DoRippleEffect()); break;

@@ -642,6 +642,14 @@ namespace Assets.Scripts.Core
             playOnPurchaseCount = 0;
             isWinning = false;
             isEntranceFinished = false;
+            
+            // Clear timer state so it doesn't carry over from previous levels
+            isTimerActive = false;
+            isTimeUp = false;
+            currentTime = 0f;
+            lastDisplayedSecond = -1;
+            levelDuration = 0f;
+            
             UpdateArrowsLeftUI(false);
         }
 
@@ -1088,7 +1096,16 @@ namespace Assets.Scripts.Core
         // Timer-related methods
         public void InitializeTimer(float durationInSeconds)
         {
-            levelDuration = durationInSeconds;
+            if (p_isLevelProgression)
+            {
+                // Force no timer for normal levels as requested
+                levelDuration = 0f;
+            }
+            else
+            {
+                levelDuration = durationInSeconds;
+            }
+
             if (levelDuration > 0)
             {
                 currentTime = levelDuration;
@@ -1364,6 +1381,14 @@ namespace Assets.Scripts.Core
             }
             else
             {
+                isTimerActive = false;
+            }
+
+            // Enforce that normal levels never have a timer
+            if (p_isLevelProgression)
+            {
+                levelDuration = 0f;
+                currentTime = 0f;
                 isTimerActive = false;
             }
 
