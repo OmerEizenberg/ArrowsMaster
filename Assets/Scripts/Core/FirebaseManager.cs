@@ -12,7 +12,7 @@ using Singular;
 using Assets.Scripts.Core;
 
 
-public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDeferredDeepLinkHandler
+public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDeferredDeepLinkHandler, SingularDeviceAttributionCallbackHandler
 {
     public static FirebaseManager Instance { get; private set; }
     private bool isInitialized = false;
@@ -71,6 +71,7 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
         #if !UNITY_EDITOR
         SingularSDK.registeredSingularLinkHandler = this;
         SingularSDK.registeredDDLHandler = this;
+        SingularSDK.SetSingularDeviceAttributionCallbackHandler(this);
         #endif
 
         #if UNITY_IOS && !UNITY_EDITOR
@@ -309,6 +310,29 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     {
         Debug.Log($"[Singular] Deferred Deep Link Received: {deepLink}");
         // Add your custom logic here (e.g., show a welcome reward)
+    }
+
+    public void OnSingularDeviceAttributionCallback(Dictionary<string, object> attributionInfo)
+    {
+        Debug.Log("[Singular] Device Attribution Callback Triggered.");
+        if (attributionInfo != null)
+        {
+            foreach (var kvp in attributionInfo)
+            {
+                Debug.Log($"[Singular] Attribution Data - {kvp.Key}: {kvp.Value}");
+            }
+
+            // You can extract specific fields like network, campaign, sub_adnetwork, etc.
+            string network = attributionInfo.ContainsKey("network") ? attributionInfo["network"].ToString() : "organic";
+            string campaign = attributionInfo.ContainsKey("campaign") ? attributionInfo["campaign"].ToString() : "unknown";
+            string subAdNetwork = attributionInfo.ContainsKey("sub_adnetwork") ? attributionInfo["sub_adnetwork"].ToString() : "unknown";
+
+            Debug.Log($"[Singular] User Acquired via Network: {network}, Campaign: {campaign}, Source: {subAdNetwork}");
+            
+            // Note: You can log this data to Firebase Analytics as User Properties if you'd like
+            // SetUserProperty("acquisition_network", network);
+            // SetUserProperty("acquisition_campaign", campaign);
+        }
     }
     // ----------------------------
     #endregion

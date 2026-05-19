@@ -171,6 +171,51 @@ namespace Assets.Scripts.Core
             DontDestroyOnLoad(gameObject);
             
             _ = InitializeSDK();
+            StartCoroutine(AdHealthCheckRoutine());
+        }
+
+        private System.Collections.IEnumerator AdHealthCheckRoutine()
+        {
+            WaitForSeconds wait = new WaitForSeconds(5f);
+            while (true)
+            {
+                yield return wait;
+                
+                try
+                {
+                    if (!isInitialized && !isInitializing)
+                    {
+                        Debug.Log("[AdsManager] HealthCheck: SDK not initialized. Attempting to initialize.");
+                        _ = InitializeSDK();
+                    }
+                    else if (isInitialized)
+                    {
+                        if (interstitialAd != null && !IsInterstitialReady)
+                        {
+                            LoadInterstitial();
+                        }
+                        
+                        if (RewardedAd != null && !IsRewardedReady)
+                        {
+                            LoadRewarded();
+                        }
+                        
+                        if (coinsRewardedAd != null && !IsCoinsRewardedReady)
+                        {
+                            LoadCoinsRewarded();
+                        }
+                        
+                        if (multiplyRewardedAd != null && !IsMultiplyRewardedReady)
+                        {
+                            LoadMultiplyRewarded();
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[AdsManager] HealthCheck error: {e.Message}");
+                }
+            }
         }
 
         private async Task InitializeSDK()
