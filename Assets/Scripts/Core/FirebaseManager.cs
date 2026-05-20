@@ -330,8 +330,9 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
             Debug.Log($"[Singular] User Acquired via Network: {network}, Campaign: {campaign}, Source: {subAdNetwork}");
             
             // Note: You can log this data to Firebase Analytics as User Properties if you'd like
-            // SetUserProperty("acquisition_network", network);
-            // SetUserProperty("acquisition_campaign", campaign);
+            SetUserProperty("acquisition_network", network);
+            SetUserProperty("acquisition_campaign", campaign);
+            SetUserProperty("acquisition_source", subAdNetwork);
         }
     }
     // ----------------------------
