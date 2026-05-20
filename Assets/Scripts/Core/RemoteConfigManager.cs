@@ -23,6 +23,7 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_SHARE_URL = "ShareUrl";
     public const string KEY_IS_INTERSTITIAL_ACTIVE = "isInterstitialActive";
     public const string KEY_IS_DYNAMIC_MAX_ZOOM = "isDynamicMaxZoom";
+    public const string KEY_AD_COOLDOWN = "adCooldown";
 
 
 
@@ -71,7 +72,8 @@ public class RemoteConfigManager : MonoBehaviour
             { KEY_SHARE_TEXT, "Check out Arrows Legend! Can you beat my level?" },
             { KEY_SHARE_URL, "https://play.google.com/store/apps/details?id=com.Arrows.Master" },
             { KEY_IS_INTERSTITIAL_ACTIVE, true },
-            { KEY_IS_DYNAMIC_MAX_ZOOM, true }
+            { KEY_IS_DYNAMIC_MAX_ZOOM, true },
+            { KEY_AD_COOLDOWN, 60 }
         };
 
 
@@ -157,6 +159,7 @@ public class RemoteConfigManager : MonoBehaviour
     public int ThirdPlayOn => (int)GetLong(KEY_THIRD_PLAY_ON);
     public int CoinsRewardedAd => (int)GetLong(KEY_COINS_REWARDED_AD);
     public int RewardedAdCoinsCooldown => (int)GetLong(KEY_REWARDED_AD_COINS_COOLDOWN);
+    public int AdCooldown => (int)GetLong(KEY_AD_COOLDOWN);
 
     #endregion
 

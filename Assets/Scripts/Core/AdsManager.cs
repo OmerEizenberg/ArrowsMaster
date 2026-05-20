@@ -23,7 +23,6 @@ namespace Assets.Scripts.Core
         private bool isInitializing = false;
         private int sdkInitRetryCount = 0;
         private float lastAdShowTime = -60f;
-        private const float AD_COOLDOWN = 60f;
 
         // Track which rewarded ad type is currently being shown
         private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward, LifeReward }
@@ -458,10 +457,16 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            float timeSinceLastAd = Time.time - lastAdShowTime;
-            if (timeSinceLastAd < AD_COOLDOWN)
+            float currentAdCooldown = 60f;
+            if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
             {
-                Debug.Log($"[AdsManager] Skipping Interstitial due to cooldown. Last ad was {timeSinceLastAd:F1}s ago.");
+                currentAdCooldown = RemoteConfigManager.Instance.AdCooldown;
+            }
+
+            float timeSinceLastAd = Time.time - lastAdShowTime;
+            if (timeSinceLastAd < currentAdCooldown)
+            {
+                Debug.Log($"[AdsManager] Skipping Interstitial due to cooldown. Last ad was {timeSinceLastAd:F1}s ago (Cooldown: {currentAdCooldown}s).");
                 return;
             }
 
