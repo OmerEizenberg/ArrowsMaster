@@ -232,31 +232,31 @@ namespace Assets.Scripts.Core
                 
                 Debug.Log("[AdsManager] Unity Services Initialized.");
                 
-                // Request ATT and wait for choice to set proper LevelPlay consent status
-                bool attChoiceMade = false;
-                IOSAdsHelper.RequestATT(); // Start the system request
-                StartCoroutine(IOSAdsHelper.PollATTStatus((authorized) => {
-                    attChoiceMade = true;
-                    // Note: LevelPlay consent is set inside PollATTStatus
-                    Debug.Log($"[AdsManager] ATT choice made: {authorized}. Continuing SDK Init.");
-                }));
+                // Request Consent (GDPR/UMP) and wait for completion
+                bool consentFinished = false;
+                
+                // UMP requires main thread, so we dispatch it
+                EnqueueAction(() => 
+                {
+                    ConsentManager.RequestConsent(() => 
+                    {
+                        consentFinished = true;
+                        Debug.Log("[AdsManager] Consent gathering finished. Continuing SDK Init.");
+                    });
+                });
 
-                // Wait for choice slightly to ensure IDFA and privacy flags are ready.
-                // On iOS, we wait up to 30s for the user to respond to the ATT popup.
-                // On Android, PollATTStatus returns instantly.
-                float waitTimeout = 30.0f; 
-#if !UNITY_IOS
-                waitTimeout = 1.0f; // Very short wait for other platforms as it's usually instant
-#endif
+                // Wait for UMP flow to finish. This might include showing UI.
+                // We give it a generous timeout just in case it hangs, but normally it completes when the user dismisses the form.
+                float waitTimeout = 60.0f; 
                 float waitStart = Time.time;
-                while (!attChoiceMade && Time.time - waitStart < waitTimeout) 
+                while (!consentFinished && Time.time - waitStart < waitTimeout) 
                 {
                     await Task.Yield();
                 }
                 
-                if (!attChoiceMade)
+                if (!consentFinished)
                 {
-                    Debug.LogWarning("[AdsManager] ATT choice not made within timeout. Proceeding with default privacy flags.");
+                    Debug.LogWarning("[AdsManager] Consent flow timed out. Proceeding with SDK initialization anyway.");
                 }
 
                 string currentAppKey = AppKey;
@@ -272,6 +272,9 @@ namespace Assets.Scripts.Core
                 LevelPlay.OnInitFailed -= OnSdkInitFailed;
                 LevelPlay.OnInitSuccess += OnSdkInitSuccess;
                 LevelPlay.OnInitFailed += OnSdkInitFailed;
+
+                LevelPlay.OnImpressionDataReady -= OnImpressionDataReady;
+                LevelPlay.OnImpressionDataReady += OnImpressionDataReady;
                 
                 LevelPlay.Init(currentAppKey, SystemInfo.deviceUniqueIdentifier);
             }
@@ -316,6 +319,30 @@ namespace Assets.Scripts.Core
         private void EnqueueAction(Action action)
         {
             _mainThreadQueue.Enqueue(action);
+        }
+
+        private void OnImpressionDataReady(LevelPlayImpressionData impressionData)
+        {
+            EnqueueAction(() => {
+                if (impressionData == null || impressionData.Revenue == null) return;
+
+                if (FirebaseManager.Instance != null)
+                {
+                    FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, impressionData.AdNetwork),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, impressionData.MediationAdUnitName),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, impressionData.AdFormat),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, impressionData.Revenue.Value),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
+                }
+
+                SingularAdData singularAdData = new SingularAdData("ironSource", "USD", impressionData.Revenue.Value);
+                singularAdData.WithNetworkName(impressionData.AdNetwork)
+                              .WithAdUnitName(impressionData.MediationAdUnitName)
+                              .WithAdType(impressionData.AdFormat);
+                SingularSDK.AdRevenue(singularAdData);
+            });
         }
 
         private async void OnSdkInitSuccess(LevelPlayConfiguration config)
@@ -371,27 +398,6 @@ namespace Assets.Scripts.Core
             interstitialAd.OnAdDisplayFailed += OnInterstitialDisplayFailed;
             interstitialAd.OnAdDisplayed += (info) => {
                 Debug.Log($"[AdsManager] Interstitial Ad Displayed: {info}");
-
-                // --- Analytics: ad_impression (ILRD) ---
-                if (FirebaseManager.Instance != null)
-                {
-                    FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "interstitial"),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD")); // Revenue is in USD
-                }
-                
-                // --- Singular: Ad Revenue tracking ---
-                SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
-                singularAdData.WithNetworkName(info.AdNetwork)
-                              .WithAdUnitName(info.AdUnitName)
-                              .WithAdType("interstitial");
-                SingularSDK.AdRevenue(singularAdData);
-                // -------------------------------------
-                // --------------------------------
             };
             interstitialAd.OnAdClicked += (info) => Debug.Log($"[AdsManager] Interstitial Ad Clicked: {info}");
 
@@ -400,9 +406,9 @@ namespace Assets.Scripts.Core
 
         public void LoadInterstitial()
         {
-            if (!isInitialized) 
+            if (!isInitialized || interstitialAd == null) 
             {
-                if (!isInitializing) _ = InitializeSDK();
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
                 return;
             }
             if (IAPManager.Instance == null)
@@ -567,35 +573,6 @@ namespace Assets.Scripts.Core
             RewardedAd.OnAdDisplayed += (info) => {
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}");
-                    
-                    // --- Analytics: ad_impression (ILRD) ---
-                    if (FirebaseManager.Instance != null)
-                    {
-                        FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "rewarded"),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
-                    }
-
-                    // --- Singular: Ad Revenue tracking ---
-                    SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
-                    singularAdData.WithNetworkName(info.AdNetwork)
-                                  .WithAdUnitName(info.AdUnitName)
-                                  .WithAdType("rewarded_multiply");
-                    SingularSDK.AdRevenue(singularAdData);
-                    // -------------------------------------
-                    
-                    // --- Singular: Ad Revenue tracking ---
-                    singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
-                    singularAdData.WithNetworkName(info.AdNetwork)
-                                  .WithAdUnitName(info.AdUnitName)
-                                  .WithAdType("rewarded");
-                    SingularSDK.AdRevenue(singularAdData);
-                    // -------------------------------------
-                    // --------------------------------
                 });
             };
 
@@ -628,9 +605,9 @@ namespace Assets.Scripts.Core
 
         public void LoadRewarded()
         {
-            if (!isInitialized) 
+            if (!isInitialized || RewardedAd == null) 
             {
-                if (!isInitializing) _ = InitializeSDK();
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
                 return;
             }
             RewardedAd.LoadAd();
@@ -761,27 +738,6 @@ namespace Assets.Scripts.Core
             coinsRewardedAd.OnAdDisplayed += (info) => {
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Coins Rewarded Ad Displayed: {info}");
-
-                    // --- Analytics: ad_impression (ILRD) ---
-                    if (FirebaseManager.Instance != null)
-                    {
-                        FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "rewarded_coins"),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
-                    }
-
-                    // --- Singular: Ad Revenue tracking ---
-                    SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
-                    singularAdData.WithNetworkName(info.AdNetwork)
-                                  .WithAdUnitName(info.AdUnitName)
-                                  .WithAdType("rewarded_coins");
-                    SingularSDK.AdRevenue(singularAdData);
-                    // -------------------------------------
-                    // --------------------------------
                 });
             };
 
@@ -877,26 +833,6 @@ namespace Assets.Scripts.Core
             multiplyRewardedAd.OnAdDisplayed += (info) => {
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Multiply Rewarded Ad Displayed: {info}");
-
-                    // --- Analytics: ad_impression (ILRD) ---
-                    if (FirebaseManager.Instance != null)
-                    {
-                        FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "rewarded_multiply"),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
-                            new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
-                    }
-
-                    // --- Singular: Ad Revenue tracking ---
-                    SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
-                    singularAdData.WithNetworkName(info.AdNetwork)
-                                  .WithAdUnitName(info.AdUnitName)
-                                  .WithAdType("rewarded_multiply");
-                    SingularSDK.AdRevenue(singularAdData);
-                    // -------------------------------------
                 });
             };
 
@@ -1104,26 +1040,6 @@ namespace Assets.Scripts.Core
             settingsBannerAd.OnAdLoadFailed += (error) => Debug.LogError($"[AdsManager] Settings Banner Load Failed: {error}");
             settingsBannerAd.OnAdDisplayed += (info) => {
                 Debug.Log($"[AdsManager] Settings Banner Displayed: {info}");
-
-                // --- Analytics: ad_impression (ILRD) ---
-                if (FirebaseManager.Instance != null)
-                {
-                    FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "ironSource"),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, info.AdNetwork),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, info.AdUnitName),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, "banner"),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, info.Revenue ?? 0),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
-                }
-
-                // --- Singular: ad_revenue Tracking ---
-                SingularAdData singularAdData = new SingularAdData("ironSource", "USD", info.Revenue ?? 0);
-                singularAdData.WithNetworkName(info.AdNetwork)
-                              .WithAdUnitName(info.AdUnitName)
-                              .WithAdType("banner");
-                SingularSDK.AdRevenue(singularAdData);
-                // ------------------------------------
             };
 
             Debug.Log("[AdsManager] Pre-loading Settings Banner Ad (Hidden).");
@@ -1167,6 +1083,8 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
+            LevelPlay.OnImpressionDataReady -= OnImpressionDataReady;
+
             if (interstitialAd != null) interstitialAd.DestroyAd();
             if (RewardedAd != null) RewardedAd.DestroyAd();
             if (coinsRewardedAd != null) coinsRewardedAd.DestroyAd();

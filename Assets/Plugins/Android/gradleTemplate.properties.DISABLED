@@ -1,7 +1,0 @@
-unityStreamingAssets=.unity3d**STREAMING_ASSETS**
-org.gradle.jvmargs=-Xmx6144m -Xss32m
-android.suppressUnsupportedCompileSdk=35
-android.enableDexingArtifactTransform=true
-android.parallel=true
-android.useAndroidX=true
-android.enableJetifier=true

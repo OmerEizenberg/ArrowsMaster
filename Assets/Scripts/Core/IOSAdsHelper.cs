@@ -47,43 +47,13 @@ namespace Assets.Scripts.Core
             bool isAuthorized = ATTrackingStatusBinding.GetAuthorizationTrackingStatus() == ATTrackingStatusBinding.AuthorizationTrackingStatus.AUTHORIZED;
             Debug.Log($"[IOSAdsHelper] ATT Status changed: {isAuthorized}");
             
-            // Set privacy flags for LevelPlay based on user's choice
-            // SDK 8.x/9.x uses LevelPlayPrivacySettings for centralized compliance
-            var consents = new System.Collections.Generic.Dictionary<string, bool> 
-            { 
-                { "ironSource", isAuthorized },
-                { "Facebook", isAuthorized },
-                { "AdMob", isAuthorized },
-                { "UnityAds", isAuthorized },
-                { "AppLovin", isAuthorized },
-                { "Pangle", isAuthorized },
-                { "Vungle", isAuthorized }
-            };
-            LevelPlayPrivacySettings.SetGDPRConsents(consents);
-            
-            // Explicitly set CCPA and COPPA flags to maximize fill rate
-            // SetCCPA(true) means the user has OPTED OUT. So we pass 'false' to indicate they are NOT opted out.
-            LevelPlayPrivacySettings.SetCCPA(false); 
-            LevelPlayPrivacySettings.SetCOPPA(false);   // App is not child-directed
+            // Note: GDPR, CCPA, and COPPA are now handled by Google UMP (ConsentManager).
+            // We no longer set them manually here based on ATT.
             
             onComplete?.Invoke(isAuthorized);
 #else
             // On other platforms (like Android/Editor), we send true to the callback directly.
-            var consents = new System.Collections.Generic.Dictionary<string, bool> 
-            { 
-                { "ironSource", true },
-                { "Facebook", true },
-                { "AdMob", true },
-                { "UnityAds", true },
-                { "AppLovin", true },
-                { "Pangle", true },
-                { "Vungle", true }
-            };
-            LevelPlayPrivacySettings.SetGDPRConsents(consents);
-            LevelPlayPrivacySettings.SetCCPA(false);
-            LevelPlayPrivacySettings.SetCOPPA(false);
-
-            Debug.Log("[IOSAdsHelper] Platform is not iOS. Defaulting LevelPlay privacy flags to 'true/false'.");
+            Debug.Log("[IOSAdsHelper] Platform is not iOS. ATT does not apply.");
             onComplete?.Invoke(true);
             yield break;
 #endif

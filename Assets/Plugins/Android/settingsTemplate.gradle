@@ -31,7 +31,7 @@ dependencyResolutionManagement {
             url (unityProjectPath + "/Assets/GeneratedLocalRepo/GooglePlayGames/com.google.play.games/Editor/m2repository") // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:11
         }
         maven {
-            url "https://maven.google.com/" // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:12, Assets/LevelPlay/Editor/ISAdMobAdapterDependencies.xml:8
+            url "https://maven.google.com/" // Assets/LevelPlay/Editor/IronSourceSDKDependencies.xml:12, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:7, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:12, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:17, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleUmpDependencies.xml:7
         }
         maven {
             url "https://artifact.bytedance.com/repository/pangle/" // Assets/LevelPlay/Editor/ISPangleAdapterDependencies.xml:12
