@@ -19,7 +19,11 @@ namespace Assets.Scripts.LiveOps
         [SerializeField] private GameObject m_UnlockTooltip;
         [SerializeField] private TextMeshProUGUI m_UnlockTooltipText;
 
+        [Header("Claim Notification")]
+        [SerializeField] private GameObject m_ClaimNotification;
+
         private ALiveOpService service;
+        private DailyMissionsLiveOpService dailyMissionsService;
         private bool isLocked = false;
         private Coroutine tooltipCoroutine;
         private float m_NextUiRefreshTime;
@@ -27,18 +31,44 @@ namespace Assets.Scripts.LiveOps
 
         public void Initialize(ALiveOpService service)
         {
+            UnsubscribeDailyMissions();
+
             this.service = service;
-            
+            dailyMissionsService = service as DailyMissionsLiveOpService;
+
+            EnsureClaimNotification();
+
             if (m_UnlockTooltip != null) m_UnlockTooltip.SetActive(false);
-            
+
             if (m_IconButton != null)
             {
                 m_IconButton.onClick.RemoveAllListeners();
                 m_IconButton.onClick.AddListener(OnIconClicked);
             }
-            
+
+            if (dailyMissionsService != null)
+            {
+                dailyMissionsService.OnStateChanged += RefreshClaimNotification;
+                EnsureClaimNotification();
+            }
+
             CheckUnlockState();
             RefreshUI();
+            RefreshClaimNotification();
+        }
+
+        private void OnDestroy()
+        {
+            UnsubscribeDailyMissions();
+        }
+
+        private void UnsubscribeDailyMissions()
+        {
+            if (dailyMissionsService != null)
+            {
+                dailyMissionsService.OnStateChanged -= RefreshClaimNotification;
+                dailyMissionsService = null;
+            }
         }
 
         private void Update()
@@ -47,6 +77,7 @@ namespace Assets.Scripts.LiveOps
 
             m_NextUiRefreshTime = Time.time + UiRefreshInterval;
             CheckUnlockState();
+            RefreshClaimNotification();
 
             if (m_TimerTexts != null && m_TimerTexts.Count > 0)
             {
@@ -103,7 +134,39 @@ namespace Assets.Scripts.LiveOps
 
         private void RefreshUI()
         {
-            // Set image if needed 
+            RefreshClaimNotification();
+        }
+
+        private void EnsureClaimNotification()
+        {
+            if (m_ClaimNotification == null)
+                m_ClaimNotification = transform.Find("ClaimNotification")?.gameObject;
+
+            if (m_ClaimNotification != null || dailyMissionsService == null) return;
+
+            var badge = new GameObject("ClaimNotification", typeof(RectTransform), typeof(Image));
+            badge.transform.SetParent(transform, false);
+            var rect = badge.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-8f, -8f);
+            rect.sizeDelta = new Vector2(36f, 36f);
+
+            var image = badge.GetComponent<Image>();
+            image.color = new Color(1f, 0.2f, 0.2f, 1f);
+            image.raycastTarget = false;
+            badge.SetActive(false);
+            m_ClaimNotification = badge;
+        }
+
+        private void RefreshClaimNotification()
+        {
+            if (dailyMissionsService == null) return;
+            EnsureClaimNotification();
+            if (m_ClaimNotification == null) return;
+            bool show = !isLocked && dailyMissionsService.HasClaimableReward();
+            m_ClaimNotification.SetActive(show);
         }
 
         private void UpdateTimers()
@@ -138,7 +201,6 @@ namespace Assets.Scripts.LiveOps
                 return;
             }
 
-            // Instantiate popup from Resources
             GameObject popupPrefab = Resources.Load<GameObject>(service.SO.PopupPrefabName);
             if (popupPrefab != null)
             {
@@ -148,6 +210,22 @@ namespace Assets.Scripts.LiveOps
                     GameObject popup = Instantiate(popupPrefab, null);
                     popup.SetActive(true);
                     popup.transform.SetAsLastSibling();
+
+                    var dmService = dailyMissionsService;
+                    if (dmService == null && LiveOpManager.Instance != null)
+                        dmService = LiveOpManager.Instance.GetActiveService(DailyMissionsLiveOpService.EventId) as DailyMissionsLiveOpService;
+
+                    if (dmService != null)
+                    {
+                        var popupView = popup.GetComponentInChildren<Missions.MissionsPopupView>(true);
+                        if (popupView == null)
+                            popupView = popup.AddComponent<Missions.MissionsPopupView>();
+                        popupView.Initialize(dmService);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[LiveOpIconView] Daily Missions service is not active — popup UI will not update.");
+                    }
                 }
             }
         }

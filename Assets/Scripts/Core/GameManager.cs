@@ -517,6 +517,7 @@ namespace Assets.Scripts.Core
             {
                 UserDataManager.Instance.IncrementCurrentLevelAttempts();
                 UserDataManager.Instance.ResetLevelStreak();
+                Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyMainLevelFailed();
             }
 
             if (levelManager != null && !string.IsNullOrEmpty(levelManager.CurrentLevelId))
@@ -827,6 +828,7 @@ namespace Assets.Scripts.Core
                 int completedLevel = UserDataManager.Instance.CurrentLevel;
                 UserDataManager.Instance.IncrementLevelStreak();
                 UserDataManager.Instance.IncrementLevel();
+                Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyMainLevelWon();
                 UserDataManager.Instance.ClearCurrentLevelAttempts();
                 UserDataManager.Instance.IsRateUsCheckPending = true;
 
@@ -844,6 +846,7 @@ namespace Assets.Scripts.Core
             else
             {
                 UserDataManager.Instance.SaveMonthlyChallengeProgress(currentChallengeYear, currentChallengeMonth, currentChallengeDay);
+                Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyChallengeLevelWon();
             }
 
             // --- Analytics: level_end (Success) ---
@@ -1000,6 +1003,7 @@ namespace Assets.Scripts.Core
                 UserDataManager.Instance.IncrementCurrentLevelAttempts();
                 m_SavedStreakBeforeGameOver = UserDataManager.Instance.LevelStreak;
                 UserDataManager.Instance.ResetLevelStreak();
+                Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyMainLevelFailed();
             }
 
             // --- Analytics: level_end (Fail - Lives) ---

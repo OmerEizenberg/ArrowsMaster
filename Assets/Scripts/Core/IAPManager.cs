@@ -430,6 +430,7 @@ namespace Assets.Scripts.Core
             SingularSDK.CustomRevenue("Purchase", metadataSingular.isoCurrencyCode, (double)metadataSingular.localizedPrice);
             // ------------------------------------------------
 
+            Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyPurchaseMade();
             OnPurchaseSuccess?.Invoke(id);
             SpawnCoinsExplosion();
 

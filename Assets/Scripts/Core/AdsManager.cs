@@ -634,7 +634,7 @@ namespace Assets.Scripts.Core
                 if (pendingRewardType != RewardAdType.None)
                 {
                     Debug.Log("[AdsManager] Interstitial was used as a fallback. Giving pending reward.");
-                    ProcessPendingReward();
+                    ProcessPendingReward(fromRewardedAdUnit: false);
                 }
 
                 ScheduleDeferredLoad(LoadInterstitial);
@@ -696,7 +696,7 @@ namespace Assets.Scripts.Core
             RewardedAd.OnAdRewarded += (info, reward) => {
                 EnqueueAction(() => {
                     Debug.Log("[AdsManager] Rewarded Ad Rewarded Event Received.");
-                    ProcessPendingReward();
+                    ProcessPendingReward(fromRewardedAdUnit: true);
                 });
             };
             
@@ -767,11 +767,14 @@ namespace Assets.Scripts.Core
         /// Central reward processor. Captures and resets pendingRewardType atomically,
         /// then dispatches the correct reward. Safe if called multiple times — second call is a no-op.
         /// </summary>
-        private void ProcessPendingReward()
+        private void ProcessPendingReward(bool fromRewardedAdUnit)
         {
             // Capture and immediately reset so duplicate callbacks are no-ops
             RewardAdType rewardType = pendingRewardType;
             pendingRewardType = RewardAdType.None;
+
+            if (rewardType != RewardAdType.None && fromRewardedAdUnit)
+                Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyAdWatched();
 
             switch (rewardType)
             {
@@ -876,7 +879,7 @@ namespace Assets.Scripts.Core
             coinsRewardedAd.OnAdRewarded += (info, reward) => {
                 EnqueueAction(() => {
                     Debug.Log("[AdsManager] Coins Rewarded Ad Rewarded Event Received.");
-                    ProcessPendingReward();
+                    ProcessPendingReward(fromRewardedAdUnit: true);
                 });
             };
 
@@ -989,7 +992,7 @@ namespace Assets.Scripts.Core
             multiplyRewardedAd.OnAdRewarded += (info, reward) => {
                 EnqueueAction(() => {
                     Debug.Log("[AdsManager] Multiply Rewarded Ad Rewarded Event Received.");
-                    ProcessPendingReward();
+                    ProcessPendingReward(fromRewardedAdUnit: true);
                 });
             };
 

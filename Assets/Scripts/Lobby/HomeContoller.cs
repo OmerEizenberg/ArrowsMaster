@@ -210,6 +210,7 @@ namespace Assets.Scripts.Lobby
             if (LiveOpManager.Instance != null)
             {
                 LiveOpManager.Instance.CheckLiveOps();
+                LiveOpManager.Instance.SyncLobbyIcons();
             }
 
         }

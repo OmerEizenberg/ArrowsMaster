@@ -30,6 +30,18 @@ namespace Assets.Scripts.LiveOps
         }
 
         private bool isInitialized = false;
+
+        private void Awake()
+        {
+            if (instance != null && instance != this)
+            {
+                Debug.LogWarning($"[LiveOpManager] Duplicate LiveOpManager on '{gameObject.name}' removed.");
+                Destroy(this);
+                return;
+            }
+            instance = this;
+        }
+
         private void Init()
         {
             if (isInitialized) return;
@@ -57,13 +69,16 @@ namespace Assets.Scripts.LiveOps
 
         private void Start()
         {
+            if (instance != this) return;
+
             Init();
-            // Initial check
             CheckLiveOps();
         }
 
         private void Update()
         {
+            if (instance != this) return;
+
             timer += Time.deltaTime;
             if (timer >= checkInterval)
             {
@@ -88,7 +103,7 @@ namespace Assets.Scripts.LiveOps
                     }
                     else if (activeServices[so.EventID].UniqueID != uniqueID)
                     {
-                        // Different week iteration detected
+                        // New period detected (e.g. new day for Daily Missions, new week for others)
                         DeactivateLiveOp(so.EventID);
                         ActivateLiveOp(so, uniqueID);
                     }
@@ -121,7 +136,11 @@ namespace Assets.Scripts.LiveOps
 
         private string GetUniqueEventID(LiveOpSO so, DateTime now)
         {
-            // ID = EventID + Year + WeekNumber (using ISO 8601 week)
+            // Daily Missions reset each calendar day.
+            if (so.EventID == DailyMissionsLiveOpService.EventId)
+                return $"{so.EventID}_{now:yyyy-MM-dd}";
+
+            // Other live ops use weekly buckets (ISO 8601 week).
             int week = GetIso8601WeekOfYear(now);
             return $"{so.EventID}_{now.Year}_W{week}";
         }
@@ -174,39 +193,97 @@ namespace Assets.Scripts.LiveOps
                 service.OnDeactivate();
                 
                 // Cleanup UI
-                if (service.IconInstance != null)
-                {
-                    Destroy(service.IconInstance);
-                }
-                
+                DestroyIconInstance(service);
                 activeServices.Remove(eventID);
             }
         }
 
         public void InstantiateIcon(ALiveOpService service)
         {
-            // This would normally be triggered when entering the lobby
-            // or if activation happens while in lobby
+            if (service == null || service.SO == null) return;
+            if (service.IconInstance != null) return;
+
             HomeContoller lobby = FindFirstObjectByType<HomeContoller>();
-            if (lobby != null && lobby.gameObject.activeInHierarchy)
+            if (lobby == null || !lobby.gameObject.activeInHierarchy) return;
+
+            Transform container = lobby.LiveOpIconsContainer;
+            if (container == null) return;
+
+            if (TryBindExistingIcon(service, container)) return;
+
+            GameObject prefab = Resources.Load<GameObject>(service.SO.IconPrefabName);
+            if (prefab == null) return;
+
+            GameObject icon = Instantiate(prefab, container);
+            icon.name = service.SO.IconPrefabName;
+            service.IconInstance = icon;
+
+            LiveOpIconView view = icon.GetComponent<LiveOpIconView>();
+            if (view != null)
+                view.Initialize(service);
+        }
+
+        /// <summary>
+        /// Binds lobby icons when returning to home (does not create duplicates).
+        /// </summary>
+        public void SyncLobbyIcons()
+        {
+            if (instance != this) return;
+
+            foreach (var service in activeServices.Values)
+                InstantiateIcon(service);
+        }
+
+        private static bool TryBindExistingIcon(ALiveOpService service, Transform container)
+        {
+            string prefabName = service.SO.IconPrefabName;
+            if (string.IsNullOrEmpty(prefabName)) return false;
+
+            for (int i = 0; i < container.childCount; i++)
             {
-                Transform container = lobby.LiveOpIconsContainer;
-                if (container != null)
-                {
-                    GameObject prefab = Resources.Load<GameObject>(service.SO.IconPrefabName);
-                    if (prefab != null)
-                    {
-                        GameObject icon = Instantiate(prefab, container);
-                        service.IconInstance = icon;
-                        
-                        LiveOpIconView view = icon.GetComponent<LiveOpIconView>();
-                        if (view != null)
-                        {
-                            view.Initialize(service);
-                        }
-                    }
-                }
+                Transform child = container.GetChild(i);
+                if (!IsMatchingIconObject(child.gameObject, prefabName)) continue;
+                if (IsIconBoundToAnotherService(child.gameObject, service)) continue;
+
+                service.IconInstance = child.gameObject;
+                LiveOpIconView view = child.GetComponent<LiveOpIconView>();
+                if (view != null)
+                    view.Initialize(service);
+                return true;
             }
+
+            return false;
+        }
+
+        private static bool IsMatchingIconObject(GameObject obj, string prefabName)
+        {
+            if (obj == null) return false;
+            string n = obj.name;
+            return n == prefabName || n.StartsWith(prefabName + "(", StringComparison.Ordinal);
+        }
+
+        private static bool IsIconBoundToAnotherService(GameObject icon, ALiveOpService current)
+        {
+            if (instance == null) return false;
+            foreach (var kvp in instance.activeServices)
+            {
+                if (kvp.Value == current) continue;
+                if (kvp.Value?.IconInstance == icon) return true;
+            }
+            return false;
+        }
+
+        private static void DestroyIconInstance(ALiveOpService service)
+        {
+            if (service?.IconInstance == null) return;
+
+            // Scene-placed icons (not runtime clones) are hidden, not destroyed.
+            if (service.IconInstance.name.Contains("(Clone)", StringComparison.Ordinal))
+                Destroy(service.IconInstance);
+            else
+                service.IconInstance.SetActive(false);
+
+            service.IconInstance = null;
         }
 
         public ALiveOpService GetActiveService(string eventID)

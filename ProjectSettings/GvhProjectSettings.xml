@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <projectSettings>
-  <projectSetting name="com.google.external-dependency-managerAnalyticsEnabled" value="False" />
-  <projectSetting name="com.google.firebaseAnalyticsCookie" value="f091274c28b64b2c81f8534bdd2f7366" />
-  <projectSetting name="com.google.firebaseAnalyticsEnabled" value="True" />
-  <projectSetting name="Google.IOSResolver.AutoPodToolInstallInEditor" value="True" />
   <projectSetting name="Google.IOSResolver.CocoapodsIntegrationMethod" value="2" />
-  <projectSetting name="Google.IOSResolver.Enabled" value="True" />
   <projectSetting name="Google.IOSResolver.PodfileEnabled" value="True" />
-  <projectSetting name="Google.IOSResolver.PodToolExecutionViaShellEnabled" value="True" />
   <projectSetting name="Google.IOSResolver.SkipPodInstallWhenUsingWorkspaceIntegration" value="True" />
-  <projectSetting name="Google.VersionHandler.VerboseLoggingEnabled" value="True" />
-  <projectSetting name="Google.VersionHandler.VersionHandlingEnabled" value="True" />
-  <projectSetting name="GooglePlayServices.PromptBeforeAutoResolution" value="False" />
-  <projectSetting name="GooglePlayServices.UseJetifier" value="True" />
 </projectSettings>
