@@ -10,10 +10,20 @@ namespace Assets.Scripts.Core
         public ArrowController ParentArrow { get; set; }
         public Transform CachedTransform { get; private set; }
 
+        private Sprite poolDefaultSprite;
+        private Color poolDefaultColor = Color.white;
+        private int poolDefaultSortingOrder;
+
         private void Awake()
         {
             CachedTransform = transform;
             if (Renderer == null) Renderer = GetComponent<SpriteRenderer>();
+            if (Renderer != null)
+            {
+                poolDefaultSprite = Renderer.sprite;
+                poolDefaultColor = Renderer.color;
+                poolDefaultSortingOrder = Renderer.sortingOrder;
+            }
         }
 
         public void Initialize(Sprite sprite, Color color)
@@ -21,6 +31,22 @@ namespace Assets.Scripts.Core
             if (Renderer == null) Renderer = GetComponent<SpriteRenderer>();
             Renderer.sprite = sprite;
             Renderer.color = color;
+        }
+
+        /// <summary>Clear head/blocked/win visual state before segment pool reuse.</summary>
+        public void ResetForPool()
+        {
+            ParentArrow = null;
+            GridPosition = Vector2Int.zero;
+            CachedTransform.localScale = Vector3.one;
+            CachedTransform.rotation = Quaternion.identity;
+
+            if (Renderer == null) return;
+
+            Renderer.enabled = false;
+            Renderer.sprite = poolDefaultSprite;
+            Renderer.color = poolDefaultColor;
+            Renderer.sortingOrder = poolDefaultSortingOrder;
         }
 
     }

@@ -65,9 +65,7 @@ namespace Assets.Scripts.Core
                     m_MaxLevelIndex = i - 1;
                     break;
                 }
-                // Unload immediately to save memory during check if needed, 
-                // though Resources.Load caches it anyway. 
-                // Resources.UnloadAsset(levelAsset); 
+                Resources.UnloadAsset(levelAsset);
                 i++;
             }
             Debug.Log($"[LevelManager] Max Level Index initialized to: {m_MaxLevelIndex}");
@@ -168,6 +166,12 @@ namespace Assets.Scripts.Core
             }
         }
 
+        public void ReleaseArrow(ArrowController arrow)
+        {
+            if (arrow == null) return;
+            arrows.Remove(arrow);
+        }
+
         public void ClearLevel()
         {
             if (GameManager.Instance != null) GameManager.Instance.ResetLevelState();
@@ -175,15 +179,32 @@ namespace Assets.Scripts.Core
             // Stop all running coroutines (including win animations) before clearing
             StopAllCoroutines();
             
-            foreach (var arrow in arrows)
+            // Snapshot first — ReturnArrow removes from arrows and would break foreach.
+            List<ArrowController> arrowsToReturn = new List<ArrowController>(arrows);
+            arrows.Clear();
+
+            for (int i = 0; i < arrowsToReturn.Count; i++)
             {
-                if (arrow != null)
+                ArrowController arrow = arrowsToReturn[i];
+                if (arrow == null) continue;
+
+                if (ArrowPoolManager.Instance != null)
                 {
-                    if (ArrowPoolManager.Instance != null) ArrowPoolManager.Instance.ReturnArrow(arrow);
-                    else Destroy(arrow.gameObject);
+                    if (!ArrowPoolManager.Instance.IsArrowInPool(arrow))
+                    {
+                        ArrowPoolManager.Instance.ReturnArrow(arrow);
+                    }
+                }
+                else
+                {
+                    Destroy(arrow.gameObject);
                 }
             }
-            arrows.Clear();
+
+            if (ArrowPoolManager.Instance != null)
+            {
+                ArrowPoolManager.Instance.PurgeAndReplenishArrows();
+            }
 
             foreach (GameObject obj in currentLevelObjects)
             {
@@ -230,10 +251,16 @@ namespace Assets.Scripts.Core
                 }
             }
 
+            HashSet<int> pickedArrowSet = null;
+            if (pickedArrows != null && pickedArrows.Count > 0)
+            {
+                pickedArrowSet = new HashSet<int>(pickedArrows);
+            }
+
             arrows = new List<ArrowController>();
             foreach (ArrowData arrowData in data.arrows)
             {
-                if (pickedArrows != null && pickedArrows.Contains(arrowData.id)) continue;
+                if (pickedArrowSet != null && pickedArrowSet.Contains(arrowData.id)) continue;
 
                 ArrowController arrow;
                 if (ArrowPoolManager.Instance != null)

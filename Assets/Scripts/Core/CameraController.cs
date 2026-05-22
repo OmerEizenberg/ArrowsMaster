@@ -403,6 +403,7 @@ namespace Assets.Scripts.Core
 
         public void ResetZoom()
         {
+            m_CurrentOrthoSize = defaultZoom;
             cam.orthographicSize = defaultZoom;
         }
 

@@ -24,6 +24,10 @@ namespace Assets.Scripts.Core
         private Camera m_Camera;
         private ArrowController highlightedArrow;
 
+        private static readonly List<(float dist, ArrowController arrow, Segment segment)> s_RatioCandidates =
+            new List<(float, ArrowController, Segment)>(16);
+        private static readonly HashSet<ArrowController> s_RatioUniqueArrows = new HashSet<ArrowController>();
+
         private void Awake()
         {
             m_Camera = Camera.main;
@@ -186,9 +190,8 @@ namespace Assets.Scripts.Core
             int gridX = Mathf.RoundToInt(worldEndPos.x);
             int gridY = Mathf.RoundToInt(worldEndPos.y);
 
-            // Candidate tracking: (SqrDist, Arrow, Segment)
-            List<(float dist, ArrowController arrow, Segment segment)> candidates = new List<(float, ArrowController, Segment)>();
-            HashSet<ArrowController> uniqueArrows = new HashSet<ArrowController>();
+            s_RatioCandidates.Clear();
+            s_RatioUniqueArrows.Clear();
 
             // Scan area based on search radius
             int cellRadius = Mathf.CeilToInt(searchRadius);
@@ -197,7 +200,7 @@ namespace Assets.Scripts.Core
                 for (int y = gridY - cellRadius; y <= gridY + cellRadius; y++)
                 {
                     ArrowController occupant = GridManager.Instance.GetOccupant(new Vector2Int(x, y));
-                    if (occupant != null && !uniqueArrows.Contains(occupant))
+                    if (occupant != null && !s_RatioUniqueArrows.Contains(occupant))
                     {
                         // Find closest segment within this arrow
                         float minSqrDist = float.MaxValue;
@@ -210,22 +213,19 @@ namespace Assets.Scripts.Core
 
                         if (minSqrDist <= sqrSearchRadius)
                         {
-                            candidates.Add((minSqrDist, occupant, bestSeg));
-                            uniqueArrows.Add(occupant);
+                            s_RatioCandidates.Add((minSqrDist, occupant, bestSeg));
+                            s_RatioUniqueArrows.Add(occupant);
                         }
                     }
                 }
             }
 
-            if (candidates.Count == 0) return false;
+            if (s_RatioCandidates.Count == 0) return false;
 
-            // Sort by distance
-            candidates.Sort((a, b) => a.dist.CompareTo(b.dist));
+            s_RatioCandidates.Sort((a, b) => a.dist.CompareTo(b.dist));
 
-            // Rule logic:
-            // 1. Only one arrow in radius -> Success
-            // 2. Nearest is 2x closer than next nearest -> Success (comparing raw distance, so 4x sqrDist)
-            bool isRatioValid = candidates.Count == 1 || (candidates[0].dist * 4f <= candidates[1].dist);
+            bool isRatioValid = s_RatioCandidates.Count == 1 ||
+                                (s_RatioCandidates[0].dist * 4f <= s_RatioCandidates[1].dist);
 
             if (isRatioValid)
             {
@@ -233,7 +233,7 @@ namespace Assets.Scripts.Core
                 {
                     GameManager.Instance.StartTimer();
                 }
-                candidates[0].arrow.OnArrowClicked(candidates[0].segment, endScreenPos);
+                s_RatioCandidates[0].arrow.OnArrowClicked(s_RatioCandidates[0].segment, endScreenPos);
                 return true;
             }
 

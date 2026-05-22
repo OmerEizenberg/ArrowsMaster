@@ -15,7 +15,7 @@ public class LegendPassManager : MonoBehaviour
         {
             if (_instance == null)
             {
-                _instance = FindObjectOfType<LegendPassManager>();
+                _instance = FindFirstObjectByType<LegendPassManager>();
                 if (_instance == null)
                 {
                     GameObject go = new GameObject("LegendPassManager");

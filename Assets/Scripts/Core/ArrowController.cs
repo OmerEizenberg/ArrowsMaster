@@ -27,6 +27,8 @@ namespace Assets.Scripts.Core
         private bool isMoving = false;
         public bool IsMoving => isMoving;
         private Coroutine moveCoroutine;
+        private Coroutine poolReturnCoroutine;
+        private bool isInPool;
         
         public int ArrowId { get; private set; }
         private ArrowData cachedData;
@@ -35,6 +37,26 @@ namespace Assets.Scripts.Core
         private Vector2Int m_LookDirection = Vector2Int.up;
         
         private static Material s_SharedLineMaterial;
+
+        public static void EnsureSharedLineMaterialFromPrefab(ArrowController prefab)
+        {
+            if (s_SharedLineMaterial != null) return;
+
+            if (prefab != null)
+            {
+                LineRenderer prefabLine = prefab.GetComponent<LineRenderer>();
+                if (prefabLine != null && prefabLine.sharedMaterial != null)
+                {
+                    s_SharedLineMaterial = prefabLine.sharedMaterial;
+                    return;
+                }
+            }
+
+            if (s_SharedLineMaterial == null)
+            {
+                s_SharedLineMaterial = new Material(Shader.Find("Sprites/Default"));
+            }
+        }
 
         private LineRenderer lineRenderer;
         private LineRenderer previewLineRenderer;
@@ -86,8 +108,40 @@ namespace Assets.Scripts.Core
             UpdateVisuals(); // Initial visual sync
         }
 
+        public void PrepareForReuse()
+        {
+            isInPool = false;
+            m_LastHeadSegment = null;
+            forceVisualsUpdate = true;
+            forceLineUpdate = true;
+            highlightCoroutine = null;
+            currentArrowColor = Color.black;
+            m_OriginalColor = Color.black;
+            m_IsMarkedBlocked = false;
+            hasReducedLife = false;
+            isMoving = false;
+            moveCoroutine = null;
+            m_CurrentVisualDirection = Vector2Int.up;
+            m_LookDirection = Vector2Int.up;
+
+            if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = 0;
+                lineRenderer.sortingOrder = 0;
+                lineRenderer.startColor = Color.black;
+                lineRenderer.endColor = Color.black;
+            }
+
+            if (previewLineRenderer != null)
+            {
+                previewLineRenderer.positionCount = 0;
+                previewLineRenderer.gameObject.SetActive(false);
+            }
+        }
+
         public void PrepareIncrementalInit(ArrowData data)
         {
+            PrepareForReuse();
             cachedData = data;
             ArrowId = data.id;
             
@@ -106,8 +160,11 @@ namespace Assets.Scripts.Core
             lineRenderer.numCapVertices = 5;
             lineRenderer.numCornerVertices = 5;
             
-            // Optimization: Share material to avoid overhead
-            if (s_SharedLineMaterial == null) s_SharedLineMaterial = new Material(Shader.Find("Sprites/Default"));
+            if (s_SharedLineMaterial == null)
+            {
+                ArrowController prefabRef = ArrowPoolManager.Instance != null ? ArrowPoolManager.Instance.arrowPrefab : null;
+                EnsureSharedLineMaterialFromPrefab(prefabRef);
+            }
             lineRenderer.material = s_SharedLineMaterial;
 
             lineRenderer.sortingOrder = 0; 
@@ -519,8 +576,7 @@ namespace Assets.Scripts.Core
                         // Start success color animation (White -> Green -> White)
                         StartCoroutine(SuccessColorAnimation());
 
-                        // Start destruction timer immediately on click (5 seconds)
-                        Invoke("DestroySelf", 5.0f);
+                        SchedulePoolReturn(5.0f);
                         moveCoroutine = StartCoroutine(AutoMoveRoutine());
                         
                         // Notify GameManager that this arrow is moving (solved)
@@ -652,30 +708,116 @@ namespace Assets.Scripts.Core
             }
         }
 
-        private void DestroySelf()
+        private void SchedulePoolReturn(float delaySeconds)
         {
-            GridManager.Instance.UnregisterArrow(this);
-            // Destroy all instantiated effects
-            foreach (var effect in instantiatedEffects)
+            CancelPendingPoolReturn();
+            poolReturnCoroutine = StartCoroutine(PoolReturnAfterDelay(delaySeconds));
+        }
+
+        private void CancelPendingPoolReturn()
+        {
+            CancelInvoke(nameof(DestroySelf));
+            if (poolReturnCoroutine != null)
             {
-                if (effect != null) GameManager.Instance.ReturnEffect(effect);
+                StopCoroutine(poolReturnCoroutine);
+                poolReturnCoroutine = null;
             }
-            instantiatedEffects.Clear();
-            
-            // Clean up segments first
-            while (segments.Count > 0)
+        }
+
+        private IEnumerator PoolReturnAfterDelay(float delaySeconds)
+        {
+            yield return new WaitForSeconds(delaySeconds);
+            poolReturnCoroutine = null;
+            if (!isInPool)
             {
-                if (ArrowPoolManager.Instance != null) ArrowPoolManager.Instance.ReturnSegment(segments[0]);
-                else Destroy(segments[0].gameObject);
-                segments.RemoveAt(0);
+                DestroySelf();
+            }
+        }
+
+        /// <summary>Reset and return to pool without destroying the GameObject.</summary>
+        public void ReturnToPool()
+        {
+            if (isInPool) return;
+
+            isInPool = true;
+            CancelPendingPoolReturn();
+
+            if (GridManager.Instance != null)
+            {
+                GridManager.Instance.UnregisterArrow(this);
             }
 
-            if (ArrowPoolManager.Instance != null) ArrowPoolManager.Instance.ReturnArrow(this);
-            else Destroy(gameObject, 0.5f);
+            foreach (var effect in instantiatedEffects)
+            {
+                if (effect != null && GameManager.Instance != null)
+                {
+                    GameManager.Instance.ReturnEffect(effect);
+                }
+            }
+            instantiatedEffects.Clear();
+
+            StopAllCoroutines();
+            CancelInvoke();
+            isMoving = false;
+            moveCoroutine = null;
+
+            while (segments.Count > 0)
+            {
+                Segment seg = segments[0];
+                segments.RemoveAt(0);
+                if (ArrowPoolManager.Instance != null)
+                {
+                    ArrowPoolManager.Instance.ReturnSegment(seg);
+                }
+                else if (seg != null)
+                {
+                    Destroy(seg.gameObject);
+                }
+            }
+
+            if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = 0;
+            }
+
+            if (previewLineRenderer != null)
+            {
+                previewLineRenderer.positionCount = 0;
+                previewLineRenderer.gameObject.SetActive(false);
+            }
+
+            forceLineUpdate = true;
+            forceVisualsUpdate = true;
+            m_LastHeadSegment = null;
+            highlightCoroutine = null;
+            currentArrowColor = Color.black;
+            m_OriginalColor = Color.black;
+            hasReducedLife = false;
+            m_IsMarkedBlocked = false;
+        }
+
+        private void DestroySelf()
+        {
+            if (isInPool) return;
+
+            if (ArrowPoolManager.Instance != null)
+            {
+                ArrowPoolManager.Instance.ReturnArrow(this);
+            }
+            else
+            {
+                ReturnToPool();
+                Destroy(gameObject, 0.5f);
+            }
         }
 
         private void OnDestroy()
         {
+            if (ArrowPoolManager.Instance != null)
+            {
+                ArrowPoolManager.Instance.NotifyArrowDestroyed(this);
+            }
+
             // Fallback cleanup if destroyed by other means
             foreach (var effect in instantiatedEffects)
             {
@@ -710,6 +852,9 @@ namespace Assets.Scripts.Core
                 // Check if completely escaped (no segments left)
                 if (segments.Count == 0)
                 {
+                    isMoving = false;
+                    CancelPendingPoolReturn();
+                    DestroySelf();
                     yield break;
                 }
             }
@@ -892,9 +1037,8 @@ namespace Assets.Scripts.Core
                     _animationStarts[i] = segments[i].CachedTransform.position;
             }
 
-            // Slow animations (entrance, ~0.04s): update every frame for smoothness
-            // Fast movement: update every 2 frames (barely noticeable, saves CPU)
-            int updateFrequency = 1; // Updated: Always update every frame for smoothness across platforms
+            // Entrance/growth stays every frame; fast movement can skip every other visual rebuild.
+            int updateFrequency = duration <= 0.05f ? 2 : 1;
             animationFrameCounter = 0;
 
             float elapsed = 0;

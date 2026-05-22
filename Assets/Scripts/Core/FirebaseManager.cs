@@ -162,6 +162,10 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
             else
             {
                 Debug.LogError($"[FirebaseManager] Could not resolve Firebase dependencies: {dependencyStatus}");
+                if (RemoteConfigManager.Instance != null)
+                {
+                    RemoteConfigManager.Instance.ApplyDefaultsOnly($"Firebase dependencies unavailable: {dependencyStatus}");
+                }
             }
         });
     }

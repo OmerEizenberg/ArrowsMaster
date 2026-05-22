@@ -3,6 +3,7 @@ using Unity.Services.Core;
 using UnityEngine;
 using System;
 using System.Threading.Tasks;
+using System.Collections;
 using Singular;
 using System.Collections.Generic;
 
@@ -39,38 +40,31 @@ namespace Assets.Scripts.Core
         public event Action OnLifeRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
-        public bool IsRewardedReady 
-        {
-            get 
-            {
-                try { return RewardedAd != null && RewardedAd.IsAdReady(); }
-                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking RewardedAd readiness: {e.Message}"); return false; }
-            }
-        }
-        public bool IsMultiplyRewardedReady 
-        {
-            get 
-            {
-                try { return multiplyRewardedAd != null && multiplyRewardedAd.IsAdReady(); }
-                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking MultiplyRewardedAd readiness: {e.Message}"); return false; }
-            }
-        }
-        public bool IsCoinsRewardedReady 
-        {
-            get 
-            {
-                try { return coinsRewardedAd != null && coinsRewardedAd.IsAdReady(); }
-                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking CoinsRewardedAd readiness: {e.Message}"); return false; }
-            }
-        }
-        public bool IsInterstitialReady 
-        {
-            get 
-            {
-                try { return interstitialAd != null && interstitialAd.IsAdReady(); }
-                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking InterstitialAd readiness: {e.Message}"); return false; }
-            }
-        }
+        /// <summary>Fired when any cached ad-ready flag changes (avoids per-frame native IsAdReady calls).</summary>
+        public event Action OnAdReadinessChanged;
+
+        // Cached readiness — updated on load/close/display events only (not every frame).
+        private bool _rewardedReady;
+        private bool _multiplyRewardedReady;
+        private bool _coinsRewardedReady;
+        private bool _interstitialReady;
+
+        private GameObject _coinsExplosionPrefab;
+        private Coroutine _deferredWorkCoroutine;
+        private float _lastAdCloseTime = -999f;
+
+        private const float HealthCheckIntervalSeconds = 20f;
+        private const float PostAdLoadCooldownSeconds = 4f;
+        private const float DeferredLoadDelaySeconds = 1.5f;
+
+        private bool sharesGameRewardedUnitForCoins;
+
+        public bool IsRewardedReady => _rewardedReady;
+        public bool IsMultiplyRewardedReady => _multiplyRewardedReady;
+        public bool IsCoinsRewardedReady => sharesGameRewardedUnitForCoins ? _rewardedReady : _coinsRewardedReady;
+        public bool IsInterstitialReady => _interstitialReady;
+        public bool IsAnyRewardedOrInterstitialReady =>
+            _rewardedReady || _interstitialReady || _coinsRewardedReady || _multiplyRewardedReady;
 
         private string AppKey
         {
@@ -168,46 +162,142 @@ namespace Assets.Scripts.Core
             }
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            
+
+#if (UNITY_ANDROID || UNITY_EDITOR) && !UNITY_IOS
+            sharesGameRewardedUnitForCoins = RewardedAdUnitId == CoinsRewardedAdUnitId;
+#else
+            sharesGameRewardedUnitForCoins = false;
+#endif
+
+            _coinsExplosionPrefab = Resources.Load<GameObject>("CoinsSmallExplosion");
+
             _ = InitializeSDK();
             StartCoroutine(AdHealthCheckRoutine());
         }
 
-        private System.Collections.IEnumerator AdHealthCheckRoutine()
+        private void SetCachedReady(ref bool field, bool value)
         {
-            WaitForSeconds wait = new WaitForSeconds(5f);
+            if (field == value) return;
+            field = value;
+            OnAdReadinessChanged?.Invoke();
+        }
+
+        private static bool QueryNativeReady(LevelPlayInterstitialAd ad)
+        {
+            if (ad == null) return false;
+            try { return ad.IsAdReady(); }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] Error checking interstitial readiness: {e.Message}");
+                return false;
+            }
+        }
+
+        private static bool QueryNativeReady(LevelPlayRewardedAd ad)
+        {
+            if (ad == null) return false;
+            try { return ad.IsAdReady(); }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] Error checking rewarded readiness: {e.Message}");
+                return false;
+            }
+        }
+
+        private void RefreshInterstitialReady() =>
+            SetCachedReady(ref _interstitialReady, QueryNativeReady(interstitialAd));
+
+        private void RefreshRewardedReady() =>
+            SetCachedReady(ref _rewardedReady, QueryNativeReady(RewardedAd));
+
+        private void RefreshCoinsRewardedReady()
+        {
+            if (sharesGameRewardedUnitForCoins)
+            {
+                SetCachedReady(ref _coinsRewardedReady, _rewardedReady);
+                return;
+            }
+            SetCachedReady(ref _coinsRewardedReady, QueryNativeReady(coinsRewardedAd));
+        }
+
+        private void RefreshMultiplyRewardedReady() =>
+            SetCachedReady(ref _multiplyRewardedReady, QueryNativeReady(multiplyRewardedAd));
+
+        private void RefreshAllReadiness()
+        {
+            RefreshInterstitialReady();
+            RefreshRewardedReady();
+            RefreshCoinsRewardedReady();
+            RefreshMultiplyRewardedReady();
+        }
+
+        private void ScheduleDeferredLoad(Action loadAction)
+        {
+            if (loadAction == null) return;
+            if (_deferredWorkCoroutine != null)
+            {
+                StopCoroutine(_deferredWorkCoroutine);
+            }
+            _deferredWorkCoroutine = StartCoroutine(DeferredLoadRoutine(loadAction));
+        }
+
+        private IEnumerator DeferredLoadRoutine(Action loadAction)
+        {
+            yield return new WaitForSecondsRealtime(DeferredLoadDelaySeconds);
+            if (this == null || loadAction == null) yield break;
+            if (Time.realtimeSinceStartup - _lastAdCloseTime < PostAdLoadCooldownSeconds) yield break;
+            loadAction.Invoke();
+            _deferredWorkCoroutine = null;
+        }
+
+        private void NotifyAdClosed()
+        {
+            _lastAdCloseTime = Time.realtimeSinceStartup;
+            OnAdClosed?.Invoke();
+        }
+
+        private IEnumerator AdHealthCheckRoutine()
+        {
+            var wait = new WaitForSeconds(HealthCheckIntervalSeconds);
             while (true)
             {
                 yield return wait;
-                
+
                 try
                 {
                     if (!isInitialized && !isInitializing)
                     {
                         Debug.Log("[AdsManager] HealthCheck: SDK not initialized. Attempting to initialize.");
                         _ = InitializeSDK();
+                        continue;
                     }
-                    else if (isInitialized)
+
+                    if (!isInitialized) continue;
+
+                    // Avoid stacking native load work right after an ad closes.
+                    if (Time.realtimeSinceStartup - _lastAdCloseTime < PostAdLoadCooldownSeconds)
                     {
-                        if (interstitialAd != null && !IsInterstitialReady)
-                        {
-                            LoadInterstitial();
-                        }
-                        
-                        if (RewardedAd != null && !IsRewardedReady)
-                        {
-                            LoadRewarded();
-                        }
-                        
-                        if (coinsRewardedAd != null && !IsCoinsRewardedReady)
-                        {
-                            LoadCoinsRewarded();
-                        }
-                        
-                        if (multiplyRewardedAd != null && !IsMultiplyRewardedReady)
-                        {
-                            LoadMultiplyRewarded();
-                        }
+                        continue;
+                    }
+
+                    if (interstitialAd != null && !_interstitialReady)
+                    {
+                        LoadInterstitial();
+                    }
+
+                    if (RewardedAd != null && !_rewardedReady)
+                    {
+                        LoadRewarded();
+                    }
+
+                    if (!sharesGameRewardedUnitForCoins && coinsRewardedAd != null && !_coinsRewardedReady)
+                    {
+                        LoadCoinsRewarded();
+                    }
+
+                    if (multiplyRewardedAd != null && !_multiplyRewardedReady)
+                    {
+                        LoadMultiplyRewarded();
                     }
                 }
                 catch (Exception e)
@@ -224,13 +314,28 @@ namespace Assets.Scripts.Core
             isInitializing = true;
             try
             {
-                if (UnityServices.State != ServicesInitializationState.Initialized)
-                {
-                    Debug.Log($"[AdsManager] Initializing Unity Services... (Current State: {UnityServices.State})");
-                    await UnityServices.InitializeAsync();
-                }
+                await IAPManager.EnsureUnityServicesInitializedAsync();
                 
                 Debug.Log("[AdsManager] Unity Services Initialized.");
+
+#if UNITY_IOS && !UNITY_EDITOR
+                // Request ATT before consent/ads init (required for IDFA on iOS 14+)
+                bool attFinished = false;
+                EnqueueAction(() =>
+                {
+                    IOSAdsHelper.RequestATT();
+                    StartCoroutine(IOSAdsHelper.PollATTStatus(_ => attFinished = true));
+                });
+                float attWaitStart = Time.time;
+                while (!attFinished && Time.time - attWaitStart < 30f)
+                {
+                    await Task.Yield();
+                }
+                if (!attFinished)
+                {
+                    Debug.LogWarning("[AdsManager] ATT flow timed out. Proceeding with ads initialization.");
+                }
+#endif
                 
                 // Request Consent (GDPR/UMP) and wait for completion
                 bool consentFinished = false;
@@ -345,30 +450,30 @@ namespace Assets.Scripts.Core
             });
         }
 
-        private async void OnSdkInitSuccess(LevelPlayConfiguration config)
+        private void OnSdkInitSuccess(LevelPlayConfiguration config)
         {
-            // The success callback can fire on a background thread
-            // Enqueue to main thread for safety and to use async/await
-            EnqueueAction(async () => {
+            EnqueueAction(() => {
                 Debug.Log("[AdsManager] LevelPlay SDK Initialized Successfully.");
                 isInitialized = true;
                 isInitializing = false;
                 sdkInitRetryCount = 0;
-                
-                // Add a small delay after init success to give all adapters/bidders
-                // time to finish their own internal initialization before the first Load request.
-                // This improves fill rate for networks like Meta and Google that take a bit longer.
-                Debug.Log("[AdsManager] Waiting 2s for adapters to stabilize before pre-loading ads...");
-                await Task.Delay(2000);
-
-                if (this == null) return;
-
-                CreateInterstitialAd();
-                CreateRewardedAd();
-                CreateCoinsRewardedAd();
-                CreateMultiplyRewardedAd();
-                CreateSettingsBannerAd();
+                StartCoroutine(FinishSdkInitAfterAdapterDelay());
             });
+        }
+
+        private IEnumerator FinishSdkInitAfterAdapterDelay()
+        {
+            Debug.Log("[AdsManager] Waiting 2s for adapters to stabilize before pre-loading ads...");
+            yield return new WaitForSeconds(2f);
+
+            if (this == null) yield break;
+
+            CreateInterstitialAd();
+            CreateRewardedAd();
+            CreateCoinsRewardedAd();
+            CreateMultiplyRewardedAd();
+            CreateSettingsBannerAd();
+            RefreshAllReadiness();
         }
 
         private void OnSdkInitFailed(LevelPlayInitError error)
@@ -397,7 +502,10 @@ namespace Assets.Scripts.Core
             interstitialAd.OnAdClosed += OnInterstitialClosed;
             interstitialAd.OnAdDisplayFailed += OnInterstitialDisplayFailed;
             interstitialAd.OnAdDisplayed += (info) => {
-                Debug.Log($"[AdsManager] Interstitial Ad Displayed: {info}");
+                EnqueueAction(() => {
+                    Debug.Log($"[AdsManager] Interstitial Ad Displayed: {info}");
+                    SetCachedReady(ref _interstitialReady, false);
+                });
             };
             interstitialAd.OnAdClicked += (info) => Debug.Log($"[AdsManager] Interstitial Ad Clicked: {info}");
 
@@ -494,6 +602,7 @@ namespace Assets.Scripts.Core
         {
             EnqueueAction(() => {
                 Debug.Log($"[AdsManager] Interstitial Ad Loaded: {adInfo}");
+                RefreshInterstitialReady();
             });
         }
 
@@ -517,9 +626,10 @@ namespace Assets.Scripts.Core
         private void OnInterstitialClosed(LevelPlayAdInfo adInfo)
         {
             EnqueueAction(() => {
-                Debug.Log("[AdsManager] Interstitial Ad Closed. Loading next one.");
+                Debug.Log("[AdsManager] Interstitial Ad Closed. Scheduling reload.");
                 lastAdShowTime = Time.time;
-                OnAdClosed?.Invoke();
+                SetCachedReady(ref _interstitialReady, false);
+                NotifyAdClosed();
                 
                 if (pendingRewardType != RewardAdType.None)
                 {
@@ -527,7 +637,7 @@ namespace Assets.Scripts.Core
                     ProcessPendingReward();
                 }
 
-                LoadInterstitial();
+                ScheduleDeferredLoad(LoadInterstitial);
             });
         }
 
@@ -535,14 +645,15 @@ namespace Assets.Scripts.Core
         {
             EnqueueAction(() => {
                 Debug.LogError($"[AdsManager] Interstitial Ad Display Failed: {error}");
-                OnAdClosed?.Invoke();
+                SetCachedReady(ref _interstitialReady, false);
+                NotifyAdClosed();
                 
                 if (pendingRewardType != RewardAdType.None)
                 {
                     pendingRewardType = RewardAdType.None;
                 }
 
-                LoadInterstitial();
+                ScheduleDeferredLoad(LoadInterstitial);
             });
         }
 
@@ -554,10 +665,12 @@ namespace Assets.Scripts.Core
             
             RewardedAd.OnAdClosed += (info) => { 
                 EnqueueAction(() => {
-                    Debug.Log("[AdsManager] Rewarded Ad Closed. Requesting next.");
+                    Debug.Log("[AdsManager] Rewarded Ad Closed. Scheduling reload.");
                     lastAdShowTime = Time.time;
-                    OnAdClosed?.Invoke();
-                    LoadRewarded(); 
+                    SetCachedReady(ref _rewardedReady, false);
+                    if (sharesGameRewardedUnitForCoins) SetCachedReady(ref _coinsRewardedReady, false);
+                    NotifyAdClosed();
+                    ScheduleDeferredLoad(LoadRewarded);
                 });
             };
             
@@ -565,14 +678,18 @@ namespace Assets.Scripts.Core
                 EnqueueAction(() => {
                     Debug.LogError($"[AdsManager] Rewarded Ad Display Failed: {err}. ");
                     pendingRewardType = RewardAdType.None;
-                    OnAdClosed?.Invoke();
-                    LoadRewarded(); 
+                    SetCachedReady(ref _rewardedReady, false);
+                    if (sharesGameRewardedUnitForCoins) SetCachedReady(ref _coinsRewardedReady, false);
+                    NotifyAdClosed();
+                    ScheduleDeferredLoad(LoadRewarded);
                 });
             };
             
             RewardedAd.OnAdDisplayed += (info) => {
                 EnqueueAction(() => {
                     Debug.Log($"[AdsManager] Rewarded Ad Displayed: {info}");
+                    SetCachedReady(ref _rewardedReady, false);
+                    if (sharesGameRewardedUnitForCoins) SetCachedReady(ref _coinsRewardedReady, false);
                 });
             };
 
@@ -583,7 +700,11 @@ namespace Assets.Scripts.Core
                 });
             };
             
-            RewardedAd.OnAdLoaded += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Rewarded Ad Loaded: {info}"));
+            RewardedAd.OnAdLoaded += (info) => EnqueueAction(() => {
+                Debug.Log($"[AdsManager] Rewarded Ad Loaded: {info}");
+                RefreshRewardedReady();
+                if (sharesGameRewardedUnitForCoins) RefreshCoinsRewardedReady();
+            });
             RewardedAd.OnAdLoadFailed += (info) => {
                 EnqueueAction(() => {
                      Debug.LogWarning($"[AdsManager] Rewarded Ad Load Failed: {info}. Retrying in 15s...");
@@ -622,12 +743,13 @@ namespace Assets.Scripts.Core
                 OnAdOpened?.Invoke();
                 RewardedAd.ShowAd();
             }
+            // Rewarded fallbacks use interstitial even for No Ads buyers so they still receive the reward.
             else if (IsInterstitialReady)
             {
                 Debug.LogWarning("[AdsManager] Rewarded Ad is not ready. Falling back to Interstitial.");
                 pendingRewardType = RewardAdType.GameReward;
                 OnAdOpened?.Invoke();
-                interstitialAd.ShowAd(); // Direct ShowAd skips cooldowns & No Ads checks
+                interstitialAd.ShowAd();
             }
             else 
             {
@@ -670,7 +792,7 @@ namespace Assets.Scripts.Core
                         UserDataManager.Instance.AddArrowsCurrency(rewardAmount);
                     }
                     OnCoinsRewardReceived?.Invoke();
-                    SpawnCoinsSmallExplosion();
+                    StartCoroutine(SpawnCoinsExplosionDeferred());
 
                     // --- Analytics: ad_reward_coins ---
                     if (FirebaseManager.Instance != null)
@@ -714,15 +836,24 @@ namespace Assets.Scripts.Core
         // --- Coins Rewarded Ad ---
         private void CreateCoinsRewardedAd()
         {
+            if (sharesGameRewardedUnitForCoins)
+            {
+                coinsRewardedAd = null;
+                RefreshCoinsRewardedReady();
+                Debug.Log("[AdsManager] Coins rewarded uses shared game rewarded unit on Android — no duplicate ad instance.");
+                return;
+            }
+
             if (coinsRewardedAd != null) coinsRewardedAd.DestroyAd();
             coinsRewardedAd = new LevelPlayRewardedAd(CoinsRewardedAdUnitId);
 
             coinsRewardedAd.OnAdClosed += (info) => {
                 EnqueueAction(() => {
-                    Debug.Log("[AdsManager] Coins Rewarded Ad Closed. Requesting next.");
+                    Debug.Log("[AdsManager] Coins Rewarded Ad Closed. Scheduling reload.");
                     lastAdShowTime = Time.time;
-                    OnAdClosed?.Invoke();
-                    LoadCoinsRewarded();
+                    SetCachedReady(ref _coinsRewardedReady, false);
+                    NotifyAdClosed();
+                    ScheduleDeferredLoad(LoadCoinsRewarded);
                 });
             };
 
@@ -730,8 +861,9 @@ namespace Assets.Scripts.Core
                 EnqueueAction(() => {
                     Debug.LogError($"[AdsManager] Coins Rewarded Ad Display Failed: {err}. ");
                     pendingRewardType = RewardAdType.None;
-                    OnAdClosed?.Invoke();
-                    LoadCoinsRewarded();
+                    SetCachedReady(ref _coinsRewardedReady, false);
+                    NotifyAdClosed();
+                    ScheduleDeferredLoad(LoadCoinsRewarded);
                 });
             };
 
@@ -748,7 +880,10 @@ namespace Assets.Scripts.Core
                 });
             };
 
-            coinsRewardedAd.OnAdLoaded += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Coins Rewarded Ad Loaded: {info}"));
+            coinsRewardedAd.OnAdLoaded += (info) => EnqueueAction(() => {
+                Debug.Log($"[AdsManager] Coins Rewarded Ad Loaded: {info}");
+                RefreshCoinsRewardedReady();
+            });
             coinsRewardedAd.OnAdLoadFailed += (info) => {
                 EnqueueAction(() => {
                     Debug.LogWarning($"[AdsManager] Coins Rewarded Ad Load Failed: {info}. Retrying in 15s...");
@@ -770,6 +905,12 @@ namespace Assets.Scripts.Core
 
         public void LoadCoinsRewarded()
         {
+            if (sharesGameRewardedUnitForCoins)
+            {
+                LoadRewarded();
+                return;
+            }
+
             if (!isInitialized || coinsRewardedAd == null) 
             {
                 if (!isInitialized && !isInitializing) _ = InitializeSDK();
@@ -785,7 +926,14 @@ namespace Assets.Scripts.Core
                 Debug.Log("[AdsManager] Showing Coins Rewarded Ad (CoinsReward).");
                 pendingRewardType = RewardAdType.CoinsReward;
                 OnAdOpened?.Invoke();
-                coinsRewardedAd.ShowAd();
+                if (sharesGameRewardedUnitForCoins)
+                {
+                    RewardedAd.ShowAd();
+                }
+                else
+                {
+                    coinsRewardedAd.ShowAd();
+                }
             }
             else if (IsInterstitialReady)
             {
@@ -814,10 +962,11 @@ namespace Assets.Scripts.Core
 
             multiplyRewardedAd.OnAdClosed += (info) => {
                 EnqueueAction(() => {
-                    Debug.Log("[AdsManager] Multiply Rewarded Ad Closed. Requesting next.");
+                    Debug.Log("[AdsManager] Multiply Rewarded Ad Closed. Scheduling reload.");
                     lastAdShowTime = Time.time;
-                    OnAdClosed?.Invoke();
-                    LoadMultiplyRewarded();
+                    SetCachedReady(ref _multiplyRewardedReady, false);
+                    NotifyAdClosed();
+                    ScheduleDeferredLoad(LoadMultiplyRewarded);
                 });
             };
 
@@ -825,8 +974,9 @@ namespace Assets.Scripts.Core
                 EnqueueAction(() => {
                     Debug.LogError($"[AdsManager] Multiply Rewarded Ad Display Failed: {err}. ");
                     pendingRewardType = RewardAdType.None;
-                    OnAdClosed?.Invoke();
-                    LoadMultiplyRewarded();
+                    SetCachedReady(ref _multiplyRewardedReady, false);
+                    NotifyAdClosed();
+                    ScheduleDeferredLoad(LoadMultiplyRewarded);
                 });
             };
 
@@ -843,7 +993,10 @@ namespace Assets.Scripts.Core
                 });
             };
 
-            multiplyRewardedAd.OnAdLoaded += (info) => EnqueueAction(() => Debug.Log($"[AdsManager] Multiply Rewarded Ad Loaded: {info}"));
+            multiplyRewardedAd.OnAdLoaded += (info) => EnqueueAction(() => {
+                Debug.Log($"[AdsManager] Multiply Rewarded Ad Loaded: {info}");
+                RefreshMultiplyRewardedReady();
+            });
             multiplyRewardedAd.OnAdLoadFailed += (info) => {
                 EnqueueAction(() => {
                     Debug.LogWarning($"[AdsManager] Multiply Rewarded Ad Load Failed: {info}. Retrying in 15s...");
@@ -1015,9 +1168,24 @@ namespace Assets.Scripts.Core
 
         public void SpawnCoinsSmallExplosion()
         {
-            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 11) return;
+            StartCoroutine(SpawnCoinsExplosionDeferred());
+        }
 
-            GameObject prefab = Resources.Load<GameObject>("CoinsSmallExplosion");
+        private IEnumerator SpawnCoinsExplosionDeferred()
+        {
+            // Let the OS finish tearing down the fullscreen ad before spawning VFX.
+            yield return null;
+            yield return null;
+
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 11) yield break;
+
+            GameObject prefab = _coinsExplosionPrefab;
+            if (prefab == null)
+            {
+                prefab = Resources.Load<GameObject>("CoinsSmallExplosion");
+                _coinsExplosionPrefab = prefab;
+            }
+
             if (prefab != null)
             {
                 Vector3 spawnPos = new Vector3(-0.5f, 2.4f, 60.2f);
@@ -1083,6 +1251,14 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
+            if (_deferredWorkCoroutine != null)
+            {
+                StopCoroutine(_deferredWorkCoroutine);
+                _deferredWorkCoroutine = null;
+            }
+
+            LevelPlay.OnInitSuccess -= OnSdkInitSuccess;
+            LevelPlay.OnInitFailed -= OnSdkInitFailed;
             LevelPlay.OnImpressionDataReady -= OnImpressionDataReady;
 
             if (interstitialAd != null) interstitialAd.DestroyAd();

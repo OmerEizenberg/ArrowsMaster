@@ -63,8 +63,8 @@ namespace Assets.Scripts.GameUI
         
         private void Update()
         {
-            // SetVerticesDirty forces the UI layout system to call ModifyMesh every frame
-            if (m_Graphic != null)
+            // Rebuild mesh at half rate — sway is slow enough to stay visually identical.
+            if (m_Graphic != null && (Time.frameCount & 1) == 0)
             {
                 m_Graphic.SetVerticesDirty();
             }

@@ -108,8 +108,6 @@ namespace Assets.Scripts.Lobby
         private Coroutine m_ShopScaleCoroutine;
         private Coroutine m_TooltipCoroutine;
         private int m_LastToggleFrame = -1;
-        private float m_NextAdCheckTime = 0f;
-        private const float AD_CHECK_INTERVAL = 0.7f;
 
 
         private void Awake()
@@ -176,6 +174,8 @@ namespace Assets.Scripts.Lobby
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnCoinsRewardReceived += HandleCoinsRewardReceived;
+                AdsManager.Instance.OnAdReadinessChanged += UpdateLobbyAdReadyImage;
+                UpdateLobbyAdReadyImage();
             }
 
             if(GameManager.Instance != null && !GameManager.Instance.p_isLevelProgression)
@@ -225,6 +225,7 @@ namespace Assets.Scripts.Lobby
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnCoinsRewardReceived -= HandleCoinsRewardReceived;
+                AdsManager.Instance.OnAdReadinessChanged -= UpdateLobbyAdReadyImage;
             }
 
             if (RemoteConfigManager.Instance != null)
@@ -254,11 +255,6 @@ namespace Assets.Scripts.Lobby
 
         private void Update()
         {
-            if (Time.time >= m_NextAdCheckTime)
-            {
-                m_NextAdCheckTime = Time.time + AD_CHECK_INTERVAL;
-                UpdateLobbyAdReadyImage();
-            }
             HandleSwipeNavigation();
         }
 
@@ -496,7 +492,7 @@ namespace Assets.Scripts.Lobby
                 int month = m_MonthlyChallengeController.p_CurrentMonth;
                 int day = m_MonthlyChallengeController.p_CurrentDay;
                 int year = m_MonthlyChallengeController.p_CurrentYear;
-                levelId = $"Level{month + day + (year % 10)}";
+                levelId = GameManager.GetChallengeLevelId(month, day, year);
                 folder = "ChallengeLevels";
             }
             else
@@ -559,9 +555,18 @@ namespace Assets.Scripts.Lobby
             }
             
 
-                int lastDifit = UserDataManager.Instance.CurrentLevel % 10;
+                int levelForDifficulty = UserDataManager.Instance.CurrentLevel;
+                if (GameManager.Instance != null && !GameManager.Instance.p_isLevelProgression)
+                {
+                    levelForDifficulty = GameManager.GetChallengeLevelNumber(
+                        m_MonthlyChallengeController.p_CurrentMonth,
+                        m_MonthlyChallengeController.p_CurrentDay,
+                        m_MonthlyChallengeController.p_CurrentYear);
+                }
+
+                int lastDifit = levelForDifficulty % 10;
                 
-                if (lastDifit == 4 || lastDifit == 9 || UserDataManager.Instance.CurrentLevel < 7)
+                if (lastDifit == 4 || lastDifit == 9 || levelForDifficulty < 7)
                 {
                     m_DifficultyText.text = "Easy Level";
                     Color c = m_EasyColor; c.a = 1f;
@@ -996,6 +1001,7 @@ namespace Assets.Scripts.Lobby
                 
                 if (manager != null)
                 {
+                    manager.p_isLevelProgression = true;
                     manager.StartLevel(levelName);
                 }
                 else
@@ -1023,7 +1029,7 @@ namespace Assets.Scripts.Lobby
             int day = m_MonthlyChallengeController.p_CurrentDay;
             int year = m_MonthlyChallengeController.p_CurrentYear;
 
-            string levelName = $"Level{165-(month + day + (year % 10))}";
+            string levelName = GameManager.GetChallengeLevelId(month, day, year);
             Debug.Log($"[HomeContoller] Calendar Play clicked. Starting Challenge: {levelName}");
 
             SwitchToGameUI();

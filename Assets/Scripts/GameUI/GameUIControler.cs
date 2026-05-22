@@ -360,8 +360,13 @@ public class GameUIContoleer : MonoBehaviour
         m_RestartButtonFadeCoroutine = StartCoroutine(RestartButtonFadeRoutine());
 
         if (m_AdButtonRefreshCoroutine != null) StopCoroutine(m_AdButtonRefreshCoroutine);
-        
-        // Initial state before starting the loop
+
+        if (AdsManager.Instance != null)
+        {
+            AdsManager.Instance.OnAdReadinessChanged -= UpdateAdButtonStatus;
+            AdsManager.Instance.OnAdReadinessChanged += UpdateAdButtonStatus;
+        }
+
         UpdateAdButtonStatus();
         m_AdButtonRefreshCoroutine = StartCoroutine(AdButtonRefreshRoutine());
     }
@@ -412,6 +417,11 @@ public class GameUIContoleer : MonoBehaviour
 
     public void StopAdButtonRefreshCoroutine()
     {
+        if (AdsManager.Instance != null)
+        {
+            AdsManager.Instance.OnAdReadinessChanged -= UpdateAdButtonStatus;
+        }
+
         if (m_AdButtonRefreshCoroutine != null)
         {
             StopCoroutine(m_AdButtonRefreshCoroutine);
@@ -421,19 +431,14 @@ public class GameUIContoleer : MonoBehaviour
 
     private IEnumerator AdButtonRefreshRoutine()
     {
-        // Periodic check while on failure screen
+        // Event-driven updates via OnAdReadinessChanged; infrequent fallback poll only.
         while (true)
         {
-            yield return new WaitForSeconds(1.5f); // Check every 1.5 seconds for better responsiveness
-            
-            // Bullet-proof: Check if scene/manager still exists
+            yield return new WaitForSeconds(4f);
+
             if (AdsManager.Instance == null) yield break;
-            
+
             UpdateAdButtonStatus();
-            
-            // Optimistically stop if both ads are ready and we are shown already
-            // since we don't expect them to go "unready" usually once they are
-            // But let's keep polling for 30s max for extreme corner cases? No, let's keep it simple.
         }
     }
 
@@ -528,7 +533,10 @@ public class GameUIContoleer : MonoBehaviour
            AdsManager.Instance.ShowInterstitial(true);
         }
         
-        UserDataManager.Instance.ClearLevelProgress();
+        if (GameManager.Instance == null || GameManager.Instance.p_isLevelProgression)
+        {
+            UserDataManager.Instance.ClearLevelProgress();
+        }
         if (GameManager.Instance != null) GameManager.Instance.HideScreens();
         SetGameUIVisible(false);
     }

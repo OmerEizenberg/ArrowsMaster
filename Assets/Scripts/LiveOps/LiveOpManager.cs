@@ -16,7 +16,7 @@ namespace Assets.Scripts.LiveOps
             {
                 if (instance == null)
                 {
-                    instance = FindObjectOfType<LiveOpManager>();
+                    instance = FindFirstObjectByType<LiveOpManager>();
                     if (instance == null)
                     {
                         GameObject go = new GameObject("LiveOpManager");
@@ -187,7 +187,7 @@ namespace Assets.Scripts.LiveOps
         {
             // This would normally be triggered when entering the lobby
             // or if activation happens while in lobby
-            HomeContoller lobby = FindObjectOfType<HomeContoller>();
+            HomeContoller lobby = FindFirstObjectByType<HomeContoller>();
             if (lobby != null && lobby.gameObject.activeInHierarchy)
             {
                 Transform container = lobby.LiveOpIconsContainer;

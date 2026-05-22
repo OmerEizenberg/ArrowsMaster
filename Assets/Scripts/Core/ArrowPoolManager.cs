@@ -22,6 +22,7 @@ namespace Assets.Scripts.Core
         [SerializeField] private int arrowsCount=0;
         private Queue<ArrowController> arrowPool = new Queue<ArrowController>();
         private Queue<Segment> segmentPool = new Queue<Segment>();
+        private readonly HashSet<ArrowController> pooledArrows = new HashSet<ArrowController>();
 
         private void Awake()
         {
@@ -69,13 +70,13 @@ namespace Assets.Scripts.Core
                 if (segmentPool.Count % 100 == 0) yield return null;
             }
             
+            EnsureSharedLineMaterial();
             Debug.Log($"[ArrowPoolManager] Buffer initialized: {arrowPool.Count} arrows, {segmentPool.Count} segments.");
         }
 
         private void ReplenishArrow()
         {
             if (arrowPrefab == null) return;
-            Debug.Log("[DIAGNOSTIC] ArrowPoolManager.ReplenishArrow: Instantiating new arrow.");
             ArrowController arrow = Instantiate(arrowPrefab);
             arrow.gameObject.SetActive(false);
             arrow.transform.SetParent(this.transform);
@@ -92,16 +93,73 @@ namespace Assets.Scripts.Core
             segmentPool.Enqueue(seg);
         }
 
+        public bool IsArrowInPool(ArrowController arrow)
+        {
+            return arrow != null && pooledArrows.Contains(arrow);
+        }
+
+        /// <summary>Drop destroyed references and top up the pool after corruption.</summary>
+        public void PurgeAndReplenishArrows()
+        {
+            PruneDestroyedArrowRefs();
+
+            while (arrowPool.Count < targetArrowCount && arrowPrefab != null)
+            {
+                ReplenishArrow();
+            }
+
+            arrowsCount = arrowPool.Count;
+        }
+
+        private void PruneDestroyedArrowRefs()
+        {
+            int queueSize = arrowPool.Count;
+            for (int i = 0; i < queueSize; i++)
+            {
+                ArrowController candidate = arrowPool.Dequeue();
+                if (candidate != null)
+                {
+                    arrowPool.Enqueue(candidate);
+                }
+            }
+
+            var snapshot = new List<ArrowController>(pooledArrows);
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                ArrowController arrow = snapshot[i];
+                if (!arrow)
+                {
+                    pooledArrows.Remove(arrow);
+                }
+            }
+        }
+
+        private ArrowController TakeArrowFromPool()
+        {
+            while (arrowPool.Count > 0)
+            {
+                ArrowController candidate = arrowPool.Dequeue();
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                pooledArrows.Remove(candidate);
+                return candidate;
+            }
+
+            return null;
+        }
+
         public ArrowController GetArrow(Vector3 position, Quaternion rotation, Transform parent)
         {
-            ArrowController arrow;
-            if (arrowPool.Count > 0)
+            ArrowController arrow = TakeArrowFromPool();
+            if (arrow != null)
             {
-                arrow = arrowPool.Dequeue();
-                Debug.Log($"[DIAGNOSTIC] GetArrow: Dequeued from pool. Pool size remaining: {arrowPool.Count}");
                 arrow.transform.SetParent(parent);
                 arrow.transform.position = position;
                 arrow.transform.rotation = rotation;
+                arrow.PrepareForReuse();
                 arrow.gameObject.SetActive(true);
             }
             else
@@ -112,31 +170,52 @@ namespace Assets.Scripts.Core
                     return null;
                 }
                 arrow = Instantiate(arrowPrefab, position, rotation, parent);
+                arrow.PrepareForReuse();
             }
+
             return arrow;
         }
 
         public void ReturnArrow(ArrowController arrow)
         {
             if (arrow == null) return;
+            if (IsArrowInPool(arrow)) return;
 
-            // One-time use strategy: Destroy the old one
-            // This ensures every use starts with a fresh, untainted object
-            Destroy(arrow.gameObject);
+            arrow.ReturnToPool();
+            arrow.gameObject.SetActive(false);
+            arrow.transform.SetParent(transform);
 
-            // Immediately replenish the pool to maintain the 500 buffer
-            ReplenishArrow();
+            pooledArrows.Add(arrow);
+            arrowPool.Enqueue(arrow);
+            arrowsCount = arrowPool.Count;
+
+            ReleaseArrowFromLevel(arrow);
+        }
+
+        public void NotifyArrowDestroyed(ArrowController arrow)
+        {
+            if (arrow == null) return;
+            pooledArrows.Remove(arrow);
+            ReleaseArrowFromLevel(arrow);
+        }
+
+        private static void ReleaseArrowFromLevel(ArrowController arrow)
+        {
+            if (GameManager.Instance != null && GameManager.Instance.levelManager != null)
+            {
+                GameManager.Instance.levelManager.ReleaseArrow(arrow);
+            }
         }
 
         public Segment GetSegment(Vector3 position, Quaternion rotation, Transform parent)
         {
-            Segment seg;
-            if (segmentPool.Count > 0)
+            Segment seg = TakeSegmentFromPool();
+            if (seg != null)
             {
-                seg = segmentPool.Dequeue();
                 seg.transform.SetParent(parent);
                 seg.transform.position = position;
                 seg.transform.rotation = rotation;
+                seg.ResetForPool();
                 seg.gameObject.SetActive(true);
             }
             else
@@ -151,15 +230,35 @@ namespace Assets.Scripts.Core
             return seg;
         }
 
+        private Segment TakeSegmentFromPool()
+        {
+            while (segmentPool.Count > 0)
+            {
+                Segment candidate = segmentPool.Dequeue();
+                if (candidate != null)
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
         public void ReturnSegment(Segment seg)
         {
             if (seg == null) return;
-            
-            // One-time use strategy: Destroy
-            Destroy(seg.gameObject);
-            
-            // Immediately replenish
-            ReplenishSegment();
+
+            seg.ResetForPool();
+
+            seg.gameObject.SetActive(false);
+            seg.transform.SetParent(transform);
+            segmentPool.Enqueue(seg);
+        }
+
+        /// <summary>Caches line material from the arrow prefab so runtime Shader.Find is not needed.</summary>
+        public static void EnsureSharedLineMaterial()
+        {
+            ArrowController.EnsureSharedLineMaterialFromPrefab(Instance != null ? Instance.arrowPrefab : null);
         }
     }
 }

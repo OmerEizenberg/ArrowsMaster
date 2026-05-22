@@ -105,6 +105,14 @@ public class MonthlyChallengeController : MonoBehaviour
         // 3. Get total days in the month
         int daysInMonth = DateTime.DaysInMonth(year, month);
 
+        // 35 UI slots cannot fit every month when day 1 is late in the week (e.g. Mar 2026).
+        // Shift the grid start so all in-month days remain playable; weekday labels may shift slightly.
+        int requiredSlots = dayOffset + daysInMonth;
+        if (dayImages != null && requiredSlots > dayImages.Length)
+        {
+            dayOffset = Mathf.Max(0, dayImages.Length - daysInMonth);
+        }
+
         // Load progress
         int passedCount = 0;
 

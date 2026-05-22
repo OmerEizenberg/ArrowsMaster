@@ -22,6 +22,8 @@ namespace Assets.Scripts.LiveOps
         private ALiveOpService service;
         private bool isLocked = false;
         private Coroutine tooltipCoroutine;
+        private float m_NextUiRefreshTime;
+        private const float UiRefreshInterval = 1f;
 
         public void Initialize(ALiveOpService service)
         {
@@ -41,14 +43,14 @@ namespace Assets.Scripts.LiveOps
 
         private void Update()
         {
-            if (service != null)
+            if (service == null || Time.time < m_NextUiRefreshTime) return;
+
+            m_NextUiRefreshTime = Time.time + UiRefreshInterval;
+            CheckUnlockState();
+
+            if (m_TimerTexts != null && m_TimerTexts.Count > 0)
             {
-                CheckUnlockState();
-                
-                if (m_TimerTexts != null && m_TimerTexts.Count > 0)
-                {
-                    UpdateTimers();
-                }
+                UpdateTimers();
             }
         }
 

@@ -25,10 +25,13 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_IS_DYNAMIC_MAX_ZOOM = "isDynamicMaxZoom";
     public const string KEY_AD_COOLDOWN = "adCooldown";
 
-
+    private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
 
     private bool isConfigReady = false;
+    private bool isFirebaseNativeReady = false;
+
     public bool IsConfigReady => isConfigReady;
+    public bool IsFirebaseNativeReady => isFirebaseNativeReady;
 
     public event Action OnConfigInitialized;
 
@@ -41,6 +44,7 @@ public class RemoteConfigManager : MonoBehaviour
         }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        BuildDefaultValues();
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -53,89 +57,199 @@ public class RemoteConfigManager : MonoBehaviour
         }
     }
 
+    private void BuildDefaultValues()
+    {
+        defaults.Clear();
+        defaults[KEY_FORCE_UPDATE_VERSION_ANDROID] = "1.0.0";
+        defaults[KEY_FORCE_UPDATE_VERSION_IOS] = "1.0.0";
+        defaults[KEY_SOFT_UPDATE_VERSION_ANDROID] = "1.0.0";
+        defaults[KEY_SOFT_UPDATE_VERSION_IOS] = "1.0.0";
+        defaults[KEY_FIRST_PLAY_ON] = 1600L;
+        defaults[KEY_SEC_PLAY_ON] = 3200L;
+        defaults[KEY_THIRD_PLAY_ON] = 4200L;
+        defaults[KEY_COINS_REWARDED_AD] = 2000L;
+        defaults[KEY_REWARDED_AD_COINS_COOLDOWN] = 240L;
+        defaults[KEY_SHARE_TEXT] = "Check out Arrows Legend! Can you beat my level?";
+        defaults[KEY_SHARE_URL] = "https://play.google.com/store/apps/details?id=com.Arrows.Master";
+        defaults[KEY_IS_INTERSTITIAL_ACTIVE] = true;
+        defaults[KEY_IS_DYNAMIC_MAX_ZOOM] = true;
+        defaults[KEY_AD_COOLDOWN] = 60L;
+    }
+
+    /// <summary>
+    /// Use baked-in defaults when Firebase native libs are missing (common in Editor on macOS).
+    /// </summary>
+    public void ApplyDefaultsOnly(string reason = null)
+    {
+        if (!string.IsNullOrEmpty(reason))
+        {
+            Debug.LogWarning("[RemoteConfigManager] Using baked-in defaults. " + reason);
+        }
+
+        isFirebaseNativeReady = false;
+        isConfigReady = true;
+        ApplyUserDataFromDefaults();
+        OnConfigInitialized?.Invoke();
+    }
+
     public void Initialize()
     {
         Debug.Log("[RemoteConfigManager] Initializing Remote Config...");
 
-        // Set default values
-        Dictionary<string, object> defaults = new Dictionary<string, object>
+        try
         {
-            { KEY_FORCE_UPDATE_VERSION_ANDROID, "1.0.0" },
-            { KEY_FORCE_UPDATE_VERSION_IOS, "1.0.0" },
-            { KEY_SOFT_UPDATE_VERSION_ANDROID, "1.0.0" },
-            { KEY_SOFT_UPDATE_VERSION_IOS, "1.0.0" },
-            { KEY_FIRST_PLAY_ON, 1600 },
-            { KEY_SEC_PLAY_ON, 3200 },
-            { KEY_THIRD_PLAY_ON, 4200 },
-            { KEY_COINS_REWARDED_AD, 2000 },
-            { KEY_REWARDED_AD_COINS_COOLDOWN, 240 },
-            { KEY_SHARE_TEXT, "Check out Arrows Legend! Can you beat my level?" },
-            { KEY_SHARE_URL, "https://play.google.com/store/apps/details?id=com.Arrows.Master" },
-            { KEY_IS_INTERSTITIAL_ACTIVE, true },
-            { KEY_IS_DYNAMIC_MAX_ZOOM, true },
-            { KEY_AD_COOLDOWN, 60 }
-        };
+            FirebaseRemoteConfig.DefaultInstance.SetDefaultsAsync(defaults).ContinueWithOnMainThread(task =>
+            {
+                if (task.IsFaulted)
+                {
+                    ApplyDefaultsOnly(task.Exception?.GetBaseException()?.Message);
+                    return;
+                }
 
-
-
-        FirebaseRemoteConfig.DefaultInstance.SetDefaultsAsync(defaults).ContinueWithOnMainThread(task =>
+                isFirebaseNativeReady = true;
+                FetchData();
+            });
+        }
+        catch (Exception e)
         {
-            FetchData();
-        });
+            ApplyDefaultsOnly(e.Message);
+        }
     }
 
     public void FetchData()
     {
-        Debug.Log("[RemoteConfigManager] Fetching Remote Config...");
-        
-        // FetchAsync(TimeSpan.Zero) ensures we get the latest values without waiting for the default cache expiration (12 hours)
-        // Note: For production, you might want to use a longer cache time to avoid throttling.
-        FirebaseRemoteConfig.DefaultInstance.FetchAsync(TimeSpan.Zero).ContinueWithOnMainThread(fetchTask =>
+        if (!isFirebaseNativeReady)
         {
-            if (fetchTask.IsCompleted && !fetchTask.IsFaulted)
+            ApplyDefaultsOnly("Firebase native layer unavailable.");
+            return;
+        }
+
+        Debug.Log("[RemoteConfigManager] Fetching Remote Config...");
+
+        try
+        {
+            FirebaseRemoteConfig.DefaultInstance.FetchAsync(TimeSpan.Zero).ContinueWithOnMainThread(fetchTask =>
             {
-                Debug.Log("[RemoteConfigManager] Fetch completed successfully.");
-                ActivateConfig();
-            }
-            else
-            {
-                Debug.LogError($"[RemoteConfigManager] Fetch failed: {fetchTask.Exception}");
-                // Even if fetch fails, we can try to activate what we have (cached or defaults)
-                isConfigReady = true;
-                OnConfigInitialized?.Invoke();
-            }
-        });
+                if (fetchTask.IsCompleted && !fetchTask.IsFaulted)
+                {
+                    Debug.Log("[RemoteConfigManager] Fetch completed successfully.");
+                    ActivateConfig();
+                }
+                else
+                {
+                    Debug.LogError($"[RemoteConfigManager] Fetch failed: {fetchTask.Exception}");
+                    isConfigReady = true;
+                    ApplyUserDataFromDefaults();
+                    OnConfigInitialized?.Invoke();
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            ApplyDefaultsOnly(e.Message);
+        }
     }
 
     private void ActivateConfig()
     {
-        FirebaseRemoteConfig.DefaultInstance.ActivateAsync().ContinueWithOnMainThread(activateTask =>
+        if (!isFirebaseNativeReady)
         {
-            if (activateTask.IsCompleted && !activateTask.IsFaulted)
+            ApplyDefaultsOnly("Firebase native layer unavailable.");
+            return;
+        }
+
+        try
+        {
+            FirebaseRemoteConfig.DefaultInstance.ActivateAsync().ContinueWithOnMainThread(activateTask =>
             {
-                Debug.Log($"[RemoteConfigManager] Activate completed. Result: {activateTask.Result}");
-                
-                // Update UserDataManager with the latest value
-                Assets.Scripts.Core.UserDataManager.Instance.IsInterstitialActive = IsInterstitialActive;
-                Assets.Scripts.Core.UserDataManager.Instance.IsDynamicMaxZoom = IsDynamicMaxZoom;
-            }
+                if (activateTask.IsCompleted && !activateTask.IsFaulted)
+                {
+                    Debug.Log($"[RemoteConfigManager] Activate completed. Result: {activateTask.Result}");
+                    ApplyUserDataFromRemoteOrDefaults();
+                }
+                else
+                {
+                    Debug.LogError($"[RemoteConfigManager] Activate failed: {activateTask.Exception}");
+                    ApplyUserDataFromDefaults();
+                }
 
+                isConfigReady = true;
+                OnConfigInitialized?.Invoke();
+            });
+        }
+        catch (Exception e)
+        {
+            ApplyDefaultsOnly(e.Message);
+        }
+    }
 
-            else
-            {
-                Debug.LogError($"[RemoteConfigManager] Activate failed: {activateTask.Exception}");
-            }
+    private void ApplyUserDataFromDefaults()
+    {
+        if (Assets.Scripts.Core.UserDataManager.Instance == null) return;
 
-            isConfigReady = true;
-            OnConfigInitialized?.Invoke();
-        });
+        Assets.Scripts.Core.UserDataManager.Instance.IsInterstitialActive = GetBool(KEY_IS_INTERSTITIAL_ACTIVE);
+        Assets.Scripts.Core.UserDataManager.Instance.IsDynamicMaxZoom = GetBool(KEY_IS_DYNAMIC_MAX_ZOOM);
+    }
+
+    private void ApplyUserDataFromRemoteOrDefaults()
+    {
+        ApplyUserDataFromDefaults();
     }
 
     #region Accessors
 
     public string GetString(string key)
     {
-        return FirebaseRemoteConfig.DefaultInstance.GetValue(key).StringValue;
+        if (!isFirebaseNativeReady)
+        {
+            return defaults.TryGetValue(key, out object value) ? Convert.ToString(value) : string.Empty;
+        }
+
+        try
+        {
+            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).StringValue;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[RemoteConfigManager] GetString fallback for '{key}': {e.Message}");
+            return defaults.TryGetValue(key, out object value) ? Convert.ToString(value) : string.Empty;
+        }
+    }
+
+    public bool GetBool(string key)
+    {
+        if (!isFirebaseNativeReady)
+        {
+            return defaults.TryGetValue(key, out object value) && Convert.ToBoolean(value);
+        }
+
+        try
+        {
+            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).BooleanValue;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[RemoteConfigManager] GetBool fallback for '{key}': {e.Message}");
+            return defaults.TryGetValue(key, out object value) && Convert.ToBoolean(value);
+        }
+    }
+
+    public long GetLong(string key)
+    {
+        if (!isFirebaseNativeReady)
+        {
+            return defaults.TryGetValue(key, out object value) ? Convert.ToInt64(value) : 0L;
+        }
+
+        try
+        {
+            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).LongValue;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[RemoteConfigManager] GetLong fallback for '{key}': {e.Message}");
+            return defaults.TryGetValue(key, out object value) ? Convert.ToInt64(value) : 0L;
+        }
     }
 
     public string ForceUpdateVersionAndroid => GetString(KEY_FORCE_UPDATE_VERSION_ANDROID);
@@ -144,15 +258,8 @@ public class RemoteConfigManager : MonoBehaviour
     public string SoftUpdateVersionIOS => GetString(KEY_SOFT_UPDATE_VERSION_IOS);
     public string ShareText => GetString(KEY_SHARE_TEXT);
     public string ShareUrl => GetString(KEY_SHARE_URL);
-    public bool IsInterstitialActive => FirebaseRemoteConfig.DefaultInstance.GetValue(KEY_IS_INTERSTITIAL_ACTIVE).BooleanValue;
-    public bool IsDynamicMaxZoom => FirebaseRemoteConfig.DefaultInstance.GetValue(KEY_IS_DYNAMIC_MAX_ZOOM).BooleanValue;
-
-
-
-    public long GetLong(string key)
-    {
-        return FirebaseRemoteConfig.DefaultInstance.GetValue(key).LongValue;
-    }
+    public bool IsInterstitialActive => GetBool(KEY_IS_INTERSTITIAL_ACTIVE);
+    public bool IsDynamicMaxZoom => GetBool(KEY_IS_DYNAMIC_MAX_ZOOM);
 
     public int FirstPlayOn => (int)GetLong(KEY_FIRST_PLAY_ON);
     public int SecPlayOn => (int)GetLong(KEY_SEC_PLAY_ON);
@@ -169,13 +276,13 @@ public class RemoteConfigManager : MonoBehaviour
     {
         get
         {
-            #if UNITY_ANDROID
+#if UNITY_ANDROID
             return ForceUpdateVersionAndroid;
-            #elif UNITY_IOS
+#elif UNITY_IOS
             return ForceUpdateVersionIOS;
-            #else
+#else
             return "1.0.0";
-            #endif
+#endif
         }
     }
 
@@ -183,13 +290,13 @@ public class RemoteConfigManager : MonoBehaviour
     {
         get
         {
-            #if UNITY_ANDROID
+#if UNITY_ANDROID
             return SoftUpdateVersionAndroid;
-            #elif UNITY_IOS
+#elif UNITY_IOS
             return SoftUpdateVersionIOS;
-            #else
+#else
             return "1.0.0";
-            #endif
+#endif
         }
     }
 

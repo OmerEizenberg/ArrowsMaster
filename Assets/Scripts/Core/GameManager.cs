@@ -16,7 +16,7 @@ namespace Assets.Scripts.Core
             {
                 if (_instance == null)
                 {
-                    _instance = FindObjectOfType<GameManager>();
+                    _instance = FindFirstObjectByType<GameManager>();
                 }
                 return _instance;
             }
@@ -31,6 +31,15 @@ namespace Assets.Scripts.Core
         public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;
         public const int REFILL_BOOSTER_UNLOCK_LEVEL = 9;
 
+        public static string GetChallengeLevelId(int month, int day, int year)
+        {
+            return $"Level{165 - (month + day + (year % 10))}";
+        }
+
+        public static int GetChallengeLevelNumber(int month, int day, int year)
+        {
+            return 165 - (month + day + (year % 10));
+        }
 
         public GameObject failureScreen;
         public GameUIContoleer m_GameUI;
@@ -82,6 +91,9 @@ namespace Assets.Scripts.Core
         public int currentChallengeDay;
 
         private float hintTimer = 0f;
+        private float hintAdPollTimer = 0f;
+        private bool cachedHintAdReady = false;
+        private const float HintAdPollInterval = 2f;
         private bool isEntranceFinished = false;
         private bool isHintVisible = false;
         private bool isWinning = false;
@@ -174,6 +186,8 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnLifeRewardReceived += HandleLifeRewardReceived;
                 AdsManager.Instance.OnAdOpened += HandleAdOpened;
                 AdsManager.Instance.OnAdClosed += HandleAdClosed;
+                AdsManager.Instance.OnAdReadinessChanged += RefreshHintAdReadyCache;
+                RefreshHintAdReadyCache();
             }
 
             if (UserDataManager.Instance != null)
@@ -237,6 +251,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnLifeRewardReceived -= HandleLifeRewardReceived;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
                 AdsManager.Instance.OnAdClosed -= HandleAdClosed;
+                AdsManager.Instance.OnAdReadinessChanged -= RefreshHintAdReadyCache;
             }
 
             if (UserDataManager.Instance != null)
@@ -292,6 +307,13 @@ namespace Assets.Scripts.Core
                 isTimerActive = true;
                 wasTimerActiveBeforeAd = false;
             }
+            RefreshHintAdReadyCache();
+        }
+
+        private void RefreshHintAdReadyCache()
+        {
+            cachedHintAdReady = AdsManager.Instance != null &&
+                (AdsManager.Instance.IsRewardedReady || AdsManager.Instance.IsInterstitialReady);
         }
 
         public void ShowHint()
@@ -413,7 +435,7 @@ namespace Assets.Scripts.Core
 
         public int GetPlayOnCost()
         {
-            if (RemoteConfigManager.Instance != null)
+            if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
             {
                 if (playOnPurchaseCount == 0) return RemoteConfigManager.Instance.FirstPlayOn;
                 if (playOnPurchaseCount == 1) return RemoteConfigManager.Instance.SecPlayOn;
@@ -515,7 +537,8 @@ namespace Assets.Scripts.Core
         {
             if (m_LobbyUI != null) m_LobbyUI.SetActive(false);
             g_IsFromGame = true;
-            
+            p_isLevelProgression = true;
+
             p_pickedArrowIds.Clear();
             UserDataManager.Instance.ClearLevelProgress(); 
             ResetLevelState();
@@ -1023,8 +1046,13 @@ namespace Assets.Scripts.Core
             if (isEntranceFinished && !isWinning && !isHintVisible && !isFailureVisible && !isLobbyVisible)
             {
                 hintTimer += Time.deltaTime;
-                bool isAdReady = AdsManager.Instance != null && (AdsManager.Instance.IsRewardedReady || AdsManager.Instance.IsInterstitialReady);
-                if (hintTimer >= 5.0f && isAdReady)
+                hintAdPollTimer += Time.deltaTime;
+                if (hintAdPollTimer >= HintAdPollInterval)
+                {
+                    hintAdPollTimer = 0f;
+                    RefreshHintAdReadyCache();
+                }
+                if (hintTimer >= 5.0f && cachedHintAdReady)
                 {
                     SetHintVisibility(true);
                     SoundManager.Instance.PlayHint();
@@ -1051,6 +1079,7 @@ namespace Assets.Scripts.Core
         public void ResetHintTimer(bool clearActiveHint = true)
         {
             hintTimer = 0f;
+            hintAdPollTimer = 0f;
             SetHintVisibility(false);
             
             // If there's an active hint, clear it immediately when user starts interacting

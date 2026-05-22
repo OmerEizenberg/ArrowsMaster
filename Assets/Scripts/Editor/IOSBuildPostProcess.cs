@@ -1,5 +1,7 @@
 #if UNITY_IOS
 using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 using UnityEditor.Callbacks;
 using UnityEditor.iOS.Xcode;
 using UnityEditor.iOS.Xcode.Extensions;
@@ -8,9 +10,23 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 
 [InitializeOnLoad]
-public class IOSBuildPostProcess
+public class IOSBuildPostProcess : IPreprocessBuildWithReport
 {
+    public int callbackOrder => 0;
+
     static IOSBuildPostProcess()
+    {
+        ConfigureBuildEnvironment();
+        ConfigureIOSResolverForWorkspace();
+    }
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        if (report.summary.platform != BuildTarget.iOS) return;
+        EnsureCocoaPodsAvailableOrThrow();
+    }
+
+    private static void ConfigureBuildEnvironment()
     {
         // Set environment variables for the current process so all internal Unity calls (like EDM4U)
         // use the correct encoding and path.
@@ -18,16 +34,58 @@ public class IOSBuildPostProcess
         System.Environment.SetEnvironmentVariable("LC_ALL", "en_US.UTF-8");
         System.Environment.SetEnvironmentVariable("LC_CTYPE", "en_US.UTF-8");
         System.Environment.SetEnvironmentVariable("RUBYOPT", "-Eutf-8");
-        
+
         string currentPath = System.Environment.GetEnvironmentVariable("PATH") ?? "";
         string homebrewPath = "/opt/homebrew/bin:/usr/local/bin";
         if (!currentPath.StartsWith(homebrewPath))
         {
             System.Environment.SetEnvironmentVariable("PATH", homebrewPath + ":" + currentPath);
         }
+    }
 
-        // Silence EDM4U as early as possible (when script is loaded)
-        SilenceEDM4U();
+    private static void ConfigureIOSResolverForWorkspace()
+    {
+        try
+        {
+            foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.FullName.Contains("Google.IOSResolver")) continue;
+
+                var type = assembly.GetType("Google.IOSResolver");
+                if (type == null) continue;
+
+                // Workspace integration creates Unity-iPhone.xcworkspace (required for Firebase / LevelPlay pods).
+                SetStaticBool(type, "PodfileGenerationEnabled", true);
+
+                var integrationMethod = type.GetProperty("CocoapodsIntegrationMethodPref",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (integrationMethod != null)
+                {
+                    var workspaceEnum = System.Enum.Parse(integrationMethod.PropertyType, "Workspace");
+                    integrationMethod.SetValue(null, workspaceEnum);
+                }
+
+                // Let our post-process run the final pod install after Podfile tweaks.
+                SetStaticBool(type, "SkipPodInstallWhenUsingWorkspaceIntegration", true);
+
+                Debug.Log("[IOSBuildPostProcess] iOS Resolver configured for Xcode workspace integration.");
+                return;
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Could not configure iOS Resolver: " + e.Message);
+        }
+    }
+
+    private static void SetStaticBool(System.Type type, string propertyName, bool value)
+    {
+        var property = type.GetProperty(propertyName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        if (property != null && property.PropertyType == typeof(bool))
+        {
+            property.SetValue(null, value);
+        }
     }
 
     // High order to ensure it runs after EDM4U and other processors
@@ -39,39 +97,86 @@ public class IOSBuildPostProcess
         UpdatePodfile(pathToBuiltProject);
         UpdateXcodeProject(pathToBuiltProject);
         FixFBLPromisesPrivacyBundle(pathToBuiltProject);
+        EnsureWorkspaceExistsOrThrow(pathToBuiltProject);
     }
 
-    private static void SilenceEDM4U()
-    {
-        try
-        {
-            // We use reflection to set EDM4U settings to false to prevent it from running its own
-            // failing 'pod install' and showing the error popup.
-            foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (assembly.FullName.Contains("Google.IOSResolver"))
-                {
-                    var type = assembly.GetType("Google.IOSResolver");
-                    if (type != null)
-                    {
-                        var podfileEnabled = type.GetProperty("PodfileEnabled", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                        if (podfileEnabled != null) podfileEnabled.SetValue(null, false);
-                        
-                        var autoInstall = type.GetProperty("AutoPodToolInstallInEditor", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                        if (autoInstall != null) autoInstall.SetValue(null, false);
+    private const string WorkspaceName = "Unity-iPhone.xcworkspace";
 
-                        var podToolExecutionViaShellEnabled = type.GetProperty("PodToolExecutionViaShellEnabled", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                        if (podToolExecutionViaShellEnabled != null) podToolExecutionViaShellEnabled.SetValue(null, true);
-                        
-                        Debug.Log("[IOSBuildPostProcess] programmatically silenced EDM4U resolver at load time.");
-                    }
-                }
+    private static string ResolvePodExecutable()
+    {
+        string[] podPaths = { "/opt/homebrew/bin/pod", "/usr/local/bin/pod", "pod" };
+        foreach (var path in podPaths)
+        {
+            if (path == "pod" || File.Exists(path))
+            {
+                return path;
             }
         }
-        catch (System.Exception e)
+        return "pod";
+    }
+
+    private static bool IsPodAvailable()
+    {
+        string pod = ResolvePodExecutable();
+        if (pod != "pod" && !File.Exists(pod)) return false;
+
+        try
         {
-            Debug.LogWarning("[IOSBuildPostProcess] Could not silence EDM4U via reflection: " + e.Message);
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "/bin/bash",
+                Arguments = $"-c \"export PATH=\\\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin\\\" && \\\"{pod}\\\" --version\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            using (var process = System.Diagnostics.Process.Start(startInfo))
+            {
+                process.WaitForExit();
+                return process.ExitCode == 0;
+            }
         }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void EnsureCocoaPodsAvailableOrThrow()
+    {
+        if (IsPodAvailable()) return;
+
+        throw new BuildFailedException(
+            "CocoaPods is not installed on this Mac. Unity iOS builds for this project need " +
+            "'pod install' to generate Unity-iPhone.xcworkspace.\n\n" +
+            "Install CocoaPods, then rebuild:\n" +
+            "  brew install cocoapods\n" +
+            "  # or: sudo gem install cocoapods\n\n" +
+            "Verify with: pod --version");
+    }
+
+    private static void EnsureWorkspaceExistsOrThrow(string pathToBuiltProject)
+    {
+        string workspacePath = Path.Combine(pathToBuiltProject, WorkspaceName);
+        if (Directory.Exists(workspacePath))
+        {
+            Debug.Log("[IOSBuildPostProcess] Open this file in Xcode: " + workspacePath);
+            return;
+        }
+
+        string podfilePath = Path.Combine(pathToBuiltProject, "Podfile");
+        string podfileHint = File.Exists(podfilePath)
+            ? "A Podfile was generated but 'pod install' did not create the workspace."
+            : "No Podfile was found in the Xcode export folder.";
+
+        throw new BuildFailedException(
+            WorkspaceName + " was not created after the iOS build.\n" +
+            podfileHint + "\n\n" +
+            "Install CocoaPods if needed (brew install cocoapods), then run:\n" +
+            "  cd \"" + pathToBuiltProject + "\"\n" +
+            "  pod install\n\n" +
+            "Always open " + WorkspaceName + " in Xcode, not Unity-iPhone.xcodeproj.");
     }
 
     private static void UpdateXcodeProject(string pathToBuiltProject)
@@ -99,6 +204,9 @@ public class IOSBuildPostProcess
         
         // ATT Permission Message
         rootDict.SetString("NSUserTrackingUsageDescription", "Your data will be used to provide you with a better and more personalized ad experience.");
+
+        // AdMob application ID (required for IronSource AdMob adapter on iOS)
+        rootDict.SetString("GADApplicationIdentifier", "ca-app-pub-2980983758149509~7869782198");
 
         PlistElementArray backgroundModes = rootDict.CreateArray("UIBackgroundModes");
         backgroundModes.AddString("remote-notification");
@@ -336,19 +444,10 @@ public class IOSBuildPostProcess
 
     private static void RunPodInstall(string pathToBuiltProject)
     {
-        Debug.Log("[IOSBuildPostProcess] Running pod install with UTF-8 environment...");
-        
-        string[] podPaths = { "/opt/homebrew/bin/pod", "/usr/local/bin/pod", "pod" };
-        string chosenPod = "pod";
-        
-        foreach (var path in podPaths)
-        {
-            if (File.Exists(path))
-            {
-                chosenPod = path;
-                break;
-            }
-        }
+        EnsureCocoaPodsAvailableOrThrow();
+
+        string chosenPod = ResolvePodExecutable();
+        Debug.Log("[IOSBuildPostProcess] Running pod install with UTF-8 environment using: " + chosenPod);
 
         System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
         startInfo.FileName = "/bin/bash";
@@ -368,11 +467,15 @@ public class IOSBuildPostProcess
             if (process.ExitCode == 0)
             {
                 Debug.Log("[IOSBuildPostProcess] pod install finished successfully.\n" + output);
+                return;
             }
-            else
-            {
-                Debug.LogError("[IOSBuildPostProcess] pod install failed with exit code " + process.ExitCode + ".\nError: " + error + "\nOutput: " + output);
-            }
+
+            throw new BuildFailedException(
+                "[IOSBuildPostProcess] pod install failed with exit code " + process.ExitCode + ".\n" +
+                "Error: " + error + "\nOutput: " + output + "\n\n" +
+                "Fix CocoaPods, then run manually:\n" +
+                "  cd \"" + pathToBuiltProject + "\"\n" +
+                "  pod install");
         }
     }
 

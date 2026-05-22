@@ -7,7 +7,11 @@ public class LikeBehaviour : MonoBehaviour
     // Start is called before the first frame update
     void OnEnable()
     {
-        gameObject.GetComponent<Animator>().SetTrigger("StartAnim");
+        var animator = GetComponent<Animator>();
+        if (animator != null)
+        {
+            animator.SetTrigger("StartAnim");
+        }
     }
     public void DESTROYME()
     {

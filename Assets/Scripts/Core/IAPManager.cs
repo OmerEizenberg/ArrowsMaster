@@ -62,6 +62,7 @@ namespace Assets.Scripts.Core
 
         private string m_PendingPurchaseId = null;
         private bool m_IsInitializing = false;
+        private static Task unityServicesInitTask;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoInitialize()
@@ -119,7 +120,40 @@ namespace Assets.Scripts.Core
             }
         }
 
+        public static async Task EnsureUnityServicesInitializedAsync()
+        {
+            if (UnityServices.State == ServicesInitializationState.Initialized) return;
+
+            if (Instance != null)
+            {
+                await Instance.InitializeUnityServices();
+                return;
+            }
+
+            try
+            {
+                var options = new InitializationOptions().SetEnvironmentName("production");
+                await UnityServices.InitializeAsync(options);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAPManager] Unity Services Failed: {e.Message}");
+            }
+        }
+
         private async Task InitializeUnityServices()
+        {
+            if (UnityServices.State == ServicesInitializationState.Initialized) return;
+
+            if (unityServicesInitTask == null)
+            {
+                unityServicesInitTask = InitializeUnityServicesInternal();
+            }
+
+            await unityServicesInitTask;
+        }
+
+        private async Task InitializeUnityServicesInternal()
         {
             if (UnityServices.State == ServicesInitializationState.Initialized) return;
 
@@ -205,6 +239,7 @@ namespace Assets.Scripts.Core
             {
                 ProductTypeID.NoAds999 => ProductNoAds999,
                 ProductTypeID.NoAdsCoins999 => ProductNoAdsCoins999,
+                ProductTypeID.Donate199 => ProductCoins199,
                 ProductTypeID.Coins199 => ProductCoins199,
                 ProductTypeID.Coins499 => ProductCoins499,
                 ProductTypeID.Coins999 => ProductCoins999,
@@ -439,6 +474,10 @@ namespace Assets.Scripts.Core
                 var apple = m_StoreExtensionProvider.GetExtension<IAppleExtensions>();
                 apple.RestoreTransactions((result, error) => {
                     Debug.Log($"[IAPManager] Restore result: {result}. Error: {error}");
+                    if (result && IsInitialized())
+                    {
+                        CheckAlreadyOwnedProducts();
+                    }
                 });
             }
         }
