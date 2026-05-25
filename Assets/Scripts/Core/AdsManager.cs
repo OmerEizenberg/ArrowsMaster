@@ -48,6 +48,7 @@ namespace Assets.Scripts.Core
         private bool _multiplyRewardedReady;
         private bool _coinsRewardedReady;
         private bool _interstitialReady;
+        private bool _bannerReady;
 
         private GameObject _coinsExplosionPrefab;
         private Coroutine _deferredWorkCoroutine;
@@ -223,6 +224,11 @@ namespace Assets.Scripts.Core
         private void RefreshMultiplyRewardedReady() =>
             SetCachedReady(ref _multiplyRewardedReady, QueryNativeReady(multiplyRewardedAd));
 
+        private void RefreshBannerReady(bool loaded)
+        {
+            SetCachedReady(ref _bannerReady, loaded);
+        }
+
         private void RefreshAllReadiness()
         {
             RefreshInterstitialReady();
@@ -298,6 +304,11 @@ namespace Assets.Scripts.Core
                     if (multiplyRewardedAd != null && !_multiplyRewardedReady)
                     {
                         LoadMultiplyRewarded();
+                    }
+
+                    if (settingsBannerAd != null && !_bannerReady)
+                    {
+                        LoadSettingsBanner();
                     }
                 }
                 catch (Exception e)
@@ -1224,17 +1235,42 @@ namespace Assets.Scripts.Core
             if (settingsBannerAd != null) settingsBannerAd.DestroyAd();
             settingsBannerAd = new LevelPlayBannerAd(SettingsBannerAdUnitId);
             
-            settingsBannerAd.OnAdLoaded += (info) => Debug.Log($"[AdsManager] Settings Banner Loaded: {info}");
-            settingsBannerAd.OnAdLoadFailed += (error) => Debug.LogError($"[AdsManager] Settings Banner Load Failed: {error}");
+            settingsBannerAd.OnAdLoaded += (info) => EnqueueAction(() => {
+                Debug.Log($"[AdsManager] Settings Banner Loaded: {info}");
+                RefreshBannerReady(true);
+            });
+            settingsBannerAd.OnAdLoadFailed += (error) => EnqueueAction(() => {
+                Debug.LogWarning($"[AdsManager] Settings Banner Load Failed: {error}. Retrying in 15s...");
+                RefreshBannerReady(false);
+                _ = RetryLoadBanner(15000);
+            });
             settingsBannerAd.OnAdDisplayed += (info) => {
                 Debug.Log($"[AdsManager] Settings Banner Displayed: {info}");
             };
 
-            Debug.Log("[AdsManager] Pre-loading Settings Banner Ad (Hidden).");
-            settingsBannerAd.LoadAd();
+            LoadSettingsBanner();
             settingsBannerAd.HideAd();
         }
 
+        private async Task RetryLoadBanner(int delayMs)
+        {
+            await Task.Delay(delayMs);
+            if (this != null && !_bannerReady)
+            {
+                EnqueueAction(LoadSettingsBanner);
+            }
+        }
+
+        public void LoadSettingsBanner()
+        {
+            if (!isInitialized || settingsBannerAd == null)
+            {
+                if (!isInitialized && !isInitializing) _ = InitializeSDK();
+                return;
+            }
+            Debug.Log("[AdsManager] Loading Settings Banner Ad...");
+            settingsBannerAd.LoadAd();
+        }
 
         public void ShowSettingsBanner()
         {
@@ -1257,7 +1293,6 @@ namespace Assets.Scripts.Core
 
             Debug.Log("[AdsManager] Showing Settings Banner Ad.");
             settingsBannerAd.ShowAd();
-            // Ad is already pre-loaded or loading in background
         }
 
         public void HideSettingsBanner()
