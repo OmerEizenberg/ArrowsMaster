@@ -230,11 +230,6 @@ namespace Assets.Scripts.Core
                     Debug.LogError("Failed to deserialize LevelData.");
                     return;
                 }
-            // Initialize timer if level has duration
-            if (GameManager.Instance != null && data.duration > 0)
-            {
-                GameManager.Instance.InitializeTimer(data.duration);
-            }
             // Initialize Grid
             m_CurrentGridSize = data.gridSize.ToVector2Int();
             GridManager.Instance.InitializeGrid(m_CurrentGridSize);
@@ -248,6 +243,22 @@ namespace Assets.Scripts.Core
                 foreach (var arrow in data.arrows)
                 {
                     if (arrow.path != null) m_TotalPointsInLevel += arrow.path.Count;
+                }
+            }
+
+            // Initialize timer: use JSON duration for challenge levels, compute from points for normal levels when AllLevelsTimer is on
+            if (GameManager.Instance != null)
+            {
+                float timerDuration = data.duration;
+                Debug.Log($"[LevelManager] Timer check: dataDuration={data.duration}, totalPoints={m_TotalPointsInLevel}, isProgression={GameManager.Instance.p_isLevelProgression}, allLevelsTimer={GameManager.Instance.IsAllLevelsTimerEnabled}, ptsMul={GameManager.Instance.PointsToSecondsMultiplier}");
+                if (timerDuration <= 0 && GameManager.Instance.p_isLevelProgression && GameManager.Instance.IsAllLevelsTimerEnabled)
+                {
+                    timerDuration = m_TotalPointsInLevel * GameManager.Instance.PointsToSecondsMultiplier;
+                    Debug.Log($"[LevelManager] Computed timer from points: {m_TotalPointsInLevel} * {GameManager.Instance.PointsToSecondsMultiplier} = {timerDuration}s");
+                }
+                if (timerDuration > 0)
+                {
+                    GameManager.Instance.InitializeTimer(timerDuration);
                 }
             }
 

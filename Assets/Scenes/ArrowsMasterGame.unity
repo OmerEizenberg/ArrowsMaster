@@ -7518,6 +7518,7 @@ MonoBehaviour:
   m_TimerText: {fileID: 1407470196}
   m_FailureTitle: {fileID: 603927629}
   m_FailureSubtitle: {fileID: 598936578}
+  m_FailureAdText: {fileID: 591900102}
   m_FailureDescription: {fileID: 598936578}
   m_NoAdsOfferImage: {fileID: 29634319}
   m_PlayOnAdButton: {fileID: 624092796}
@@ -14192,7 +14193,7 @@ GameObject:
   - component: {fileID: 591900103}
   - component: {fileID: 591900102}
   m_Layer: 5
-  m_Name: Text (TMP)
+  m_Name: KeepPlayTxt
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

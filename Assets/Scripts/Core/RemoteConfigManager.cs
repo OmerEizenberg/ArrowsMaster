@@ -24,6 +24,8 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_IS_INTERSTITIAL_ACTIVE = "isInterstitialActive";
     public const string KEY_IS_DYNAMIC_MAX_ZOOM = "isDynamicMaxZoom";
     public const string KEY_AD_COOLDOWN = "adCooldown";
+    public const string KEY_ALL_LEVELS_TIMER = "AllLevelsTimer";
+    public const string KEY_PTS_MUL = "PTS_Mul";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
 
@@ -32,6 +34,7 @@ public class RemoteConfigManager : MonoBehaviour
 
     public bool IsConfigReady => isConfigReady;
     public bool IsFirebaseNativeReady => isFirebaseNativeReady;
+
 
     public event Action OnConfigInitialized;
 
@@ -74,6 +77,8 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_IS_INTERSTITIAL_ACTIVE] = true;
         defaults[KEY_IS_DYNAMIC_MAX_ZOOM] = true;
         defaults[KEY_AD_COOLDOWN] = 60L;
+        defaults[KEY_ALL_LEVELS_TIMER] = false;
+        defaults[KEY_PTS_MUL] = 0.28d;
     }
 
     /// <summary>
@@ -252,6 +257,24 @@ public class RemoteConfigManager : MonoBehaviour
         }
     }
 
+    public double GetDouble(string key)
+    {
+        if (!isFirebaseNativeReady)
+        {
+            return defaults.TryGetValue(key, out object value) ? Convert.ToDouble(value) : 0.0;
+        }
+
+        try
+        {
+            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).DoubleValue;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[RemoteConfigManager] GetDouble fallback for '{key}': {e.Message}");
+            return defaults.TryGetValue(key, out object value) ? Convert.ToDouble(value) : 0.0;
+        }
+    }
+
     public string ForceUpdateVersionAndroid => GetString(KEY_FORCE_UPDATE_VERSION_ANDROID);
     public string ForceUpdateVersionIOS => GetString(KEY_FORCE_UPDATE_VERSION_IOS);
     public string SoftUpdateVersionAndroid => GetString(KEY_SOFT_UPDATE_VERSION_ANDROID);
@@ -267,6 +290,8 @@ public class RemoteConfigManager : MonoBehaviour
     public int CoinsRewardedAd => (int)GetLong(KEY_COINS_REWARDED_AD);
     public int RewardedAdCoinsCooldown => (int)GetLong(KEY_REWARDED_AD_COINS_COOLDOWN);
     public int AdCooldown => (int)GetLong(KEY_AD_COOLDOWN);
+    public bool AllLevelsTimer => GetBool(KEY_ALL_LEVELS_TIMER);
+    public float PtsMul => (float)GetDouble(KEY_PTS_MUL);
 
     #endregion
 

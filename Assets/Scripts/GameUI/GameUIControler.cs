@@ -29,6 +29,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_TimerText; // Timer display (MM:SS)
     [SerializeField] private TextMeshProUGUI m_FailureTitle; // "Out of Lives!" or "Time's Up!"
     [SerializeField] private TextMeshProUGUI m_FailureSubtitle; // Subtitle text
+    [SerializeField] private TextMeshProUGUI m_FailureAdText; // Ad text
     [SerializeField] private TextMeshProUGUI m_FailureDescription; // Description text
     [SerializeField] private GameObject m_NoAdsOfferImage; // Image for the special offer (coins + no ads)
     [SerializeField] private GameObject m_PlayOnAdButton; // Button to watch ad for PlayOn
@@ -492,6 +493,11 @@ public class GameUIContoleer : MonoBehaviour
             if (m_FailureSubtitle != null)
             {
                 m_FailureSubtitle.text = GameManager.Instance.GetFailureSubtitle();
+            }
+
+            if (m_FailureAdText != null)
+            {
+                m_FailureAdText.text = GameManager.Instance.GetFailureAdText();
             }
 
             if (m_FailureDescription != null)

@@ -1127,12 +1127,33 @@ namespace Assets.Scripts.Core
         }
         
         // Timer-related methods
+        public float PointsToSecondsMultiplier =>
+            RemoteConfigManager.Instance != null
+                ? RemoteConfigManager.Instance.PtsMul
+                : 0.28f;
+
+        public const int ALL_LEVELS_TIMER_START_LEVEL = 15;
+
+        public bool IsAllLevelsTimerEnabled =>
+            RemoteConfigManager.Instance != null &&
+            RemoteConfigManager.Instance.AllLevelsTimer &&
+            UserDataManager.Instance != null &&
+            UserDataManager.Instance.CurrentLevel >= ALL_LEVELS_TIMER_START_LEVEL;
+
         public void InitializeTimer(float durationInSeconds)
         {
+            Debug.Log($"[GameManager] InitializeTimer called. duration={durationInSeconds}, isLevelProgression={p_isLevelProgression}, AllLevelsTimer={IsAllLevelsTimerEnabled}, ConfigReady={RemoteConfigManager.Instance?.IsConfigReady}, FirebaseNative={RemoteConfigManager.Instance?.IsFirebaseNativeReady}");
+
             if (p_isLevelProgression)
             {
-                // Force no timer for normal levels as requested
-                levelDuration = 0f;
+                if (IsAllLevelsTimerEnabled)
+                {
+                    levelDuration = durationInSeconds;
+                }
+                else
+                {
+                    levelDuration = 0f;
+                }
             }
             else
             {
@@ -1143,8 +1164,12 @@ namespace Assets.Scripts.Core
             {
                 currentTime = levelDuration;
                 lastDisplayedSecond = -1;
-                // Timer will start when first touch happens (when isEntranceFinished is true)
+                Debug.Log($"[GameManager] Timer initialized: {levelDuration}s");
                 UpdateTimerUI();
+            }
+            else
+            {
+                Debug.Log("[GameManager] Timer NOT set (levelDuration=0).");
             }
         }
 
@@ -1183,6 +1208,7 @@ namespace Assets.Scripts.Core
         {
             if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
+            ClearActiveVoices();
             Debug.Log("Time's up!");
             if (failureScreen != null)
             {
@@ -1193,6 +1219,9 @@ namespace Assets.Scripts.Core
             if (p_isLevelProgression)
             {
                 UserDataManager.Instance.IncrementCurrentLevelAttempts();
+                m_SavedStreakBeforeGameOver = UserDataManager.Instance.LevelStreak;
+                UserDataManager.Instance.ResetLevelStreak();
+                Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyMainLevelFailed();
             }
 
             // --- Analytics: level_end (Fail - Time) ---
@@ -1216,6 +1245,18 @@ namespace Assets.Scripts.Core
                 m_UserBalanceText.text = UserDataManager.Instance.ArrowsCurrency.ToString("N0");
             }
 
+            if (m_RewardedAdAmountText != null)
+            {
+                int amount = 2000;
+                if (RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady)
+                {
+                    amount = RemoteConfigManager.Instance.CoinsRewardedAd;
+                }
+                m_RewardedAdAmountText.text = amount.ToString("N0");
+            }
+
+            UserDataManager.Instance.ClearLevelProgress();
+            if (m_PeriodicSaveCoroutine != null) { StopCoroutine(m_PeriodicSaveCoroutine); m_PeriodicSaveCoroutine = null; }
             OnGameOver?.Invoke();
         }
         
@@ -1233,6 +1274,18 @@ namespace Assets.Scripts.Core
             else
             {
                 return "Watch an ad to refill lives\nand Keep Playing!";
+            }
+        }
+
+         public string GetFailureAdText()
+        {
+            if (isTimeUp)
+            {
+                return "+60 Seconds";
+            }
+            else
+            {
+                return "Add More Lives";
             }
         }
 
@@ -1417,8 +1470,8 @@ namespace Assets.Scripts.Core
                 isTimerActive = false;
             }
 
-            // Enforce that normal levels never have a timer
-            if (p_isLevelProgression)
+            // Enforce that normal levels never have a timer (unless AllLevelsTimer is on)
+            if (p_isLevelProgression && !IsAllLevelsTimerEnabled)
             {
                 levelDuration = 0f;
                 currentTime = 0f;
