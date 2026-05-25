@@ -94,10 +94,110 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
     {
         if (target != BuildTarget.iOS) return;
 
+        PatchSingularUnityWrapper(pathToBuiltProject);
         UpdatePodfile(pathToBuiltProject);
         UpdateXcodeProject(pathToBuiltProject);
+        FixWebKitFrameworkCasing(pathToBuiltProject);
         FixFBLPromisesPrivacyBundle(pathToBuiltProject);
         EnsureWorkspaceExistsOrThrow(pathToBuiltProject);
+    }
+
+    private static void PatchSingularUnityWrapper(string pathToBuiltProject)
+    {
+        string wrapperPath = Path.Combine(
+            pathToBuiltProject,
+            "Libraries/singular-unity-package/SingularSDK/Plugins/iOS/SingularUnityWrapper.mm");
+
+        if (!File.Exists(wrapperPath))
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] SingularUnityWrapper.mm not found; skipping main-thread patch.");
+            return;
+        }
+
+        string content = File.ReadAllText(wrapperPath);
+        if (content.Contains("dispatch_get_main_queue"))
+        {
+            Debug.Log("[IOSBuildPostProcess] SingularUnityWrapper.mm already patched for main-thread delivery.");
+            return;
+        }
+
+        const string oldSendSdkMessage =
+            "static void sendSdkMessage(const char *methodName, NSString *param) {\n" +
+            "    const char* str = [param UTF8String];\n" +
+            "    char* result = (char*)malloc(strlen(str)+1);\n" +
+            "    strcpy(result,str);\n" +
+            "    \n" +
+            "    UnitySendMessage(\"SingularSDKObject\", methodName, result);\n" +
+            "}";
+
+        const string newSendSdkMessage =
+            "static void sendSdkMessage(const char *methodName, NSString *param) {\n" +
+            "    const char* str = [param UTF8String];\n" +
+            "    if (str == NULL) {\n" +
+            "        return;\n" +
+            "    }\n" +
+            "    size_t length = strlen(str);\n" +
+            "    char* result = (char*)malloc(length + 1);\n" +
+            "    if (result == NULL) {\n" +
+            "        return;\n" +
+            "    }\n" +
+            "    memcpy(result, str, length + 1);\n" +
+            "\n" +
+            "    void (^deliverMessage)(void) = ^{\n" +
+            "        UnitySendMessage(\"SingularSDKObject\", methodName, result);\n" +
+            "    };\n" +
+            "\n" +
+            "    if ([NSThread isMainThread]) {\n" +
+            "        deliverMessage();\n" +
+            "    } else {\n" +
+            "        dispatch_async(dispatch_get_main_queue(), deliverMessage);\n" +
+            "    }\n" +
+            "}";
+
+        if (!content.Contains(oldSendSdkMessage))
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] SingularUnityWrapper.mm format changed; main-thread patch not applied.");
+            return;
+        }
+
+        content = content.Replace(oldSendSdkMessage, newSendSdkMessage);
+
+        const string oldDeferredHandler =
+            "    void RegisterDeferredDeepLinkHandler_(){\n" +
+            "        [Singular registerDeferredDeepLinkHandler:^(NSString *deeplink) {\n" +
+            "            if(deeplink != NULL){\n" +
+            "                const char* str = [deeplink UTF8String];\n" +
+            "                char* result = (char*)malloc(strlen(str)+1);\n" +
+            "                strcpy(result,str);\n" +
+            "                UnitySendMessage(\"SingularSDKObject\", \"DeepLinkHandler\", result);\n" +
+            "            }else{\n" +
+            "                UnitySendMessage(\"SingularSDKObject\", \"DeepLinkHandler\", \"\");\n" +
+            "            }\n" +
+            "        }];\n" +
+            "    }";
+
+        const string newDeferredHandler =
+            "    void RegisterDeferredDeepLinkHandler_(){\n" +
+            "        [Singular registerDeferredDeepLinkHandler:^(NSString *deeplink) {\n" +
+            "            if(deeplink != NULL){\n" +
+            "                sendSdkMessage(\"DeepLinkHandler\", deeplink);\n" +
+            "            }else{\n" +
+            "                sendSdkMessage(\"DeepLinkHandler\", @\"\");\n" +
+            "            }\n" +
+            "        }];\n" +
+            "    }";
+
+        if (content.Contains(oldDeferredHandler))
+        {
+            content = content.Replace(oldDeferredHandler, newDeferredHandler);
+        }
+        else
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Singular deferred deep link handler format changed; patch not applied.");
+        }
+
+        File.WriteAllText(wrapperPath, content);
+        Debug.Log("[IOSBuildPostProcess] Patched SingularUnityWrapper.mm to deliver UnitySendMessage on the main thread.");
     }
 
     private const string WorkspaceName = "Unity-iPhone.xcworkspace";
@@ -177,6 +277,22 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
             "  cd \"" + pathToBuiltProject + "\"\n" +
             "  pod install\n\n" +
             "Always open " + WorkspaceName + " in Xcode, not Unity-iPhone.xcodeproj.");
+    }
+
+    /// <summary>
+    /// Singular SDK post-build adds "Webkit.framework" (wrong casing). Xcode requires WebKit.framework.
+    /// </summary>
+    private static void FixWebKitFrameworkCasing(string pathToBuiltProject)
+    {
+        string projectPath = PBXProject.GetPBXProjectPath(pathToBuiltProject);
+        if (!File.Exists(projectPath)) return;
+
+        string content = File.ReadAllText(projectPath);
+        if (!content.Contains("Webkit.framework")) return;
+
+        content = content.Replace("Webkit.framework", "WebKit.framework");
+        File.WriteAllText(projectPath, content);
+        Debug.Log("[IOSBuildPostProcess] Corrected WebKit.framework casing in project.pbxproj.");
     }
 
     private static void UpdateXcodeProject(string pathToBuiltProject)

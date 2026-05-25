@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Purchasing;
 using UnityEngine.Purchasing.Extension;
+using UnityEngine.Purchasing.Security;
 using Unity.Services.Core;
 using Unity.Services.Core.Environments;
 using System.Threading.Tasks;
@@ -59,6 +61,8 @@ namespace Assets.Scripts.Core
 
         public event Action<bool> OnNoAdsStatusChanged;
         public event Action<string> OnPurchaseSuccess;
+        /// <summary>Fired on Android when the user chose a delayed payment method (e.g. pay in cash). Fulfillment happens after Google marks the order paid.</summary>
+        public event Action<string> OnPurchaseAwaitingPayment;
 
         private string m_PendingPurchaseId = null;
         private bool m_IsInitializing = false;
@@ -182,6 +186,11 @@ namespace Assets.Scripts.Core
 #endif
 
             var builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance(store));
+
+#if UNITY_ANDROID
+            var googleConfig = builder.Configure<IGooglePlayConfiguration>();
+            googleConfig.SetDeferredPurchaseListener(OnGooglePlayDeferredPurchase);
+#endif
 
             // Consumables
             builder.AddProduct(ProductCoins199, ProductType.Consumable);
@@ -314,8 +323,18 @@ namespace Assets.Scripts.Core
 
         private void OnDeferredPurchase(Product product)
         {
-            Debug.Log($"[IAPManager] Purchase deferred: {product.definition.id}");
+            Debug.Log($"[IAPManager] Purchase deferred (Apple): {product.definition.id}");
         }
+
+#if UNITY_ANDROID
+        private void OnGooglePlayDeferredPurchase(Product product)
+        {
+            if (product == null) return;
+            string id = product.definition.id;
+            Debug.Log($"[IAPManager] Google Play purchase awaiting payment (cash/OTC): {id}");
+            OnPurchaseAwaitingPayment?.Invoke(id);
+        }
+#endif
 
         private void CheckAlreadyOwnedProducts()
         {
@@ -385,8 +404,23 @@ namespace Assets.Scripts.Core
 
         public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
         {
-            string id = args.purchasedProduct.definition.id;
+            Product product = args.purchasedProduct;
+            string id = product.definition.id;
 
+            if (IsPurchaseAwaitingPayment(product, out string paymentWaitReason))
+            {
+                Debug.Log($"[IAPManager] Payment not completed yet for {id} ({paymentWaitReason}). Rewards will be granted after Google confirms payment.");
+                OnPurchaseAwaitingPayment?.Invoke(id);
+                return PurchaseProcessingResult.Pending;
+            }
+
+            FulfillPurchase(product);
+            return PurchaseProcessingResult.Complete;
+        }
+
+        private void FulfillPurchase(Product product)
+        {
+            string id = product.definition.id;
             switch (id)
             {
                 case ProductNoAds999:
@@ -418,7 +452,7 @@ namespace Assets.Scripts.Core
 
             if (FirebaseManager.Instance != null)
             {
-                var metadata = args.purchasedProduct.metadata;
+                var metadata = product.metadata;
                 FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_PURCHASE,
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, (double)metadata.localizedPrice),
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, metadata.isoCurrencyCode),
@@ -426,16 +460,80 @@ namespace Assets.Scripts.Core
             }
 
             // --- Singular: IAP revenue tracking ---
-            var metadataSingular = args.purchasedProduct.metadata;
+            var metadataSingular = product.metadata;
             SingularSDK.CustomRevenue("Purchase", metadataSingular.isoCurrencyCode, (double)metadataSingular.localizedPrice);
             // ------------------------------------------------
 
             Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyPurchaseMade();
             OnPurchaseSuccess?.Invoke(id);
             SpawnCoinsExplosion();
-
-            return PurchaseProcessingResult.Complete;
         }
+
+#if UNITY_ANDROID
+        private static bool IsPurchaseAwaitingPayment(Product product, out string reason)
+        {
+            reason = null;
+            if (product == null) return false;
+
+            if (IAPManager.Instance != null &&
+                IAPManager.Instance.m_StoreExtensionProvider != null)
+            {
+                try
+                {
+                    var google = IAPManager.Instance.m_StoreExtensionProvider.GetExtension<IGooglePlayStoreExtensions>();
+                    if (google != null && google.IsPurchasedProductDeferred(product))
+                    {
+                        reason = "deferred";
+                        return true;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[IAPManager] Could not query deferred state: {e.Message}");
+                }
+            }
+
+            if (TryGetGooglePurchaseState(product.receipt, out GooglePurchaseState state) &&
+                state != GooglePurchaseState.Purchased)
+            {
+                reason = state.ToString();
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Google Play receipt purchaseState: 0=purchased, 1=cancelled, 2=pending (cash/OTC).
+        /// Unity maps 2 to GooglePurchaseState.Refunded in its enum — treat any non-zero Purchased as unpaid.
+        /// </summary>
+        private static bool TryGetGooglePurchaseState(string unityReceipt, out GooglePurchaseState state)
+        {
+            state = GooglePurchaseState.Purchased;
+            if (string.IsNullOrEmpty(unityReceipt)) return false;
+
+            Match match = Regex.Match(unityReceipt, @"""purchaseState""\s*:\s*(\d+)");
+            if (!match.Success) return false;
+
+            if (!int.TryParse(match.Groups[1].Value, out int rawState)) return false;
+
+            // Google Play: 0=purchased, 1=cancelled, 2=pending (cash at store, etc.)
+            if (!Enum.IsDefined(typeof(GooglePurchaseState), rawState))
+            {
+                state = (GooglePurchaseState)rawState;
+                return true;
+            }
+
+            state = (GooglePurchaseState)rawState;
+            return true;
+        }
+#else
+        private static bool IsPurchaseAwaitingPayment(Product product, out string reason)
+        {
+            reason = null;
+            return false;
+        }
+#endif
 
         private void SpawnCoinsExplosion()
         {

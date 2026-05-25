@@ -193,6 +193,9 @@ namespace Assets.Scripts.LiveOps
 
         private void OnIconClicked()
         {
+            if (SoundManager.Instance != null)
+                SoundManager.Instance.PlayClick();
+
             if (service == null) return;
             
             if (isLocked)

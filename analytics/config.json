@@ -1,0 +1,7 @@
+{
+  "gcp_project_id": "arrowsmaster-6b84f",
+  "ga4_property_id": "520375039",
+  "ga4_property_name": "Arrows Master",
+  "bigquery_dataset": "analytics_520375039",
+  "events_table_pattern": "arrowsmaster-6b84f.analytics_520375039.events_*"
+}

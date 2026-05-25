@@ -429,7 +429,22 @@ namespace Assets.Scripts.Core
         private void OnImpressionDataReady(LevelPlayImpressionData impressionData)
         {
             EnqueueAction(() => {
-                if (impressionData == null || impressionData.Revenue == null) return;
+                if (impressionData == null)
+                {
+                    Debug.LogWarning("[AdsManager] ImpressionDataReady: impressionData is null");
+                    return;
+                }
+
+                if (impressionData.Revenue == null || impressionData.Revenue.Value <= 0)
+                {
+                    Debug.LogWarning(
+                        $"[AdsManager] ImpressionDataReady: no revenue (network={impressionData.AdNetwork}, " +
+                        $"unit={impressionData.MediationAdUnitName}, format={impressionData.AdFormat}). " +
+                        "Enable impression-level revenue in LevelPlay/ironSource if this persists.");
+                    return;
+                }
+
+                double revenueUsd = impressionData.Revenue.Value;
 
                 if (FirebaseManager.Instance != null)
                 {
@@ -438,15 +453,17 @@ namespace Assets.Scripts.Core
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, impressionData.AdNetwork),
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, impressionData.MediationAdUnitName),
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, impressionData.AdFormat),
-                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, impressionData.Revenue.Value),
+                        new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, revenueUsd),
                         new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
                 }
 
-                SingularAdData singularAdData = new SingularAdData("ironSource", "USD", impressionData.Revenue.Value);
+                // Singular docs require platform name "IronSource" (not "ironSource")
+                SingularAdData singularAdData = new SingularAdData("IronSource", "USD", revenueUsd);
                 singularAdData.WithNetworkName(impressionData.AdNetwork)
                               .WithAdUnitName(impressionData.MediationAdUnitName)
                               .WithAdType(impressionData.AdFormat);
                 SingularSDK.AdRevenue(singularAdData);
+                Debug.Log($"[AdsManager] Singular AdRevenue: ${revenueUsd:F6} USD, network={impressionData.AdNetwork}");
             });
         }
 

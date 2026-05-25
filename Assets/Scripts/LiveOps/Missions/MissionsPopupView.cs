@@ -257,6 +257,9 @@ namespace Assets.Scripts.LiveOps.Missions
 
         private void ClosePopup()
         {
+            if (SoundManager.Instance != null)
+                SoundManager.Instance.PlayClick();
+
             Destroy(gameObject);
         }
     }

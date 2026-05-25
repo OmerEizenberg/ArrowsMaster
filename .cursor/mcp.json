@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "bigquery-arrowsmaster": {
+      "command": "npx",
+      "args": ["-y", "@dataengineeringwithalex/mcp-bigquery"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "arrowsmaster-6b84f"
+      }
+    }
+  }
+}
