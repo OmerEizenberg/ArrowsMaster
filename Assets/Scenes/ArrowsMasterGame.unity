@@ -21578,6 +21578,7 @@ MonoBehaviour:
   - {fileID: 7570702124109651582, guid: e889dc4ff171b435990342fd01472e7c, type: 3}
   - {fileID: 0}
   - {fileID: 0}
+  m_ArrowNudgePrefab: {fileID: 2566170132814623622, guid: 419e0825344444726a8973b0ff329956, type: 3}
   m_PlayOnPriceText: {fileID: 456046973}
   m_UserBalanceText: {fileID: 1621138959}
   m_RewardedAdAmountText: {fileID: 0}

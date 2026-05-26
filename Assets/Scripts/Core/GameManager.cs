@@ -50,6 +50,12 @@ namespace Assets.Scripts.Core
         [SerializeField] private GameObject[] m_LevelUIElements;
         private GameObject m_currentLevelUIElement;
 
+        [Header("FTUE Arrow Nudge")]
+        [SerializeField] private GameObject m_ArrowNudgePrefab;
+        private GameObject m_currentArrowNudge;
+        private float m_ArrowNudgeTimer = 0f;
+        private const float ARROW_NUDGE_DELAY = 7f;
+
         [Header("Shop UI")]
         [SerializeField] private TextMeshProUGUI m_PlayOnPriceText;
         [SerializeField] private TextMeshProUGUI m_UserBalanceText;
@@ -223,7 +229,10 @@ namespace Assets.Scripts.Core
                         {
                             if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
                             m_currentLevelUIElement = Instantiate(prefab, m_GameUI.GameUIParent);
-                            Destroy(m_currentLevelUIElement , 5.0f);
+                            if (currentLevel != 1)
+                            {
+                                Destroy(m_currentLevelUIElement , 5.0f);
+                            }
                         }
                     }
                 };
@@ -673,6 +682,9 @@ namespace Assets.Scripts.Core
             currentTime = 0f;
             lastDisplayedSecond = -1;
             levelDuration = 0f;
+
+            if (m_currentArrowNudge != null) { Destroy(m_currentArrowNudge); m_currentArrowNudge = null; }
+            m_ArrowNudgeTimer = 0f;
             
             UpdateArrowsLeftUI(false);
         }
@@ -685,6 +697,13 @@ namespace Assets.Scripts.Core
 
         public void NotifyArrowSuccess(Vector2 clickPosition, int arrowId)
         {
+            if (m_currentArrowNudge != null)
+            {
+                Destroy(m_currentArrowNudge);
+                m_currentArrowNudge = null;
+            }
+            m_ArrowNudgeTimer = 0f;
+
             if (UserDataManager.Instance.CurrentLevel >= COINS_START_LEVEL)
             {
                 // Collect currency logic
@@ -773,6 +792,11 @@ namespace Assets.Scripts.Core
         public void NotifyArrowSelection()
         {
             LastArrowSelectionTime = Time.time;
+            if (m_currentLevelUIElement != null)
+            {
+                Destroy(m_currentLevelUIElement);
+                m_currentLevelUIElement = null;
+            }
         }
 
         public void IncrementStreak()
@@ -1062,7 +1086,36 @@ namespace Assets.Scripts.Core
                     SoundManager.Instance.PlayHint();
                 }
             }
-            
+
+            // FTUE arrow nudge for levels 2-6
+            int nudgeLevel = UserDataManager.Instance.CurrentLevel;
+            if (isEntranceFinished && !isWinning && !isFailureVisible && !isLobbyVisible
+                && nudgeLevel > 1 && nudgeLevel < 7
+                && m_ArrowNudgePrefab != null && m_currentArrowNudge == null)
+            {
+                m_ArrowNudgeTimer += Time.deltaTime;
+                if (m_ArrowNudgeTimer >= ARROW_NUDGE_DELAY && GridManager.Instance != null)
+                {
+                    List<ArrowController> free = GridManager.Instance.GetNonBlockedArrows(1);
+                    if (free.Count > 0 && free[0] != null)
+                    {
+                        ArrowController targetArrow = free[0];
+                        m_currentArrowNudge = Instantiate(m_ArrowNudgePrefab, targetArrow.transform);
+
+                        Vector3 center = Vector3.zero;
+                        int segCount = targetArrow.segments.Count;
+                        for (int i = 0; i < segCount; i++)
+                        {
+                            center += targetArrow.segments[i].CachedTransform.position;
+                        }
+                        if (segCount > 0) center /= segCount;
+
+                        Vector3 local = targetArrow.transform.InverseTransformPoint(center);
+                        m_currentArrowNudge.transform.localPosition = new Vector3(local.x, local.y, 0f);
+                    }
+                }
+            }
+
             // Update countdown timer
             if (isTimerActive && isEntranceFinished && !isWinning && !isFailureVisible && !isLobbyVisible)
             {
