@@ -16,6 +16,7 @@ dependencies {
     implementation 'com.applovin.mediation:google-ad-manager-adapter:[25.3.0.0]' // Packages/com.applovin.mediation.adapters.googleadmanager.android/Editor/Dependencies.xml:4
     implementation 'com.applovin.mediation:unityads-adapter:4.18.0.0' // Packages/com.applovin.mediation.adapters.unityads.android/Editor/Dependencies.xml:4
     implementation 'com.applovin.mediation:vungle-adapter:7.7.4.0' // Packages/com.applovin.mediation.adapters.vungle.android/Editor/Dependencies.xml:4
+    // implementation 'com.applovin:applovin-sdk:11.5.3' // Assets/MaxSdk/AppLovin/Editor/Dependencies.xml:4
     implementation 'com.applovin:applovin-sdk:13.6.2' // Packages/com.applovin.mediation.ads/AppLovin/Editor/Dependencies.xml:4
     implementation 'com.google.android.gms:play-services-ads:25.2.0' // Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:7
     implementation 'com.google.android.gms:play-services-ads-identifier:18.0.1' // Packages/singular-unity-package/SingularSDK/Editor/SingularSDKDependencies.xml:10
@@ -41,7 +42,6 @@ dependencies {
 
 // Android Resolver Exclusions Start
 android {
-    ndkVersion "**NDKVERSION**"
   packaging {
       exclude ('/lib/armeabi/*' + '*')
       exclude ('/lib/mips/*' + '*')

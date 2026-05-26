@@ -54,7 +54,7 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
                 var type = assembly.GetType("Google.IOSResolver");
                 if (type == null) continue;
 
-                // Workspace integration creates Unity-iPhone.xcworkspace (required for Firebase / LevelPlay pods).
+                // Workspace integration creates Unity-iPhone.xcworkspace (required for Firebase / AppLovin MAX pods).
                 SetStaticBool(type, "PodfileGenerationEnabled", true);
 
                 var integrationMethod = type.GetProperty("CocoapodsIntegrationMethodPref",
@@ -321,7 +321,7 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
         // ATT Permission Message
         rootDict.SetString("NSUserTrackingUsageDescription", "Your data will be used to provide you with a better and more personalized ad experience.");
 
-        // AdMob application ID (required for IronSource AdMob adapter on iOS)
+        // AdMob application ID (required for AppLovin MAX AdMob mediation adapter on iOS)
         rootDict.SetString("GADApplicationIdentifier", "ca-app-pub-2980983758149509~7869782198");
 
         PlistElementArray backgroundModes = rootDict.CreateArray("UIBackgroundModes");
@@ -503,6 +503,11 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
         }
 
         string podfileContent = File.ReadAllText(podfilePath);
+
+        // Remove duplicate CocoaPods source that causes "Found multiple specifications" errors.
+        // The CDN source (cdn.cocoapods.org) already covers all public pods; the git-based
+        // github.com/CocoaPods/Specs source is redundant and creates duplicate spec entries.
+        podfileContent = Regex.Replace(podfileContent, @"source\s+'https://github\.com/CocoaPods/Specs'\s*\n?", "");
 
         // Clean up any previous versions of our fix blocks to avoid conflicts
         podfileContent = Regex.Replace(podfileContent, @"\n# FIX_FB12_S\d+.*?\nend\n", "", RegexOptions.Singleline);

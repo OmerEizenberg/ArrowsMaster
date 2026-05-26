@@ -2,7 +2,6 @@ using UnityEngine;
 using System;
 using System.Collections;
 
-using Unity.Services.LevelPlay;
 #if UNITY_IOS
 using Unity.Advertisement.IosSupport;
 #endif
@@ -20,9 +19,6 @@ namespace Assets.Scripts.Core
             if (status == ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
             {
                 ATTrackingStatusBinding.RequestAuthorizationTracking();
-                // We'll need to poll for the status change or use a callback if available.
-                // Since this is a static helper, we'll let the caller handle the wait if they need to,
-                // or we can provide a coroutine.
             }
             else
             {
@@ -31,14 +27,13 @@ namespace Assets.Scripts.Core
             }
 #else
             Debug.Log("[IOSAdsHelper] ATT Request skipped (Not on iOS device).");
-            onComplete?.Invoke(true); // Default to true on other platforms for ad flow
+            onComplete?.Invoke(true);
 #endif
         }
 
         public static IEnumerator PollATTStatus(Action<bool> onComplete)
         {
 #if UNITY_IOS && !UNITY_EDITOR
-            // Wait for user to make a choice
             while (ATTrackingStatusBinding.GetAuthorizationTrackingStatus() == ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
             {
                 yield return null;
@@ -46,13 +41,8 @@ namespace Assets.Scripts.Core
             
             bool isAuthorized = ATTrackingStatusBinding.GetAuthorizationTrackingStatus() == ATTrackingStatusBinding.AuthorizationTrackingStatus.AUTHORIZED;
             Debug.Log($"[IOSAdsHelper] ATT Status changed: {isAuthorized}");
-            
-            // Note: GDPR, CCPA, and COPPA are now handled by Google UMP (ConsentManager).
-            // We no longer set them manually here based on ATT.
-            
             onComplete?.Invoke(isAuthorized);
 #else
-            // On other platforms (like Android/Editor), we send true to the callback directly.
             Debug.Log("[IOSAdsHelper] Platform is not iOS. ATT does not apply.");
             onComplete?.Invoke(true);
             yield break;
@@ -60,5 +50,3 @@ namespace Assets.Scripts.Core
         }
     }
 }
-
-
