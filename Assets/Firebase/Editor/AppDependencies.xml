@@ -14,7 +14,7 @@ FirebaseApp iOS and Android Dependencies.
   <androidPackages>
     <androidPackage spec="com.google.firebase:firebase-common:22.0.1">
     </androidPackage>
-    <androidPackage spec="com.google.firebase:firebase-analytics:23.0.0">
+    <androidPackage spec="com.google.firebase:firebase-analytics:23.2.0">
     </androidPackage>
     <androidPackage spec="com.google.android.gms:play-services-base:18.10.0">
     </androidPackage>

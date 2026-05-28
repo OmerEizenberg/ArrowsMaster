@@ -88,6 +88,14 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
 
     void Start()
     {
+        StartCoroutine(InitializeFirebaseDeferred());
+    }
+
+    private IEnumerator InitializeFirebaseDeferred()
+    {
+        // Let the app render at least one frame before Firebase dependency checks and SDK setup.
+        yield return null;
+        yield return new WaitForSecondsRealtime(0.5f);
 
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task => {
             DependencyStatus dependencyStatus = task.Result;
@@ -99,6 +107,7 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
 
                 // Enable Crashlytics collection
                 Crashlytics.ReportUncaughtExceptionsAsFatal = true;
+                Crashlytics.IsCrashlyticsCollectionEnabled = true;
                 
                 // Initialize Analytics
                 FirebaseAnalytics.SetAnalyticsCollectionEnabled(true);
@@ -106,6 +115,7 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
                 // Initialize Messaging
                 FirebaseMessaging.TokenReceived += OnTokenReceived;
                 FirebaseMessaging.MessageReceived += OnMessageReceived;
+                FirebaseMessaging.TokenRegistrationOnInitEnabled = true;
 
                 // Request permission for push notifications (required for iOS and Android 13+)
                 FirebaseMessaging.RequestPermissionAsync().ContinueWithOnMainThread(task => {
@@ -168,6 +178,20 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
                 }
             }
         });
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+
+        if (isInitialized)
+        {
+            FirebaseMessaging.TokenReceived -= OnTokenReceived;
+            FirebaseMessaging.MessageReceived -= OnMessageReceived;
+        }
     }
 
     private void OnTokenReceived(object sender, TokenReceivedEventArgs token)

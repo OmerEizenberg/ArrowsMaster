@@ -7,20 +7,22 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:430732968211:android:296bfe8c031c7596ad5ae6",
+        "mobilesdk_app_id": "1:430732968211:ios:3a14be9d6ff08e97ad5ae6",
         "android_client_info": {
           "package_name": "com.everybodygames.arrowsmaster"
         }
       },
-      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDvuVByfwRImiZ3c7HJTAUmE9N1Iz58waA"
+          "current_key": "AIzaSyD-8jWdd0FvQYPb_JWCF6_ydkVFzNEsnnA"
         }
       ],
       "services": {
+        "analytics_service": {
+          "status": 0
+        },
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "status": 1
         }
       }
     }

@@ -12,9 +12,9 @@ FirebaseRemoteConfig iOS and Android Dependencies.
     </iosPod>
   </iosPods>
   <androidPackages>
-    <androidPackage spec="com.google.firebase:firebase-config:23.0.1">
+    <androidPackage spec="com.google.firebase:firebase-config:23.1.0">
     </androidPackage>
-    <androidPackage spec="com.google.firebase:firebase-analytics:23.0.0">
+    <androidPackage spec="com.google.firebase:firebase-analytics:23.2.0">
     </androidPackage>
     <androidPackage spec="com.google.firebase:firebase-config-unity:13.7.0">
       <repositories>

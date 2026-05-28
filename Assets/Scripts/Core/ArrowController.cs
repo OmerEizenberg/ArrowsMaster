@@ -818,10 +818,13 @@ namespace Assets.Scripts.Core
                 ArrowPoolManager.Instance.NotifyArrowDestroyed(this);
             }
 
-            // Fallback cleanup if destroyed by other means
+            // Fallback cleanup if destroyed by other means (GameManager may already be gone on teardown)
             foreach (var effect in instantiatedEffects)
             {
-                if (effect != null) GameManager.Instance.ReturnEffect(effect);
+                if (effect != null && GameManager.Instance != null)
+                {
+                    GameManager.Instance.ReturnEffect(effect);
+                }
             }
             instantiatedEffects.Clear();
         }
