@@ -12,7 +12,7 @@ using Singular;
 using Assets.Scripts.Core;
 
 
-public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDeferredDeepLinkHandler, SingularDeviceAttributionCallbackHandler
+public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDeferredDeepLinkHandler, SingularDeviceAttributionCallbackHandler, SingularConversionValuesUpdatedHandler
 {
     public static FirebaseManager Instance { get; private set; }
     private bool isInitialized = false;
@@ -72,17 +72,9 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
         SingularSDK.registeredSingularLinkHandler = this;
         SingularSDK.registeredDDLHandler = this;
         SingularSDK.SetSingularDeviceAttributionCallbackHandler(this);
+        SingularSDK.registeredConversionValuesUpdatedHandler = this;
         #endif
-
-        #if UNITY_IOS && !UNITY_EDITOR
-        var singular = FindFirstObjectByType<SingularSDK>();
-        if (singular != null)
-        {
-            // Set ATT timeout BEFORE initialization
-            singular.waitForTrackingAuthorizationWithTimeoutInterval = 300;
-            Debug.Log("[FirebaseManager] Configured Singular ATT timeout (300s) in Awake.");
-        }
-        #endif
+        // Singular init + ATT ordering is handled by IOSAttributionBootstrap on iOS.
         // -----------------------------------------------------------------
     }
 
@@ -338,6 +330,11 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     {
         Debug.Log($"[Singular] Deferred Deep Link Received: {deepLink}");
         // Add your custom logic here (e.g., show a welcome reward)
+    }
+
+    public void OnConversionValuesUpdated(int value, int coarse, bool _lock)
+    {
+        Debug.Log($"[Singular] SKAN conversion updated: value={value}, coarse={coarse}, locked={_lock}");
     }
 
     public void OnSingularDeviceAttributionCallback(Dictionary<string, object> attributionInfo)

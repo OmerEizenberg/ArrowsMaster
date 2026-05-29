@@ -281,17 +281,24 @@ namespace Assets.Scripts.Core
                 Debug.Log("[AdsManager] Unity Services Initialized.");
 
 #if UNITY_IOS && !UNITY_EDITOR
-                bool attFinished = false;
-                EnqueueAction(() =>
+                if (!IOSAttributionBootstrap.IsAttResolved)
                 {
-                    IOSAdsHelper.RequestATT();
-                    StartCoroutine(IOSAdsHelper.PollATTStatus(_ => attFinished = true));
-                });
-                float attWaitStart = Time.time;
-                while (!attFinished && Time.time - attWaitStart < 30f)
-                    await Task.Yield();
-                if (!attFinished)
-                    Debug.LogWarning("[AdsManager] ATT flow timed out. Proceeding with ads initialization.");
+                    bool attFinished = false;
+                    EnqueueAction(() =>
+                    {
+                        IOSAdsHelper.RequestATT();
+                        StartCoroutine(IOSAdsHelper.PollATTStatus(_ => attFinished = true));
+                    });
+                    float attWaitStart = Time.time;
+                    while (!attFinished && Time.time - attWaitStart < 30f)
+                        await Task.Yield();
+                    if (!attFinished)
+                        Debug.LogWarning("[AdsManager] ATT flow timed out. Proceeding with ads initialization.");
+                }
+                else
+                {
+                    Debug.Log("[AdsManager] ATT already resolved by IOSAttributionBootstrap.");
+                }
 #endif
 
                 bool consentFinished = false;

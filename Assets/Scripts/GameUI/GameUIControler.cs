@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Assets.Scripts.Core;
 using Assets.Scripts.GameUI;
+using Assets.Scripts.Lobby;
 using TMPro;
 
 public class GameUIContoleer : MonoBehaviour
@@ -545,12 +546,36 @@ public class GameUIContoleer : MonoBehaviour
         }
         if (GameManager.Instance != null) GameManager.Instance.HideScreens();
         SetGameUIVisible(false);
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.ScheduleLobbyStreakRefresh();
+        }
     }
 
-    public void SetGameUIVisible(bool visible)
+    public void SetGameUIVisible(bool visible, bool notifyLobbyWhenHidden = true)
     {
         if (m_LobbyUI != null) m_LobbyUI.SetActive(!visible);
         if (m_GameUI != null) m_GameUI.SetActive(visible);
+
+        // GameUIController is on TopBar; lobby refresh used to disable this object directly.
+        if (visible && !gameObject.activeSelf)
+        {
+            gameObject.SetActive(true);
+        }
+
+        if (!visible && notifyLobbyWhenHidden)
+        {
+            NotifyLobbyShown();
+        }
+    }
+
+    private void NotifyLobbyShown()
+    {
+        HomeContoller home = FindFirstObjectByType<HomeContoller>();
+        if (home != null)
+        {
+            home.RefreshLobbyUI();
+        }
     }
 
     public MultiplyCoinsPopup ShowMultiplyCoinsPopup(int coinsWon)

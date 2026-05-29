@@ -27,6 +27,7 @@ public class LegendPassUI : MonoBehaviour
 
     private void OnEnable()
     {
+        if (IAPManager.Instance != null) IAPManager.Instance.WarmUp();
         RefreshUI(scrollToCurrentStep: true);
         LegendPassManager.Instance.OnProgressChanged += OnPassProgressChanged;
     }

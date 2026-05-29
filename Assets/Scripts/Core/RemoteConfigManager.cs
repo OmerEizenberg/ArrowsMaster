@@ -26,6 +26,7 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_AD_COOLDOWN = "adCooldown";
     public const string KEY_ALL_LEVELS_TIMER = "AllLevelsTimer";
     public const string KEY_PTS_MUL = "PTS_Mul";
+    public const string KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED = "isPostWinLevelChoiceEnabled";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
 
@@ -79,6 +80,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_AD_COOLDOWN] = 60L;
         defaults[KEY_ALL_LEVELS_TIMER] = false;
         defaults[KEY_PTS_MUL] = 0.28d;
+        defaults[KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED] = true;
     }
 
     /// <summary>
@@ -291,6 +293,7 @@ public class RemoteConfigManager : MonoBehaviour
     public int RewardedAdCoinsCooldown => (int)GetLong(KEY_REWARDED_AD_COINS_COOLDOWN);
     public int AdCooldown => (int)GetLong(KEY_AD_COOLDOWN);
     public bool AllLevelsTimer => GetBool(KEY_ALL_LEVELS_TIMER);
+    public bool IsPostWinLevelChoiceEnabled => GetBool(KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED);
     public float PtsMul => (float)GetDouble(KEY_PTS_MUL);
 
     #endregion

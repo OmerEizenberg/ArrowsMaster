@@ -348,7 +348,7 @@ MonoBehaviour:
   m_WatchAdButton: {fileID: 0}
   m_WatchAdButtonText: {fileID: 0}
   m_ActiveRowColor: {r: 0.49, g: 0.37, b: 1, a: 1}
-  m_CompletedRowColor: {r: 0.35, g: 0.35, b: 0.4, a: 0.85}
+  m_CompletedRowColor: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
 --- !u!1 &368482792751901048
 GameObject:
   m_ObjectHideFlags: 0
@@ -1283,8 +1283,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -43.88, y: -33.1}
-  m_SizeDelta: {x: 500, y: 120}
+  m_AnchoredPosition: {x: -43.88, y: 0}
+  m_SizeDelta: {x: 500, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8769499063017029706
 CanvasRenderer:
@@ -1307,7 +1307,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.49019608, g: 0.37254903, b: 1, a: 1}
+  m_Color: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1435,8 +1435,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -43.88, y: -33.1}
-  m_SizeDelta: {x: 500, y: 120}
+  m_AnchoredPosition: {x: -43.88, y: 0}
+  m_SizeDelta: {x: 500, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2932305643789631907
 CanvasRenderer:
@@ -1459,7 +1459,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.49019608, g: 0.37254903, b: 1, a: 1}
+  m_Color: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2114,7 +2114,7 @@ MonoBehaviour:
   m_WatchAdButton: {fileID: 8124651491278108100}
   m_WatchAdButtonText: {fileID: 7906861261121142430}
   m_ActiveRowColor: {r: 0.49, g: 0.37, b: 1, a: 1}
-  m_CompletedRowColor: {r: 0.35, g: 0.35, b: 0.4, a: 0.85}
+  m_CompletedRowColor: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
 --- !u!1 &1884762800643287555
 GameObject:
   m_ObjectHideFlags: 0
@@ -2440,7 +2440,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: -147.71}
-  m_SizeDelta: {x: 1400, y: 480}
+  m_SizeDelta: {x: 1400, y: 5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &463006340439848122
 CanvasRenderer:
@@ -4239,8 +4239,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -43.88, y: -33.1}
-  m_SizeDelta: {x: 500, y: 120}
+  m_AnchoredPosition: {x: -43.88, y: 0}
+  m_SizeDelta: {x: 500, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1132359653348088318
 CanvasRenderer:
@@ -4263,7 +4263,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.49019608, g: 0.37254903, b: 1, a: 1}
+  m_Color: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5112,7 +5112,7 @@ MonoBehaviour:
   m_WatchAdButton: {fileID: 0}
   m_WatchAdButtonText: {fileID: 0}
   m_ActiveRowColor: {r: 0.49, g: 0.37, b: 1, a: 1}
-  m_CompletedRowColor: {r: 0.35, g: 0.35, b: 0.4, a: 0.85}
+  m_CompletedRowColor: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
 --- !u!1 &4220689502214468963
 GameObject:
   m_ObjectHideFlags: 0
@@ -5362,7 +5362,7 @@ MonoBehaviour:
   m_WatchAdButton: {fileID: 0}
   m_WatchAdButtonText: {fileID: 0}
   m_ActiveRowColor: {r: 0.49, g: 0.37, b: 1, a: 1}
-  m_CompletedRowColor: {r: 0.35, g: 0.35, b: 0.4, a: 0.85}
+  m_CompletedRowColor: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
 --- !u!1 &4321795013387000646
 GameObject:
   m_ObjectHideFlags: 0
@@ -6649,8 +6649,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -43.88, y: -33.1}
-  m_SizeDelta: {x: 500, y: 120}
+  m_AnchoredPosition: {x: -43.88, y: 0}
+  m_SizeDelta: {x: 500, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2084518544122269766
 CanvasRenderer:
@@ -6673,7 +6673,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.49019608, g: 0.37254903, b: 1, a: 1}
+  m_Color: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -10015,8 +10015,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -43.88, y: -33.1}
-  m_SizeDelta: {x: 500, y: 120}
+  m_AnchoredPosition: {x: -43.88, y: 0}
+  m_SizeDelta: {x: 500, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &171397122881340021
 CanvasRenderer:
@@ -10039,7 +10039,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.49019608, g: 0.37254903, b: 1, a: 1}
+  m_Color: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -11893,7 +11893,7 @@ MonoBehaviour:
   m_WatchAdButton: {fileID: 0}
   m_WatchAdButtonText: {fileID: 0}
   m_ActiveRowColor: {r: 0.49, g: 0.37, b: 1, a: 1}
-  m_CompletedRowColor: {r: 0.35, g: 0.35, b: 0.4, a: 0.85}
+  m_CompletedRowColor: {r: 0.1764706, g: 0.76862746, b: 0.42352942, a: 1}
 --- !u!1 &9220270005715525132
 GameObject:
   m_ObjectHideFlags: 0

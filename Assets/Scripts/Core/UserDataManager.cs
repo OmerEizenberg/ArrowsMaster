@@ -429,10 +429,11 @@ namespace Assets.Scripts.Core
             }
         }
 
-        public bool NeedsLevelStreakAnimation { get; set; } = false;
+        public bool NeedsLevelStreakAnimation { get; set; }
 
         public void ResetLevelStreak()
         {
+            NeedsLevelStreakAnimation = false;
             if (LevelStreak > 0)
             {
                 LevelStreak = 0;
@@ -444,6 +445,7 @@ namespace Assets.Scripts.Core
 
         public void RestoreLevelStreak(int previousStreak)
         {
+            NeedsLevelStreakAnimation = false;
             if (previousStreak > 0)
             {
                 LevelStreak = previousStreak;

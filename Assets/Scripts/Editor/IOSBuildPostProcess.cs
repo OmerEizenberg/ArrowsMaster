@@ -321,6 +321,12 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
         // ATT Permission Message
         rootDict.SetString("NSUserTrackingUsageDescription", "Your data will be used to provide you with a better and more personalized ad experience.");
 
+        // SKAN 4+: Apple sends winning postback copies to the MMP (Singular).
+        if (!rootDict.values.ContainsKey("NSAdvertisingAttributionReportEndpoint"))
+        {
+            rootDict.SetString("NSAdvertisingAttributionReportEndpoint", "https://skan.singular.net");
+        }
+
         // AdMob application ID (required for AppLovin MAX AdMob mediation adapter on iOS)
         rootDict.SetString("GADApplicationIdentifier", "ca-app-pub-2980983758149509~7869782198");
 

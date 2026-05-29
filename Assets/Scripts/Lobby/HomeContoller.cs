@@ -121,7 +121,7 @@ namespace Assets.Scripts.Lobby
 
         private void Start()
         {
-            UserDataManager.Instance.OnLevelChanged += RefreshLobbyUI;
+            UserDataManager.Instance.OnLevelChanged += OnLevelChangedWhileInLobby;
             UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
             UserDataManager.Instance.OnMonthlyProgressChanged += UpdateChallengeNotification;
         }
@@ -164,6 +164,8 @@ namespace Assets.Scripts.Lobby
                 // No change — just display current value instantly
                 SetCurrencyTextImmediate(currentCoins);
             }
+
+            WarmUpIAPStore();
 
             if (IAPManager.Instance != null)
             {
@@ -248,7 +250,7 @@ namespace Assets.Scripts.Lobby
         {
             if (UserDataManager.Instance != null)
             {
-                UserDataManager.Instance.OnLevelChanged -= RefreshLobbyUI;
+                UserDataManager.Instance.OnLevelChanged -= OnLevelChangedWhileInLobby;
                 UserDataManager.Instance.OnCurrencyChanged -= UpdateCurrencyUI;
                 UserDataManager.Instance.OnMonthlyProgressChanged -= UpdateChallengeNotification;
             }
@@ -472,14 +474,41 @@ namespace Assets.Scripts.Lobby
         }
 
 
+        private void OnLevelChangedWhileInLobby()
+        {
+            if (!IsLobbyVisible()) return;
+            RefreshLobbyUI();
+        }
+
+        private bool IsLobbyVisible()
+        {
+            GameObject lobby = m_LobbyUI;
+            if (lobby == null && GameManager.Instance != null)
+                lobby = GameManager.Instance.m_LobbyUI;
+            return lobby != null && lobby.activeInHierarchy;
+        }
+
         public void RefreshLobbyUI()
         {
-            if (m_LobbyUI != null && !m_LobbyUI.activeInHierarchy) return;
+            if (!IsLobbyVisible()) return;
 
-            // Ensure GameUI is hidden when refreshing lobby (returning to lobby)
-            if (m_GameUI != null) m_GameUI.SetActive(false);
-            else if (GameManager.Instance != null && GameManager.Instance.m_GameUI != null)
-                GameManager.Instance.m_GameUI.gameObject.SetActive(false);
+            bool deferStreak = GameManager.Instance != null && GameManager.Instance.IsDeferredLobbyStreakSyncPending;
+            if (!deferStreak)
+            {
+                RefreshLevelStreakUI();
+            }
+
+            // Hide gameplay canvas via GameUIController — do not deactivate m_GameUI.gameObject
+            // (that component lives on TopBar; disabling it breaks the bar on the next level).
+            if (GameManager.Instance != null && GameManager.Instance.m_GameUI != null)
+            {
+                GameManager.Instance.m_GameUI.SetGameUIVisible(false, notifyLobbyWhenHidden: false);
+            }
+            else if (m_GameUI != null && m_GameUI.activeSelf)
+            {
+                m_GameUI.SetActive(false);
+                if (m_LobbyUI != null) m_LobbyUI.SetActive(true);
+            }
 
             m_TitleText.text = "Arrows Master";
             m_LevelText.isRightToLeftText = false;
@@ -606,45 +635,64 @@ namespace Assets.Scripts.Lobby
                 }
             }
 
-            if (m_LevelStreakIcon != null) 
+            UpdateLobbyAdReadyImage();
+            UpdateChallengeLock();
+        }
+
+        /// <summary>
+        /// Syncs lobby streak labels from saved data. Call whenever the lobby becomes visible
+        /// (HomeController may stay enabled while only m_LobbyUI is toggled).
+        /// </summary>
+        public void RefreshLevelStreakUI()
+        {
+            if (UserDataManager.Instance == null || m_LevelStreakIcon == null) return;
+
+            m_LevelStreakIcon.SetActive(true);
+
+            int levelStreak = UserDataManager.Instance.LevelStreak;
+            bool showAnimation = UserDataManager.Instance.NeedsLevelStreakAnimation && levelStreak > 0;
+
+            if (UserDataManager.Instance.NeedsLevelStreakAnimation && levelStreak <= 0)
             {
-                m_LevelStreakIcon.SetActive(true);
-                
-                bool showAnimation = UserDataManager.Instance.NeedsLevelStreakAnimation;
-                int displayStreak = UserDataManager.Instance.LevelStreak;
-                if (showAnimation) displayStreak--;
+                UserDataManager.Instance.NeedsLevelStreakAnimation = false;
+            }
 
-                bool isStreakActive = displayStreak >= 6;
-                
-                var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
-                if (iconImage != null && m_LevelStreakActiveSprite != null && m_LevelStreakInactiveSprite != null)
+            bool isStreakActive = levelStreak >= 6;
+
+            var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
+            if (iconImage != null && m_LevelStreakActiveSprite != null && m_LevelStreakInactiveSprite != null)
+            {
+                iconImage.sprite = isStreakActive ? m_LevelStreakActiveSprite : m_LevelStreakInactiveSprite;
+            }
+
+            var fireSkew = m_LevelStreakIcon.GetComponent<Assets.Scripts.GameUI.UIFireSkew>();
+            if (fireSkew != null)
+            {
+                if (fireSkew.enabled != isStreakActive)
                 {
-                    iconImage.sprite = isStreakActive ? m_LevelStreakActiveSprite : m_LevelStreakInactiveSprite;
-                }
-
-                var fireSkew = m_LevelStreakIcon.GetComponent<Assets.Scripts.GameUI.UIFireSkew>();
-                if (fireSkew != null)
-                {
-                    if (fireSkew.enabled != isStreakActive)
-                    {
-                        fireSkew.enabled = isStreakActive;
-                        // Ensure the graphic resets to standard un-skewed mesh if disabled
-                        m_LevelStreakIcon.GetComponent<UnityEngine.UI.Graphic>()?.SetVerticesDirty();
-                    }
-                }
-
-                if (m_LevelStreakText != null) m_LevelStreakText.text = displayStreak.ToString();
-                if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = displayStreak.ToString();
-
-                if (showAnimation)
-                {
-                    CleanupFireAnimation();
-                    m_FireAnimationCoroutine = StartCoroutine(AnimateStreakFire(displayStreak + 1));
+                    fireSkew.enabled = isStreakActive;
+                    m_LevelStreakIcon.GetComponent<UnityEngine.UI.Graphic>()?.SetVerticesDirty();
                 }
             }
 
-            UpdateLobbyAdReadyImage();
-            UpdateChallengeLock();
+            int displayStreak = showAnimation ? levelStreak - 1 : levelStreak;
+            SetLevelStreakText(displayStreak);
+
+            if (showAnimation)
+            {
+                CleanupFireAnimation();
+                MonoBehaviour runner = isActiveAndEnabled
+                    ? this
+                    : (GameManager.Instance != null ? GameManager.Instance : this);
+                m_FireAnimationCoroutine = runner.StartCoroutine(AnimateStreakFire(levelStreak));
+            }
+        }
+
+        private void SetLevelStreakText(int streakValue)
+        {
+            string text = Mathf.Max(0, streakValue).ToString();
+            if (m_LevelStreakText != null) m_LevelStreakText.text = text;
+            if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = text;
         }
 
         private void UpdateChallengeLock()
@@ -687,6 +735,8 @@ namespace Assets.Scripts.Lobby
             if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
             
             if (UserDataManager.Instance.CurrentLevel < 30) return;
+
+            WarmUpIAPStore();
 
             if (m_LegendPassUI != null)
             {
@@ -774,6 +824,7 @@ namespace Assets.Scripts.Lobby
         public void OnDonateButtonClicked()
         {
             SoundManager.Instance.PlayClick();
+            WarmUpIAPStore();
 
             if(m_DonateLayer.activeInHierarchy)
             {
@@ -789,6 +840,7 @@ namespace Assets.Scripts.Lobby
         public void OnNoAdsButtonClicked()
         {
             SoundManager.Instance.PlayClick();
+            WarmUpIAPStore();
 
             if(m_NoAdsLayer.activeInHierarchy)
             {
@@ -901,6 +953,7 @@ namespace Assets.Scripts.Lobby
 
         public void ShowShop()
         {
+            WarmUpIAPStore();
             SoundManager.Instance.PlayShop();
             CleanupFireAnimation();
             
@@ -941,6 +994,7 @@ namespace Assets.Scripts.Lobby
         public void OnBuyProductButtonClicked(string productId)
         {
             if (SoundManager.Instance != null) SoundManager.Instance.PlayClick();
+            WarmUpIAPStore();
             if (IAPManager.Instance != null)
             {
                 IAPManager.Instance.BuyProduct(productId);
@@ -948,6 +1002,14 @@ namespace Assets.Scripts.Lobby
             else
             {
                 Debug.LogError("[HomeContoller] IAPManager.Instance is null!");
+            }
+        }
+
+        private static void WarmUpIAPStore()
+        {
+            if (IAPManager.Instance != null)
+            {
+                IAPManager.Instance.WarmUp();
             }
         }
 
@@ -1073,32 +1135,19 @@ namespace Assets.Scripts.Lobby
         private void SwitchToGameUI()
         {
             CleanupFireAnimation();
-            // Use local references if assigned, otherwise fallback to GameManager
+
+            if (GameManager.Instance != null && GameManager.Instance.m_GameUI != null)
+            {
+                GameManager.Instance.m_GameUI.SetGameUIVisible(true, notifyLobbyWhenHidden: false);
+                return;
+            }
+
             GameObject lobby = m_LobbyUI;
             GameObject game = m_GameUI;
-
             if (lobby == null && GameManager.Instance != null) lobby = GameManager.Instance.m_LobbyUI;
-            if (game == null && GameManager.Instance != null) game = GameManager.Instance.m_GameUI.gameObject;
 
-            if (lobby != null)
-            {
-                Debug.Log($"[HomeContoller] Hiding Lobby UI: {lobby.name}");
-                lobby.SetActive(false);
-            }
-            else
-            {
-                Debug.LogWarning("[HomeContoller] Could not find Lobby UI reference to hide!");
-            }
-
-            if (game != null)
-            {
-                Debug.Log($"[HomeContoller] Showing Game UI: {game.name}");
-                game.SetActive(true);
-            }
-            else
-            {
-                Debug.LogWarning("[HomeContoller] Could not find Game UI reference to show!");
-            }
+            if (lobby != null) lobby.SetActive(false);
+            if (game != null) game.SetActive(true);
         }
 
         private void CheckForUpdates()
@@ -1474,6 +1523,8 @@ namespace Assets.Scripts.Lobby
             {
                 Debug.Log("[HomeContoller] Special No Ads Offer conditions met: showing No Ads layer!");
 
+                WarmUpIAPStore();
+
                 m_SettingsLayer.SetActive(false);
                 m_CalanderLayer.SetActive(false);
                 m_ShopLayer.SetActive(false);
@@ -1487,9 +1538,6 @@ namespace Assets.Scripts.Lobby
         }
         private IEnumerator AnimateStreakFire(int targetStreak)
         {
-            UserDataManager.Instance.NeedsLevelStreakAnimation = false;
-            
-            // Wait for a small delay to let transition finish
             yield return new WaitForSeconds(m_FireJumpStartDelay);
             
             if (m_LevelStreakIcon == null) yield break;
@@ -1545,10 +1593,8 @@ namespace Assets.Scripts.Lobby
                 m_ActiveFireSprite = null;
             }
             
-            // Update UI
-            if (m_LevelStreakText != null) m_LevelStreakText.text = targetStreak.ToString();
-            if (m_LevelStreakTextShade != null) m_LevelStreakTextShade.text = targetStreak.ToString();
-            
+            SetLevelStreakText(targetStreak);
+
             // Update Icon state
             bool isStreakActive = targetStreak >= 6;
             var iconImage = m_LevelStreakIcon.GetComponent<UnityEngine.UI.Image>();
@@ -1571,6 +1617,8 @@ namespace Assets.Scripts.Lobby
             
             m_ActiveFireSprite = null;
             m_FireAnimationCoroutine = null;
+
+            UserDataManager.Instance.NeedsLevelStreakAnimation = false;
         }
 
         private void CleanupFireAnimation()

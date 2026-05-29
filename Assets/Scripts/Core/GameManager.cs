@@ -3,6 +3,7 @@ using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
 using Assets.Scripts.GameUI;
+using Assets.Scripts.Lobby;
 
 
 namespace Assets.Scripts.Core
@@ -90,6 +91,8 @@ namespace Assets.Scripts.Core
         public event Action<int, Vector2> OnLevelCurrencyChanged; 
         public event Action<int> OnMaxStreakBroken;
         public bool p_isLevelProgression = true;
+        private bool m_IsChallengeLevelActive;
+        public bool IsChallengeLevelActive => m_IsChallengeLevelActive;
         public static bool g_IsFromGame = false;
 
         public int currentChallengeYear;
@@ -147,9 +150,15 @@ namespace Assets.Scripts.Core
 
         [SerializeField] private GameObject m_WinParticles;
         [SerializeField] private TextMeshProUGUI m_WinLevelText;
+
+        [Header("Post-Win Level Choice")]
+        [SerializeField] private PostWinLevelChoiceView m_PostWinLevelChoiceView;
         private string[] m_LevelWinFeedbacks = new string[] { "Perfect !", "Well Done !", "Excellent !", "Amazing !", "Incredible !", "Masterpiece !", "Legendary !" , "You're a Legend !" , "Fantastic!" , "Awesome !" , "Phenomenal!"};
         public int p_lastWinAmount;
         private float m_LastMultiplyPopupTime = -180f; // Initialize so it can show on first win
+        private bool m_DeferredLobbyStreakSync;
+
+        public bool IsDeferredLobbyStreakSyncPending => m_DeferredLobbyStreakSync;
 
         private void Awake()
         {
@@ -470,6 +479,7 @@ namespace Assets.Scripts.Core
                 Debug.Log("Open Shop");
                 if (m_ShopLayer != null)
                 {
+                    if (IAPManager.Instance != null) IAPManager.Instance.WarmUp();
                     m_ShopLayer.SetActive(true);
                     if (SoundManager.Instance != null)
                     {
@@ -548,6 +558,7 @@ namespace Assets.Scripts.Core
             if (m_LobbyUI != null) m_LobbyUI.SetActive(false);
             g_IsFromGame = true;
             p_isLevelProgression = true;
+            m_IsChallengeLevelActive = false;
 
             p_pickedArrowIds.Clear();
             UserDataManager.Instance.ClearLevelProgress(); 
@@ -607,6 +618,7 @@ namespace Assets.Scripts.Core
             if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
             
             p_isLevelProgression = false;
+            m_IsChallengeLevelActive = true;
             currentChallengeYear = year;
             currentChallengeMonth = month;
             currentChallengeDay = day;
@@ -924,44 +936,146 @@ namespace Assets.Scripts.Core
 
             yield return new WaitForSeconds(2.5f);
 
-            // --- MULTIPLY REWARD POPUP (Cooldown based) ---
-            bool isCooldownUp = (Time.time - m_LastMultiplyPopupTime) >= 180f;
-            bool isAdReady = AdsManager.Instance != null && (AdsManager.Instance.IsMultiplyRewardedReady || AdsManager.Instance.IsInterstitialReady);
-            if (collectedLevelCurrency > 0 && m_GameUI != null && isCooldownUp && UserDataManager.Instance.CurrentLevel > 16 && UserDataManager.Instance.CurrentLevel%2 == 1 && isAdReady)
+            // Multiply popup is deferred until lobby when post-win level choice is enabled.
+            if (!ShouldShowPostWinLevelChoice())
             {
-                m_LastMultiplyPopupTime = Time.time;
-                p_lastWinAmount = collectedLevelCurrency;
-                MultiplyCoinsPopup popup = m_GameUI.ShowMultiplyCoinsPopup(collectedLevelCurrency);
-                if (popup != null)
-                {
-                    // Wait for popup to finish before transition
-                    while (popup != null) yield return null;
-                }
+                yield return TryShowMultiplyCoinsPopupAndWait();
             }
-            // -----------------------------
-            
-            if (p_isLevelProgression && UserDataManager.Instance.CurrentLevel <= ADS_START_LEVEL)
 
+            if (p_isLevelProgression && UserDataManager.Instance.CurrentLevel <= ADS_START_LEVEL)
             {
                 Debug.Log($"[GameManager] Below Ads level ({ADS_START_LEVEL}). Transitioning to next level directly.");
                 StartLevel($"level{UserDataManager.Instance.CurrentLevel}");
             }
+            else if (ShouldShowPostWinLevelChoice())
+            {
+                yield return PostWinLevelChoiceFlow();
+            }
             else
             {
-                m_GameUI.SetGameUIVisible(false);
-                HideScreens();
-                
-                if (AdsManager.Instance != null)
-                {
-                    AdsManager.Instance.ShowInterstitial(true);
-                    AdsManager.Instance.SpawnCoinsSmallExplosion();
-                }
-                
-                CameraController.Instance.ResetZoom();
-                OnLevelWon?.Invoke();
+                TransitionToLobbyAfterWin(showAd: true);
+            }
+        }
+
+        private bool ShouldShowPostWinLevelChoice()
+        {
+            // Main campaign levels only (timed or not). Challenge levels always use the classic lobby flow.
+            if (!p_isLevelProgression || m_IsChallengeLevelActive) return false;
+            // Levels 1–12 keep legacy flow (auto-advance / lobby); remote toggle applies from level 13+.
+            if (UserDataManager.Instance.CurrentLevel <= ADS_START_LEVEL) return false;
+            if (m_PostWinLevelChoiceView == null) return false;
+            if (RemoteConfigManager.Instance == null) return false;
+            return RemoteConfigManager.Instance.IsPostWinLevelChoiceEnabled;
+        }
+
+        private void HideWinSequencePresentation()
+        {
+            if (m_WinParticles != null) m_WinParticles.SetActive(false);
+            if (m_WinLevelText != null) m_WinLevelText.gameObject.SetActive(false);
+        }
+
+        private System.Collections.IEnumerator PostWinLevelChoiceFlow()
+        {
+            HideWinSequencePresentation();
+
+            int completedLevel = UserDataManager.Instance.CurrentLevel - 1;
+            m_PostWinLevelChoiceView.Show(completedLevel);
+
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowInterstitial(true);
+                AdsManager.Instance.SpawnCoinsSmallExplosion();
             }
 
+            while (m_PostWinLevelChoiceView.SelectedChoice == PostWinLevelChoiceView.Choice.None)
+            {
+                yield return null;
+            }
 
+            PostWinLevelChoiceView.Choice choice = m_PostWinLevelChoiceView.SelectedChoice;
+            m_PostWinLevelChoiceView.Hide();
+
+            if (choice == PostWinLevelChoiceView.Choice.NextLevel)
+            {
+                HideScreens();
+                if (CameraController.Instance != null) CameraController.Instance.ResetZoom();
+                StartLevel($"level{UserDataManager.Instance.CurrentLevel}");
+            }
+            else
+            {
+                yield return TryShowMultiplyCoinsPopupAndWait();
+                m_DeferredLobbyStreakSync = true;
+                TransitionToLobbyAfterWin(showAd: false, deferStreakRefresh: true);
+                yield return SyncLobbyStreakUIAfterTransition();
+            }
+        }
+
+        private bool ShouldOfferMultiplyCoinsPopup()
+        {
+            bool isCooldownUp = (Time.time - m_LastMultiplyPopupTime) >= 180f;
+            bool isAdReady = AdsManager.Instance != null &&
+                (AdsManager.Instance.IsMultiplyRewardedReady || AdsManager.Instance.IsInterstitialReady);
+            return collectedLevelCurrency > 0
+                && m_GameUI != null
+                && isCooldownUp
+                && UserDataManager.Instance.CurrentLevel > 16
+                && UserDataManager.Instance.CurrentLevel % 2 == 1
+                && isAdReady;
+        }
+
+        private System.Collections.IEnumerator TryShowMultiplyCoinsPopupAndWait()
+        {
+            if (!ShouldOfferMultiplyCoinsPopup()) yield break;
+
+            m_LastMultiplyPopupTime = Time.time;
+            p_lastWinAmount = collectedLevelCurrency;
+            MultiplyCoinsPopup popup = m_GameUI.ShowMultiplyCoinsPopup(collectedLevelCurrency);
+            if (popup != null)
+            {
+                while (popup != null) yield return null;
+            }
+        }
+
+        private void TransitionToLobbyAfterWin(bool showAd, bool deferStreakRefresh = false)
+        {
+            m_GameUI.SetGameUIVisible(false);
+            HideScreens();
+
+            if (showAd && AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowInterstitial(true);
+                AdsManager.Instance.SpawnCoinsSmallExplosion();
+            }
+
+            if (CameraController.Instance != null) CameraController.Instance.ResetZoom();
+
+            if (!deferStreakRefresh)
+            {
+                ScheduleLobbyStreakRefresh();
+            }
+
+            OnLevelWon?.Invoke();
+        }
+
+        public void ScheduleLobbyStreakRefresh()
+        {
+            m_DeferredLobbyStreakSync = true;
+            StartCoroutine(SyncLobbyStreakUIAfterTransition());
+        }
+
+        private System.Collections.IEnumerator SyncLobbyStreakUIAfterTransition()
+        {
+            // Let lobby hierarchy, ads, and multiply popup fully settle before streak UI + animation.
+            yield return null;
+            yield return null;
+
+            m_DeferredLobbyStreakSync = false;
+
+            HomeContoller home = FindFirstObjectByType<HomeContoller>();
+            if (home != null)
+            {
+                home.RefreshLevelStreakUI();
+            }
         }
 
         public void LoseLife()
@@ -1052,6 +1166,7 @@ namespace Assets.Scripts.Core
             if (AdsManager.Instance != null) AdsManager.Instance.HideSettingsBanner();
             if (m_WinParticles != null) m_WinParticles.SetActive(false);
             if (m_WinLevelText != null) m_WinLevelText.gameObject.SetActive(false);
+            if (m_PostWinLevelChoiceView != null) m_PostWinLevelChoiceView.Hide();
             if (m_GameUI != null) m_GameUI.StopFailureFadeCoroutine();
         }
 
@@ -1472,6 +1587,7 @@ namespace Assets.Scripts.Core
             if (m_currentLevelUIElement != null) Destroy(m_currentLevelUIElement);
 
             p_isLevelProgression = progress.isChallenge ? false : true;
+            m_IsChallengeLevelActive = progress.isChallenge;
             currentChallengeYear = progress.challengeYear;
             currentChallengeMonth = progress.challengeMonth;
             currentChallengeDay = progress.challengeDay;

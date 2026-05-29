@@ -61,12 +61,15 @@ namespace Assets.Scripts.Core
 
         public event Action<bool> OnNoAdsStatusChanged;
         public event Action<string> OnPurchaseSuccess;
+        /// <summary>Fired when the store connection is ready and all product metadata has been fetched.</summary>
+        public event Action OnStoreReady;
         /// <summary>Fired on Android when the user chose a delayed payment method (e.g. pay in cash). Fulfillment happens after Google marks the order paid.</summary>
         public event Action<string> OnPurchaseAwaitingPayment;
 
         private string m_PendingPurchaseId = null;
         private bool m_IsInitializing = false;
         private static Task unityServicesInitTask;
+        private static Task storeInitTask;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void AutoInitialize()
@@ -88,25 +91,46 @@ namespace Assets.Scripts.Core
             }
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            WarmUp();
         }
 
-        private void Start()
+        /// <summary>
+        /// Starts store initialization as early as possible. Safe to call repeatedly.
+        /// </summary>
+        public void WarmUp()
         {
-            // Start initialization immediately and don't block the main thread
-            _ = InitializeAllServices();
+            _ = EnsureStoreReadyAsync();
         }
 
-        private async Task InitializeAllServices()
+        /// <summary>
+        /// Awaits store initialization. Returns immediately if the store is already ready.
+        /// </summary>
+        public Task EnsureStoreReadyAsync()
         {
-            if (m_IsInitializing || IsInitialized()) return;
+            if (IsInitialized()) return Task.CompletedTask;
+
+            if (storeInitTask == null)
+            {
+                storeInitTask = InitializeAllServicesInternal();
+            }
+
+            return storeInitTask;
+        }
+
+        public bool IsStoreInitializing => m_IsInitializing;
+
+        private async Task InitializeAllServicesInternal()
+        {
+            if (IsInitialized()) return;
+            if (m_IsInitializing) return;
             m_IsInitializing = true;
 
             try
             {
                 // Parallel initialization: Start Unity Services and Store setup concurrently
                 var servicesTask = InitializeUnityServices();
-                
-                // We start purchasing initialization. Note: On some platforms, 
+
+                // We start purchasing initialization. Note: On some platforms,
                 // UnityPurchasing requires UnityServices to be initialized for certain features,
                 // but the native store module can often start its handshake immediately.
                 InitializePurchasing();
@@ -117,6 +141,7 @@ namespace Assets.Scripts.Core
             catch (Exception e)
             {
                 Debug.LogError($"[IAPManager] Initialization Flow Error: {e.Message}");
+                storeInitTask = null;
             }
             finally
             {
@@ -234,7 +259,7 @@ namespace Assets.Scripts.Core
             {
                 Debug.LogWarning($"[IAPManager] Store not ready. Queueing purchase for: {productId}");
                 m_PendingPurchaseId = productId;
-                _ = InitializeAllServices();
+                WarmUp();
                 return;
             }
 
@@ -268,13 +293,16 @@ namespace Assets.Scripts.Core
             m_StoreController = controller;
             m_StoreExtensionProvider = extensions;
 
-            // 1. Warm-up and Cache Metadata
+            // Warm up metadata for every registered offer so BuyProduct can fire immediately later
             foreach (var product in m_StoreController.products.all)
             {
                 // Accessing metadata warms up the native-to-Unity bridge cache
-                var dummyPrice = product.metadata.localizedPriceString;
+                _ = product.metadata.localizedPriceString;
+                _ = product.metadata.localizedPrice;
+                _ = product.metadata.isoCurrencyCode;
                 CacheProductMetadata(product);
             }
+            PlayerPrefs.Save();
 
             // 2. iOS specific listeners
             if (Application.platform == RuntimePlatform.IPhonePlayer || Application.platform == RuntimePlatform.OSXPlayer)
@@ -293,6 +321,7 @@ namespace Assets.Scripts.Core
             }
 
             CheckAlreadyOwnedProducts();
+            OnStoreReady?.Invoke();
         }
 
         private void CacheProductMetadata(Product product)
@@ -301,7 +330,6 @@ namespace Assets.Scripts.Core
             string key = MetadataCachePrefix + product.definition.id;
             // Store formatted price string for immediate UI display in next session
             PlayerPrefs.SetString(key, product.metadata.localizedPriceString);
-            PlayerPrefs.Save();
         }
 
         public string GetProductPrice(string productId)
@@ -394,12 +422,14 @@ namespace Assets.Scripts.Core
         {
             Debug.LogError($"[IAPManager] Initialization failed: {error}");
             m_IsInitializing = false;
+            storeInitTask = null;
         }
 
         public void OnInitializeFailed(InitializationFailureReason error, string message)
         {
             Debug.LogError($"[IAPManager] Initialization failed: {error}. Message: {message}");
             m_IsInitializing = false;
+            storeInitTask = null;
         }
 
         public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
