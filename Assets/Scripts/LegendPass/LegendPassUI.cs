@@ -27,16 +27,21 @@ public class LegendPassUI : MonoBehaviour
 
     private void OnEnable()
     {
-        RefreshUI();
-        LegendPassManager.Instance.OnProgressChanged += RefreshUI;
+        RefreshUI(scrollToCurrentStep: true);
+        LegendPassManager.Instance.OnProgressChanged += OnPassProgressChanged;
     }
 
     private void OnDisable()
     {
         if (LegendPassManager.Instance != null)
         {
-            LegendPassManager.Instance.OnProgressChanged -= RefreshUI;
+            LegendPassManager.Instance.OnProgressChanged -= OnPassProgressChanged;
         }
+    }
+
+    private void OnPassProgressChanged()
+    {
+        RefreshUI(scrollToCurrentStep: false);
     }
 
     /// <summary>
@@ -53,7 +58,7 @@ public class LegendPassUI : MonoBehaviour
     /// Reuses existing children to avoid memory allocation and layout leaks.
     /// </summary>
     [ContextMenu("Refresh Pass UI")]
-    public void RefreshUI()
+    public void RefreshUI(bool scrollToCurrentStep = false)
     {
         if (m_Config == null || m_StepPrefab == null || m_ContentTransform == null)
         {
@@ -121,10 +126,12 @@ public class LegendPassUI : MonoBehaviour
 
         // Force layout rebuild to ensure ScrollRect handles the new content size
         LayoutRebuilder.ForceRebuildLayoutImmediate(m_ContentTransform);
-        
-        // Auto-scroll to the current unlocked step with a slight delay to ensure layout is ready
-        if (m_ScrollCoroutine != null) StopCoroutine(m_ScrollCoroutine);
-        m_ScrollCoroutine = StartCoroutine(ScrollToCurrentStepRoutine());
+
+        if (scrollToCurrentStep)
+        {
+            if (m_ScrollCoroutine != null) StopCoroutine(m_ScrollCoroutine);
+            m_ScrollCoroutine = StartCoroutine(ScrollToCurrentStepRoutine());
+        }
     }
 
     private Coroutine m_ScrollCoroutine;
