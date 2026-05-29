@@ -134,6 +134,27 @@ namespace Assets.Scripts.Core
 
         private Dictionary<string, int> m_MonthlyCache = new Dictionary<string, int>();
 
+        // PlayerPrefs.Save() can hitch (sync disk flush), especially in Editor/Desktop.
+        // LevelProgress is written frequently (periodic autosave), so throttle flushes.
+        private const float LevelProgressPrefsFlushIntervalSeconds = 30f;
+        private float m_LastLevelProgressPrefsFlushRealtime = -999f;
+
+        private void MaybeFlushPrefsForLevelProgress(bool force)
+        {
+            if (force)
+            {
+                PlayerPrefs.Save();
+                m_LastLevelProgressPrefsFlushRealtime = Time.realtimeSinceStartup;
+                return;
+            }
+
+            if (Time.realtimeSinceStartup - m_LastLevelProgressPrefsFlushRealtime >= LevelProgressPrefsFlushIntervalSeconds)
+            {
+                PlayerPrefs.Save();
+                m_LastLevelProgressPrefsFlushRealtime = Time.realtimeSinceStartup;
+            }
+        }
+
         private UserDataManager()
         {
             LoadData();
@@ -516,7 +537,7 @@ namespace Assets.Scripts.Core
             }
             string json = JsonUtility.ToJson(progress);
             PlayerPrefs.SetString(LevelProgressKey, json);
-            PlayerPrefs.Save();
+            MaybeFlushPrefsForLevelProgress(force: false);
         }
 
         public LevelProgress LoadLevelProgress()
@@ -541,7 +562,8 @@ namespace Assets.Scripts.Core
         public void ClearLevelProgress()
         {
             PlayerPrefs.DeleteKey(LevelProgressKey);
-            PlayerPrefs.Save();
+            // Force flush so "no-progress" is durable immediately (e.g. on lobby return).
+            MaybeFlushPrefsForLevelProgress(force: true);
         }
 
         #region LiveOps Persistence

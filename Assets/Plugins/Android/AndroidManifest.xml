@@ -17,10 +17,7 @@
     <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
     <meta-data android:name="firebase_crashlytics_collection_enabled" android:value="false" />
     <!-- Prevent Crashlytics/Analytics eager init on the main thread during app bind (ANR). -->
-    <provider
-      android:name="com.google.firebase.provider.FirebaseInitProvider"
-      android:authorities="${applicationId}.firebaseinitprovider"
-      tools:node="remove" />
+    <provider android:name="com.google.firebase.provider.FirebaseInitProvider" android:authorities="com.everybodygames.arrowsmaster.firebaseinitprovider" tools:node="remove" />
     <activity android:name="com.google.firebase.MessagingUnityPlayerActivity" android:theme="@style/UnityThemeSelector">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
