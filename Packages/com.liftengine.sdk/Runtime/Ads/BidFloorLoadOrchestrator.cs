@@ -42,11 +42,13 @@ namespace LiftEngine.Ads
             if (prediction == null || prediction.multipliers == null || prediction.multipliers.Length == 0)
             {
                 LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
-                    $"{format} — no predict multipliers, entering bid-0 fill loop.");
+                    $"{format} — no predict multipliers available → skipping [Attempt 0..N] → [Attempt -1]");
                 LiftEngineSignalBus.Publish(new BidFloorPredictionFailedSignal(format));
                 yield return BidZeroUntilFill(format, adUnitId, onComplete);
                 yield break;
             }
+
+            var requireRevenue = RequiresRevenueForMultiplierPhase(format);
 
             for (var i = 0; i < prediction.multipliers.Length; i++)
             {
@@ -54,29 +56,38 @@ namespace LiftEngine.Ads
                 var floorStr = PredictDataNormalizers.FormatBidFloor(bidFloor);
                 LiftEngineLogger.LogAttempt(i,
                     $"{format} — loading with multiplier[{i}]={prediction.multipliers[i]}, " +
-                    $"prediction={prediction.prediction}, jC7Fp={floorStr}");
+                    $"prediction={prediction.prediction}, jC7Fp={floorStr}, requireRevenue={requireRevenue}");
 
                 _mediation.SetBidFloorExtra(format, adUnitId, floorStr);
                 _mediation.RequestLoad(format, adUnitId);
 
                 var success = false;
-                yield return WaitForLoad(format, adUnitId, i, requireRevenue: true, result => success = result);
+                yield return WaitForLoad(format, adUnitId, i, requireRevenue, result => success = result);
 
                 if (success)
                 {
-                    LiftEngineLogger.LogAttempt(i, $"{format} — fill success with revenue.");
+                    LiftEngineLogger.LogAttempt(i, $"{format} — fill success at multiplier[{i}].");
                     onComplete?.Invoke(true);
                     yield break;
                 }
 
                 LiftEngineLogger.LogAttemptWarning(i,
-                    $"{format} — no fill with revenue, trying next multiplier.");
+                    $"{format} — no fill at multiplier[{i}], trying next.");
                 _mediation.DestroyAd(format, adUnitId);
             }
 
             LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
-                $"{format} — multiplier waterfall exhausted, entering bid-0 fill loop.");
+                $"{format} — all multipliers exhausted → [Attempt -1]");
             yield return BidZeroUntilFill(format, adUnitId, onComplete);
+        }
+
+        private bool RequiresRevenueForMultiplierPhase(LiftEngineAdFormat format)
+        {
+            // Banners rarely expose ILRD at load time; full-screen formats do on device.
+            if (format == LiftEngineAdFormat.Banner)
+                return false;
+
+            return true;
         }
 
         private IEnumerator BidZeroUntilFill(LiftEngineAdFormat format, string adUnitId, Action<bool> onComplete)
@@ -115,15 +126,7 @@ namespace LiftEngine.Ads
 
             while (elapsed < timeout)
             {
-                if (requireRevenue)
-                {
-                    if (_mediation.HasLoadedWithRevenue(format, adUnitId))
-                    {
-                        callback?.Invoke(true);
-                        yield break;
-                    }
-                }
-                else if (_mediation.IsReady(format, adUnitId))
+                if (IsLoadSuccessful(format, adUnitId, requireRevenue))
                 {
                     callback?.Invoke(true);
                     yield break;
@@ -136,6 +139,24 @@ namespace LiftEngine.Ads
             LiftEngineLogger.LogAttemptWarning(attempt,
                 $"{format} — load timed out after {timeout}s (requireRevenue={requireRevenue}).");
             callback?.Invoke(false);
+        }
+
+        private bool IsLoadSuccessful(LiftEngineAdFormat format, string adUnitId, bool requireRevenue)
+        {
+            if (!requireRevenue)
+                return _mediation.IsReady(format, adUnitId);
+
+            if (_mediation.HasLoadedWithRevenue(format, adUnitId))
+                return true;
+
+            if (_settings.treatEditorLoadAsFilledForMultiplierPhase &&
+                Application.isEditor &&
+                _mediation.IsReady(format, adUnitId))
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }

@@ -12,9 +12,16 @@ namespace LiftEngine
                 UnityEngine.Debug.Log($"[LiftEngine] {message}");
         }
 
-        /// <summary>Backend request/response — always logged.</summary>
+        /// <summary>Outgoing client request — always logged.</summary>
+        public static void LogClient(string message) =>
+            UnityEngine.Debug.Log($"[LiftEngine] [CL] {message}");
+
+        /// <summary>Incoming backend response — always logged.</summary>
         public static void LogBackend(string message) =>
             UnityEngine.Debug.Log($"[LiftEngine] [BE] {message}");
+
+        public static void LogClientWarning(string message) =>
+            UnityEngine.Debug.LogWarning($"[LiftEngine] [CL] {message}");
 
         public static void LogBackendWarning(string message) =>
             UnityEngine.Debug.LogWarning($"[LiftEngine] [BE] {message}");

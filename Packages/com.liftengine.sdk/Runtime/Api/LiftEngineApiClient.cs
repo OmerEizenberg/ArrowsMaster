@@ -39,7 +39,8 @@ namespace LiftEngine.Api
 
             var json = JsonConvert.SerializeObject(body);
             var path = $"/api/v1/predict/{deviceId}";
-            _host.StartCoroutine(Post(path, json, (code, response) =>
+            var model = body.model;
+            _host.StartCoroutine(PostPredict(path, model, json, (code, response) =>
             {
                 if (code == 204)
                 {
@@ -152,7 +153,7 @@ namespace LiftEngine.Api
         private IEnumerator Get(string method, string path, bool auth, Action<int, string> callback)
         {
             var url = _settings.ApiBaseUrl.TrimEnd('/') + path;
-            LiftEngineLogger.LogBackend($"{method} {path} → sending");
+            LiftEngineLogger.LogClient($"{method} {path}");
 
             using var request = UnityWebRequest.Get(url);
             if (auth)
@@ -167,10 +168,30 @@ namespace LiftEngine.Api
             callback?.Invoke(code, body);
         }
 
+        private IEnumerator PostPredict(string path, string model, string json, Action<int, string> callback)
+        {
+            var url = _settings.ApiBaseUrl.TrimEnd('/') + path;
+            LiftEngineLogger.LogClient($"POST {path} model={model} ({json.Length} bytes)");
+
+            using var request = new UnityWebRequest(url, "POST");
+            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", "Bearer " + _settings.apiKey);
+            request.timeout = Mathf.CeilToInt(_settings.predictTimeoutSeconds);
+
+            yield return request.SendWebRequest();
+
+            var body = request.downloadHandler?.text ?? string.Empty;
+            var code = (int)request.responseCode;
+            LogBackendResponse("POST", $"{path} model={model}", code, body);
+            callback?.Invoke(code, body);
+        }
+
         private IEnumerator Post(string path, string json, Action<int, string> callback)
         {
             var url = _settings.ApiBaseUrl.TrimEnd('/') + path;
-            LiftEngineLogger.LogBackend($"POST {path} → sending body ({json.Length} bytes)");
+            LiftEngineLogger.LogClient($"POST {path} ({json.Length} bytes)");
 
             using var request = new UnityWebRequest(url, "POST");
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));

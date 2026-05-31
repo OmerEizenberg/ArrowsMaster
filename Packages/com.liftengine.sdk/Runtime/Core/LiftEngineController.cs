@@ -55,7 +55,6 @@ namespace LiftEngine
                 {
                     _api.CheckHealth((ok, body) =>
                     {
-                    LiftEngineLogger.Log(ok ? $"Health OK: {body}" : $"Health failed: {body}");
                         CompleteInit();
                     });
                 }

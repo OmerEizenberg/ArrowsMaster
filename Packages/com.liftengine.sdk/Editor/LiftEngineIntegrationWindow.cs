@@ -364,15 +364,15 @@ namespace LiftEngine.Editor
                 if (GUILayout.Button("Ping Health"))
                 {
                     var url = _settings.ApiBaseUrl.TrimEnd('/') + "/health/live";
-                    Log($"[BE] Ping Health — sending GET {url}");
+                    Log($"[CL] Ping Health — GET {url}");
                     _lastHealthResult = "Pinging…";
                     LiftEngineSdk.CheckHealth((ok, body) =>
                     {
                         _lastHealthResult = ok ? $"OK — {body}" : $"FAILED — {body}";
                         if (ok)
-                            Log($"[BE] Ping Health — response received: {body}");
+                            Log($"[BE] Ping Health — {body}");
                         else
-                            LogWarning($"[BE] Ping Health — request failed. Response: {body}");
+                            LogWarning($"[BE] Ping Health failed — {body}");
                         Repaint();
                     });
                 }
@@ -406,7 +406,7 @@ namespace LiftEngine.Editor
                     if (!RequireSdkInitialized())
                         return;
 
-                    Log($"Run Predict / Prewarm — starting for {_debugFormat} (predict → bid floor → load).");
+                    Log($"[CL] Run Predict / Prewarm — {_debugFormat}");
                     LiftEngineSdk.LoadAd(_debugFormat);
                     _lastPredictResult = $"Prewarm started for {_debugFormat}…";
                 }
