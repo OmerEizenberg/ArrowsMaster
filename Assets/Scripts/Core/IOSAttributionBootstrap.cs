@@ -33,6 +33,10 @@ namespace Assets.Scripts.Core
 
         private void Awake()
         {
+#if UNITY_EDITOR
+            // SingularSDK.Awake returns early in Editor and never registers an instance.
+            return;
+#endif
 #if UNITY_IOS && !UNITY_EDITOR
             StartCoroutine(BootstrapIOS());
 #else
@@ -40,10 +44,21 @@ namespace Assets.Scripts.Core
 #endif
         }
 
+        private const float SingularInstanceWaitTimeoutSeconds = 10f;
+
         private IEnumerator InitializeSingularAfterSceneLoad()
         {
-            yield return null;
+            yield return WaitForSingularInstance();
             TryInitializeSingular();
+        }
+
+        private static IEnumerator WaitForSingularInstance()
+        {
+            float deadline = Time.realtimeSinceStartup + SingularInstanceWaitTimeoutSeconds;
+            while (FindFirstObjectByType<SingularSDK>() == null && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
         }
 
 #if UNITY_IOS && !UNITY_EDITOR
@@ -77,7 +92,7 @@ namespace Assets.Scripts.Core
             }
 
             // Allow the scene (and SingularSDKObject) to load before init.
-            yield return null;
+            yield return WaitForSingularInstance();
 
             TryInitializeSingular();
         }
@@ -89,21 +104,27 @@ namespace Assets.Scripts.Core
                 return;
 
             var singular = FindFirstObjectByType<SingularSDK>();
-            if (singular != null)
+            if (singular == null)
             {
-                singular.InitializeOnAwake = false;
-#if UNITY_IOS && !UNITY_EDITOR
-                singular.waitForTrackingAuthorizationWithTimeoutInterval = SingularAttWaitIntervalSeconds;
-                if (!singular.SKANEnabled)
-                {
-                    singular.SKANEnabled = true;
-                    Debug.LogWarning("[IOSAttributionBootstrap] Re-enabled Singular SKAN.");
-                }
-#endif
+                Debug.LogError("[IOSAttributionBootstrap] SingularSDKObject not found in scene; cannot initialize Singular.");
+                return;
             }
 
+            singular.InitializeOnAwake = false;
+#if UNITY_IOS && !UNITY_EDITOR
+            singular.waitForTrackingAuthorizationWithTimeoutInterval = SingularAttWaitIntervalSeconds;
+            if (!singular.SKANEnabled)
+            {
+                singular.SKANEnabled = true;
+                Debug.LogWarning("[IOSAttributionBootstrap] Re-enabled Singular SKAN.");
+            }
+#endif
+
             SingularSDK.InitializeSingularSDK();
-            Debug.Log("[IOSAttributionBootstrap] Singular SDK initialized.");
+            if (SingularSDK.Initialized)
+            {
+                Debug.Log("[IOSAttributionBootstrap] Singular SDK initialized.");
+            }
         }
     }
 }

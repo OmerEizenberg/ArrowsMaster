@@ -89,6 +89,17 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
         yield return null;
         yield return new WaitForSecondsRealtime(0.5f);
 
+#if UNITY_EDITOR
+        // macOS Editor needs FirebaseCppApp-*.bundle, which is not checked into git (see .gitignore).
+        // Touching Firebase APIs here throws DllNotFoundException; use baked-in Remote Config defaults instead.
+        Debug.Log("[FirebaseManager] Skipping Firebase native init in Editor. Use a device build for full Firebase.");
+        if (RemoteConfigManager.Instance != null)
+        {
+            RemoteConfigManager.Instance.ApplyDefaultsOnly("Firebase native SDK not loaded in Unity Editor.");
+        }
+        yield break;
+#endif
+
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task => {
             DependencyStatus dependencyStatus = task.Result;
             
