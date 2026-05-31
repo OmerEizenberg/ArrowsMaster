@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d27a4536e2f4c407e93f2ed4509d4c14, type: 3}
+  m_Name: LiftEngineSettings
+  m_EditorClassIdentifier: LiftEngine.Runtime::LiftEngine.LiftEngineSettings
+  environment: 0
+  customApiBaseUrl: https://api-stg.liftengine.ai/
+  apiKey: test-api-key
+  mediationPlatform: 1
+  iosBannerAdUnitId: b4b98419050ba611
+  iosInterstitialAdUnitId: 9625ca772cf7c819
+  iosRewardedAdUnitId: 39cd5fd76b5da61f
+  androidBannerAdUnitId: b3d625776838cd3e
+  androidInterstitialAdUnitId: 8cf59aa021b449bf
+  androidRewardedAdUnitId: a9110da25686aa62
+  bannerPlacementId: banner-default
+  interstitialPlacementId: interstitial-default
+  rewardedPlacementId: rewarded-default
+  predictTimeoutSeconds: 1
+  defaultPredictionFallback: 1
+  loadAttemptTimeoutSeconds: 15
+  prewarmOnInit: 1
+  prewarmAfterShow: 1
+  readinessCheckIntervalSeconds: 2
+  autoInitialize: 0
+  runHealthCheckOnInit: 1
+  verboseLogging: 0
+  debugMode: 1

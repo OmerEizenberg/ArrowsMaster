@@ -1,0 +1,10 @@
+{
+  "name": "com.liftengine.sdk",
+  "version": "0.1.0",
+  "displayName": "LiftEngine SDK",
+  "description": "Bid floor optimization SDK with LiftEngine API, MAX mediation, and report context management.",
+  "unity": "2021.3",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
+}

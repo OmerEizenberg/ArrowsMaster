@@ -1,0 +1,23 @@
+{
+  "name": "LiftEngine.Runtime",
+  "rootNamespace": "LiftEngine",
+  "references": [
+    "MaxSdk.Scripts",
+    "Newtonsoft.Json"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "com.applovin.mediation.ads",
+      "expression": "",
+      "define": "LIFTENGINE_MAX"
+    }
+  ],
+  "noEngineReferences": false
+}

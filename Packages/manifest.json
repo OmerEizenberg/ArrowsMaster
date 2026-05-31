@@ -1,5 +1,7 @@
 {
     "dependencies": {
+        "com.liftengine.sdk": "file:com.liftengine.sdk",
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
         "com.google.ads.mobile": "11.1.0",
         "com.unity.ads.ios-support": "1.2.0",
         "com.unity.collab-proxy": "2.12.4",
