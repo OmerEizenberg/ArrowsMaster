@@ -7748,6 +7748,9 @@ MonoBehaviour:
   m_RefillLockIcon: {fileID: 2054261499}
   m_RefillTooltip: {fileID: 789305190}
   m_RefillFullLivesTooltip: {fileID: 1861445587}
+  m_HintBoosterButton: {fileID: 1499949759}
+  m_MagicBoosterButton: {fileID: 1819644689}
+  m_RefillBoosterButton: {fileID: 695552027}
   m_BoosterOverlayParent: {fileID: 937078175}
   m_BoosterImagePrefab: {fileID: 5826844018470820252, guid: bce1a3f00e5ab4bfbb45555e5e615c9f, type: 3}
   m_MagicBoosterFeedbackSprite: {fileID: 21300000, guid: 9aa6aac210b1f44499288385f2a5890b, type: 3}
@@ -23409,6 +23412,7 @@ MonoBehaviour:
   MagicBoosterSound: {fileID: 8300000, guid: ab25027bee74f49c9ab4158591c94033, type: 3}
   HintBoosterSound: {fileID: 8300000, guid: b873ee57d65204275af76049ea6b615e, type: 3}
   RefillBoosterSound: {fileID: 8300000, guid: e58c3c25ae89b4d5c8b29f9553e90799, type: 3}
+  HeartNudgeSound: {fileID: 8300000, guid: e58c3c25ae89b4d5c8b29f9553e90799, type: 3}
   musicSource: {fileID: 0}
 --- !u!1 &985538275
 GameObject:

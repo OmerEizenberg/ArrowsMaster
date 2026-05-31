@@ -1266,6 +1266,7 @@ namespace Assets.Scripts.Core
             hintTimer = 0f;
             hintAdPollTimer = 0f;
             SetHintVisibility(false);
+            if (m_GameUI != null) m_GameUI.ResetIdleBoosterNudgeTimer();
             
             // If there's an active hint, clear it immediately when user starts interacting
             if (clearActiveHint && isHintActive)

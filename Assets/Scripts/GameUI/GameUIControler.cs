@@ -48,6 +48,37 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_RefillTooltip;
     [SerializeField] private GameObject m_RefillFullLivesTooltip;
     
+    [Header("Booster Button Nudge")]
+    [SerializeField] private RectTransform m_HintBoosterButton;
+    [SerializeField] private RectTransform m_MagicBoosterButton;
+    [SerializeField] private RectTransform m_RefillBoosterButton;
+    private const float RefillNudgeDelay = 0.7f;
+    private const float IdleBoosterNudgeThreshold = 5f;
+    private const int IdleBoosterMinLevel = 15;
+    private float m_idleBoosterTimer;
+    private int m_lastDisplayedLives = -1;
+    private Coroutine m_refillNudgeDelayCoroutine;
+    private Coroutine m_refillNudgeCoroutine;
+    private Coroutine m_hintNudgeCoroutine;
+    private Coroutine m_magicNudgeCoroutine;
+
+    private enum BoosterNudgeStyle
+    {
+        SinglePulse,
+        HeartbeatDouble
+    }
+    private bool m_boosterRestPosesCaptured;
+    private BoosterButtonRestPose? m_hintRestPose;
+    private BoosterButtonRestPose? m_magicRestPose;
+    private BoosterButtonRestPose? m_refillRestPose;
+
+    private struct BoosterButtonRestPose
+    {
+        public Vector2 AnchoredPosition;
+        public Quaternion LocalRotation;
+        public Vector3 LocalScale;
+    }
+
     [Header("Booster Visual Feedback")]
     [SerializeField] private RectTransform m_BoosterOverlayParent;
     [SerializeField] private GameObject m_BoosterImagePrefab; // Prefab with Image component
@@ -90,6 +121,8 @@ public class GameUIContoleer : MonoBehaviour
 
     private void Start()
     {
+        CaptureBoosterButtonRestPoses();
+
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnLivesChanged += UpdateLivesUI;
@@ -120,13 +153,22 @@ public class GameUIContoleer : MonoBehaviour
             }
         }
         #endif
+
+        UpdateIdleBoosterNudge();
     }
 
     private void OnEnable()
     {
+        ResetBoosterButtonsToRestPose();
+
         UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
         UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
         UpdateRefillBoosterUI(UserDataManager.Instance.RefillBoosterCount);
+    }
+
+    private void OnDisable()
+    {
+        ResetBoosterButtonsToRestPose();
     }
 
     private void OnDestroy()
@@ -157,6 +199,286 @@ public class GameUIContoleer : MonoBehaviour
                 m_Hearts[i].color = (i < currentLives) ? activeColor : inactiveColor;
             }
         }
+
+        if (m_lastDisplayedLives != 1 && currentLives == 1)
+        {
+            ScheduleRefillButtonNudge();
+        }
+        else if (currentLives != 1)
+        {
+            CancelRefillButtonNudge();
+        }
+
+        m_lastDisplayedLives = currentLives;
+    }
+
+    public void ResetIdleBoosterNudgeTimer()
+    {
+        m_idleBoosterTimer = 0f;
+    }
+
+    private void UpdateIdleBoosterNudge()
+    {
+        if (GameManager.Instance == null || !GameManager.Instance.CanInteract) return;
+        if (UserDataManager.Instance == null || UserDataManager.Instance.CurrentLevel <= IdleBoosterMinLevel) return;
+
+        m_idleBoosterTimer += Time.deltaTime;
+        if (m_idleBoosterTimer < IdleBoosterNudgeThreshold) return;
+
+        RectTransform target = PickIdleNudgeTarget();
+        m_idleBoosterTimer = 0f;
+        if (target != null)
+        {
+            PlayBoosterButtonNudge(target, BoosterNudgeStyle.SinglePulse);
+        }
+    }
+
+    private RectTransform PickIdleNudgeTarget()
+    {
+        int level = UserDataManager.Instance.CurrentLevel;
+        bool hintAvailable = level >= GameManager.HINT_BOOSTER_UNLOCK_LEVEL && m_HintBoosterButton != null;
+        bool magicAvailable = level >= GameManager.MAGIC_BOOSTER_UNLOCK_LEVEL && m_MagicBoosterButton != null;
+
+        if (hintAvailable && magicAvailable)
+        {
+            return Random.value < 0.5f ? m_HintBoosterButton : m_MagicBoosterButton;
+        }
+
+        if (hintAvailable) return m_HintBoosterButton;
+        if (magicAvailable) return m_MagicBoosterButton;
+        return null;
+    }
+
+    private void ScheduleRefillButtonNudge()
+    {
+        CancelRefillButtonNudge();
+        if (m_RefillBoosterButton == null || GameManager.Instance == null || !GameManager.Instance.CanInteract) return;
+        m_refillNudgeDelayCoroutine = StartCoroutine(RefillButtonNudgeDelayedRoutine());
+    }
+
+    private void CancelRefillButtonNudge()
+    {
+        if (m_refillNudgeDelayCoroutine != null)
+        {
+            StopCoroutine(m_refillNudgeDelayCoroutine);
+            m_refillNudgeDelayCoroutine = null;
+        }
+    }
+
+    private IEnumerator RefillButtonNudgeDelayedRoutine()
+    {
+        yield return new WaitForSeconds(RefillNudgeDelay);
+
+        if (GameManager.Instance == null || !GameManager.Instance.CanInteract || GameManager.Instance.CurrentLives != 1)
+        {
+            m_refillNudgeDelayCoroutine = null;
+            yield break;
+        }
+
+        PlayBoosterButtonNudge(m_RefillBoosterButton, BoosterNudgeStyle.HeartbeatDouble);
+        m_refillNudgeDelayCoroutine = null;
+    }
+
+    private void PlayBoosterButtonNudge(RectTransform target, BoosterNudgeStyle style)
+    {
+        if (target == null) return;
+
+        ref Coroutine nudgeCoroutine = ref GetNudgeCoroutineRef(target);
+        if (nudgeCoroutine != null)
+        {
+            StopCoroutine(nudgeCoroutine);
+        }
+
+        nudgeCoroutine = StartCoroutine(BoosterButtonNudgeRoutine(target, style));
+    }
+
+    private ref Coroutine GetNudgeCoroutineRef(RectTransform target)
+    {
+        if (target == m_HintBoosterButton) return ref m_hintNudgeCoroutine;
+        if (target == m_MagicBoosterButton) return ref m_magicNudgeCoroutine;
+        return ref m_refillNudgeCoroutine;
+    }
+
+    private void CaptureBoosterButtonRestPoses()
+    {
+        if (m_HintBoosterButton != null)
+        {
+            m_hintRestPose = CreateRestPose(m_HintBoosterButton);
+        }
+
+        if (m_MagicBoosterButton != null)
+        {
+            m_magicRestPose = CreateRestPose(m_MagicBoosterButton);
+        }
+
+        if (m_RefillBoosterButton != null)
+        {
+            m_refillRestPose = CreateRestPose(m_RefillBoosterButton);
+        }
+
+        m_boosterRestPosesCaptured = true;
+    }
+
+    private static BoosterButtonRestPose CreateRestPose(RectTransform target)
+    {
+        return new BoosterButtonRestPose
+        {
+            AnchoredPosition = target.anchoredPosition,
+            LocalRotation = target.localRotation,
+            LocalScale = target.localScale
+        };
+    }
+
+    private static void ApplyRestPose(RectTransform target, BoosterButtonRestPose restPose)
+    {
+        if (target == null) return;
+
+        target.anchoredPosition = restPose.AnchoredPosition;
+        target.localRotation = restPose.LocalRotation;
+        target.localScale = restPose.LocalScale;
+    }
+
+    private bool TryGetRestPose(RectTransform target, out BoosterButtonRestPose restPose)
+    {
+        if (!m_boosterRestPosesCaptured)
+        {
+            CaptureBoosterButtonRestPoses();
+        }
+
+        if (target == m_HintBoosterButton && m_hintRestPose.HasValue)
+        {
+            restPose = m_hintRestPose.Value;
+            return true;
+        }
+
+        if (target == m_MagicBoosterButton && m_magicRestPose.HasValue)
+        {
+            restPose = m_magicRestPose.Value;
+            return true;
+        }
+
+        if (target == m_RefillBoosterButton && m_refillRestPose.HasValue)
+        {
+            restPose = m_refillRestPose.Value;
+            return true;
+        }
+
+        restPose = default;
+        return false;
+    }
+
+    public void ResetBoosterButtonsToRestPose()
+    {
+        CancelRefillButtonNudge();
+        StopAllBoosterNudgeCoroutines();
+        ResetIdleBoosterNudgeTimer();
+
+        if (!m_boosterRestPosesCaptured)
+        {
+            CaptureBoosterButtonRestPoses();
+        }
+
+        if (m_hintRestPose.HasValue)
+        {
+            ApplyRestPose(m_HintBoosterButton, m_hintRestPose.Value);
+        }
+
+        if (m_magicRestPose.HasValue)
+        {
+            ApplyRestPose(m_MagicBoosterButton, m_magicRestPose.Value);
+        }
+
+        if (m_refillRestPose.HasValue)
+        {
+            ApplyRestPose(m_RefillBoosterButton, m_refillRestPose.Value);
+        }
+    }
+
+    private void StopAllBoosterNudgeCoroutines()
+    {
+        if (m_hintNudgeCoroutine != null)
+        {
+            StopCoroutine(m_hintNudgeCoroutine);
+            m_hintNudgeCoroutine = null;
+        }
+
+        if (m_magicNudgeCoroutine != null)
+        {
+            StopCoroutine(m_magicNudgeCoroutine);
+            m_magicNudgeCoroutine = null;
+        }
+
+        if (m_refillNudgeCoroutine != null)
+        {
+            StopCoroutine(m_refillNudgeCoroutine);
+            m_refillNudgeCoroutine = null;
+        }
+    }
+
+    private IEnumerator BoosterButtonNudgeRoutine(RectTransform target, BoosterNudgeStyle style)
+    {
+        if (!TryGetRestPose(target, out BoosterButtonRestPose restPose))
+        {
+            GetNudgeCoroutineRef(target) = null;
+            yield break;
+        }
+
+        Vector3 restScale = restPose.LocalScale;
+
+        switch (style)
+        {
+            case BoosterNudgeStyle.SinglePulse:
+                yield return BoosterScalePulseRoutine(target, restScale, 1.12f, 0.18f, 0.22f);
+                break;
+            case BoosterNudgeStyle.HeartbeatDouble:
+                PlayRefillHeartNudgeSound();
+                yield return BoosterScalePulseRoutine(target, restScale, 1.1f, 0.2f, 0.28f);
+                yield return new WaitForSeconds(0.25f);
+                PlayRefillHeartNudgeSound();
+                yield return BoosterScalePulseRoutine(target, restScale, 1.1f, 0.2f, 0.28f);
+                break;
+        }
+
+        ApplyRestPose(target, restPose);
+        GetNudgeCoroutineRef(target) = null;
+    }
+
+    private static void PlayRefillHeartNudgeSound()
+    {
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayHeartNudge();
+        }
+    }
+
+    private static IEnumerator BoosterScalePulseRoutine(
+        RectTransform target,
+        Vector3 restScale,
+        float peakMultiplier,
+        float upDuration,
+        float downDuration)
+    {
+        if (target == null) yield break;
+
+        Vector3 peakScale = restScale * peakMultiplier;
+        float elapsed = 0f;
+
+        while (elapsed < upDuration)
+        {
+            elapsed += Time.deltaTime;
+            target.localScale = Vector3.Lerp(restScale, peakScale, elapsed / upDuration);
+            yield return null;
+        }
+        target.localScale = peakScale;
+
+        elapsed = 0f;
+        while (elapsed < downDuration)
+        {
+            elapsed += Time.deltaTime;
+            target.localScale = Vector3.Lerp(peakScale, restScale, elapsed / downDuration);
+            yield return null;
+        }
+        target.localScale = restScale;
     }
 
     public void PlayWrongAnimation()
@@ -310,6 +632,8 @@ public class GameUIContoleer : MonoBehaviour
         UpdateLevelHeaderText();
 
         ResetComboIndication();
+        ResetBoosterButtonsToRestPose();
+        m_lastDisplayedLives = GameManager.Instance != null ? GameManager.Instance.CurrentLives : -1;
     }
 
     private void UpdateLevelHeaderText()
@@ -356,6 +680,8 @@ public class GameUIContoleer : MonoBehaviour
     
     private void OnGameOver()
     {
+        ResetBoosterButtonsToRestPose();
+
         UpdateFailureScreenText();
         
         if (m_RestartButtonFadeCoroutine != null) StopCoroutine(m_RestartButtonFadeCoroutine);
@@ -554,6 +880,11 @@ public class GameUIContoleer : MonoBehaviour
 
     public void SetGameUIVisible(bool visible, bool notifyLobbyWhenHidden = true)
     {
+        if (!visible)
+        {
+            ResetBoosterButtonsToRestPose();
+        }
+
         if (m_LobbyUI != null) m_LobbyUI.SetActive(!visible);
         if (m_GameUI != null) m_GameUI.SetActive(visible);
 
@@ -561,6 +892,11 @@ public class GameUIContoleer : MonoBehaviour
         if (visible && !gameObject.activeSelf)
         {
             gameObject.SetActive(true);
+        }
+
+        if (visible)
+        {
+            ResetBoosterButtonsToRestPose();
         }
 
         if (!visible && notifyLobbyWhenHidden)
@@ -603,6 +939,8 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnHintButtonClicked()
     {
+        ResetIdleBoosterNudgeTimer();
+
         if (UserDataManager.Instance.CurrentLevel < GameManager.HINT_BOOSTER_UNLOCK_LEVEL)
         {
             HideAllBoosterTooltips();
@@ -744,6 +1082,8 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnMagicButtonClicked()
     {
+        ResetIdleBoosterNudgeTimer();
+
         if (UserDataManager.Instance.CurrentLevel < GameManager.MAGIC_BOOSTER_UNLOCK_LEVEL)
         {
             HideAllBoosterTooltips();
@@ -789,6 +1129,8 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnRefillButtonClicked()
     {
+        ResetIdleBoosterNudgeTimer();
+
         if (UserDataManager.Instance.CurrentLevel < GameManager.REFILL_BOOSTER_UNLOCK_LEVEL)
         {
             HideAllBoosterTooltips();
