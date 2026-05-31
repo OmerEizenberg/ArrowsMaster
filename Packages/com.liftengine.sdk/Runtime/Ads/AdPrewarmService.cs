@@ -105,24 +105,11 @@ namespace LiftEngine.Ads
                     : "timeout waiting for response";
 
                 LiftEngineLogger.LogBackendWarning($"{format} predict failed ({reason})");
+                LiftEngineLogger.LogAttemptWarning(-1,
+                    $"{format} — no multipliers available → [Attempt -1] bid-0 only");
 
-                if (_settings.useDefaultMultipliersWhenPredictFails &&
-                    _settings.defaultMultipliersFallback != null &&
-                    _settings.defaultMultipliersFallback.Length > 0)
-                {
-                    prediction = CreateFallbackPrediction(format);
-                    LiftEngineLogger.LogBackendWarning(
-                        $"{format} — using default multipliers → starting at [Attempt 0] (not [Attempt -1])");
-                    _context.SetAuctionContext(format, prediction.keyword, prediction.auction_id);
-                    LiftEngineSdkCallbacks.RaisePredictSuccess(prediction);
-                }
-                else
-                {
-                    LiftEngineLogger.LogAttemptWarning(-1,
-                        $"{format} — predict unavailable and fallback disabled → [Attempt -1] only");
-                    LiftEngineSdkCallbacks.RaisePredictFailed(predictError ?? new LiftEngineError(0, reason));
-                    LiftEngineSignalBus.Publish(new BidFloorPredictionFailedSignal(format));
-                }
+                LiftEngineSdkCallbacks.RaisePredictFailed(predictError ?? new LiftEngineError(0, reason));
+                LiftEngineSignalBus.Publish(new BidFloorPredictionFailedSignal(format));
             }
 
             _states[index] = AdPrewarmState.Loading;
@@ -143,18 +130,6 @@ namespace LiftEngine.Ads
 
             LiftEngineSignalBus.Publish(new AdPrewarmCompletedSignal(format, loadSuccess));
             LiftEngineSignalBus.Publish(new AdReadyStateChangedSignal(format, loadSuccess));
-        }
-
-        private LiftEnginePredictResult CreateFallbackPrediction(LiftEngineAdFormat format)
-        {
-            return new LiftEnginePredictResult
-            {
-                model = _settings.GetModelName(format),
-                prediction = _settings.defaultPredictionFallback,
-                multipliers = _settings.defaultMultipliersFallback,
-                keyword = "fallback",
-                auction_id = Guid.NewGuid().ToString()
-            };
         }
     }
 

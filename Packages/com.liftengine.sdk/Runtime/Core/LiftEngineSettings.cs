@@ -58,12 +58,6 @@ namespace LiftEngine
         [Tooltip("Base eCPM prediction used when the API response omits the prediction field (e.g. staging mock). Bid floor = this value × each multiplier.")]
         public float defaultPredictionFallback = 1f;
 
-        [Tooltip("When predict fails (e.g. banner not supported on staging), use these multipliers and still run [Attempt 0..N] before bid-0.")]
-        public float[] defaultMultipliersFallback = { 1.3f, 1f, 0.8f };
-
-        [Tooltip("If predict HTTP fails, fall back to default multipliers instead of jumping straight to [Attempt -1].")]
-        public bool useDefaultMultipliersWhenPredictFails = true;
-
         [Tooltip("Unity Editor MAX mock ads load with revenue=-1. Treat IsReady as fill during multiplier phase so [Attempt 0] can succeed.")]
         public bool treatEditorLoadAsFilledForMultiplierPhase = true;
 
