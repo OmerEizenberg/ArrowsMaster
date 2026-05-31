@@ -46,6 +46,33 @@ namespace Assets.Scripts.Core
         private Coroutine _deferredWorkCoroutine;
         private float _lastAdCloseTime = -999f;
         private bool _showNextInterstitial = true;
+        private bool _isFlushingPendingSingularRevenue;
+
+        private static readonly ConcurrentQueue<SingularAdRevenuePayload> _pendingSingularRevenue =
+            new ConcurrentQueue<SingularAdRevenuePayload>();
+
+        private readonly struct SingularAdRevenuePayload
+        {
+            public readonly double RevenueUsd;
+            public readonly string NetworkName;
+            public readonly string AdUnitId;
+            public readonly string AdFormat;
+            public readonly string RevenuePrecision;
+
+            public SingularAdRevenuePayload(
+                double revenueUsd,
+                string networkName,
+                string adUnitId,
+                string adFormat,
+                string revenuePrecision)
+            {
+                RevenueUsd = revenueUsd;
+                NetworkName = networkName;
+                AdUnitId = adUnitId;
+                AdFormat = adFormat;
+                RevenuePrecision = revenuePrecision;
+            }
+        }
 
         private const float HealthCheckIntervalSeconds = 20f;
         private const float PostAdLoadCooldownSeconds = 4f;
@@ -323,6 +350,9 @@ namespace Assets.Scripts.Core
 
                 Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
 
+                // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
+                MaxSdkBase.InvokeEventsOnUnityMainThread = true;
+
                 MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
                 MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
 
@@ -467,6 +497,7 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Interstitial Ad Loaded.");
             interstitialRetryAttempt = 0;
+            AdMonetizationOptimizer.RecordInterstitialAd(adInfo);
             RefreshInterstitialReady();
         }
 
@@ -512,8 +543,8 @@ namespace Assets.Scripts.Core
 
             if (pendingRewardType != RewardAdType.None)
             {
-                Debug.Log("[AdsManager] Interstitial was used as a fallback. Giving pending reward.");
-                ProcessPendingReward(fromRewardedAdUnit: false);
+                Debug.Log("[AdsManager] Interstitial fulfilled a rewarded placement. Granting pending reward.");
+                ProcessPendingReward();
             }
 
             ScheduleDeferredLoad(LoadInterstitial);
@@ -526,6 +557,7 @@ namespace Assets.Scripts.Core
 
         private void OnInterstitialRevenuePaid(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
+            AdMonetizationOptimizer.RecordInterstitialAd(adInfo);
             TrackAdRevenue(adInfo, "interstitial");
         }
 
@@ -563,199 +595,65 @@ namespace Assets.Scripts.Core
         public void LoadCoinsRewarded() => LoadRewarded();
         public void LoadMultiplyRewarded() => LoadRewarded();
 
-        public void ShowRewarded()
-        {
-            if (IsRewardedReady)
-            {
-                Debug.Log("[AdsManager] Showing Rewarded Ad (GameReward).");
-                pendingRewardType = RewardAdType.GameReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-            }
-            else if (IsInterstitialReady)
-            {
-                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready. Falling back to Interstitial.");
-                pendingRewardType = RewardAdType.GameReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-            }
-            else
-            {
-                Debug.LogWarning($"[AdsManager] Both Rewarded Ad and Interstitial Ad are not ready. Initialized: {isInitialized}");
-                if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else
-                {
-                    LoadRewarded();
-                    LoadInterstitial();
-                }
-            }
-        }
+        public void ShowRewarded() => ShowRewardedForType(RewardAdType.GameReward);
 
-        public void ShowRewardedForCoins()
-        {
-            if (IsRewardedReady)
-            {
-                Debug.Log("[AdsManager] Showing Rewarded Ad (CoinsReward).");
-                pendingRewardType = RewardAdType.CoinsReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-            }
-            else if (IsInterstitialReady)
-            {
-                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for coins. Falling back to Interstitial.");
-                pendingRewardType = RewardAdType.CoinsReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-            }
-            else
-            {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready. Initialized: {isInitialized}");
-                if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else
-                {
-                    LoadRewarded();
-                    LoadInterstitial();
-                }
-            }
-        }
+        public void ShowRewardedForCoins() => ShowRewardedForType(RewardAdType.CoinsReward);
 
-        public void ShowRewardedForMultiply()
-        {
-            if (IsRewardedReady)
-            {
-                Debug.Log("[AdsManager] Showing Rewarded Ad (MultiplyReward).");
-                pendingRewardType = RewardAdType.MultiplyReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-            }
-            else if (IsInterstitialReady)
-            {
-                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for multiply. Falling back to Interstitial.");
-                pendingRewardType = RewardAdType.MultiplyReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-            }
-            else
-            {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready. Initialized: {isInitialized}");
-                if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else
-                {
-                    LoadRewarded();
-                    LoadInterstitial();
-                }
-            }
-        }
+        public void ShowRewardedForMultiply() => ShowRewardedForType(RewardAdType.MultiplyReward);
 
-        public void ShowRewardedForHint()
-        {
-            if (IsRewardedReady)
-            {
-                Debug.Log("[AdsManager] Showing Rewarded Ad for Hint (HintReward).");
-                pendingRewardType = RewardAdType.HintReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-            }
-            else if (IsInterstitialReady)
-            {
-                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for hint. Falling back to Interstitial.");
-                pendingRewardType = RewardAdType.HintReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-            }
-            else
-            {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for Hint. Initialized: {isInitialized}");
-                if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else
-                {
-                    LoadRewarded();
-                    LoadInterstitial();
-                }
-            }
-        }
+        public void ShowRewardedForHint() => ShowRewardedForType(RewardAdType.HintReward);
 
-        public void ShowRewardedForPlayOn()
-        {
-            if (IsRewardedReady)
-            {
-                Debug.Log("[AdsManager] Showing Rewarded Ad for PlayOn (PlayOnReward).");
-                pendingRewardType = RewardAdType.PlayOnReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-            }
-            else if (IsInterstitialReady)
-            {
-                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for playon. Falling back to Interstitial.");
-                pendingRewardType = RewardAdType.PlayOnReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-            }
-            else
-            {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for PlayOn. Initialized: {isInitialized}");
-                if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else
-                {
-                    LoadRewarded();
-                    LoadInterstitial();
-                }
-            }
-        }
+        public void ShowRewardedForPlayOn() => ShowRewardedForType(RewardAdType.PlayOnReward);
 
-        public void ShowRewardedForMagic()
-        {
-            if (IsRewardedReady)
-            {
-                Debug.Log("[AdsManager] Showing Rewarded Ad for Magic (MagicReward).");
-                pendingRewardType = RewardAdType.MagicReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-            }
-            else if (IsInterstitialReady)
-            {
-                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for magic. Falling back to Interstitial.");
-                pendingRewardType = RewardAdType.MagicReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-            }
-            else
-            {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for Magic. Initialized: {isInitialized}");
-                if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else
-                {
-                    LoadRewarded();
-                    LoadInterstitial();
-                }
-            }
-        }
+        public void ShowRewardedForMagic() => ShowRewardedForType(RewardAdType.MagicReward);
 
-        public void ShowRewardedForLife()
+        public void ShowRewardedForLife() => ShowRewardedForType(RewardAdType.LifeReward);
+
+        /// <summary>
+        /// Shows the best ad for a user-initiated reward: interstitial when its eCPM beats rewarded
+        /// (shorter ad, higher revenue), otherwise rewarded, with interstitial as a readiness fallback.
+        /// </summary>
+        private void ShowRewardedForType(RewardAdType rewardType)
         {
-            if (IsRewardedReady)
+            pendingRewardType = rewardType;
+
+            bool interstitialReady = IsInterstitialReady;
+            bool rewardedReady = IsRewardedReady;
+
+            if (AdMonetizationOptimizer.ShouldShowInterstitialInsteadOfRewarded(interstitialReady, rewardedReady))
             {
-                Debug.Log("[AdsManager] Showing Rewarded Ad for Life (LifeReward).");
-                pendingRewardType = RewardAdType.LifeReward;
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-            }
-            else if (IsInterstitialReady)
-            {
-                Debug.LogWarning("[AdsManager] Rewarded Ad is not ready for life. Falling back to Interstitial.");
-                pendingRewardType = RewardAdType.LifeReward;
+                Debug.Log(
+                    $"[AdsManager] Monetization optimizer: interstitial eCPM ${AdMonetizationOptimizer.InterstitialEcpm:F2} > " +
+                    $"rewarded ${AdMonetizationOptimizer.RewardedEcpm:F2}. Showing interstitial for {rewardType}.");
                 OnAdOpened?.Invoke();
                 MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                return;
             }
+
+            if (rewardedReady)
+            {
+                Debug.Log($"[AdsManager] Showing Rewarded Ad ({rewardType}).");
+                OnAdOpened?.Invoke();
+                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
+                return;
+            }
+
+            if (interstitialReady)
+            {
+                Debug.LogWarning($"[AdsManager] Rewarded Ad is not ready for {rewardType}. Falling back to Interstitial.");
+                OnAdOpened?.Invoke();
+                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                return;
+            }
+
+            Debug.LogWarning($"[AdsManager] Rewarded and Interstitial are not ready for {rewardType}. Initialized: {isInitialized}");
+            pendingRewardType = RewardAdType.None;
+            if (!isInitialized && !isInitializing)
+                _ = InitializeSDK();
             else
             {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad and Interstitial are not ready for Life. Initialized: {isInitialized}");
-                if (!isInitialized && !isInitializing) _ = InitializeSDK();
-                else
-                {
-                    LoadRewarded();
-                    LoadInterstitial();
-                }
+                LoadRewarded();
+                LoadInterstitial();
             }
         }
 
@@ -765,6 +663,7 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Rewarded Ad Loaded.");
             rewardedRetryAttempt = 0;
+            AdMonetizationOptimizer.RecordRewardedAd(adInfo);
             RefreshRewardedReady();
         }
 
@@ -815,11 +714,12 @@ namespace Assets.Scripts.Core
         private void OnRewardedAdReceivedReward(string adUnitId, MaxSdk.Reward reward, MaxSdkBase.AdInfo adInfo)
         {
             Debug.Log("[AdsManager] Rewarded Ad Rewarded Event Received.");
-            ProcessPendingReward(fromRewardedAdUnit: true);
+            ProcessPendingReward();
         }
 
         private void OnRewardedAdRevenuePaid(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
+            AdMonetizationOptimizer.RecordRewardedAd(adInfo);
             TrackAdRevenue(adInfo, "rewarded");
         }
 
@@ -920,12 +820,12 @@ namespace Assets.Scripts.Core
         /// Central reward processor. Captures and resets pendingRewardType atomically,
         /// then dispatches the correct reward. Safe if called multiple times — second call is a no-op.
         /// </summary>
-        private void ProcessPendingReward(bool fromRewardedAdUnit)
+        private void ProcessPendingReward()
         {
             RewardAdType rewardType = pendingRewardType;
             pendingRewardType = RewardAdType.None;
 
-            if (rewardType != RewardAdType.None && fromRewardedAdUnit)
+            if (rewardType != RewardAdType.None)
                 Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyAdWatched();
 
             switch (rewardType)
@@ -991,6 +891,10 @@ namespace Assets.Scripts.Core
         //  REVENUE TRACKING (Firebase + Singular)
         // ════════════════════════════════════════════
 
+        /// <summary>
+        /// Sends AppLovin MAX impression-level revenue (ILRD) to Firebase and Singular.
+        /// MAX fires OnAdRevenuePaidEvent off the main thread unless InvokeEventsOnUnityMainThread is set.
+        /// </summary>
         private void TrackAdRevenue(MaxSdkBase.AdInfo adInfo, string adFormat)
         {
             if (adInfo == null)
@@ -1000,33 +904,119 @@ namespace Assets.Scripts.Core
             }
 
             double revenueUsd = adInfo.Revenue;
+            string resolvedFormat = string.IsNullOrEmpty(adInfo.AdFormat) ? adFormat : adInfo.AdFormat;
 
             if (revenueUsd <= 0)
             {
                 Debug.LogWarning(
                     $"[AdsManager] TrackAdRevenue: no revenue (network={adInfo.NetworkName}, " +
-                    $"unit={adInfo.AdUnitIdentifier}, format={adFormat}). " +
-                    "Verify impression-level revenue is enabled in the AppLovin dashboard.");
+                    $"unit={adInfo.AdUnitIdentifier}, format={resolvedFormat}, precision={adInfo.RevenuePrecision}). " +
+                    "Enable Impression-Level User Revenue (ILRD) in the AppLovin MAX dashboard.");
                 return;
             }
 
+            var payload = new SingularAdRevenuePayload(
+                revenueUsd,
+                adInfo.NetworkName,
+                adInfo.AdUnitIdentifier,
+                resolvedFormat,
+                adInfo.RevenuePrecision);
+
+            EnqueueAction(() => ReportAdRevenueOnMainThread(payload));
+        }
+
+        private void ReportAdRevenueOnMainThread(SingularAdRevenuePayload payload)
+        {
             if (FirebaseManager.Instance != null)
             {
                 FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "AppLovinMAX"),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, adInfo.NetworkName),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, adInfo.AdUnitIdentifier),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, adFormat),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, revenueUsd),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, payload.NetworkName),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, payload.AdUnitId),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, payload.AdFormat),
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, payload.RevenueUsd),
                     new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
             }
 
-            SingularAdData singularAdData = new SingularAdData("AppLovin", "USD", revenueUsd);
-            singularAdData.WithNetworkName(adInfo.NetworkName)
-                          .WithAdUnitName(adInfo.AdUnitIdentifier)
-                          .WithAdType(adFormat);
+#if !UNITY_EDITOR
+            if (!SingularSDK.Initialized)
+            {
+                _pendingSingularRevenue.Enqueue(payload);
+                EnsurePendingSingularRevenueFlushScheduled();
+                Debug.LogWarning(
+                    $"[AdsManager] Singular not initialized yet; queued ad revenue ${payload.RevenueUsd:F6} " +
+                    $"(network={payload.NetworkName}, format={payload.AdFormat}).");
+                return;
+            }
+
+            SendSingularAdRevenue(payload);
+#endif
+
+            Debug.Log(
+                $"[AdsManager] Ad Revenue: ${payload.RevenueUsd:F6} USD, network={payload.NetworkName}, " +
+                $"format={payload.AdFormat}, precision={payload.RevenuePrecision}");
+        }
+
+        private void SendSingularAdRevenue(SingularAdRevenuePayload payload)
+        {
+            SingularAdData singularAdData = new SingularAdData("AppLovin", "USD", payload.RevenueUsd);
+            singularAdData.WithNetworkName(payload.NetworkName)
+                          .WithAdUnitName(payload.AdUnitId)
+                          .WithAdType(payload.AdFormat)
+                          .WithPrecision(payload.RevenuePrecision);
+
+            if (!singularAdData.HasRequiredParams())
+            {
+                Debug.LogWarning(
+                    "[AdsManager] Singular ad revenue skipped: missing required params " +
+                    $"(network={payload.NetworkName}, unit={payload.AdUnitId}, revenue={payload.RevenueUsd}).");
+                return;
+            }
+
             SingularSDK.AdRevenue(singularAdData);
-            Debug.Log($"[AdsManager] Ad Revenue: ${revenueUsd:F6} USD, network={adInfo.NetworkName}, format={adFormat}");
+            Debug.Log(
+                $"[AdsManager] Singular ad revenue sent: ${payload.RevenueUsd:F6} USD, " +
+                $"network={payload.NetworkName}, format={payload.AdFormat}");
+        }
+
+        private void EnsurePendingSingularRevenueFlushScheduled()
+        {
+            if (_isFlushingPendingSingularRevenue)
+                return;
+
+            _isFlushingPendingSingularRevenue = true;
+            StartCoroutine(FlushPendingSingularRevenueWhenReady());
+        }
+
+        private IEnumerator FlushPendingSingularRevenueWhenReady()
+        {
+            const float timeoutSeconds = 60f;
+            float deadline = Time.realtimeSinceStartup + timeoutSeconds;
+
+            while (!SingularSDK.Initialized && Time.realtimeSinceStartup < deadline)
+                yield return null;
+
+            if (!SingularSDK.Initialized)
+            {
+                Debug.LogWarning(
+                    $"[AdsManager] Singular still not initialized after {timeoutSeconds}s; " +
+                    $"dropping {_pendingSingularRevenue.Count} queued ad revenue event(s).");
+                while (_pendingSingularRevenue.TryDequeue(out _)) { }
+                _isFlushingPendingSingularRevenue = false;
+                yield break;
+            }
+
+            int flushedCount = 0;
+            while (_pendingSingularRevenue.TryDequeue(out SingularAdRevenuePayload payload))
+            {
+                SendSingularAdRevenue(payload);
+                flushedCount++;
+            }
+
+            if (flushedCount > 0)
+                Debug.Log($"[AdsManager] Flushed {flushedCount} queued Singular ad revenue event(s).");
+
+            _isFlushingPendingSingularRevenue = false;
         }
 
         // ════════════════════════════════════════════

@@ -813,17 +813,37 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
-            if (ArrowPoolManager.Instance != null)
+            CancelPendingPoolReturn();
+
+            // ReturnToPool already unregisters; only needed when destroyed outside the pool path.
+            if (!isInPool)
             {
-                ArrowPoolManager.Instance.NotifyArrowDestroyed(this);
+                var gridManager = GridManager.Instance;
+                if (gridManager != null)
+                {
+                    gridManager.UnregisterArrow(this);
+                }
             }
 
-            // Fallback cleanup if destroyed by other means (GameManager may already be gone on teardown)
-            foreach (var effect in instantiatedEffects)
+            var poolManager = ArrowPoolManager.Instance;
+            if (poolManager != null)
             {
-                if (effect != null && GameManager.Instance != null)
+                poolManager.NotifyArrowDestroyed(this);
+            }
+
+            if (instantiatedEffects == null || instantiatedEffects.Count == 0)
+            {
+                return;
+            }
+
+            // Cache once — GameManager.Instance may stop resolving during app/scene teardown.
+            var gameManager = GameManager.Instance;
+            for (int i = 0; i < instantiatedEffects.Count; i++)
+            {
+                GameObject effect = instantiatedEffects[i];
+                if (effect != null && gameManager != null)
                 {
-                    GameManager.Instance.ReturnEffect(effect);
+                    gameManager.ReturnEffect(effect);
                 }
             }
             instantiatedEffects.Clear();

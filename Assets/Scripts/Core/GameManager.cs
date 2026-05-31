@@ -11,10 +11,17 @@ namespace Assets.Scripts.Core
     public class GameManager : MonoBehaviour
     {
         private static GameManager _instance;
+        private static bool s_ApplicationIsQuitting;
+
         public static GameManager Instance 
         { 
             get 
             {
+                if (s_ApplicationIsQuitting)
+                {
+                    return null;
+                }
+
                 if (_instance == null)
                 {
                     _instance = FindFirstObjectByType<GameManager>();
@@ -160,6 +167,11 @@ namespace Assets.Scripts.Core
 
         public bool IsDeferredLobbyStreakSyncPending => m_DeferredLobbyStreakSync;
 
+        private void OnApplicationQuit()
+        {
+            s_ApplicationIsQuitting = true;
+        }
+
         private void Awake()
         {
             if (_instance != null && _instance != this)
@@ -168,6 +180,7 @@ namespace Assets.Scripts.Core
                 return;
             }
             Instance = this;
+            s_ApplicationIsQuitting = false;
             DontDestroyOnLoad(gameObject);
 
             HideScreens();

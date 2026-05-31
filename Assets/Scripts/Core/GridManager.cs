@@ -71,6 +71,8 @@ namespace Assets.Scripts.Core
 
         public void UnregisterArrow(ArrowController arrow)
         {
+            if (arrow == null) return;
+
             if (DependencyTree != null) DependencyTree.OnArrowStartedMoving(arrow);
 
             if (allArrowsSet.Contains(arrow))
@@ -84,6 +86,7 @@ namespace Assets.Scripts.Core
             {
                 foreach (var seg in arrow.segments)
                 {
+                    if (seg == null) continue;
                     if (occupancyMap.TryGetValue(seg.GridPosition, out var occupant) && occupant == arrow)
                     {
                         occupancyMap.Remove(seg.GridPosition);

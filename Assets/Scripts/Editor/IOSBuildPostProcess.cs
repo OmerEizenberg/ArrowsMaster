@@ -23,7 +23,31 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
     public void OnPreprocessBuild(BuildReport report)
     {
         if (report.summary.platform != BuildTarget.iOS) return;
+        DisableEngineDiagnostics();
         EnsureCocoaPodsAvailableOrThrow();
+    }
+
+    private static void DisableEngineDiagnostics()
+    {
+        // Unity 6 Engine Diagnostics hooks NSURLSession metrics and can crash on iOS
+        // (NetworkTransactionDiagnosticAdapter.convertToDiagnosticEvent EXC_BREAKPOINT).
+        try
+        {
+            var settingsType = System.Type.GetType("UnityEditor.EngineDiagnostics.EngineDiagnosticsSettings, UnityEditor");
+            if (settingsType == null) return;
+
+            var enabledProperty = settingsType.GetProperty(
+                "enabled",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (enabledProperty == null || enabledProperty.PropertyType != typeof(bool)) return;
+
+            enabledProperty.SetValue(null, false);
+            Debug.Log("[IOSBuildPostProcess] Disabled Unity Engine Diagnostics for iOS build.");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] Could not disable Engine Diagnostics: " + e.Message);
+        }
     }
 
     private static void ConfigureBuildEnvironment()

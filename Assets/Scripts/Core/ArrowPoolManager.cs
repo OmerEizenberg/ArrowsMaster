@@ -36,6 +36,14 @@ namespace Assets.Scripts.Core
             CheckPreWarm();
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+        }
+
         private void CheckPreWarm()
         {
             if (arrowPrefab != null && segmentPrefab != null && arrowPool.Count == 0)
@@ -194,17 +202,22 @@ namespace Assets.Scripts.Core
 
         public void NotifyArrowDestroyed(ArrowController arrow)
         {
-            if (arrow == null) return;
+            if (arrow == null || pooledArrows == null) return;
             pooledArrows.Remove(arrow);
             ReleaseArrowFromLevel(arrow);
         }
 
         private static void ReleaseArrowFromLevel(ArrowController arrow)
         {
-            if (GameManager.Instance != null && GameManager.Instance.levelManager != null)
-            {
-                GameManager.Instance.levelManager.ReleaseArrow(arrow);
-            }
+            if (arrow == null) return;
+
+            var gameManager = GameManager.Instance;
+            if (gameManager == null) return;
+
+            var levelManager = gameManager.levelManager;
+            if (levelManager == null) return;
+
+            levelManager.ReleaseArrow(arrow);
         }
 
         public Segment GetSegment(Vector3 position, Quaternion rotation, Transform parent)

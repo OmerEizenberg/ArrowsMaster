@@ -34,3 +34,5 @@ UnityConnectSettings:
     m_GameId: 
   PerformanceReportingSettings:
     m_Enabled: 0
+  InsightsSettings:
+    m_EngineDiagnosticsEnabled: 0
