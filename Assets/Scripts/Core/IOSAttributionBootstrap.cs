@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Singular;
 
 #if UNITY_IOS
@@ -10,6 +11,7 @@ namespace Assets.Scripts.Core
 {
     /// <summary>
     /// Ensures ATT is resolved before Singular starts so IDFA/SKAN data reaches the MMP and ad networks.
+    /// SingularSDKObject must have InitializeOnAwake disabled so this bootstrap owns initialization.
     /// </summary>
     [DefaultExecutionOrder(-10000)]
     public class IOSAttributionBootstrap : MonoBehaviour
@@ -29,6 +31,14 @@ namespace Assets.Scripts.Core
             var go = new GameObject("IOSAttributionBootstrap");
             DontDestroyOnLoad(go);
             go.AddComponent<IOSAttributionBootstrap>();
+
+            SceneManager.sceneLoaded += OnFirstSceneLoaded;
+        }
+
+        private static void OnFirstSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            SceneManager.sceneLoaded -= OnFirstSceneLoaded;
+            DisableSingularAutoInitOnAllInstances();
         }
 
         private void Awake()
@@ -44,7 +54,7 @@ namespace Assets.Scripts.Core
 #endif
         }
 
-        private const float SingularInstanceWaitTimeoutSeconds = 10f;
+        private const float SingularInstanceWaitTimeoutSeconds = 30f;
 
         private IEnumerator InitializeSingularAfterSceneLoad()
         {
@@ -55,10 +65,20 @@ namespace Assets.Scripts.Core
         private static IEnumerator WaitForSingularInstance()
         {
             float deadline = Time.realtimeSinceStartup + SingularInstanceWaitTimeoutSeconds;
-            while (FindFirstObjectByType<SingularSDK>() == null && Time.realtimeSinceStartup < deadline)
+            while (Time.realtimeSinceStartup < deadline)
             {
+                var singular = FindFirstObjectByType<SingularSDK>();
+                if (singular != null)
+                {
+                    PrepareSingularForManualInit(singular);
+                    yield break;
+                }
+
                 yield return null;
             }
+
+            Debug.LogError(
+                $"[IOSAttributionBootstrap] SingularSDKObject not found within {SingularInstanceWaitTimeoutSeconds}s.");
         }
 
 #if UNITY_IOS && !UNITY_EDITOR
@@ -91,18 +111,29 @@ namespace Assets.Scripts.Core
                 Debug.LogWarning("[IOSAttributionBootstrap] ATT timed out; initializing Singular without IDFA.");
             }
 
-            // Allow the scene (and SingularSDKObject) to load before init.
             yield return WaitForSingularInstance();
 
             TryInitializeSingular();
         }
 #endif
 
-        private static void TryInitializeSingular()
+        private static void DisableSingularAutoInitOnAllInstances()
         {
-            if (SingularSDK.Initialized)
+            var instances = FindObjectsByType<SingularSDK>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var singular in instances)
+                PrepareSingularForManualInit(singular);
+        }
+
+        private static void PrepareSingularForManualInit(SingularSDK singular)
+        {
+            if (singular == null)
                 return;
 
+            singular.InitializeOnAwake = false;
+        }
+
+        private static void TryInitializeSingular()
+        {
             var singular = FindFirstObjectByType<SingularSDK>();
             if (singular == null)
             {
@@ -110,7 +141,17 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            singular.InitializeOnAwake = false;
+            PrepareSingularForManualInit(singular);
+
+            if (SingularSDK.Initialized)
+            {
+                Debug.LogWarning(
+                    "[IOSAttributionBootstrap] Singular already initialized before bootstrap; " +
+                    "ensure SingularSDKObject.InitializeOnAwake is disabled in the scene.");
+                AdsManager.NotifySingularSdkInitialized();
+                return;
+            }
+
 #if UNITY_IOS && !UNITY_EDITOR
             singular.waitForTrackingAuthorizationWithTimeoutInterval = SingularAttWaitIntervalSeconds;
             if (!singular.SKANEnabled)
@@ -124,6 +165,11 @@ namespace Assets.Scripts.Core
             if (SingularSDK.Initialized)
             {
                 Debug.Log("[IOSAttributionBootstrap] Singular SDK initialized.");
+                AdsManager.NotifySingularSdkInitialized();
+            }
+            else
+            {
+                Debug.LogError("[IOSAttributionBootstrap] Singular SDK failed to initialize.");
             }
         }
     }

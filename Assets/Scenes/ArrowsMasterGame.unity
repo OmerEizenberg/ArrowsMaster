@@ -13769,7 +13769,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1500
+  far clip plane: 250
   field of view: 60
   orthographic: 1
   orthographic size: 9
@@ -13846,6 +13846,10 @@ PrefabInstance:
       value: SingularSDKObject
       objectReference: {fileID: 0}
     - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
+      propertyPath: InitializeOnAwake
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
       propertyPath: ddlTimeoutSec
       value: 10
       objectReference: {fileID: 0}
@@ -13871,7 +13875,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4110131251777105351, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
       propertyPath: waitForTrackingAuthorizationWithTimeoutInterval
-      value: 30
+      value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 7363679512987422457, guid: 3bdc8169fdaaa4f8ca750b10b56d78d3, type: 3}
       propertyPath: m_LocalPosition.x

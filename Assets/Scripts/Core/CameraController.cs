@@ -92,9 +92,8 @@ namespace Assets.Scripts.Core
             // Precalculate Y-offset factor: (0.5 - target) * 2
             m_ViewportYFactor = (0.5f - targetViewportCenterY) * 2f;
 
-            // Disable VSync to allow targetFrameRate to take effect
+            // Reinforce 2D Mobile quality (vSync off); allows targetFrameRate to take effect.
             QualitySettings.vSyncCount = 0;
-            // Target 120 FPS on supported mobile devices for maximum smoothness
             Application.targetFrameRate = 120;
         }
 

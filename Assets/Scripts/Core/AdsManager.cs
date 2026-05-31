@@ -979,6 +979,15 @@ namespace Assets.Scripts.Core
                 $"network={payload.NetworkName}, format={payload.AdFormat}");
         }
 
+        /// <summary>Called by IOSAttributionBootstrap after SingularSDK.InitializeSingularSDK succeeds.</summary>
+        public static void NotifySingularSdkInitialized()
+        {
+            if (Instance == null)
+                return;
+
+            Instance.EnqueueAction(Instance.FlushPendingSingularRevenueIfReady);
+        }
+
         private void EnsurePendingSingularRevenueFlushScheduled()
         {
             if (_isFlushingPendingSingularRevenue)
@@ -990,7 +999,7 @@ namespace Assets.Scripts.Core
 
         private IEnumerator FlushPendingSingularRevenueWhenReady()
         {
-            const float timeoutSeconds = 60f;
+            const float timeoutSeconds = 120f;
             float deadline = Time.realtimeSinceStartup + timeoutSeconds;
 
             while (!SingularSDK.Initialized && Time.realtimeSinceStartup < deadline)
@@ -1006,6 +1015,16 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
+            FlushPendingSingularRevenueIfReady();
+            _isFlushingPendingSingularRevenue = false;
+        }
+
+        private void FlushPendingSingularRevenueIfReady()
+        {
+#if !UNITY_EDITOR
+            if (!SingularSDK.Initialized)
+                return;
+
             int flushedCount = 0;
             while (_pendingSingularRevenue.TryDequeue(out SingularAdRevenuePayload payload))
             {
@@ -1015,8 +1034,7 @@ namespace Assets.Scripts.Core
 
             if (flushedCount > 0)
                 Debug.Log($"[AdsManager] Flushed {flushedCount} queued Singular ad revenue event(s).");
-
-            _isFlushingPendingSingularRevenue = false;
+#endif
         }
 
         // ════════════════════════════════════════════

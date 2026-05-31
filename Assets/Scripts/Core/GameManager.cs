@@ -449,6 +449,11 @@ namespace Assets.Scripts.Core
 
         public void PlayOn()
         {
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayClick();
+            }
+
             Debug.Log("[GameManager] PlayOn method called.");
             if (AdsManager.Instance != null)
             {
@@ -480,6 +485,11 @@ namespace Assets.Scripts.Core
 
         public void BuyPlayOn()
         {
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayClick();
+            }
+
             int cost = GetPlayOnCost();
             if (UserDataManager.Instance.ReduceArrowsCurrency(cost))
             {
