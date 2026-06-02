@@ -43,8 +43,7 @@ namespace Assets.Scripts.Core
         private bool _bannerCreated;
 
         private GameObject _coinsExplosionPrefab;
-        private Coroutine _deferredWorkCoroutine;
-        private float _lastAdCloseTime = -999f;
+        private int _bannerRetryAttempt;
         private bool _showNextInterstitial = true;
         private bool _isFlushingPendingSingularRevenue;
 
@@ -75,8 +74,6 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
-        private const float PostAdLoadCooldownSeconds = 4f;
-        private const float DeferredLoadDelaySeconds = 1.5f;
 
         // ──────────────────────────────────────────────────────────────────
         // AppLovin MAX SDK Key
@@ -170,12 +167,6 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
-            if (_deferredWorkCoroutine != null)
-            {
-                StopCoroutine(_deferredWorkCoroutine);
-                _deferredWorkCoroutine = null;
-            }
-
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
 
             MaxSdkCallbacks.Interstitial.OnAdLoadedEvent -= OnInterstitialLoaded;
@@ -238,26 +229,54 @@ namespace Assets.Scripts.Core
             RefreshRewardedReady();
         }
 
-        private void ScheduleDeferredLoad(Action loadAction)
+        /// <summary>
+        /// Preloads the next interstitial, rewarded, and banner after any ad is shown or dismissed.
+        /// MAX recommends loading before the current ad finishes; we also call again on close as a fallback.
+        /// </summary>
+        private void PrepareAllAdsAfterClose()
         {
-            if (loadAction == null) return;
-            if (_deferredWorkCoroutine != null)
-                StopCoroutine(_deferredWorkCoroutine);
-            _deferredWorkCoroutine = StartCoroutine(DeferredLoadRoutine(loadAction));
+            if (!isInitialized)
+            {
+                if (!isInitializing) _ = InitializeSDK();
+                return;
+            }
+
+            Debug.Log("[AdsManager] Preparing next ads (rewarded, interstitial, banner).");
+            LoadRewarded();
+            LoadInterstitial();
+            PrepareBannerAd();
         }
 
-        private IEnumerator DeferredLoadRoutine(Action loadAction)
+        private void PrepareBannerAd()
         {
-            yield return new WaitForSecondsRealtime(DeferredLoadDelaySeconds);
-            if (this == null || loadAction == null) yield break;
-            if (Time.realtimeSinceStartup - _lastAdCloseTime < PostAdLoadCooldownSeconds) yield break;
-            loadAction.Invoke();
-            _deferredWorkCoroutine = null;
+            if (!isInitialized) return;
+            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds) return;
+
+            if (!_bannerCreated)
+            {
+                LoadSettingsBanner();
+                return;
+            }
+
+            if (_bannerReady) return;
+
+            Debug.Log("[AdsManager] Banner not ready — recreating banner ad unit.");
+            try
+            {
+                MaxSdk.DestroyBanner(BannerAdUnitId);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] DestroyBanner failed: {e.Message}");
+            }
+
+            _bannerCreated = false;
+            SetCachedReady(ref _bannerReady, false);
+            InitializeBannerAds();
         }
 
         private void NotifyAdClosed()
         {
-            _lastAdCloseTime = Time.realtimeSinceStartup;
             OnAdClosed?.Invoke();
         }
 
@@ -279,12 +298,9 @@ namespace Assets.Scripts.Core
 
                     if (!isInitialized) continue;
 
-                    if (Time.realtimeSinceStartup - _lastAdCloseTime < PostAdLoadCooldownSeconds)
-                        continue;
-
                     if (!_interstitialReady) LoadInterstitial();
                     if (!_rewardedReady) LoadRewarded();
-                    if (!_bannerCreated || !_bannerReady) LoadSettingsBanner();
+                    if (!_bannerCreated || !_bannerReady) PrepareBannerAd();
                 }
                 catch (Exception e)
                 {
@@ -520,6 +536,7 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Interstitial Ad Displayed.");
             SetCachedReady(ref _interstitialReady, false);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnInterstitialDisplayFailed(string adUnitId, MaxSdkBase.ErrorInfo errorInfo, MaxSdkBase.AdInfo adInfo)
@@ -531,12 +548,12 @@ namespace Assets.Scripts.Core
             if (pendingRewardType != RewardAdType.None)
                 pendingRewardType = RewardAdType.None;
 
-            ScheduleDeferredLoad(LoadInterstitial);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnInterstitialHidden(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
-            Debug.Log("[AdsManager] Interstitial Ad Closed. Scheduling reload.");
+            Debug.Log("[AdsManager] Interstitial Ad Closed. Preparing next ads.");
             lastAdShowTime = Time.time;
             SetCachedReady(ref _interstitialReady, false);
             NotifyAdClosed();
@@ -547,7 +564,7 @@ namespace Assets.Scripts.Core
                 ProcessPendingReward();
             }
 
-            ScheduleDeferredLoad(LoadInterstitial);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnInterstitialClicked(string adUnitId, MaxSdkBase.AdInfo adInfo)
@@ -686,6 +703,7 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Rewarded Ad Displayed.");
             SetCachedReady(ref _rewardedReady, false);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnRewardedAdDisplayFailed(string adUnitId, MaxSdkBase.ErrorInfo errorInfo, MaxSdkBase.AdInfo adInfo)
@@ -694,16 +712,16 @@ namespace Assets.Scripts.Core
             pendingRewardType = RewardAdType.None;
             SetCachedReady(ref _rewardedReady, false);
             NotifyAdClosed();
-            ScheduleDeferredLoad(LoadRewarded);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnRewardedAdHidden(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
-            Debug.Log("[AdsManager] Rewarded Ad Closed. Scheduling reload.");
+            Debug.Log("[AdsManager] Rewarded Ad Closed. Preparing next ads.");
             lastAdShowTime = Time.time;
             SetCachedReady(ref _rewardedReady, false);
             NotifyAdClosed();
-            ScheduleDeferredLoad(LoadRewarded);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnRewardedAdClicked(string adUnitId, MaxSdkBase.AdInfo adInfo)
@@ -791,6 +809,7 @@ namespace Assets.Scripts.Core
         private void OnBannerAdLoaded(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
             Debug.Log("[AdsManager] Settings Banner Loaded.");
+            _bannerRetryAttempt = 0;
             SetCachedReady(ref _bannerReady, true);
         }
 
@@ -798,6 +817,16 @@ namespace Assets.Scripts.Core
         {
             Debug.LogWarning($"[AdsManager] Settings Banner Load Failed (code: {errorInfo.Code}).");
             SetCachedReady(ref _bannerReady, false);
+            _bannerRetryAttempt++;
+            double retryDelay = Math.Pow(2, Math.Min(6, _bannerRetryAttempt));
+            _ = RetryPrepareBanner((int)(retryDelay * 1000));
+        }
+
+        private async Task RetryPrepareBanner(int delayMs)
+        {
+            await Task.Delay(delayMs);
+            if (this != null && !_bannerReady)
+                EnqueueAction(PrepareBannerAd);
         }
 
         private void OnBannerAdClicked(string adUnitId, MaxSdkBase.AdInfo adInfo)

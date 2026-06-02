@@ -529,7 +529,7 @@ namespace Assets.Scripts.Core
             else
             {
                Debug.Log("[GameManager] Out of lives! Refilling lives.");
-               ResetLives();
+               RefillLivesForPlayOn();
                if (IsTimedLevel)
                {
                    isTimerActive = true;
@@ -700,6 +700,28 @@ namespace Assets.Scripts.Core
             CurrentLives = maxLives;
             OnLivesChanged?.Invoke(CurrentLives);
             SaveCurrentProgress(); // Save restored lives to level state
+        }
+
+        public bool IsOneLifePlayOnEnabled()
+        {
+            return !isTimeUp
+                && RemoteConfigManager.Instance != null
+                && RemoteConfigManager.Instance.IsConfigReady
+                && RemoteConfigManager.Instance.OneLifePlayOn;
+        }
+
+        private void RefillLivesForPlayOn()
+        {
+            if (IsOneLifePlayOnEnabled())
+            {
+                CurrentLives = 1;
+                OnLivesChanged?.Invoke(CurrentLives);
+                SaveCurrentProgress();
+            }
+            else
+            {
+                ResetLives();
+            }
         }
 
         public void ResetLevelState()
@@ -1463,10 +1485,13 @@ namespace Assets.Scripts.Core
             {
                 return "Watch an ad to get 60 seconds\nand Keep Playing!";
             }
-            else
+
+            if (IsOneLifePlayOnEnabled())
             {
-                return "Watch an ad to refill lives\nand Keep Playing!";
+                return "Watch an ad to add 1 live\nand Keep Playing!";
             }
+
+            return "Watch an ad to refill lives\nand Keep Playing!";
         }
 
          public string GetFailureAdText()
@@ -1475,10 +1500,13 @@ namespace Assets.Scripts.Core
             {
                 return "+60 Seconds";
             }
-            else
+
+            if (IsOneLifePlayOnEnabled())
             {
-                return "Add More Lives";
+                return "Add Life";
             }
+
+            return "Add More Lives";
         }
 
         public string GetFailureDescription()
@@ -1487,10 +1515,13 @@ namespace Assets.Scripts.Core
             {
                 return "Time's up! get more 60 seconds with coins or by watching a short ad.";
             }
-            else
+
+            if (IsOneLifePlayOnEnabled())
             {
-                return "Refill lives with coins or by watching a short ad.";
+                return "Add 1 live with coins or by watching a short ad.";
             }
+
+            return "Refill lives with coins or by watching a short ad.";
         }
 
         public void RegisterCombo(RectTransform rect)

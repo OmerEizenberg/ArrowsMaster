@@ -77,10 +77,10 @@ namespace Assets.Scripts.Core
 
             EnqueueOnMainThread(() =>
             {
-                if (_instance == null)
-                    Create();
+                if (!EnsureInstance())
+                    return;
 
-                _instance?.IngestAttributionDictionary(attributionInfo);
+                _instance.IngestAttributionDictionary(attributionInfo);
             });
         }
 
@@ -88,14 +88,14 @@ namespace Assets.Scripts.Core
         {
             EnqueueOnMainThread(() =>
             {
-                if (_instance == null)
-                    Create();
+                if (!EnsureInstance())
+                    return;
 
-                _instance?._firebaseManager = firebaseManager;
+                _instance._firebaseManager = firebaseManager;
                 _instance._firebaseReady = firebaseManager != null;
-                _instance?.ApplyPendingAnalyticsUserId(fireLoginEvent: false);
-                _instance?.ApplySnapshotToFirebase();
-                _instance?.ApplySnapshotToSingularGlobals();
+                _instance.ApplyPendingAnalyticsUserId(fireLoginEvent: false);
+                _instance.ApplySnapshotToFirebase();
+                _instance.ApplySnapshotToSingularGlobals();
             });
         }
 
@@ -103,12 +103,12 @@ namespace Assets.Scripts.Core
         {
             EnqueueOnMainThread(() =>
             {
-                if (_instance == null)
-                    Create();
+                if (!EnsureInstance())
+                    return;
 
                 _instance._singularReady = true;
-                _instance?.ApplyPendingAnalyticsUserId(fireLoginEvent: false);
-                _instance?.ApplySnapshotToSingularGlobals();
+                _instance.ApplyPendingAnalyticsUserId(fireLoginEvent: false);
+                _instance.ApplySnapshotToSingularGlobals();
             });
         }
 
@@ -117,10 +117,10 @@ namespace Assets.Scripts.Core
         {
             EnqueueOnMainThread(() =>
             {
-                if (_instance == null)
-                    Create();
+                if (!EnsureInstance())
+                    return;
 
-                _instance?.ApplyPendingAnalyticsUserId(fireLoginEvent: false);
+                _instance.ApplyPendingAnalyticsUserId(fireLoginEvent: false);
             });
         }
 
@@ -128,6 +128,15 @@ namespace Assets.Scripts.Core
         {
             snapshot = _instance?._cachedSnapshot;
             return snapshot != null && snapshot.HasAnyData;
+        }
+
+        private static bool EnsureInstance()
+        {
+            if (_instance != null)
+                return true;
+
+            Create();
+            return _instance != null;
         }
 
         private static void EnqueueOnMainThread(Action action)

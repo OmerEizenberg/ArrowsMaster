@@ -32,6 +32,10 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI m_FailureSubtitle; // Subtitle text
     [SerializeField] private TextMeshProUGUI m_FailureAdText; // Ad text
     [SerializeField] private TextMeshProUGUI m_FailureDescription; // Description text
+    [Header("Failure Screen - One Life Play On")]
+    [SerializeField] private GameObject m_LHeartObj;
+    [SerializeField] private GameObject m_RHeartObj;
+    [SerializeField] private GameObject m_PlusObj;
     [SerializeField] private GameObject m_NoAdsOfferImage; // Image for the special offer (coins + no ads)
     [SerializeField] private GameObject m_PlayOnAdButton; // Button to watch ad for PlayOn
     [SerializeField] private TextMeshProUGUI m_MagicBoosterText; // Display magic booster count
@@ -808,6 +812,26 @@ public class GameUIContoleer : MonoBehaviour
         }
     }
     
+    private void UpdateFailureScreenOneLifeVisuals()
+    {
+        bool oneLifeMode = GameManager.Instance != null && GameManager.Instance.IsOneLifePlayOnEnabled();
+
+        if (m_LHeartObj != null)
+        {
+            m_LHeartObj.SetActive(!oneLifeMode);
+        }
+
+        if (m_RHeartObj != null)
+        {
+            m_RHeartObj.SetActive(!oneLifeMode);
+        }
+
+        if (m_PlusObj != null)
+        {
+            m_PlusObj.SetActive(oneLifeMode);
+        }
+    }
+
     private void UpdateFailureScreenText()
     {
         if (GameManager.Instance != null)
@@ -831,6 +855,8 @@ public class GameUIContoleer : MonoBehaviour
             {
                 m_FailureDescription.text = GameManager.Instance.GetFailureDescription();
             }
+
+            UpdateFailureScreenOneLifeVisuals();
         }
 
         if (m_NoAdsOfferImage != null)
