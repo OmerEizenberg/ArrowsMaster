@@ -38,6 +38,7 @@ namespace Assets.Scripts.Core
         public const int COINS_START_LEVEL = 5;
         public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;
         public const int REFILL_BOOSTER_UNLOCK_LEVEL = 9;
+        public const int SHUFFLE_BOOSTER_UNLOCK_LEVEL = 14;
 
         public static string GetChallengeLevelId(int month, int day, int year)
         {
@@ -114,6 +115,8 @@ namespace Assets.Scripts.Core
         private bool isHintVisible = false;
         private bool isWinning = false;
         private bool isHintActive = false;
+        private bool isShuffleInProgress = false;
+        private Coroutine m_ShuffleBoosterCoroutine;
         private bool isTimeUp = false;
         public float LastArrowSelectionTime { get; private set; } = -10f;
         public int p_StreakCount { get; private set; } = 0;
@@ -150,7 +153,7 @@ namespace Assets.Scripts.Core
         private Vector2 m_ScreenCenter;
         private Vector2[] m_QuarterCenters = new Vector2[4];
 
-        public bool CanInteract => isEntranceFinished && !isWinning && !isTimeUp &&
+        public bool CanInteract => isEntranceFinished && !isWinning && !isTimeUp && !isShuffleInProgress &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
                                 (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy) &&
                                 (m_FunFact == null || !m_FunFact.activeInHierarchy);
@@ -212,6 +215,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnPlayOnRewardReceived += ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived += HandleMagicRewardReceived;
                 AdsManager.Instance.OnLifeRewardReceived += HandleLifeRewardReceived;
+                AdsManager.Instance.OnShuffleRewardReceived += HandleShuffleRewardReceived;
                 AdsManager.Instance.OnAdOpened += HandleAdOpened;
                 AdsManager.Instance.OnAdClosed += HandleAdClosed;
                 AdsManager.Instance.OnAdReadinessChanged += RefreshHintAdReadyCache;
@@ -233,6 +237,7 @@ namespace Assets.Scripts.Core
             {
                 levelManager.OnEntranceAnimationFinished += () => {
                     isEntranceFinished = true;
+                    if (m_FunFact != null) m_FunFact.SetActive(false);
                     ResetHintTimer();
                 };
 
@@ -280,6 +285,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnPlayOnRewardReceived -= ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived -= HandleMagicRewardReceived;
                 AdsManager.Instance.OnLifeRewardReceived -= HandleLifeRewardReceived;
+                AdsManager.Instance.OnShuffleRewardReceived -= HandleShuffleRewardReceived;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
                 AdsManager.Instance.OnAdClosed -= HandleAdClosed;
                 AdsManager.Instance.OnAdReadinessChanged -= RefreshHintAdReadyCache;
@@ -407,6 +413,14 @@ namespace Assets.Scripts.Core
             else ExecuteRefillLife();
         }
 
+        private void HandleShuffleRewardReceived()
+        {
+            UserDataManager.Instance.AddShuffleBooster(1);
+            UserDataManager.Instance.UseShuffleBooster(1);
+            if (m_GameUI != null) m_GameUI.HandleShuffleRewardReceived();
+            else ExecuteShuffleBooster();
+        }
+
         public void ExecuteRefillLife()
         {
             ResetLives();
@@ -445,6 +459,181 @@ namespace Assets.Scripts.Core
             
             // Save progress after Magic Wand removes arrows
             SaveCurrentProgress();
+        }
+
+        public void ExecuteShuffleBooster()
+        {
+            if (!IsShuffleOn) return;
+
+            if (m_ShuffleBoosterCoroutine != null)
+            {
+                StopCoroutine(m_ShuffleBoosterCoroutine);
+                m_ShuffleBoosterCoroutine = null;
+            }
+            m_ShuffleBoosterCoroutine = StartCoroutine(ExecuteShuffleBoosterRoutine());
+        }
+
+        private void CancelShuffleBoosterInteractionLock()
+        {
+            isShuffleInProgress = false;
+            if (m_ShuffleBoosterCoroutine != null)
+            {
+                StopCoroutine(m_ShuffleBoosterCoroutine);
+                m_ShuffleBoosterCoroutine = null;
+            }
+
+            if (GridManager.Instance == null) return;
+            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+            for (int i = 0; i < allArrows.Count; i++)
+            {
+                ArrowController arrow = allArrows[i];
+                if (arrow != null)
+                {
+                    arrow.ResetShuffleInteractionState();
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator ExecuteShuffleBoosterRoutine()
+        {
+            isShuffleInProgress = true;
+
+            if (GridManager.Instance == null)
+            {
+                isShuffleInProgress = false;
+                m_ShuffleBoosterCoroutine = null;
+                yield break;
+            }
+
+            List<ShuffleMovePlan> plans = ShuffleBoosterPlanner.BuildShufflePlans();
+            if (plans.Count == 0)
+            {
+                isShuffleInProgress = false;
+                m_ShuffleBoosterCoroutine = null;
+                yield break;
+            }
+
+            List<List<ShuffleMovePlan>> parallelGroups = ShuffleBoosterPlanner.PartitionIntoParallelGroups(plans);
+            int movedCount = 0;
+
+            for (int g = 0; g < parallelGroups.Count; g++)
+            {
+                List<ShuffleMovePlan> group = parallelGroups[g];
+                if (group == null || group.Count == 0) continue;
+
+                if (group.Count == 1)
+                {
+                    yield return group[0].Arrow.ShuffleRelocateRoutine(group[0].HeadSteps);
+                    movedCount++;
+                }
+                else
+                {
+                    yield return RunShufflePlansInParallel(group);
+                    movedCount += group.Count;
+                }
+
+                if (g < parallelGroups.Count - 1)
+                {
+                    yield return new WaitForSeconds(0.08f);
+                }
+            }
+
+            if (movedCount > 0)
+            {
+                FinalizeShuffleBoardState();
+                RefreshActiveHintPreview();
+                SaveCurrentProgress();
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] Shuffle booster: no arrows could be relocated.");
+            }
+
+            isShuffleInProgress = false;
+            m_ShuffleBoosterCoroutine = null;
+        }
+
+        private void FinalizeShuffleBoardState()
+        {
+            if (GridManager.Instance == null) return;
+
+            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+            for (int i = 0; i < allArrows.Count; i++)
+            {
+                ArrowController arrow = allArrows[i];
+                if (arrow != null)
+                {
+                    arrow.ResetShuffleInteractionState();
+                }
+            }
+
+            GridManager.Instance.RebuildOccupancyFromSegments();
+            GridManager.Instance.RebuildDependencyTree();
+        }
+
+        private System.Collections.IEnumerator RunShufflePlansInParallel(List<ShuffleMovePlan> group)
+        {
+            int remaining = 0;
+            for (int i = 0; i < group.Count; i++)
+            {
+                ShuffleMovePlan plan = group[i];
+                if (plan?.Arrow == null || plan.HeadSteps == null || plan.HeadSteps.Count == 0)
+                {
+                    continue;
+                }
+                remaining++;
+                StartCoroutine(RunSingleShufflePlan(plan, () => remaining--));
+            }
+
+            const float maxWaitSeconds = 12f;
+            float elapsed = 0f;
+            while (remaining > 0 && elapsed < maxWaitSeconds)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (remaining > 0)
+            {
+                Debug.LogWarning("[GameManager] Shuffle parallel group timed out; forcing arrow reset.");
+                for (int i = 0; i < group.Count; i++)
+                {
+                    if (group[i]?.Arrow != null)
+                    {
+                        group[i].Arrow.ResetShuffleInteractionState();
+                    }
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator RunSingleShufflePlan(ShuffleMovePlan plan, System.Action onComplete)
+        {
+            yield return plan.Arrow.ShuffleRelocateRoutine(plan.HeadSteps);
+            onComplete?.Invoke();
+        }
+
+        /// <summary>Re-evaluates hint preview after shuffle without clearing the hint-active state.</summary>
+        public void RefreshActiveHintPreview()
+        {
+            if (!isHintActive || GridManager.Instance == null) return;
+
+            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+            for (int i = 0; i < allArrows.Count; i++)
+            {
+                if (allArrows[i] != null) allArrows[i].HidePreview();
+            }
+
+            List<ArrowController> nonBlocked = GridManager.Instance.GetNonBlockedArrows(1);
+            ArrowController bestArrow = nonBlocked.Count > 0 ? nonBlocked[0] : null;
+            if (bestArrow == null && allArrows.Count > 0)
+            {
+                bestArrow = allArrows[0];
+            }
+
+            if (bestArrow != null && !bestArrow.IsMoving)
+            {
+                bestArrow.ShowPreview();
+            }
         }
 
         public void PlayOn()
@@ -623,6 +812,7 @@ namespace Assets.Scripts.Core
             
             isEntranceFinished = false;
             isWinning = false;
+            CancelShuffleBoosterInteractionLock();
             if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
@@ -688,6 +878,10 @@ namespace Assets.Scripts.Core
             // Reset UI for level currency
             OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
 
+            isEntranceFinished = false;
+            isWinning = false;
+            CancelShuffleBoosterInteractionLock();
+            if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
 
@@ -732,6 +926,7 @@ namespace Assets.Scripts.Core
             playOnPurchaseCount = 0;
             isWinning = false;
             isEntranceFinished = false;
+            CancelShuffleBoosterInteractionLock();
             
             // Clear timer state so it doesn't carry over from previous levels
             isTimerActive = false;
@@ -1354,6 +1549,9 @@ namespace Assets.Scripts.Core
             UserDataManager.Instance != null &&
             UserDataManager.Instance.CurrentLevel >= ALL_LEVELS_TIMER_START_LEVEL;
 
+        public bool IsShuffleOn =>
+            RemoteConfigManager.Instance == null || RemoteConfigManager.Instance.IsShuffleOn;
+
         public void InitializeTimer(float durationInSeconds)
         {
             Debug.Log($"[GameManager] InitializeTimer called. duration={durationInSeconds}, isLevelProgression={p_isLevelProgression}, AllLevelsTimer={IsAllLevelsTimerEnabled}, ConfigReady={RemoteConfigManager.Instance?.IsConfigReady}, FirebaseNative={RemoteConfigManager.Instance?.IsFirebaseNativeReady}");
@@ -1710,6 +1908,7 @@ namespace Assets.Scripts.Core
             
             isEntranceFinished = false;
             isWinning = false;
+            CancelShuffleBoosterInteractionLock();
             if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();

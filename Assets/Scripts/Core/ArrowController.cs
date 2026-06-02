@@ -885,30 +885,15 @@ namespace Assets.Scripts.Core
 
         public bool CanMoveForward()
         {
-            if (segments.Count == 0) return false;
-            
-            // OPTIMIZATION: Use Dependency Tree for O(1) check
-            if (GridManager.Instance != null && GridManager.Instance.DependencyTree != null)
+            if (segments.Count == 0 || GridManager.Instance == null) return false;
+
+            ArrowDependencyTree tree = GridManager.Instance.DependencyTree;
+            if (tree != null && tree.IsArrowFree(this))
             {
-                return GridManager.Instance.DependencyTree.IsArrowFree(this);
+                return true;
             }
 
-            // Fallback to legacy O(RayLength) check if tree is not built yet
-            Segment head = segments[segments.Count - 1];
-            Vector2Int currentDir = m_LookDirection;
-            Vector2Int checkPos = head.GridPosition + currentDir;
-
-            while (!GridManager.Instance.IsOutOfBounds(checkPos))
-            {
-                ArrowController occupant = GridManager.Instance.GetOccupant(checkPos);
-                if (occupant != null && occupant != this && !occupant.isMoving)
-                {
-                    return false; 
-                }
-                checkPos += currentDir;
-            }
-            
-            return true;
+            return GridManager.Instance.IsArrowFreeByForwardRay(this);
         }
 
         /// <summary>
@@ -1379,6 +1364,134 @@ namespace Assets.Scripts.Core
             // Cleanup history pool
             foreach (var arr in m_ForwardHistoryBuffer) ReturnArrayToPool(arr);
             m_ForwardHistoryBuffer.Clear();
+        }
+
+        /// <summary>Shuffle booster: snake-walk along planned head cells (4-way), same step animation as tap.</summary>
+        public IEnumerator ShuffleRelocateRoutine(IReadOnlyList<Vector2Int> headSteps)
+        {
+            if (headSteps == null || headSteps.Count == 0 || segments.Count == 0) yield break;
+
+            isMoving = true;
+            float moveStartTime = Time.time;
+
+            for (int s = 0; s < headSteps.Count; s++)
+            {
+                if (!TryApplyShuffleStep(headSteps[s], out List<Vector3> targets))
+                {
+                    break;
+                }
+
+                float elapsed = Time.time - moveStartTime;
+                float t = Mathf.Clamp01(elapsed / K_AccelerationTime);
+                float speedMult = Mathf.Lerp(K_InitialSpeedMultiplier, K_TargetSpeedMultiplier, t);
+                float stepDuration = K_LegacyStepDuration / speedMult;
+
+                yield return StartCoroutine(AnimateAllSegments(targets, stepDuration));
+            }
+
+            ResetShuffleInteractionState();
+        }
+
+        /// <summary>Restores tap input after shuffle (grid sync + clears isMoving).</summary>
+        public void ResetShuffleInteractionState()
+        {
+            isMoving = false;
+            SyncSegmentsToGridPositions();
+            forceLineUpdate = true;
+            forceVisualsUpdate = true;
+            UpdateVisuals();
+        }
+
+        /// <summary>Aligns transforms with grid after shuffle so physics/input match occupancy.</summary>
+        public void SyncSegmentsToGridPositions()
+        {
+            for (int i = 0; i < segments.Count; i++)
+            {
+                Segment seg = segments[i];
+                if (seg == null) continue;
+                Vector3 worldPos = new Vector3(seg.GridPosition.x * CellSize, seg.GridPosition.y * CellSize, 0f);
+                seg.CachedTransform.position = worldPos;
+            }
+            forceLineUpdate = true;
+        }
+
+        private bool TryApplyShuffleStep(Vector2Int newHeadCell, out List<Vector3> targetWorldPositions)
+        {
+            targetWorldPositions = null;
+            if (segments.Count == 0 || GridManager.Instance == null) return false;
+
+            Vector2Int currentHead = segments[segments.Count - 1].GridPosition;
+            Vector2Int delta = newHeadCell - currentHead;
+            if (delta == Vector2Int.zero) return false;
+            if (Mathf.Abs(delta.x) + Mathf.Abs(delta.y) != 1) return false;
+
+            ArrowController occupant = GridManager.Instance.GetOccupant(newHeadCell);
+            if (occupant != null && occupant != this) return false;
+
+            // Head sprite and escape line must both face the movement direction.
+            m_LookDirection = delta;
+            m_CurrentVisualDirection = delta;
+            forceVisualsUpdate = true;
+
+            _newPositions.Clear();
+            for (int i = 0; i < segments.Count - 1; i++)
+            {
+                _newPositions.Add(segments[i + 1].GridPosition);
+            }
+            _newPositions.Add(newHeadCell);
+
+            for (int i = 0; i < segments.Count; i++)
+            {
+                GridManager.Instance.ReleaseOccupancy(segments[i].GridPosition);
+            }
+
+            for (int i = 0; i < segments.Count; i++)
+            {
+                segments[i].GridPosition = _newPositions[i];
+                GridManager.Instance.RegisterOccupancy(_newPositions[i], this);
+            }
+
+            forceLineUpdate = true;
+
+            _targetWorldPos.Clear();
+            foreach (var pos in _newPositions)
+            {
+                _targetWorldPos.Add(new Vector3(pos.x * CellSize, pos.y * CellSize, 0));
+            }
+            targetWorldPositions = _targetWorldPos;
+            return true;
+        }
+
+        public void SetLookDirectionToNearestEscape()
+        {
+            if (segments.Count == 0 || GridManager.Instance == null) return;
+
+            Vector2Int head = GetHeadGridPosition();
+            Vector2Int bestDir = m_LookDirection;
+            int bestClear = -1;
+
+            Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+            for (int i = 0; i < dirs.Length; i++)
+            {
+                Vector2Int dir = dirs[i];
+                Vector2Int check = head + dir;
+                int clear = 0;
+                while (!GridManager.Instance.IsOutOfBounds(check))
+                {
+                    ArrowController occupant = GridManager.Instance.GetOccupant(check);
+                    if (occupant != null && occupant != this) break;
+                    clear++;
+                    check += dir;
+                }
+                if (clear > bestClear)
+                {
+                    bestClear = clear;
+                    bestDir = dir;
+                }
+            }
+
+            m_LookDirection = bestDir;
+            m_CurrentVisualDirection = bestDir;
         }
 
     }

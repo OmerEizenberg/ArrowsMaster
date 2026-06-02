@@ -33,6 +33,10 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string EVENT_RET_30 = "Ret_30";
     public const string EVENT_RET_60 = "Ret_60";
     public const string EVENT_RET_90 = "Ret_90";
+    public const string EVENT_BOOSTER_HINT_CLICKED = "booster_hint_clicked";
+    public const string EVENT_BOOSTER_MAGIC_CLICKED = "booster_magic_clicked";
+    public const string EVENT_BOOSTER_REFILL_CLICKED = "booster_refill_clicked";
+    public const string EVENT_BOOSTER_SHUFFLE_CLICKED = "booster_shuffle_clicked";
 
     // Parameter Names
     public const string PARAM_LEVEL_ID = "level_id";

@@ -20,7 +20,7 @@ namespace Assets.Scripts.Core
         private int interstitialRetryAttempt;
         private int rewardedRetryAttempt;
 
-        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward, LifeReward }
+        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward, LifeReward, ShuffleReward }
         private RewardAdType pendingRewardType = RewardAdType.None;
 
         private readonly ConcurrentQueue<Action> _mainThreadQueue = new ConcurrentQueue<Action>();
@@ -32,6 +32,7 @@ namespace Assets.Scripts.Core
         public event Action OnPlayOnRewardReceived;
         public event Action OnMagicRewardReceived;
         public event Action OnLifeRewardReceived;
+        public event Action OnShuffleRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
         /// <summary>Fired when any cached ad-ready flag changes (avoids per-frame native IsAdReady calls).</summary>
@@ -626,6 +627,8 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForLife() => ShowRewardedForType(RewardAdType.LifeReward);
 
+        public void ShowRewardedForShuffle() => ShowRewardedForType(RewardAdType.ShuffleReward);
+
         /// <summary>
         /// Shows the best ad for a user-initiated reward: interstitial when its eCPM beats rewarded
         /// (shorter ad, higher revenue), otherwise rewarded, with interstitial as a readiness fallback.
@@ -908,6 +911,11 @@ namespace Assets.Scripts.Core
                 case RewardAdType.LifeReward:
                     Debug.Log("[AdsManager] ProcessPendingReward: LifeReward → firing OnLifeRewardReceived.");
                     OnLifeRewardReceived?.Invoke();
+                    break;
+
+                case RewardAdType.ShuffleReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: ShuffleReward → firing OnShuffleRewardReceived.");
+                    OnShuffleRewardReceived?.Invoke();
                     break;
 
                 default:

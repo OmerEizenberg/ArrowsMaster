@@ -9,7 +9,7 @@ using TMPro;
 
 public class GameUIContoleer : MonoBehaviour
 {
-    public enum BoosterType { Magic, Hint, Refill }
+    public enum BoosterType { Magic, Hint, Refill, Shuffle }
     [SerializeField] private GameObject m_LobbyUI;
     [SerializeField] private GameObject m_GameUI;
     public GameManager gameManager;
@@ -51,11 +51,19 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private GameObject m_RefillLockIcon;
     [SerializeField] private GameObject m_RefillTooltip;
     [SerializeField] private GameObject m_RefillFullLivesTooltip;
+    [SerializeField] private TextMeshProUGUI m_ShuffleBoosterText;
+    [SerializeField] private GameObject m_ShuffleBalance;
+    [SerializeField] private GameObject m_ShuffleIcon;
+    [SerializeField] private GameObject m_ShuffleAd;
+    [SerializeField] private GameObject m_ShuffleLockIcon;
+    [SerializeField] private GameObject m_ShuffleTooltip;
+    private Coroutine m_ShuffleTooltipCoroutine;
     
     [Header("Booster Button Nudge")]
     [SerializeField] private RectTransform m_HintBoosterButton;
     [SerializeField] private RectTransform m_MagicBoosterButton;
     [SerializeField] private RectTransform m_RefillBoosterButton;
+    [SerializeField] private RectTransform m_ShuffleBoosterButton;
     private const float RefillNudgeDelay = 0.7f;
     private const float IdleBoosterNudgeThreshold = 5f;
     private const int IdleBoosterMinLevel = 15;
@@ -65,6 +73,7 @@ public class GameUIContoleer : MonoBehaviour
     private Coroutine m_refillNudgeCoroutine;
     private Coroutine m_hintNudgeCoroutine;
     private Coroutine m_magicNudgeCoroutine;
+    private Coroutine m_shuffleNudgeCoroutine;
 
     private enum BoosterNudgeStyle
     {
@@ -75,6 +84,7 @@ public class GameUIContoleer : MonoBehaviour
     private BoosterButtonRestPose? m_hintRestPose;
     private BoosterButtonRestPose? m_magicRestPose;
     private BoosterButtonRestPose? m_refillRestPose;
+    private BoosterButtonRestPose? m_shuffleRestPose;
 
     private struct BoosterButtonRestPose
     {
@@ -89,6 +99,7 @@ public class GameUIContoleer : MonoBehaviour
     [SerializeField] private Sprite m_MagicBoosterFeedbackSprite;
     [SerializeField] private Sprite m_HintBoosterFeedbackSprite;
     [SerializeField] private Sprite m_RefillBoosterFeedbackSprite;
+    [SerializeField] private Sprite m_ShuffleBoosterFeedbackSprite;
 
     private Coroutine m_RefillTooltipCoroutine;
     private Coroutine m_RefillFullTooltipCoroutine;
@@ -143,7 +154,19 @@ public class GameUIContoleer : MonoBehaviour
             UserDataManager.Instance.OnHintBoosterChanged += UpdateHintBoosterUI;
             UpdateRefillBoosterUI(UserDataManager.Instance.RefillBoosterCount);
             UserDataManager.Instance.OnRefillBoosterChanged += UpdateRefillBoosterUI;
+            UpdateShuffleBoosterUI(UserDataManager.Instance.ShuffleBoosterCount);
+            UserDataManager.Instance.OnShuffleBoosterChanged += UpdateShuffleBoosterUI;
+
+            if (RemoteConfigManager.Instance != null)
+            {
+                RemoteConfigManager.Instance.OnConfigInitialized += OnRemoteConfigInitialized;
+            }
         }
+    }
+
+    private void OnRemoteConfigInitialized()
+    {
+        UpdateShuffleBoosterUI(UserDataManager.Instance != null ? UserDataManager.Instance.ShuffleBoosterCount : 0);
     }
 
     private void Update()
@@ -168,6 +191,7 @@ public class GameUIContoleer : MonoBehaviour
         UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
         UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
         UpdateRefillBoosterUI(UserDataManager.Instance.RefillBoosterCount);
+        UpdateShuffleBoosterUI(UserDataManager.Instance.ShuffleBoosterCount);
     }
 
     private void OnDisable()
@@ -189,6 +213,12 @@ public class GameUIContoleer : MonoBehaviour
             UserDataManager.Instance.OnMagicBoosterChanged -= UpdateMagicBoosterUI;
             UserDataManager.Instance.OnHintBoosterChanged -= UpdateHintBoosterUI;
             UserDataManager.Instance.OnRefillBoosterChanged -= UpdateRefillBoosterUI;
+            UserDataManager.Instance.OnShuffleBoosterChanged -= UpdateShuffleBoosterUI;
+        }
+
+        if (RemoteConfigManager.Instance != null)
+        {
+            RemoteConfigManager.Instance.OnConfigInitialized -= OnRemoteConfigInitialized;
         }
     }
 
@@ -632,6 +662,7 @@ public class GameUIContoleer : MonoBehaviour
         UpdateMagicBoosterUI(UserDataManager.Instance.MagicBoosterCount);
         UpdateHintBoosterUI(UserDataManager.Instance.HintBoosterCount);
         UpdateRefillBoosterUI(UserDataManager.Instance.RefillBoosterCount);
+        UpdateShuffleBoosterUI(UserDataManager.Instance.ShuffleBoosterCount);
         UpdateBoostersPanelVisibility();
         UpdateLevelHeaderText();
 
@@ -963,8 +994,15 @@ public class GameUIContoleer : MonoBehaviour
     {
     }
 
+    private static void LogBoosterClicked(string eventName)
+    {
+        if (FirebaseManager.Instance == null) return;
+        FirebaseManager.Instance.LogEvent(eventName);
+    }
+
     public void OnHintButtonClicked()
     {
+        LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_HINT_CLICKED);
         ResetIdleBoosterNudgeTimer();
 
         if (UserDataManager.Instance.CurrentLevel < GameManager.HINT_BOOSTER_UNLOCK_LEVEL)
@@ -1049,11 +1087,14 @@ public class GameUIContoleer : MonoBehaviour
         if (m_HintTooltip != null) m_HintTooltip.SetActive(false);
         if (m_RefillTooltip != null) m_RefillTooltip.SetActive(false);
         if (m_RefillFullLivesTooltip != null) m_RefillFullLivesTooltip.SetActive(false);
+        if (m_ShuffleTooltipCoroutine != null) StopCoroutine(m_ShuffleTooltipCoroutine);
+        if (m_ShuffleTooltip != null) m_ShuffleTooltip.SetActive(false);
 
         m_MagicTooltipCoroutine = null;
         m_HintTooltipCoroutine = null;
         m_RefillTooltipCoroutine = null;
         m_RefillFullTooltipCoroutine = null;
+        m_ShuffleTooltipCoroutine = null;
     }
 
     private System.Collections.IEnumerator ShowHintTooltipCoroutine()
@@ -1108,6 +1149,7 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnMagicButtonClicked()
     {
+        LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_MAGIC_CLICKED);
         ResetIdleBoosterNudgeTimer();
 
         if (UserDataManager.Instance.CurrentLevel < GameManager.MAGIC_BOOSTER_UNLOCK_LEVEL)
@@ -1155,6 +1197,7 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnRefillButtonClicked()
     {
+        LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_REFILL_CLICKED);
         ResetIdleBoosterNudgeTimer();
 
         if (UserDataManager.Instance.CurrentLevel < GameManager.REFILL_BOOSTER_UNLOCK_LEVEL)
@@ -1194,6 +1237,120 @@ public class GameUIContoleer : MonoBehaviour
         StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, BoosterType.Refill, () => {
                    GameManager.Instance.ExecuteRefillLife();
                }));
+    }
+
+    public void OnShuffleButtonClicked()
+    {
+        if (GameManager.Instance == null || !GameManager.Instance.IsShuffleOn) return;
+
+        LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_SHUFFLE_CLICKED);
+        ResetIdleBoosterNudgeTimer();
+
+        if (UserDataManager.Instance.CurrentLevel < GameManager.SHUFFLE_BOOSTER_UNLOCK_LEVEL)
+        {
+            HideAllBoosterTooltips();
+            m_ShuffleTooltipCoroutine = StartCoroutine(ShowShuffleTooltipCoroutine());
+            return;
+        }
+
+        if (UserDataManager.Instance.ShuffleBoosterCount > 0)
+        {
+            if (UserDataManager.Instance.UseShuffleBooster(1))
+            {
+                StartCoroutine(BoosterSequence(m_ShuffleBoosterFeedbackSprite, BoosterType.Shuffle, () => {
+                    GameManager.Instance.ExecuteShuffleBooster();
+                }));
+            }
+        }
+        else
+        {
+            if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.ShowRewardedForShuffle();
+            }
+        }
+    }
+
+    public void HandleShuffleRewardReceived()
+    {
+        if (GameManager.Instance == null || !GameManager.Instance.IsShuffleOn) return;
+
+        StartCoroutine(BoosterSequence(m_ShuffleBoosterFeedbackSprite, BoosterType.Shuffle, () => {
+            GameManager.Instance.ExecuteShuffleBooster();
+        }));
+    }
+
+    private void UpdateShuffleBoosterUI(int count)
+    {
+        UpdateShuffleBoosterVisibility();
+
+        if (GameManager.Instance == null || !GameManager.Instance.IsShuffleOn) return;
+
+        bool isLocked = UserDataManager.Instance.CurrentLevel < GameManager.SHUFFLE_BOOSTER_UNLOCK_LEVEL;
+
+        if (m_ShuffleLockIcon != null)
+        {
+            m_ShuffleLockIcon.SetActive(isLocked);
+        }
+
+        if (isLocked)
+        {
+            if (m_ShuffleBoosterText != null) m_ShuffleBoosterText.gameObject.SetActive(false);
+            if (m_ShuffleAd != null) m_ShuffleAd.SetActive(true);
+            if (m_ShuffleBalance != null) m_ShuffleBalance.SetActive(false);
+            if (m_ShuffleIcon != null) m_ShuffleIcon.SetActive(false);
+        }
+        else
+        {
+            if (m_ShuffleIcon != null) m_ShuffleIcon.SetActive(true);
+            if (m_ShuffleLockIcon != null) m_ShuffleLockIcon.SetActive(false);
+            if (count > 0)
+            {
+                if (m_ShuffleBoosterText != null)
+                {
+                    m_ShuffleBoosterText.gameObject.SetActive(true);
+                    m_ShuffleBoosterText.text = count.ToString();
+                }
+                if (m_ShuffleBalance != null) m_ShuffleBalance.SetActive(true);
+                if (m_ShuffleAd != null) m_ShuffleAd.SetActive(false);
+            }
+            else
+            {
+                if (m_ShuffleBoosterText != null) m_ShuffleBoosterText.gameObject.SetActive(false);
+                if (m_ShuffleBalance != null) m_ShuffleBalance.SetActive(false);
+                if (m_ShuffleAd != null) m_ShuffleAd.SetActive(true);
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator ShowShuffleTooltipCoroutine()
+    {
+        if (m_ShuffleTooltip != null)
+        {
+            m_ShuffleTooltip.SetActive(true);
+            yield return new WaitForSeconds(3f);
+            m_ShuffleTooltip.SetActive(false);
+        }
+        m_ShuffleTooltipCoroutine = null;
+    }
+
+    private void UpdateShuffleBoosterVisibility()
+    {
+        bool show = GameManager.Instance != null && GameManager.Instance.IsShuffleOn;
+        if (m_ShuffleBoosterButton != null)
+        {
+            m_ShuffleBoosterButton.gameObject.SetActive(show);
+        }
+
+        if (!show)
+        {
+            if (m_ShuffleTooltipCoroutine != null)
+            {
+                StopCoroutine(m_ShuffleTooltipCoroutine);
+                m_ShuffleTooltipCoroutine = null;
+            }
+            if (m_ShuffleTooltip != null) m_ShuffleTooltip.SetActive(false);
+        }
     }
 
     private void UpdateRefillBoosterUI(int count)
@@ -1281,6 +1438,7 @@ public class GameUIContoleer : MonoBehaviour
                 case BoosterType.Magic: SoundManager.Instance.PlayMagicBooster(); break;
                 case BoosterType.Hint: SoundManager.Instance.PlayHintBooster(); break;
                 case BoosterType.Refill: SoundManager.Instance.PlayRefillBooster(); break;
+                case BoosterType.Shuffle: SoundManager.Instance.PlayShuffleBooster(); break;
             }
         }
 

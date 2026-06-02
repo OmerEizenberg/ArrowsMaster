@@ -12,6 +12,7 @@ namespace Assets.Scripts.Core
         // HashSet for O(1) Contains checks — List kept for ordered iteration
         private HashSet<ArrowController> allArrowsSet = new HashSet<ArrowController>();
         private Vector2Int gridSize;
+        public Vector2Int GridSize => gridSize;
         public ArrowDependencyTree DependencyTree { get; private set; }
 
         private void Awake()
@@ -47,6 +48,25 @@ namespace Assets.Scripts.Core
             if (DependencyTree != null)
             {
                 DependencyTree.Build(allArrows);
+            }
+        }
+
+        /// <summary>Rebuilds occupancy from segment grid positions (fixes stale cells after shuffle).</summary>
+        public void RebuildOccupancyFromSegments()
+        {
+            occupancyMap.Clear();
+            for (int i = 0; i < allArrows.Count; i++)
+            {
+                ArrowController arrow = allArrows[i];
+                if (arrow == null || arrow.segments == null || arrow.segments.Count == 0) continue;
+
+                for (int s = 0; s < arrow.segments.Count; s++)
+                {
+                    Segment seg = arrow.segments[s];
+                    if (seg == null) continue;
+                    Vector2Int coord = seg.GridPosition;
+                    occupancyMap[coord] = arrow;
+                }
             }
         }
 
@@ -138,24 +158,37 @@ namespace Assets.Scripts.Core
         }
         public List<ArrowController> GetNonBlockedArrows(int count)
         {
-            if (DependencyTree != null)
-            {
-                List<ArrowController> free = DependencyTree.GetAllFreeArrows();
-                if (free.Count > count) return free.GetRange(0, count);
-                return free;
-            }
-
-            // Fallback
             List<ArrowController> result = new List<ArrowController>();
             foreach (var arrow in allArrows)
             {
-                if (arrow != null && !arrow.IsMoving && arrow.CanMoveForward())
-                {
-                    result.Add(arrow);
-                    if (result.Count >= count) break;
-                }
+                if (arrow == null || arrow.IsMoving) continue;
+                if (!IsArrowFreeByForwardRay(arrow)) continue;
+                result.Add(arrow);
+                if (count > 0 && result.Count >= count) break;
             }
             return result;
+        }
+
+        /// <summary>Clear forward path in look direction (grid walk; moving arrows do not block).</summary>
+        public bool IsArrowFreeByForwardRay(ArrowController arrow)
+        {
+            if (arrow == null || arrow.IsMoving || arrow.segments.Count == 0) return false;
+
+            Vector2Int currentDir = arrow.LookDirection;
+            if (currentDir == Vector2Int.zero) return false;
+
+            Vector2Int checkPos = arrow.GetHeadGridPosition() + currentDir;
+            while (!IsOutOfBounds(checkPos))
+            {
+                ArrowController occupant = GetOccupant(checkPos);
+                if (occupant != null && occupant != arrow && !occupant.IsMoving)
+                {
+                    return false;
+                }
+                checkPos += currentDir;
+            }
+
+            return true;
         }
     }
 }

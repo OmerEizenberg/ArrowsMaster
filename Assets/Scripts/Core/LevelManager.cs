@@ -412,7 +412,6 @@ namespace Assets.Scripts.Core
             Debug.Log($"[DIAGNOSTIC] Spawned {spawnCount} background circles. Rebuilding Dependency Tree...");
 
             // 5. Build Dependency Tree for O(1) performance
-            // We use the Async version to avoid frame spikes on large levels
             yield return StartCoroutine(GridManager.Instance.RebuildDependencyTreeAsync());
             Debug.Log("[DIAGNOSTIC] Dependency Tree rebuilt. Entrance Sequence COMPLETE.");
 

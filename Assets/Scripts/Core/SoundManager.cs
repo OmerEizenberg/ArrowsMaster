@@ -198,6 +198,11 @@ namespace Assets.Scripts.Core
             PlaySound(RefillBoosterSound);
         }
 
+        public void PlayShuffleBooster()
+        {
+            PlaySound(HintBoosterSound != null ? HintBoosterSound : MagicBoosterSound);
+        }
+
         public void PlayHeartNudge()
         {
             PlaySound(HeartNudgeSound != null ? HeartNudgeSound : RefillBoosterSound);
