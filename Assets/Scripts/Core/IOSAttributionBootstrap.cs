@@ -149,6 +149,7 @@ namespace Assets.Scripts.Core
                     "[IOSAttributionBootstrap] Singular already initialized before bootstrap; " +
                     "ensure SingularSDKObject.InitializeOnAwake is disabled in the scene.");
                 AdsManager.NotifySingularSdkInitialized();
+                SingularAttributionBridge.NotifySingularInitialized();
                 return;
             }
 
@@ -166,6 +167,7 @@ namespace Assets.Scripts.Core
             {
                 Debug.Log("[IOSAttributionBootstrap] Singular SDK initialized.");
                 AdsManager.NotifySingularSdkInitialized();
+                SingularAttributionBridge.NotifySingularInitialized();
             }
             else
             {

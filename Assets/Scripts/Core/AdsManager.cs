@@ -911,7 +911,8 @@ namespace Assets.Scripts.Core
                 Debug.LogWarning(
                     $"[AdsManager] TrackAdRevenue: no revenue (network={adInfo.NetworkName}, " +
                     $"unit={adInfo.AdUnitIdentifier}, format={resolvedFormat}, precision={adInfo.RevenuePrecision}). " +
-                    "Enable Impression-Level User Revenue (ILRD) in the AppLovin MAX dashboard.");
+                    "ILRD is delivered via OnAdRevenuePaidEvent when MAX has revenue data—common causes: test ads, " +
+                    "revenue=-1 (error), or network not fully configured in MAX Mediation.");
                 return;
             }
 

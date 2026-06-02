@@ -18,19 +18,25 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
     {
         ConfigureBuildEnvironment();
         ConfigureIOSResolverForWorkspace();
+        DisableEngineDiagnostics();
+        DisableAppLovinQualityService();
     }
 
     public void OnPreprocessBuild(BuildReport report)
     {
         if (report.summary.platform != BuildTarget.iOS) return;
         DisableEngineDiagnostics();
+        DisableAppLovinQualityService();
         EnsureCocoaPodsAvailableOrThrow();
     }
 
     private static void DisableEngineDiagnostics()
     {
-        // Unity 6 Engine Diagnostics hooks NSURLSession metrics and can crash on iOS
-        // (NetworkTransactionDiagnosticAdapter.convertToDiagnosticEvent EXC_BREAKPOINT).
+        // Unity 6 Engine Diagnostics hooks NSURLSession metrics and can crash on iOS when
+        // AppLovin Quality Service (SafeDK) also swizzles NSURLSession:
+        // NetworkTransactionDiagnosticAdapter.convertToDiagnosticEvent EXC_BREAKPOINT.
+        EnsureUnityConnectDiagnosticsDisabled();
+
         try
         {
             var settingsType = System.Type.GetType("UnityEditor.EngineDiagnostics.EngineDiagnosticsSettings, UnityEditor");
@@ -41,13 +47,60 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
                 System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
             if (enabledProperty == null || enabledProperty.PropertyType != typeof(bool)) return;
 
-            enabledProperty.SetValue(null, false);
-            Debug.Log("[IOSBuildPostProcess] Disabled Unity Engine Diagnostics for iOS build.");
+            if ((bool)enabledProperty.GetValue(null))
+            {
+                enabledProperty.SetValue(null, false);
+                Debug.Log("[IOSBuildPostProcess] Disabled Unity Engine Diagnostics.");
+            }
+
+            var saveMethod = settingsType.GetMethod(
+                "Save",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            saveMethod?.Invoke(null, null);
         }
         catch (System.Exception e)
         {
             Debug.LogWarning("[IOSBuildPostProcess] Could not disable Engine Diagnostics: " + e.Message);
         }
+    }
+
+    private static void EnsureUnityConnectDiagnosticsDisabled()
+    {
+        const string settingsPath = "ProjectSettings/UnityConnectSettings.asset";
+        if (!File.Exists(settingsPath)) return;
+
+        string content = File.ReadAllText(settingsPath);
+        if (!content.Contains("m_EngineDiagnosticsEnabled: 1")) return;
+
+        File.WriteAllText(settingsPath, content.Replace("m_EngineDiagnosticsEnabled: 1", "m_EngineDiagnosticsEnabled: 0"));
+        Debug.Log("[IOSBuildPostProcess] Set m_EngineDiagnosticsEnabled=0 in UnityConnectSettings.asset.");
+    }
+
+    /// <summary>
+    /// Disables AppLovin Quality Service (SafeDK). Its NSURLSession swizzle conflicts with
+    /// Unity Services network metrics on the com.apple.NSURLSession-delegate queue.
+    /// </summary>
+    private static void DisableAppLovinQualityService()
+    {
+        const string settingsPath = "Assets/MaxSdk/Resources/AppLovinSettings.asset";
+        var settings = AssetDatabase.LoadAssetAtPath<ScriptableObject>(settingsPath);
+        if (settings == null)
+        {
+            Debug.LogWarning("[IOSBuildPostProcess] AppLovinSettings.asset not found; cannot disable Quality Service.");
+            return;
+        }
+
+        var serialized = new SerializedObject(settings);
+        var qualityService = serialized.FindProperty("qualityServiceEnabled");
+        if (qualityService == null || qualityService.propertyType != SerializedPropertyType.Boolean) return;
+
+        if (!qualityService.boolValue) return;
+
+        qualityService.boolValue = false;
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[IOSBuildPostProcess] Disabled AppLovin Quality Service (SafeDK) to avoid NSURLSession swizzle crashes.");
     }
 
     private static void ConfigureBuildEnvironment()
