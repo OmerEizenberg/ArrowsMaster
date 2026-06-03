@@ -62,8 +62,6 @@ namespace Assets.Scripts.Lobby
 
         private void OnContinuePressed()
         {
-            PlayerPrefs.SetInt("TermsAgreed", 1);
-            PlayerPrefs.Save();
             OnAgreed?.Invoke();
             Destroy(gameObject);
         }

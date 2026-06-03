@@ -156,8 +156,25 @@ namespace Assets.Scripts.Core
 
             _coinsExplosionPrefab = Resources.Load<GameObject>("CoinsSmallExplosion");
 
-            _ = InitializeSDK();
+            TermsConsentManager.OnConsentResolved += HandleTermsConsentResolved;
+            if (TermsConsentManager.HasUserDecided)
+                _ = InitializeSDK();
+            else
+                Debug.Log("[AdsManager] Waiting for terms consent before ads/ATT/UMP initialization.");
+
             StartCoroutine(AdHealthCheckRoutine());
+        }
+
+        private void HandleTermsConsentResolved()
+        {
+            if (!TermsConsentManager.HasAccepted)
+            {
+                Debug.Log("[AdsManager] Terms not accepted; skipping ads SDK initialization.");
+                return;
+            }
+
+            if (!isInitialized && !isInitializing)
+                _ = InitializeSDK();
         }
 
         private void Start()
@@ -173,6 +190,8 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
+            TermsConsentManager.OnConsentResolved -= HandleTermsConsentResolved;
+
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
 
             MaxSdkCallbacks.Interstitial.OnAdLoadedEvent -= OnInterstitialLoaded;
@@ -365,6 +384,9 @@ namespace Assets.Scripts.Core
 
         private async Task InitializeSDK()
         {
+            if (!TermsConsentManager.HasAccepted)
+                return;
+
             if (isInitialized || isInitializing) return;
 
             isInitializing = true;
@@ -422,6 +444,7 @@ namespace Assets.Scripts.Core
                 MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
                 MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
 
+                MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
                 MaxSdk.SetSdkKey(MaxSdkKey);
                 MaxSdk.InitializeSdk();
             }

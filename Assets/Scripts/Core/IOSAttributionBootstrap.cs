@@ -47,10 +47,24 @@ namespace Assets.Scripts.Core
             // SingularSDK.Awake returns early in Editor and never registers an instance.
             return;
 #endif
+            StartCoroutine(WaitForTermsConsentThenBootstrap());
+        }
+
+        private IEnumerator WaitForTermsConsentThenBootstrap()
+        {
+            while (!TermsConsentManager.HasUserDecided)
+                yield return null;
+
+            if (!TermsConsentManager.HasAccepted)
+            {
+                Debug.Log("[IOSAttributionBootstrap] Terms not accepted; skipping Singular/ATT bootstrap.");
+                yield break;
+            }
+
 #if UNITY_IOS && !UNITY_EDITOR
-            StartCoroutine(BootstrapIOS());
+            yield return BootstrapIOS();
 #else
-            StartCoroutine(InitializeSingularAfterSceneLoad());
+            yield return InitializeSingularAfterSceneLoad();
 #endif
         }
 

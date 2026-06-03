@@ -202,7 +202,6 @@ namespace Assets.Scripts.Lobby
                 }
             }
 
-            CheckForTermsAgreement();
             CheckForRateUsPopup();
             UpdateChallengeNotification();
             CheckForNoAdsOffer();
@@ -1224,38 +1223,6 @@ namespace Assets.Scripts.Lobby
                 else
                 {
                     Debug.LogError("[CheckForUpdates] SoftForcePopup prefab not found in Resources!");
-                }
-            }
-        }
-
-        private void CheckForTermsAgreement()
-        {
-            if (PlayerPrefs.GetInt("TermsAgreed", 0) == 0)
-            {
-                GameObject popupPrefab = Resources.Load<GameObject>("TermsAndConditionsPopup");
-                if (popupPrefab != null)
-                {
-                    Transform parent = m_LobbyUI != null ? m_LobbyUI.transform.parent : transform;
-                    GameObject popupInstance = Instantiate(popupPrefab, parent, false);
-                    popupInstance.SetActive(true);
-                    popupInstance.transform.SetAsLastSibling();
-
-                    RectTransform rect = popupInstance.GetComponent<RectTransform>();
-                    if (rect != null)
-                    {
-                        rect.localPosition = Vector3.zero;
-                        rect.localScale = Vector3.one;
-                    }
-                    
-                    TermsAndConditionsPopup view = popupInstance.GetComponent<TermsAndConditionsPopup>();
-                    if (view == null)
-                    {
-                        Debug.LogError("[HomeContoller] TermsAndConditionsPopup component missing on prefab!");
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning("[HomeContoller] TermsAndConditionsPopup prefab not found in Resources!");
                 }
             }
         }
