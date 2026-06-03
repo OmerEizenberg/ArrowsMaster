@@ -160,6 +160,11 @@ namespace Assets.Scripts.Core
             StartCoroutine(AdHealthCheckRoutine());
         }
 
+        private void Start()
+        {
+            SubscribeToNoAdsStatus();
+        }
+
         private void Update()
         {
             while (_mainThreadQueue.TryDequeue(out var action))
@@ -192,12 +197,56 @@ namespace Assets.Scripts.Core
             MaxSdkCallbacks.Banner.OnAdClickedEvent -= OnBannerAdClicked;
             MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent -= OnBannerAdRevenuePaid;
 
+            UnsubscribeFromNoAdsStatus();
             if (_bannerCreated) MaxSdk.DestroyBanner(BannerAdUnitId);
         }
 
         // ════════════════════════════════════════════
         //  HELPERS
         // ════════════════════════════════════════════
+
+        private bool UserHasNoAds =>
+            IAPManager.Instance != null && IAPManager.Instance.HasNoAds;
+
+        private void SubscribeToNoAdsStatus()
+        {
+            if (IAPManager.Instance == null) return;
+            IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
+            IAPManager.Instance.OnNoAdsStatusChanged += HandleNoAdsStatusChanged;
+            if (IAPManager.Instance.HasNoAds)
+                HandleNoAdsStatusChanged(true);
+        }
+
+        private void UnsubscribeFromNoAdsStatus()
+        {
+            if (IAPManager.Instance == null) return;
+            IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
+        }
+
+        private void HandleNoAdsStatusChanged(bool hasNoAds)
+        {
+            if (!hasNoAds) return;
+            Debug.Log("[AdsManager] No Ads purchased — hiding and destroying banner.");
+            DestroyBanner();
+        }
+
+        private void DestroyBanner()
+        {
+            if (!_bannerCreated) return;
+
+            try
+            {
+                MaxSdk.HideBanner(BannerAdUnitId);
+                MaxSdk.DestroyBanner(BannerAdUnitId);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] DestroyBanner failed: {e.Message}");
+            }
+
+            _bannerCreated = false;
+            SetCachedReady(ref _bannerReady, false);
+        }
 
         private void EnqueueAction(Action action) => _mainThreadQueue.Enqueue(action);
 
@@ -251,7 +300,7 @@ namespace Assets.Scripts.Core
         private void PrepareBannerAd()
         {
             if (!isInitialized) return;
-            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds) return;
+            if (UserHasNoAds) return;
 
             if (!_bannerCreated)
             {
@@ -407,7 +456,9 @@ namespace Assets.Scripts.Core
 
             InitializeInterstitialAds();
             InitializeRewardedAds();
-            InitializeBannerAds();
+            SubscribeToNoAdsStatus();
+            if (!UserHasNoAds)
+                InitializeBannerAds();
             RefreshAllReadiness();
         }
 
@@ -435,19 +486,12 @@ namespace Assets.Scripts.Core
                 if (!isInitializing) _ = InitializeSDK();
                 return;
             }
-            if (IAPManager.Instance == null)
-                Debug.LogWarning("[AdsManager] IAPManager.Instance is null. Proceeding without IAP check.");
-
-            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
-            {
-                Debug.Log("[AdsManager] Skipping Interstitial Load: User has No Ads.");
-                return;
-            }
             if (UserDataManager.Instance != null && !UserDataManager.Instance.IsInterstitialActive)
             {
                 Debug.Log("[AdsManager] Skipping Interstitial Load: IsInterstitialActive is false (Remote Config).");
                 return;
             }
+            // Loaded even for No Ads buyers so interstitials remain available as a rewarded fallback.
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
             MaxSdk.LoadInterstitial(InterstitialAdUnitId);
         }
@@ -632,6 +676,7 @@ namespace Assets.Scripts.Core
         /// <summary>
         /// Shows the best ad for a user-initiated reward: interstitial when its eCPM beats rewarded
         /// (shorter ad, higher revenue), otherwise rewarded, with interstitial as a readiness fallback.
+        /// Intentionally bypasses the No Ads gate — interstitials here are opt-in substitutes for rewarded.
         /// </summary>
         private void ShowRewardedForType(RewardAdType rewardType)
         {
@@ -765,6 +810,8 @@ namespace Assets.Scripts.Core
 
         public void LoadSettingsBanner()
         {
+            if (UserHasNoAds) return;
+
             if (!isInitialized)
             {
                 if (!isInitializing) _ = InitializeSDK();
@@ -785,9 +832,10 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
+            if (UserHasNoAds)
             {
                 Debug.Log("[AdsManager] Skipping Banner Show: User has No Ads.");
+                HideSettingsBanner();
                 return;
             }
 
