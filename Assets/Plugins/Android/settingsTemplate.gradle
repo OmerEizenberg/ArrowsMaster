@@ -27,10 +27,10 @@ dependencyResolutionManagement {
             url (unityProjectPath + "/Assets/GeneratedLocalRepo/GooglePlayGames/com.google.play.games/Editor/m2repository") // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:11
         }
         maven {
-            url "https://maven.google.com/" // Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleUmpDependencies.xml:7, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:7, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:12, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:17
+            url "https://artifact.bytedance.com/repository/pangle" // Packages/com.applovin.mediation.adapters.bytedance.android/Editor/Dependencies.xml:8
         }
         maven {
-            url "https://artifact.bytedance.com/repository/pangle" // Packages/com.applovin.mediation.adapters.bytedance.android/Editor/Dependencies.xml:8
+            url "https://maven.google.com/" // Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:7, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:12, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:17, Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleUmpDependencies.xml:7
         }
         maven {
             url "https://maven.singular.net" // Packages/singular-unity-package/SingularSDK/Editor/SingularSDKDependencies.xml:7

@@ -86,7 +86,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED] = true;
         defaults[KEY_ONE_LIFE_PLAY_ON] = false;
         defaults[KEY_IS_SHUFFLE_ON] = true;
-        defaults[KEY_NETFLIX_EFFECT] = true;
+        defaults[KEY_NETFLIX_EFFECT] = false;
     }
 
     /// <summary>
