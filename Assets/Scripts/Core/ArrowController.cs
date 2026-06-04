@@ -329,6 +329,38 @@ namespace Assets.Scripts.Core
             return segments[segments.Count - 1].CachedTransform.position;
         }
 
+        private const int MaxLikeEffectsPerArrow = 10;
+
+        private void SpawnLikeEffectsAlongArrow()
+        {
+            int segmentCount = segments.Count;
+            int likeCount = Mathf.Min(segmentCount, MaxLikeEffectsPerArrow);
+
+            for (int i = 0; i < likeCount; i++)
+            {
+                int segmentIndex = likeCount == 1
+                    ? 0
+                    : Mathf.RoundToInt(i * (segmentCount - 1f) / (likeCount - 1f));
+
+                Segment seg = segments[segmentIndex];
+                if (seg == null)
+                {
+                    continue;
+                }
+
+                GameObject effect = GameManager.Instance.SpawnEffect(
+                    pointEffectPrefab,
+                    seg.CachedTransform.position,
+                    Quaternion.identity,
+                    null);
+
+                if (effect != null)
+                {
+                    instantiatedEffects.Add(effect);
+                }
+            }
+        }
+
         private void UpdateVisuals()
         {
             UpdateLinePositions();
@@ -526,14 +558,9 @@ namespace Assets.Scripts.Core
                         if (tempProbLike < 0.12f)
                         {
                             SoundManager.Instance.PlayLike();
-                            if (pointEffectPrefab != null && clickedSegment != null)
+                            if (pointEffectPrefab != null && segments.Count > 0)
                             {
-                                GameObject effect = GameManager.Instance.SpawnEffect(
-                                    pointEffectPrefab,
-                                    clickedSegment.CachedTransform.position,
-                                    Quaternion.identity,
-                                    null);
-                                instantiatedEffects.Add(effect);
+                                SpawnLikeEffectsAlongArrow();
                             }
                         }
                         // Instantiate prefabs at each arrow point
