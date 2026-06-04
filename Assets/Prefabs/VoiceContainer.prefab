@@ -146,7 +146,6 @@ GameObject:
   - component: {fileID: 4502426743121785035}
   - component: {fileID: 717690769202879781}
   - component: {fileID: 4917404661158820459}
-  - component: {fileID: 7750162514104913113}
   - component: {fileID: 311972234195838979}
   m_Layer: 5
   m_Name: VoiceContainer
@@ -234,19 +233,6 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &7750162514104913113
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7912194092593699715}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7b96d4eb744144cabafc9283e4df81f7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_comboNum: {fileID: 0}
 --- !u!114 &311972234195838979
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -260,3 +246,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_comboVibe: {fileID: 6650915751541089671}
+  m_Animator: {fileID: 4917404661158820459}

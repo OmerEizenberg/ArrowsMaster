@@ -75,6 +75,10 @@ namespace Assets.Scripts.Core
         [SerializeField] private TextMeshProUGUI m_ArrowsLeftText;
         [SerializeField] private RectTransform m_ArrowsLeftHolder;
 
+        [Header("Streak Feedback")]
+        [SerializeField] private GameObject m_ComboFeedbackPrefab;
+        [SerializeField] private GameObject m_VoiceFeedbackPrefab;
+
         [Header("Settings")]
         public int maxLives = 3;
 
@@ -139,8 +143,13 @@ namespace Assets.Scripts.Core
         public bool p_isPlayOnRewarded = false;
         public bool p_isHintRewarded = false;
 
-        private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
-        private List<GameObject> m_ActiveVoices = new List<GameObject>();
+        private ComboController m_ComboFeedback;
+        private RectTransform m_ComboFeedbackRect;
+        private VoiceVibeController m_VoiceFeedback;
+        private RectTransform m_VoiceFeedbackRect;
+        private Transform m_ComboUIParent;
+        private RectTransform m_ComboUIParentRect;
+        private Camera m_UICamera;
         private int m_SuccessSaveCounter = 0;
         private float m_LastSaveTime = 0f;
         private Dictionary<string, Queue<GameObject>> m_EffectPools = new Dictionary<string, Queue<GameObject>>();
@@ -807,6 +816,7 @@ namespace Assets.Scripts.Core
             // -----------------------------
 
             OnLevelStarted?.Invoke();
+            PrewarmStreakFeedbackUI();
             // Reset UI for level currency
             OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
             
@@ -875,6 +885,7 @@ namespace Assets.Scripts.Core
             // ----------------------------------------
 
             OnLevelStarted?.Invoke();
+            PrewarmStreakFeedbackUI();
             // Reset UI for level currency
             OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
 
@@ -937,7 +948,8 @@ namespace Assets.Scripts.Core
 
             if (m_currentArrowNudge != null) { Destroy(m_currentArrowNudge); m_currentArrowNudge = null; }
             m_ArrowNudgeTimer = 0f;
-            
+
+            TeardownStreakFeedbackUI();
             UpdateArrowsLeftUI(false);
         }
 
@@ -1722,43 +1734,176 @@ namespace Assets.Scripts.Core
             return "Refill lives with coins or by watching a short ad.";
         }
 
-        public void RegisterCombo(RectTransform rect)
+        public void ShowComboFeedback(int displayStreak, int upcomingStreak)
         {
-            if (rect != null) m_ActiveCombos.Add(rect);
+            if (!EnsureComboFeedback())
+            {
+                return;
+            }
+
+            Vector2 screenPos = GetValidComboPosition(false);
+            if (m_ComboUIParentRect != null &&
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    m_ComboUIParentRect, screenPos, m_UICamera, out Vector2 localPos))
+            {
+                m_ComboFeedbackRect.anchoredPosition = localPos;
+            }
+
+            m_ComboFeedback.Show(displayStreak, upcomingStreak);
+        }
+
+        public void HideComboFeedback()
+        {
+            if (m_ComboFeedback != null)
+            {
+                m_ComboFeedback.Hide();
+            }
         }
 
         public void ClearActiveCombos()
         {
-            foreach (var combo in m_ActiveCombos)
-            {
-                if (combo != null && combo.gameObject != null)
-                {
-                    // OPTIMIZATION #6: Return to pool
-                    ReturnEffect(combo.gameObject);
-                }
-            }
-            m_ActiveCombos.Clear();
+            HideComboFeedback();
         }
 
-        public void RegisterVoice(GameObject voice)
+        private void PrewarmStreakFeedbackUI()
         {
-            if (voice != null)
+            TeardownStreakFeedbackUI();
+            EnsureComboFeedback();
+            EnsureVoiceFeedback();
+        }
+
+        private void TeardownStreakFeedbackUI()
+        {
+            TeardownComboFeedbackInstance();
+            TeardownVoiceFeedbackInstance();
+            m_ComboUIParent = null;
+            m_ComboUIParentRect = null;
+        }
+
+        private void TeardownComboFeedbackInstance()
+        {
+            HideComboFeedback();
+
+            if (m_ComboFeedback != null)
             {
-                m_ActiveVoices.Add(voice);
+                Destroy(m_ComboFeedback.gameObject);
+                m_ComboFeedback = null;
+                m_ComboFeedbackRect = null;
+            }
+        }
+
+        private void TeardownVoiceFeedbackInstance()
+        {
+            HideVoiceFeedback();
+
+            if (m_VoiceFeedback != null)
+            {
+                Destroy(m_VoiceFeedback.gameObject);
+                m_VoiceFeedback = null;
+                m_VoiceFeedbackRect = null;
+            }
+        }
+
+        private bool EnsureComboFeedback()
+        {
+            if (m_ComboFeedback != null)
+            {
+                return true;
+            }
+
+            if (m_ComboFeedbackPrefab == null)
+            {
+                return false;
+            }
+
+            CacheComboUIReferences();
+            if (m_ComboUIParent == null)
+            {
+                return false;
+            }
+
+            GameObject comboObject = Instantiate(m_ComboFeedbackPrefab, m_ComboUIParent);
+            comboObject.SetActive(false);
+            m_ComboFeedback = comboObject.GetComponent<ComboController>();
+            m_ComboFeedbackRect = comboObject.GetComponent<RectTransform>();
+            return m_ComboFeedback != null && m_ComboFeedbackRect != null;
+        }
+
+        private void CacheComboUIReferences()
+        {
+            if (m_GameUI == null)
+            {
+                return;
+            }
+
+            m_ComboUIParent = m_GameUI.GameUIParent;
+            m_ComboUIParentRect = m_ComboUIParent as RectTransform;
+
+            m_UICamera = null;
+            Canvas canvas = m_GameUI.GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                m_UICamera = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+            }
+        }
+
+        public void ShowVoiceFeedback()
+        {
+            if (!EnsureVoiceFeedback())
+            {
+                return;
+            }
+
+            m_VoiceFeedbackRect.anchorMin = new Vector2(0.5f, 0.5f);
+            m_VoiceFeedbackRect.anchorMax = new Vector2(0.5f, 0.5f);
+            m_VoiceFeedbackRect.pivot = new Vector2(0.5f, 0.5f);
+            m_VoiceFeedbackRect.anchoredPosition = Vector2.zero;
+            m_VoiceFeedbackRect.SetAsLastSibling();
+            m_VoiceFeedback.Show();
+        }
+
+        public void HideVoiceFeedback()
+        {
+            if (m_VoiceFeedback != null)
+            {
+                m_VoiceFeedback.Hide();
             }
         }
 
         public void ClearActiveVoices()
         {
-            foreach (var voice in m_ActiveVoices)
+            HideVoiceFeedback();
+        }
+
+        private bool EnsureVoiceFeedback()
+        {
+            if (m_VoiceFeedback != null)
             {
-                if (voice != null)
-                {
-                    // OPTIMIZATION #6: Return to pool
-                    ReturnEffect(voice);
-                }
+                return true;
             }
-            m_ActiveVoices.Clear();
+
+            if (m_VoiceFeedbackPrefab == null)
+            {
+                return false;
+            }
+
+            CacheComboUIReferences();
+            if (m_ComboUIParent == null)
+            {
+                return false;
+            }
+
+            GameObject voiceObject = Instantiate(m_VoiceFeedbackPrefab, m_ComboUIParent);
+            voiceObject.SetActive(false);
+
+            m_VoiceFeedback = voiceObject.GetComponent<VoiceVibeController>();
+            if (m_VoiceFeedback == null)
+            {
+                m_VoiceFeedback = voiceObject.AddComponent<VoiceVibeController>();
+            }
+
+            m_VoiceFeedbackRect = voiceObject.GetComponent<RectTransform>();
+            return m_VoiceFeedback != null && m_VoiceFeedbackRect != null;
         }
 
         public Vector2 GetValidComboPosition(bool isVoice)
@@ -1904,6 +2049,7 @@ namespace Assets.Scripts.Core
             Debug.Log($"[GameManager] Progress Restored: Level={progress.levelId}, Time={currentTime}/{levelDuration}, Lives={CurrentLives}, Active={isTimerActive}");
 
             OnLevelStarted?.Invoke();
+            PrewarmStreakFeedbackUI();
             OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency, Vector2.zero);
             
             isEntranceFinished = false;

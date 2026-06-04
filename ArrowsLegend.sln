@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A395E6E879E}") = "ArrowsLegendBI", "ArrowsLegendBI", "{8A3F2E1D-4B5C-6D7E-8F90-A1B2C3D4E5F6}"
 	ProjectSection(SolutionItems) = preProject
 		ArrowsLegendBI\README.md = ArrowsLegendBI\README.md
+		ArrowsLegendBI\HANDOFF.md = ArrowsLegendBI\HANDOFF.md
 		ArrowsLegendBI\package.json = ArrowsLegendBI\package.json
 		ArrowsLegendBI\server\main.py = ArrowsLegendBI\server\main.py
 		analytics\config.json = analytics\config.json

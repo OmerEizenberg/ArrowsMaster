@@ -23625,6 +23625,8 @@ MonoBehaviour:
   m_StreakRecordContainer: {fileID: 1100867710}
   m_ArrowsLeftText: {fileID: 22111134}
   m_ArrowsLeftHolder: {fileID: 195886122}
+  m_ComboFeedbackPrefab: {fileID: 7912194092593699715, guid: 67c4834f9c4b44571bd7218f8062e37d, type: 3}
+  m_VoiceFeedbackPrefab: {fileID: 7912194092593699715, guid: 42e5795d7b80d4207a31ddf4d58ea362, type: 3}
   maxLives: 3
   p_isLevelProgression: 1
   currentChallengeYear: 0

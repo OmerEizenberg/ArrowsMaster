@@ -1,93 +1,139 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using Assets.Scripts.Core;
 
 public class VoiceVibeController : MonoBehaviour
 {
-    [SerializeField]
-    TextMeshProUGUI m_comboVibe;
+    private const string VoiceAnimationState = "ComboText";
+    private const int VoiceAnimationLayer = 0;
 
-    void OnEnable()
+    [SerializeField] private TextMeshProUGUI m_comboVibe;
+    [SerializeField] private Animator m_Animator;
+
+    private int m_cachedHash;
+
+    private void Awake()
     {
-       float rand = Random.Range(0f,4.0f);
-        if (rand<1.2f)
+        ResolveReferences();
+        m_cachedHash = Animator.StringToHash(VoiceAnimationState);
+    }
+
+    public void Show()
+    {
+        ResolveReferences();
+        if (m_comboVibe == null)
         {
-            SetGood();
+            return;
         }
-        else
-        {
-            if (rand<2.4f)
-            {
-                SetNice();
-            }
-            else
-            {
-                if (rand<3.3f)
-                {
-                    SetPerfect();
-                }
-                else
-                {
-                        if (rand<3.8f)
-                        {
-                            SetPerfect();
-                        }
-                        else
-                        {
-                                SetExcellent();
-                        }
-                }
-            }   
-        }
-    }
-    public void SetPerfect()
-    {
-        transform.localScale = new Vector3(1.2f,1.2f,1.2f);
-        m_comboVibe.text = "Perfect !";
-        SoundManager.Instance.PlayPerfect();
-    }
-    public void SetAmazing()
-    {
-        transform.localScale = new Vector3(1.45f,1.45f,1.45f);
 
-        m_comboVibe.text = "Amazing !";
-        SoundManager.Instance.PlayAmazing();
+        gameObject.SetActive(true);
+        m_comboVibe.gameObject.SetActive(true);
+
+        ApplyRandomVibe();
+        RestartAnimationFromBeginning();
     }
-    public void SetGood()
+
+    public void Hide()
     {
-        transform.localScale = new Vector3(1.3f,1.3f,1.3f);
-
-        SoundManager.Instance.PlayGood();
-        m_comboVibe.text = "Good !";
-    }
-    public void SetExcellent()
-    {
-        transform.localScale = new Vector3(1.7f,1.7f,1.7f);
-
-        m_comboVibe.text = "Excellent !";
-        SoundManager.Instance.PlayExcellent();
-    }
-    public void SetNice()
-    {
-        transform.localScale = new Vector3(1.3f,1.3f,1.3f);
-
-        m_comboVibe.text = "Nice !";
-        SoundManager.Instance.PlayNice();
-
+        gameObject.SetActive(false);
     }
 
     public void DestroyME()
     {
-        // OPTIMIZATION #6: Return to pool instead of destroying
-        if (Assets.Scripts.Core.GameManager.Instance != null)
+        Hide();
+    }
+
+    private void ResolveReferences()
+    {
+        if (m_Animator == null)
         {
-            Assets.Scripts.Core.GameManager.Instance.ReturnEffect(gameObject);
+            m_Animator = GetComponent<Animator>();
+        }
+
+        if (m_comboVibe == null)
+        {
+            m_comboVibe = GetComponentInChildren<TextMeshProUGUI>(true);
+        }
+    }
+
+    private void RestartAnimationFromBeginning()
+    {
+        if (m_Animator == null)
+        {
+            return;
+        }
+
+        m_Animator.Rebind();
+        m_Animator.Update(0f);
+        m_Animator.Play(m_cachedHash, VoiceAnimationLayer, 0f);
+        m_Animator.Update(0f);
+    }
+
+    private void ApplyRandomVibe()
+    {
+        float rand = Random.Range(0f, 4f);
+        if (rand < 1.2f)
+        {
+            SetGood();
+        }
+        else if (rand < 2.4f)
+        {
+            SetNice();
+        }
+        else if (rand < 3.3f)
+        {
+            SetPerfect();
+        }
+        else if (rand < 3.8f)
+        {
+            SetAmazing();
         }
         else
         {
-            Destroy(gameObject);
+            SetExcellent();
         }
+    }
+
+    private void PlayVoiceClip(System.Action playClip)
+    {
+        if (SoundManager.Instance != null)
+        {
+            playClip();
+        }
+    }
+
+    private void SetPerfect()
+    {
+        transform.localScale = new Vector3(1.2f, 1.2f, 1.2f);
+        m_comboVibe.text = "Perfect !";
+        PlayVoiceClip(() => SoundManager.Instance.PlayPerfect());
+    }
+
+    private void SetAmazing()
+    {
+        transform.localScale = new Vector3(1.45f, 1.45f, 1.45f);
+        m_comboVibe.text = "Amazing !";
+        PlayVoiceClip(() => SoundManager.Instance.PlayAmazing());
+    }
+
+    private void SetGood()
+    {
+        transform.localScale = new Vector3(1.3f, 1.3f, 1.3f);
+        m_comboVibe.text = "Good !";
+        PlayVoiceClip(() => SoundManager.Instance.PlayGood());
+    }
+
+    private void SetExcellent()
+    {
+        transform.localScale = new Vector3(1.7f, 1.7f, 1.7f);
+        m_comboVibe.text = "Excellent !";
+        PlayVoiceClip(() => SoundManager.Instance.PlayExcellent());
+    }
+
+    private void SetNice()
+    {
+        transform.localScale = new Vector3(1.3f, 1.3f, 1.3f);
+        m_comboVibe.text = "Nice !";
+        PlayVoiceClip(() => SoundManager.Instance.PlayNice());
     }
 }

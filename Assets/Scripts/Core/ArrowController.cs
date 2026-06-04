@@ -14,8 +14,6 @@ namespace Assets.Scripts.Core
         public Sprite HeadSprite;
         public Vector3 HeadScale = new Vector3(0.477f, 0.477f, 0.477f);
         public GameObject pointEffectPrefab;
-        [SerializeField] private GameObject m_ComboPrefab;
-        [SerializeField] private GameObject m_VoicePrefab;
         private List<GameObject> instantiatedEffects = new List<GameObject>();
         private Segment m_LastHeadSegment;
         private bool forceVisualsUpdate = true;
@@ -507,46 +505,13 @@ namespace Assets.Scripts.Core
                             {
                                 gameManager.IncrementStreak();
                                 SoundManager.Instance.PlayStreak(gameManager.p_StreakCount - 1);
-                                gameManager.ClearActiveCombos();
 
-                                // Instantiate Combo Feedback
-                                if (m_ComboPrefab != null)
+                                int displayStreak = gameManager.p_StreakCount - 1;
+                                gameManager.ShowComboFeedback(displayStreak, gameManager.p_StreakCount);
+
+                                if (displayStreak == 3 || displayStreak == 7 || displayStreak == 11)
                                 {
-                                    Transform uiParent = gameManager.m_GameUI.transform.parent;
-                                    // OPTIMIZATION #6: Use object pooling for effects
-                                    GameObject comboObj = GameManager.Instance.SpawnEffect(m_ComboPrefab, Vector3.zero, Quaternion.identity, uiParent);
-                                    RectTransform comboRect = comboObj.GetComponent<RectTransform>();
-                                    // 1. Setup Combo Position
-                                    if (comboRect != null)
-                                    {
-                                        Vector3 finalScreenPos = gameManager.GetValidComboPosition(false);
-                                        RectTransform parentRect = (RectTransform)uiParent;
-                                        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, finalScreenPos, Camera.main, out Vector2 localPos))
-                                        {
-                                            comboRect.anchoredPosition = localPos;
-                                        }
-                                        gameManager.RegisterCombo(comboRect);
-                                    }
-
-                                    if(gameManager.p_StreakCount-1 == 3 || gameManager.p_StreakCount-1 == 7 || gameManager.p_StreakCount-1 == 11)
-                                    {
-                                        GameObject voiceObj = GameManager.Instance.SpawnEffect(m_VoicePrefab, Vector3.zero, Quaternion.identity, uiParent);
-                                        GameManager.Instance.RegisterVoice(voiceObj);
-                                        RectTransform voiceRect = voiceObj.GetComponent<RectTransform>();
-                                        if (voiceRect != null)
-                                        {
-                                            voiceRect.anchoredPosition = Vector2.zero;
-                                            // Don't register voice indications in the combo list so they don't get cleared on the next click
-                                        }
-                                    }
-
-                                    ComboController comboCtrl = comboObj.GetComponent<ComboController>();
-                                    if (comboCtrl != null)
-                                    {
-                                        comboCtrl.UpdateUpComingComboNumber(gameManager.p_StreakCount-1);
-                                        comboCtrl.UpdateComboNumber();
-                                        comboCtrl.UpdateUpComingComboNumber(gameManager.p_StreakCount);
-                                    }
+                                    gameManager.ShowVoiceFeedback();
                                 }
                             }
                             else
