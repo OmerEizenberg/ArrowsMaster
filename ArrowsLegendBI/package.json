@@ -1,0 +1,18 @@
+{
+  "name": "arrows-legend-bi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Arrows Master BI dashboard (monorepo with Unity game)",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:web": "npm run dev --prefix web",
+    "dev:server": "server/.venv/bin/python -m uvicorn server.main:app --reload --host 127.0.0.1 --port 8000",
+    "build": "npm run build --prefix web",
+    "setup:server": "python3 -m venv server/.venv && server/.venv/bin/pip install -r server/requirements.txt",
+    "setup": "npm run setup:server && npm install --prefix web && npm install",
+    "check:bq": "server/.venv/bin/python scripts/check_bigquery.py"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -6,7 +6,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if ! command -v gcloud >/dev/null 2>&1; then
-  echo "Install Google Cloud CLI: https://cloud.google.com/sdk/docs/install"
+  echo "gcloud not found."
+  echo ""
+  echo "Install:  brew install --cask google-cloud-sdk"
+  echo "Or skip gcloud and use a service account for ArrowsLegendBI:"
+  echo "  cp ArrowsLegendBI/.env.example ArrowsLegendBI/.env"
+  echo "  # set GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json"
+  echo ""
+  echo "Docs: ArrowsLegendBI/README.md"
   exit 1
 fi
 
