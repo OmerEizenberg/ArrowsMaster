@@ -1928,8 +1928,20 @@ namespace Assets.Scripts.Core
             if (m_EffectPools[poolKey].Count > 0)
             {
                 obj = m_EffectPools[poolKey].Dequeue();
-                if (obj == null) return SpawnEffect(prefab, position, rotation, parent); // Handle destroyed objects
-                
+                if (obj == null) return SpawnEffect(prefab, position, rotation, parent);
+
+                if (poolKey == "LikeContainer" && obj.GetComponentInChildren<LikeBehaviour>(true) == null)
+                {
+                    Destroy(obj);
+                    return SpawnEffect(prefab, position, rotation, parent);
+                }
+
+                EffectPoolTag pooledTag = obj.GetComponent<EffectPoolTag>();
+                if (pooledTag != null)
+                {
+                    pooledTag.InPool = false;
+                }
+
                 obj.transform.SetParent(parent);
                 obj.transform.position = position;
                 obj.transform.rotation = rotation;
@@ -1951,6 +1963,12 @@ namespace Assets.Scripts.Core
             EffectPoolTag tag = obj.GetComponent<EffectPoolTag>();
             if (tag != null)
             {
+                if (tag.InPool)
+                {
+                    return;
+                }
+
+                tag.InPool = true;
                 obj.SetActive(false);
                 if (!m_EffectPools.ContainsKey(tag.PoolKey)) m_EffectPools[tag.PoolKey] = new Queue<GameObject>();
                 m_EffectPools[tag.PoolKey].Enqueue(obj);
@@ -1964,6 +1982,7 @@ namespace Assets.Scripts.Core
         private class EffectPoolTag : MonoBehaviour
         {
             public string PoolKey;
+            public bool InPool;
         }
         #endregion
 

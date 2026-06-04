@@ -526,14 +526,14 @@ namespace Assets.Scripts.Core
                         if (tempProbLike < 0.12f)
                         {
                             SoundManager.Instance.PlayLike();
-                            if (pointEffectPrefab != null)
+                            if (pointEffectPrefab != null && clickedSegment != null)
                             {
-                                foreach (var seg in segments)
-                                {
-                                    // OPTIMIZATION #6: Use object pooling for point effects
-                                    GameObject effect = GameManager.Instance.SpawnEffect(pointEffectPrefab, seg.transform.position, Quaternion.identity, null);
-                                    instantiatedEffects.Add(effect);
-                                }
+                                GameObject effect = GameManager.Instance.SpawnEffect(
+                                    pointEffectPrefab,
+                                    clickedSegment.CachedTransform.position,
+                                    Quaternion.identity,
+                                    null);
+                                instantiatedEffects.Add(effect);
                             }
                         }
                         // Instantiate prefabs at each arrow point

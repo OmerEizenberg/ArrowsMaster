@@ -22,6 +22,12 @@ namespace Assets.Scripts.GameUI
         private Coroutine m_PunchCoroutine;
         private Vector3 m_OriginalScale;
         private Vector2 m_FloatingDistance = new Vector2(0f, 0f);
+
+        private RectTransform m_FloatingParentRect;
+        private RectTransform m_CurrencyTextRect;
+        private Camera m_UICamera;
+        private CoinsRewardFloatingView m_FloatingView;
+
         private void Start()
         {
              m_FloatingDistance = new Vector2(-Screen.width/23f, Screen.height/20f);
@@ -30,6 +36,7 @@ namespace Assets.Scripts.GameUI
             {
                 m_OriginalScale = m_CurrencyText.transform.localScale;
                 m_CurrencyText.text = "0";
+                CacheUICanvasReferences();
             }
 
             if (GameManager.Instance != null)
@@ -38,6 +45,37 @@ namespace Assets.Scripts.GameUI
                 m_CurrentAmount = GameManager.Instance.CollectedLevelCurrency;
                 if (m_CurrencyText != null) m_CurrencyText.text = m_CurrentAmount.ToString("N0");
             }
+        }
+
+        private void CacheUICanvasReferences()
+        {
+            m_CurrencyTextRect = m_CurrencyText.rectTransform;
+            Transform floatingParent = m_CurrencyText.transform.parent;
+            m_FloatingParentRect = floatingParent as RectTransform;
+
+            Canvas canvas = m_CurrencyText.GetComponentInParent<Canvas>();
+            m_UICamera = null;
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                m_UICamera = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+            }
+        }
+
+        private void EnsureFloatingView()
+        {
+            if (m_FloatingView != null || m_FloatingTextPrefab == null || m_FloatingParentRect == null)
+            {
+                return;
+            }
+
+            GameObject floatingObj = Instantiate(m_FloatingTextPrefab, m_FloatingParentRect);
+            m_FloatingView = floatingObj.GetComponent<CoinsRewardFloatingView>();
+            if (m_FloatingView == null)
+            {
+                m_FloatingView = floatingObj.AddComponent<CoinsRewardFloatingView>();
+            }
+
+            floatingObj.SetActive(false);
         }
 
         private void OnEnable()
@@ -55,6 +93,12 @@ namespace Assets.Scripts.GameUI
             {
                 GameManager.Instance.OnLevelCurrencyChanged -= UpdateCurrencyDisplay;
             }
+
+            if (m_FloatingView != null)
+            {
+                Destroy(m_FloatingView.gameObject);
+                m_FloatingView = null;
+            }
         }
 
         private void UpdateCurrencyDisplay(int newAmount, Vector2 clickPos)
@@ -63,13 +107,11 @@ namespace Assets.Scripts.GameUI
             
             if (difference > 0)
             {
-                // Instantiate floating text
                 if (m_FloatingTextPrefab != null)
                 {
                     ShowFloatingText(difference, clickPos);
                 }
 
-                // Punch animation for main text
                 if (m_CurrencyText != null)
                 {
                     if (m_PunchCoroutine != null) StopCoroutine(m_PunchCoroutine);
@@ -83,90 +125,32 @@ namespace Assets.Scripts.GameUI
             {
                 m_CurrencyText.text = newAmount.ToString("N0");
             }
-            m_CurrentAmount = newAmount;
         }
 
         private void ShowFloatingText(int amount, Vector2 clickPos)
         {
-            if (m_CurrencyText == null) return;
-
-            // Instantiate the prefab
-            // Use m_CurrencyText.transform.parent so they are siblings and share the same coordinate space
-            GameObject floatingObj = Instantiate(m_FloatingTextPrefab, m_CurrencyText.transform.parent);
-            TextMeshProUGUI floatingText = floatingObj.GetComponent<TextMeshProUGUI>();
-            
-            if (floatingText != null)
+            if (m_CurrencyTextRect == null)
             {
-                floatingText.text = "+" + amount.ToString("N0");
-                
-                RectTransform rect = floatingObj.GetComponent<RectTransform>();
-                if (rect != null)
-                {
-                    if (clickPos != Vector2.zero)
-                    {
-                        RectTransform parentRect = rect.parent as RectTransform;
-                        Canvas canvas = rect.GetComponentInParent<Canvas>();
-                        
-                        // Use the correct camera for coordinate conversion
-                        Camera cam = null;
-                        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                        {
-                            cam = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
-                        }
-
-                        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, (clickPos+m_FloatingDistance), cam, out Vector2 localPos))
-                        {
-                            // Important: ensure anchors are center-middle so anchoredPosition matches the calculated localPos
-                            rect.anchorMin = new Vector2(0.5f, 0.5f);
-                            rect.anchorMax = new Vector2(0.5f, 0.5f);
-                            rect.pivot = new Vector2(0.5f, 0.5f);
-                            rect.anchoredPosition = localPos;
-                        }
-                    }
-                    else
-                    {
-                        // Randomize x position slightly
-                        float xOffset = Random.Range(m_SpawnOffsetRange.x, m_SpawnOffsetRange.y);
-                        
-                        // Position relative to the main currency text:
-                        // Start at CurrencyText's position + upward offset + random X
-                        Vector2 basePos = m_CurrencyText.rectTransform.anchoredPosition;
-                        
-                        // We can assume a standard vertical offset (e.g., 50 units above the center of the text)
-                        rect.anchoredPosition = basePos + new Vector2(xOffset, m_CurrencyText.rectTransform.rect.height + m_SpawnOffsetYRange); 
-                    }
-                }
-
-                StartCoroutine(AnimateFloatingText(floatingText, rect));
-            }
-            else
-            {
-                Destroy(floatingObj);
-            }
-        }
-
-        private System.Collections.IEnumerator AnimateFloatingText(TextMeshProUGUI textComp, RectTransform rectTransform)
-        {
-            float elapsed = 0f;
-            Color startColor = textComp.color;
-            Vector2 startPos = rectTransform.anchoredPosition;
-            Vector2 endPos = startPos + new Vector2(0, m_FloatDistance);
-
-            while (elapsed < m_FloatDuration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / m_FloatDuration;
-
-                // Move up
-                rectTransform.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
-
-                // Fade out (alpha from 1 to 0)
-                textComp.color = new Color(startColor.r, startColor.g, startColor.b, Mathf.Lerp(startColor.a, 0f, t));
-
-                yield return null;
+                CacheUICanvasReferences();
             }
 
-            Destroy(textComp.gameObject);
+            EnsureFloatingView();
+            if (m_FloatingView == null)
+            {
+                return;
+            }
+
+            m_FloatingView.Show(
+                amount,
+                clickPos,
+                m_FloatingParentRect,
+                m_CurrencyTextRect,
+                m_UICamera,
+                m_FloatingDistance,
+                m_SpawnOffsetRange,
+                m_SpawnOffsetYRange,
+                m_FloatDuration,
+                m_FloatDistance);
         }
 
         private System.Collections.IEnumerator AnimatePunch()
@@ -174,7 +158,6 @@ namespace Assets.Scripts.GameUI
             float elapsed = 0f;
             Vector3 targetScale = m_OriginalScale * m_TextPunchScale;
 
-            // Scale up
             while (elapsed < m_PunchDuration / 2)
             {
                 elapsed += Time.deltaTime;
@@ -183,7 +166,6 @@ namespace Assets.Scripts.GameUI
                 yield return null;
             }
 
-            // Scale down
             elapsed = 0f;
             while (elapsed < m_PunchDuration / 2)
             {
