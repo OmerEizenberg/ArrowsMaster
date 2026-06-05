@@ -16,6 +16,7 @@ namespace Assets.Scripts.Core
         public GameObject pointEffectPrefab;
         private List<GameObject> instantiatedEffects = new List<GameObject>();
         private Segment m_LastHeadSegment;
+        private Vector2Int m_LastAppliedVisualDirection = Vector2Int.zero;
         private bool forceVisualsUpdate = true;
         
         // Grid Step size (Standard 1 unit)
@@ -110,6 +111,7 @@ namespace Assets.Scripts.Core
         {
             isInPool = false;
             m_LastHeadSegment = null;
+            m_LastAppliedVisualDirection = Vector2Int.zero;
             forceVisualsUpdate = true;
             forceLineUpdate = true;
             highlightCoroutine = null;
@@ -283,22 +285,25 @@ namespace Assets.Scripts.Core
                 GridManager.Instance.RegisterOccupancy(pos, this);
             }
 
-            // Update visual direction based on the current head movement
-            if (step > 0 && step < cachedData.path.Count)
-            {
-                m_CurrentVisualDirection = cachedData.path[step].ToVector2Int() - cachedData.path[step - 1].ToVector2Int();
-            }
-            else
-            {
-                m_CurrentVisualDirection = m_LookDirection;
-            }
-
+            m_CurrentVisualDirection = GetGrowthStepDirection(step);
+            forceVisualsUpdate = true;
             forceLineUpdate = true;
             if (!instant)
             {
                 // If not instant, we rely on the caller to start the animation coroutine
                 // with the calculated targets. But for better API, we'll keep the IEnumerator wrapper.
             }
+        }
+
+        private Vector2Int GetGrowthStepDirection(int step)
+        {
+            if (cachedData == null || cachedData.path == null || cachedData.path.Count < 2)
+                return m_LookDirection;
+
+            int fromIndex = step > 0 ? step - 1 : 0;
+            int toIndex = step > 0 ? step : 1;
+            Vector2Int delta = cachedData.path[toIndex].ToVector2Int() - cachedData.path[fromIndex].ToVector2Int();
+            return delta != Vector2Int.zero ? delta : m_LookDirection;
         }
 
         public IEnumerator UpdateGrowthSlide(int step, float duration)
@@ -1086,9 +1091,10 @@ namespace Assets.Scripts.Core
             
             Segment headSegment = segments[count - 1];
             
-            // Optimization: If the head segment is the same and visuals aren't forced, skip updates
-            if (m_LastHeadSegment == headSegment && !forceVisualsUpdate) return;
+            bool directionChanged = m_CurrentVisualDirection != m_LastAppliedVisualDirection;
+            if (m_LastHeadSegment == headSegment && !forceVisualsUpdate && !directionChanged) return;
             m_LastHeadSegment = headSegment;
+            m_LastAppliedVisualDirection = m_CurrentVisualDirection;
             forceVisualsUpdate = false;
             
             for (int i = 0; i < count; i++)
