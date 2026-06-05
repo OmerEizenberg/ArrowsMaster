@@ -27,6 +27,7 @@ namespace Assets.Scripts.Core
         private static readonly List<(float dist, ArrowController arrow, Segment segment)> s_RatioCandidates =
             new List<(float, ArrowController, Segment)>(16);
         private static readonly HashSet<ArrowController> s_RatioUniqueArrows = new HashSet<ArrowController>();
+        private static readonly HashSet<ArrowController> s_CandidateArrows = new HashSet<ArrowController>();
 
         private void Awake()
         {
@@ -118,13 +119,13 @@ namespace Assets.Scripts.Core
                 // 3. Same segment hit at start and end
                 if (dist < m_MoveThreshold && !wasMultiTouch)
                 {
-                    // Spawn click effect if assigned
-                    if (clickEffectPrefab != null)
+                    if (clickEffectPrefab != null && GameManager.Instance != null)
                     {
                         Vector3 worldPos = m_Camera.ScreenToWorldPoint(endTouchPos);
-                        worldPos.z = 0; // Ensure it spawns at z=0 (standard 2D plane)
-                        GameObject temp = Instantiate(clickEffectPrefab, worldPos, Quaternion.identity, clickEffectParent);
-                        temp.transform.localScale = Vector3.one;
+                        worldPos.z = 0f;
+                        GameObject temp = GameManager.Instance.SpawnEffect(
+                            clickEffectPrefab, worldPos, Quaternion.identity, clickEffectParent);
+                        if (temp != null) temp.transform.localScale = Vector3.one;
                     }
 
                     Segment upSegment = GetHitSegment();
@@ -162,14 +163,16 @@ namespace Assets.Scripts.Core
         private Segment GetHitSegment()
         {
             if (IsScreenPositionBlocked(Input.mousePosition)) return null;
+            if (GridManager.Instance == null) return null;
 
-            Vector2 worldPoint = m_Camera.ScreenToWorldPoint(Input.mousePosition);
-            RaycastHit2D hit = Physics2D.Raycast(worldPoint, Vector2.zero);
+            Vector3 worldPoint = m_Camera.ScreenToWorldPoint(Input.mousePosition);
+            worldPoint.z = 0f;
 
-            if (hit.collider != null)
+            if (GridTapUtility.TryGetSegmentAtWorldPosition(worldPoint, out Segment segment, out _))
             {
-                return hit.collider.GetComponent<Segment>();
+                return segment;
             }
+
             return null;
         }
 
@@ -205,10 +208,10 @@ namespace Assets.Scripts.Core
                         // Find closest segment within this arrow
                         float minSqrDist = float.MaxValue;
                         Segment bestSeg = null;
-                        foreach (var seg in occupant.segments)
+                        bestSeg = GridTapUtility.GetClosestSegmentOnArrow(occupant, worldEndPos);
+                        if (bestSeg != null)
                         {
-                            float d = Vector3.SqrMagnitude(worldEndPos - seg.transform.position);
-                            if (d < minSqrDist) { minSqrDist = d; bestSeg = seg; }
+                            minSqrDist = Vector3.SqrMagnitude(worldEndPos - bestSeg.CachedTransform.position);
                         }
 
                         if (minSqrDist <= sqrSearchRadius)
@@ -293,48 +296,44 @@ namespace Assets.Scripts.Core
             int centerGridX = Mathf.RoundToInt(worldClickPos.x);
             int centerGridY = Mathf.RoundToInt(worldClickPos.y);
 
-            HashSet<ArrowController> candidateArrows = new HashSet<ArrowController>();
-            // Search radius of 3 covers the maximum 2.5 unit threshold rule
+            s_CandidateArrows.Clear();
             for (int x = centerGridX - 3; x <= centerGridX + 3; x++)
             {
                 for (int y = centerGridY - 3; y <= centerGridY + 3; y++)
                 {
                     ArrowController occupant = GridManager.Instance.GetOccupant(new Vector2Int(x, y));
-                    if (occupant != null) candidateArrows.Add(occupant);
+                    if (occupant != null) s_CandidateArrows.Add(occupant);
                 }
             }
 
-            foreach (var arrow in candidateArrows)
+            foreach (ArrowController arrow in s_CandidateArrows)
             {
                 if (arrow == null || arrow.segments == null) continue;
                 bool canMove = arrow.CanMoveForward();
 
-                foreach (var segment in arrow.segments)
+                Segment segment = GridTapUtility.GetClosestSegmentOnArrow(arrow, worldClickPos);
+                if (segment == null) continue;
+
+                float sqrDist = Vector3.SqrMagnitude(worldClickPos - segment.CachedTransform.position);
+
+                bool isEligibleDirect = (canMove && sqrDist < sqrThreshold) || (!canMove && sqrDist < sqrWrongThreshold);
+                if (isEligibleDirect && sqrDist < minSqrDistDirect)
                 {
-                    if (segment == null) continue;
-                    float sqrDist = Vector3.SqrMagnitude(worldClickPos - segment.transform.position);
-                    
-                    // --- Direct Rules (2 & 3) ---
-                    bool isEligibleDirect = (canMove && sqrDist < sqrThreshold) || (!canMove && sqrDist < sqrWrongThreshold);
-                    if (isEligibleDirect && sqrDist < minSqrDistDirect)
-                    {
-                        minSqrDistDirect = sqrDist;
-                        directSelectionArrow = arrow;
-                        directSelectionSegment = segment;
-                    }
+                    minSqrDistDirect = sqrDist;
+                    directSelectionArrow = arrow;
+                    directSelectionSegment = segment;
+                }
 
-                    // --- Fallback Rule (4) ---
-                    if (sqrDist < sqrAnyArrowThreshold)
-                    {
-                        anyArrowInRange25 = true;
-                        if (!canMove) blockedArrowInRange25 = true;
+                if (sqrDist < sqrAnyArrowThreshold)
+                {
+                    anyArrowInRange25 = true;
+                    if (!canMove) blockedArrowInRange25 = true;
 
-                        if (sqrDist < minSqrDistFallback)
-                        {
-                            minSqrDistFallback = sqrDist;
-                            fallbackSelectionArrow = arrow;
-                            fallbackSelectionSegment = segment;
-                        }
+                    if (sqrDist < minSqrDistFallback)
+                    {
+                        minSqrDistFallback = sqrDist;
+                        fallbackSelectionArrow = arrow;
+                        fallbackSelectionSegment = segment;
                     }
                 }
             }
@@ -349,7 +348,6 @@ namespace Assets.Scripts.Core
             // Priority 2: Rule 4 (If no blocked arrows within 2.5f, select the closest arrow in that radius)
             if (anyArrowInRange25 && !blockedArrowInRange25 && fallbackSelectionArrow != null)
             {
-                Debug.Log(">>>>allCanMove (Rule 4 Triggered)");
                 closestSegment = fallbackSelectionSegment;
                 return fallbackSelectionArrow;
             }

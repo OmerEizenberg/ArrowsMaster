@@ -13,8 +13,17 @@ namespace Assets.Scripts.Core
         public Color m_CircleColor;
 
         private List<ArrowController> arrows = new List<ArrowController>();
-        private List<GameObject> currentLevelObjects = new List<GameObject>();
-        private List<SpriteRenderer> m_BackgroundCircles = new List<SpriteRenderer>();
+        private BackgroundCirclesMesh m_CirclesMesh;
+        private readonly List<Vector3> m_CirclePositionBuffer = new List<Vector3>(512);
+        private readonly List<CirclePopAnimation> m_ActivePopAnimations = new List<CirclePopAnimation>(128);
+
+        private struct CirclePopAnimation
+        {
+            public int Index;
+            public float Elapsed;
+            public float StartScale;
+            public Color PopColor;
+        }
         public event System.Action OnEntranceAnimationFinished;
         public event System.Action OnEntranceAnimationStarted;
         public string CurrentLevelId => currentLevelId;
@@ -201,19 +210,14 @@ namespace Assets.Scripts.Core
 
             if (ArrowPoolManager.Instance != null)
             {
-                ArrowPoolManager.Instance.PurgeAndReplenishArrows();
+                ArrowPoolManager.Instance.PurgeToBaseline();
             }
 
-            foreach (GameObject obj in currentLevelObjects)
+            if (m_CirclesMesh != null)
             {
-                if (obj != null)
-                {
-                    Destroy(obj);
-                }
+                m_CirclesMesh.Clear();
             }
-            currentLevelObjects.Clear();
-            m_BackgroundCircles.Clear();
-            m_BackgroundCircleInfos.Clear();
+            m_ActivePopAnimations.Clear();
             m_SpawnedCirclePositions.Clear();
             GridManager.Instance.InitializeGrid(Vector2Int.zero); // Reset with zero or just clear map
         }
@@ -266,6 +270,24 @@ namespace Assets.Scripts.Core
                 pickedArrowSet = new HashSet<int>(pickedArrows);
             }
 
+            int levelArrowCount = 0;
+            int levelPathPoints = 0;
+            if (data.arrows != null)
+            {
+                foreach (ArrowData arrowData in data.arrows)
+                {
+                    if (pickedArrowSet != null && pickedArrowSet.Contains(arrowData.id)) continue;
+
+                    levelArrowCount++;
+                    if (arrowData.path != null) levelPathPoints += arrowData.path.Count;
+                }
+            }
+
+            if (ArrowPoolManager.Instance != null)
+            {
+                ArrowPoolManager.Instance.EnsureCapacityForLevel(levelArrowCount, levelPathPoints);
+            }
+
             arrows = new List<ArrowController>();
             foreach (ArrowData arrowData in data.arrows)
             {
@@ -295,17 +317,39 @@ namespace Assets.Scripts.Core
             }
         }
 
-        private struct BackgroundCircleInfo
+        private BackgroundCirclesMesh CirclesMesh
         {
-            public SpriteRenderer renderer;
-            public Transform transform;
-            public float distanceFromCenter;
+            get
+            {
+                if (m_CirclesMesh == null)
+                {
+                    Transform child = transform.Find("BackgroundCirclesMesh");
+                    if (child == null)
+                    {
+                        GameObject go = new GameObject("BackgroundCirclesMesh");
+                        go.transform.SetParent(transform, false);
+                        m_CirclesMesh = go.AddComponent<BackgroundCirclesMesh>();
+                    }
+                    else
+                    {
+                        m_CirclesMesh = child.GetComponent<BackgroundCirclesMesh>();
+                        if (m_CirclesMesh == null)
+                        {
+                            m_CirclesMesh = child.gameObject.AddComponent<BackgroundCirclesMesh>();
+                        }
+                    }
+                }
+                return m_CirclesMesh;
+            }
         }
-        private List<BackgroundCircleInfo> m_BackgroundCircleInfos = new List<BackgroundCircleInfo>();
+
+        private bool HasBackgroundCircles => m_CirclesMesh != null && m_CirclesMesh.Count > 0;
 
         private System.Collections.IEnumerator CoordinatedLevelInitialization(List<ArrowController> arrows, LevelData data)
         {
+#if UNITY_EDITOR
             Debug.Log($"[DIAGNOSTIC] CoordinatedLevelInitialization started. Arrows: {arrows.Count}");
+#endif
             // 1. Calculate Bounding Box of all arrows for Camera Focus
             Vector3 levelCenter = Vector3.zero;
             if (data.arrows != null && data.arrows.Count > 0)
@@ -332,9 +376,7 @@ namespace Assets.Scripts.Core
             // 1. Set camera to zoomed in position (half max zoom)
             if (CameraController.Instance != null)
             {
-                Debug.Log("[DIAGNOSTIC] Playing Camera Zoom Animation...");
                 yield return StartCoroutine(CameraController.Instance.PlayInitializationZoomAnimation(data.gridSize.ToVector2Int(), levelCenter));
-                Debug.Log("[DIAGNOSTIC] Camera Zoom Animation finished.");
             }
             else
             {
@@ -368,25 +410,36 @@ namespace Assets.Scripts.Core
                 zoomCoroutine = StartCoroutine(CameraController.Instance.AnimateToDefaultZoom(levelCenter, growthDuration));
             }
 
-            Debug.Log($"[DIAGNOSTIC] Starting Arrow Growth Animation. maxArrowDuration: {maxArrowDuration}");
-            foreach (var arrow in arrows)
+            if (DevicePerformanceProfile.UseInstantEntrance)
             {
-                if (arrow.PathCount > 0)
+                foreach (var arrow in arrows)
                 {
-                    float arrowDuration = arrow.PathCount * kEntranceCellDuration;
-                    StartCoroutine(arrow.PlayEntranceGrowth(arrowDuration));
+                    if (arrow != null && arrow.PathCount > 0)
+                    {
+                        arrow.SpawnEntranceInstant();
+                    }
                 }
+                yield return null;
             }
+            else
+            {
+                foreach (var arrow in arrows)
+                {
+                    if (arrow.PathCount > 0)
+                    {
+                        float arrowDuration = arrow.PathCount * kEntranceCellDuration;
+                        StartCoroutine(arrow.PlayEntranceGrowth(arrowDuration));
+                    }
+                }
 
-            if (growthDuration > 0f) yield return new WaitForSeconds(growthDuration);
+                if (growthDuration > 0f) yield return new WaitForSeconds(growthDuration);
+            }
 
             // 3. Ensure camera finishing zoom before spawning background circles
             if (zoomCoroutine != null) yield return zoomCoroutine;
-            Debug.Log("[DIAGNOSTIC] Arrow Growth Animation finished.");
 
-            // 4. Spawn Background Circles AFTER animation
-            m_BackgroundCircleInfos.Clear();
-            int spawnCount = 0;
+            // 4. Build background circles mesh AFTER animation (single draw call)
+            m_CirclePositionBuffer.Clear();
             foreach (var arrowData in data.arrows)
             {
                 foreach (var pathPoint in arrowData.path)
@@ -394,35 +447,20 @@ namespace Assets.Scripts.Core
                     Vector2Int pos = pathPoint.ToVector2Int();
                     if (!m_SpawnedCirclePositions.Contains(pos))
                     {
-                        GameObject circleObj = new GameObject($"Circle_{pos.x}_{pos.y}");
-                        circleObj.transform.position = new Vector3(pos.x * ArrowController.CellSize, pos.y * ArrowController.CellSize, 0);
-                        circleObj.transform.SetParent(this.transform);
-
-                        SpriteRenderer sr = circleObj.AddComponent<SpriteRenderer>();
-                        sr.sprite = m_CircleSprite;
-                        sr.color = m_CircleColor;
-                        sr.sortingOrder = -1; 
-
-                        m_BackgroundCircleInfos.Add(new BackgroundCircleInfo {
-                            renderer = sr,
-                            transform = circleObj.transform,
-                            distanceFromCenter = Vector3.Distance(circleObj.transform.position, m_LevelCenter)
-                        });
-                        
+                        m_CirclePositionBuffer.Add(new Vector3(pos.x * ArrowController.CellSize, pos.y * ArrowController.CellSize, 0f));
                         m_SpawnedCirclePositions.Add(pos);
-                        currentLevelObjects.Add(circleObj);
-
-                        spawnCount++;
-                        // OPTIMIZED: Yield every 12 circles instead of 50 for smoother initialization
-                        if (spawnCount % 12 == 0) yield return null;
                     }
                 }
             }
-            Debug.Log($"[DIAGNOSTIC] Spawned {spawnCount} background circles. Rebuilding Dependency Tree...");
+
+            if (m_CircleSprite != null && m_CirclePositionBuffer.Count > 0)
+            {
+                CirclesMesh.BuildFromPositions(m_CircleSprite, m_CircleColor, m_CirclePositionBuffer, m_LevelCenter, -1);
+            }
+            yield return null;
 
             // 5. Build Dependency Tree for O(1) performance
             yield return StartCoroutine(GridManager.Instance.RebuildDependencyTreeAsync());
-            Debug.Log("[DIAGNOSTIC] Dependency Tree rebuilt. Entrance Sequence COMPLETE.");
 
             OnEntranceAnimationFinished?.Invoke();
         }
@@ -462,15 +500,17 @@ namespace Assets.Scripts.Core
 
             int levelNum = ExtractNumber(currentLevelId);
             int animIndex;
-            
-            if (levelNum > 0 && levelNum < 20)
+
+            if (DevicePerformanceProfile.UseSimplifiedWinEffects)
             {
-                // Under level 20: pick only ripple (0) or popcorn (4)
+                animIndex = Random.Range(0, 2); // ripple or explosion only
+            }
+            else if (levelNum > 0 && levelNum < 20)
+            {
                 animIndex = Random.Range(0, 2) == 0 ? 0 : 4;
             }
             else
             {
-                // 20 and forward: randomly select from all 5 options
                 animIndex = Random.Range(0, 5);
             }
 
@@ -496,22 +536,32 @@ namespace Assets.Scripts.Core
             {
                 elapsed += Time.deltaTime;
                 m_WinCirclesAlpha = Mathf.Lerp(1.0f, 0f, elapsed / duration);
+                if (HasBackgroundCircles)
+                {
+                    m_CirclesMesh.ApplyFinishState(m_CircleColor, m_WinCirclesAlpha, 2.0f);
+                }
                 yield return null;
             }
             m_WinCirclesAlpha = 0f;
+            if (HasBackgroundCircles)
+            {
+                m_CirclesMesh.ApplyFinishState(m_CircleColor, m_WinCirclesAlpha, 2.0f);
+            }
         }
 
         private System.Collections.IEnumerator DoRippleEffect()
         {
-            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+            if (!HasBackgroundCircles) yield break;
 
             Color targetColor = new Color(0.373f, 0.153f, 0.804f); // #5f27cd
             float rippleSpeed = 24.0f; // 2x Faster
             float maxDist = 0;
-            
-            foreach(var info in m_BackgroundCircleInfos)
+            int circleCount = m_CirclesMesh.Count;
+
+            for (int i = 0; i < circleCount; i++)
             {
-                if (info.distanceFromCenter > maxDist) maxDist = info.distanceFromCenter;
+                float dist = m_CirclesMesh.GetDistanceFromCenter(i);
+                if (dist > maxDist) maxDist = dist;
             }
 
             // 1. Initial Growth
@@ -522,16 +572,14 @@ namespace Assets.Scripts.Core
                 gElapsed += Time.deltaTime;
                 float t = gElapsed / startGrowthDuration;
                 float currentScale = Mathf.Lerp(1.0f, 1.5f, t);
-                foreach (var info in m_BackgroundCircleInfos)
-                {
-                    if (info.transform != null) info.transform.localScale = Vector3.one * currentScale;
-                }
+                m_CirclesMesh.SetScaleAll(currentScale);
+                m_CirclesMesh.ApplyIfDirty();
                 yield return null;
             }
 
             for (int repeat = 0; repeat < 4; repeat++) // 2x Longer (4 repeats instead of 2)
             {
-                float duration = (maxDist / rippleSpeed) + 0.25f; 
+                float duration = (maxDist / rippleSpeed) + 0.25f;
                 float elapsed = 0;
 
                 while (elapsed < duration)
@@ -539,30 +587,28 @@ namespace Assets.Scripts.Core
                     elapsed += Time.deltaTime;
                     float waveFront = maxDist - (elapsed * rippleSpeed);
 
-                    foreach (var info in m_BackgroundCircleInfos)
+                    for (int i = 0; i < circleCount; i++)
                     {
-                        if (info.transform == null || info.renderer == null) continue;
-
-                        float dist = info.distanceFromCenter;
+                        float dist = m_CirclesMesh.GetDistanceFromCenter(i);
                         float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveFront) / 4.5f);
-                        
+
                         if (proximity > 0)
                         {
                             float baseScale = (dist < waveFront) ? 1.5f : 2.0f;
                             float peakScale = 2.5f;
                             float scale = Mathf.Lerp(baseScale, peakScale, proximity);
-
-                            info.transform.localScale = Vector3.one * scale;
-                            Color c = Color.Lerp(m_CircleColor, targetColor, proximity);
-                            info.renderer.color = c;
+                            m_CirclesMesh.SetScale(i, scale);
+                            m_CirclesMesh.SetColor(i, Color.Lerp(m_CircleColor, targetColor, proximity));
                         }
                         else
                         {
                             float finalScale = (dist < waveFront) ? 1.5f : 2.0f;
-                            info.transform.localScale = Vector3.one * finalScale;
-                            info.renderer.color = m_CircleColor;
+                            m_CirclesMesh.SetScale(i, finalScale);
+                            m_CirclesMesh.SetColor(i, m_CircleColor);
                         }
                     }
+
+                    m_CirclesMesh.ApplyIfDirty();
                     yield return null;
                 }
             }
@@ -574,33 +620,33 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator DoSpiralVortex()
         {
-            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+            if (!HasBackgroundCircles) yield break;
 
             Color targetColor = new Color(0.117f, 0.741f, 0.886f); // Cyan #1ecadb
             float duration = 3.6f; // 2x Longer
             float elapsed = 0;
+            int circleCount = m_CirclesMesh.Count;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
 
-                foreach (var info in m_BackgroundCircleInfos)
+                for (int i = 0; i < circleCount; i++)
                 {
-                    if (info.transform == null || info.renderer == null) continue;
-
-                    Vector3 pos = info.transform.position - m_LevelCenter;
+                    Vector3 pos = m_CirclesMesh.GetWorldPosition(i) - m_LevelCenter;
                     float angle = Mathf.Atan2(pos.y, pos.x) * Mathf.Rad2Deg;
-                    float dist = info.distanceFromCenter;
+                    float dist = m_CirclesMesh.GetDistanceFromCenter(i);
 
-                    // Wave based on time, distance and angle (2x faster pulse frequency)
                     float spiralFactor = Mathf.Sin(t * 16f - dist * 0.5f + angle * 0.05f);
                     float proximity = Mathf.Clamp01((spiralFactor + 1f) / 2f);
 
                     float scale = Mathf.Lerp(1.2f, 2.4f, proximity);
-                    info.transform.localScale = Vector3.one * scale;
-                    info.renderer.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                    m_CirclesMesh.SetScale(i, scale);
+                    m_CirclesMesh.SetColor(i, Color.Lerp(m_CircleColor, targetColor, proximity));
                 }
+
+                m_CirclesMesh.ApplyIfDirty();
                 yield return null;
             }
 
@@ -611,25 +657,26 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator DoDiagonalCascade()
         {
-            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+            if (!HasBackgroundCircles) yield break;
 
             Color targetColor = new Color(1f, 0.435f, 0.38f); // Coral #ff6f61
             float cascadeSpeed = 40.0f; // Additional 10% faster (approx 40.0f)
             float minVal = float.MaxValue, maxVal = float.MinValue;
+            int circleCount = m_CirclesMesh.Count;
 
-            foreach (var info in m_BackgroundCircleInfos)
+            for (int i = 0; i < circleCount; i++)
             {
-                float val = info.transform.position.x + info.transform.position.y;
+                Vector3 pos = m_CirclesMesh.GetWorldPosition(i);
+                float val = pos.x + pos.y;
                 if (val < minVal) minVal = val;
                 if (val > maxVal) maxVal = val;
             }
 
             float gap = 5.0f; // Gap between the 10 lines
             int lineCount = 10;
-            
-            for (int repeat = 0; repeat < 2; repeat++) 
+
+            for (int repeat = 0; repeat < 2; repeat++)
             {
-                // Duration needs to account for all 10 lines clearing the maxVal
                 float duration = (maxVal - minVal + (gap * (lineCount + 1))) / cascadeSpeed + 0.5f;
                 float elapsed = 0;
 
@@ -638,27 +685,27 @@ namespace Assets.Scripts.Core
                     elapsed += Time.deltaTime;
                     float waveFront = minVal + (elapsed * cascadeSpeed);
 
-                    foreach (var info in m_BackgroundCircleInfos)
+                    for (int i = 0; i < circleCount; i++)
                     {
-                        if (info.transform == null || info.renderer == null) continue;
+                        Vector3 pos = m_CirclesMesh.GetWorldPosition(i);
+                        float val = pos.x + pos.y;
 
-                        float val = info.transform.position.x + info.transform.position.y;
-                        
-                        // Calculate proximity to 10 different wave fronts
                         float proximity = 0;
-                        for (int i = 0; i < lineCount; i++)
+                        for (int line = 0; line < lineCount; line++)
                         {
-                            float p = Mathf.Clamp01(1.0f - Mathf.Abs(val - (waveFront - i * gap)) / 3.5f);
+                            float p = Mathf.Clamp01(1.0f - Mathf.Abs(val - (waveFront - line * gap)) / 3.5f);
                             if (p > proximity) proximity = p;
                         }
 
                         if (proximity > 0)
                         {
                             float scale = Mathf.Lerp(1.2f, 2.5f, proximity);
-                            info.transform.localScale = Vector3.one * scale;
-                            info.renderer.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                            m_CirclesMesh.SetScale(i, scale);
+                            m_CirclesMesh.SetColor(i, Color.Lerp(m_CircleColor, targetColor, proximity));
                         }
                     }
+
+                    m_CirclesMesh.ApplyIfDirty();
                     yield return null;
                 }
             }
@@ -670,33 +717,33 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator DoExplosionEffect()
         {
-            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+            if (!HasBackgroundCircles) yield break;
 
             Color targetColor = new Color(1f, 0.843f, 0f); // Gold #ffd700
             float duration = 2.4f; // 2x Longer
             float elapsed = 0;
+            int circleCount = m_CirclesMesh.Count;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                // Double the waves and speed
-                float waveRadius = (t * 50.0f) % 30.0f; 
+                float waveRadius = (t * 50.0f) % 30.0f;
 
-                foreach (var info in m_BackgroundCircleInfos)
+                for (int i = 0; i < circleCount; i++)
                 {
-                    if (info.transform == null || info.renderer == null) continue;
-
-                    float dist = info.distanceFromCenter;
+                    float dist = m_CirclesMesh.GetDistanceFromCenter(i);
                     float proximity = Mathf.Clamp01(1.0f - Mathf.Abs(dist - waveRadius) / 6.0f);
 
                     if (proximity > 0)
                     {
                         float scale = Mathf.Lerp(1.5f, 3.5f, proximity);
-                        info.transform.localScale = Vector3.one * scale;
-                        info.renderer.color = Color.Lerp(m_CircleColor, targetColor, proximity);
+                        m_CirclesMesh.SetScale(i, scale);
+                        m_CirclesMesh.SetColor(i, Color.Lerp(m_CircleColor, targetColor, proximity));
                     }
                 }
+
+                m_CirclesMesh.ApplyIfDirty();
                 yield return null;
             }
 
@@ -707,16 +754,19 @@ namespace Assets.Scripts.Core
 
         private System.Collections.IEnumerator DoRandomPopcorn()
         {
-            if (m_BackgroundCircleInfos == null || m_BackgroundCircleInfos.Count == 0) yield break;
+            if (!HasBackgroundCircles) yield break;
 
-            Color targetColor = new Color(0.6f, 0.4f, 1f); // Purple-ish
-            float totalDuration = 8.0f; // 2x Longer (from 4s to 8s)
-            float elapsed = 0;
+            Color targetColor = new Color(0.6f, 0.4f, 1f);
+            float totalDuration = DevicePerformanceProfile.IsLowEnd ? 5.0f : 8.0f;
+            float elapsed = 0f;
+            float spawnTimer = 0f;
+            const float spawnInterval = 0.04f;
+            const float popDuration = 0.2f;
+            int circleCount = m_CirclesMesh.Count;
 
-            List<int> indices = new List<int>();
-            for (int i = 0; i < m_BackgroundCircleInfos.Count; i++) indices.Add(i);
-            
-            // Shuffle
+            List<int> indices = new List<int>(circleCount);
+            for (int i = 0; i < circleCount; i++) indices.Add(i);
+
             for (int i = 0; i < indices.Count; i++)
             {
                 int temp = indices[i];
@@ -726,67 +776,72 @@ namespace Assets.Scripts.Core
             }
 
             int count = 0;
-            // Adjust batch size to spread across the 8 seconds
-            int circlesPerBatch = Mathf.Max(1, m_BackgroundCircleInfos.Count / 100); 
+            int circlesPerBatch = Mathf.Max(1, circleCount / (DevicePerformanceProfile.IsLowEnd ? 150 : 100));
+            m_ActivePopAnimations.Clear();
 
-            while (elapsed < totalDuration)
+            while (elapsed < totalDuration || m_ActivePopAnimations.Count > 0)
             {
                 elapsed += Time.deltaTime;
-                
-                int toPop = Mathf.Min(circlesPerBatch, indices.Count - count);
-                for (int i = 0; i < toPop; i++)
-                {
-                    int idx = indices[count + i];
-                    StartCoroutine(PopSingleCircle(m_BackgroundCircleInfos[idx], targetColor));
-                }
-                count += toPop;
+                spawnTimer += Time.deltaTime;
 
-                if (count >= indices.Count) break;
-                yield return new WaitForSeconds(0.04f); // Slightly slower interval to spread the effect
+                if (spawnTimer >= spawnInterval && count < indices.Count && elapsed < totalDuration)
+                {
+                    spawnTimer = 0f;
+                    int toPop = Mathf.Min(circlesPerBatch, indices.Count - count);
+                    for (int i = 0; i < toPop; i++)
+                    {
+                        int idx = indices[count + i];
+                        m_ActivePopAnimations.Add(new CirclePopAnimation
+                        {
+                            Index = idx,
+                            Elapsed = 0f,
+                            StartScale = m_CirclesMesh.GetScale(idx),
+                            PopColor = targetColor
+                        });
+                    }
+                    count += toPop;
+                }
+
+                UpdateActivePopAnimations(popDuration);
+                m_CirclesMesh.ApplyIfDirty();
+                yield return null;
             }
 
-            yield return new WaitForSeconds(2.0f);
+            yield return new WaitForSeconds(DevicePerformanceProfile.IsLowEnd ? 0.5f : 2.0f);
             FinishAnimation();
             yield return new WaitForSeconds(0.5f);
             HideArrows();
         }
 
-        private IEnumerator PopSingleCircle(BackgroundCircleInfo info, Color popColor)
+        private void UpdateActivePopAnimations(float popDuration)
         {
-            if (info.transform == null || info.renderer == null) yield break;
+            if (!HasBackgroundCircles || m_ActivePopAnimations.Count == 0) return;
 
-            float duration = 0.2f; // 2x Faster
-            float elapsed = 0;
-            Vector3 startScale = info.transform.localScale;
-            Vector3 targetScale = Vector3.one * 2.8f;
-
-            while (elapsed < duration)
+            for (int i = m_ActivePopAnimations.Count - 1; i >= 0; i--)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                float curve = Mathf.Sin(t * Mathf.PI);
+                CirclePopAnimation pop = m_ActivePopAnimations[i];
+                pop.Elapsed += Time.deltaTime;
 
-                info.transform.localScale = Vector3.Lerp(startScale, targetScale, curve);
-                info.renderer.color = Color.Lerp(m_CircleColor, popColor, curve);
-                yield return null;
+                if (pop.Elapsed >= popDuration)
+                {
+                    m_CirclesMesh.SetScale(pop.Index, 2.0f);
+                    m_CirclesMesh.SetColor(pop.Index, m_CircleColor);
+                    m_ActivePopAnimations.RemoveAt(i);
+                    continue;
+                }
+
+                float t = pop.Elapsed / popDuration;
+                float curve = Mathf.Sin(t * Mathf.PI);
+                m_CirclesMesh.SetScale(pop.Index, Mathf.Lerp(pop.StartScale, 2.8f, curve));
+                m_CirclesMesh.SetColor(pop.Index, Color.Lerp(m_CircleColor, pop.PopColor, curve));
+                m_ActivePopAnimations[i] = pop;
             }
-            
-            if (info.transform != null) info.transform.localScale = Vector3.one * 2.0f;
-            if (info.renderer != null) info.renderer.color = m_CircleColor;
         }
 
         private void FinishAnimation()
         {
-            foreach (var info in m_BackgroundCircleInfos)
-            {
-                if (info.renderer != null && info.transform != null)
-                {
-                    info.transform.localScale = Vector3.one * 2.0f; 
-                    Color c = m_CircleColor;
-                    c.a = m_WinCirclesAlpha;
-                    info.renderer.color = c;
-                }
-            }
+            if (!HasBackgroundCircles) return;
+            m_CirclesMesh.ApplyFinishState(m_CircleColor, m_WinCirclesAlpha, 2.0f);
         }
     }
 }

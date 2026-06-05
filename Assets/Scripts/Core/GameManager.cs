@@ -1096,10 +1096,22 @@ namespace Assets.Scripts.Core
         }
 
 
+        private static int s_LevelsCompletedSinceAssetUnload;
+
         private System.Collections.IEnumerator WinSequence()
         {
             UserDataManager.Instance.ClearLevelProgress(); // Clear backup immediately on win
             if (m_PeriodicSaveCoroutine != null) { StopCoroutine(m_PeriodicSaveCoroutine); m_PeriodicSaveCoroutine = null; }
+
+            if (DevicePerformanceProfile.IsLowEnd)
+            {
+                s_LevelsCompletedSinceAssetUnload++;
+                if (s_LevelsCompletedSinceAssetUnload >= 8)
+                {
+                    s_LevelsCompletedSinceAssetUnload = 0;
+                    Resources.UnloadUnusedAssets();
+                }
+            }
             
             if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
@@ -1971,6 +1983,14 @@ namespace Assets.Scripts.Core
                 tag.InPool = true;
                 obj.SetActive(false);
                 if (!m_EffectPools.ContainsKey(tag.PoolKey)) m_EffectPools[tag.PoolKey] = new Queue<GameObject>();
+
+                int maxPerKey = DevicePerformanceProfile.MaxEffectPoolPerKey;
+                if (m_EffectPools[tag.PoolKey].Count >= maxPerKey)
+                {
+                    Destroy(obj);
+                    return;
+                }
+
                 m_EffectPools[tag.PoolKey].Enqueue(obj);
             }
             else
@@ -2138,7 +2158,9 @@ namespace Assets.Scripts.Core
             m_LastSaveTime = Time.time;
             m_SuccessSaveCounter = 0; // Reset counter whenever a real disk save occurs
             UserDataManager.Instance.SaveLevelProgress(progress);
+#if UNITY_EDITOR
             Debug.Log($"[GameManager] Progress saved for level {progress.levelId}. Picked arrows: {progress.pickedArrowIds.Count}, Time={currentTime}/{levelDuration}, Active={isTimerActive}");
+#endif
         }
 
         private void CheckAchievements(int completedLevel)

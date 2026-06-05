@@ -24,6 +24,9 @@ namespace Assets.Scripts.Core
                 poolDefaultColor = Renderer.color;
                 poolDefaultSortingOrder = Renderer.sortingOrder;
             }
+
+            // Gameplay uses grid tap detection — colliders are never needed at runtime.
+            SetColliderEnabled(false);
         }
 
         public void Initialize(Sprite sprite, Color color)
@@ -40,6 +43,7 @@ namespace Assets.Scripts.Core
             GridPosition = Vector2Int.zero;
             CachedTransform.localScale = Vector3.one;
             CachedTransform.rotation = Quaternion.identity;
+            SetColliderEnabled(false);
 
             if (Renderer == null) return;
 
@@ -47,6 +51,15 @@ namespace Assets.Scripts.Core
             Renderer.sprite = poolDefaultSprite;
             Renderer.color = poolDefaultColor;
             Renderer.sortingOrder = poolDefaultSortingOrder;
+        }
+
+        public void SetColliderEnabled(bool enabled)
+        {
+            BoxCollider2D col = GetComponent<BoxCollider2D>();
+            if (col != null)
+            {
+                col.enabled = enabled;
+            }
         }
 
     }

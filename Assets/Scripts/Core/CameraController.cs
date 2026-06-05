@@ -92,9 +92,8 @@ namespace Assets.Scripts.Core
             // Precalculate Y-offset factor: (0.5 - target) * 2
             m_ViewportYFactor = (0.5f - targetViewportCenterY) * 2f;
 
-            // Reinforce 2D Mobile quality (vSync off); allows targetFrameRate to take effect.
             QualitySettings.vSyncCount = 0;
-            Application.targetFrameRate = 120;
+            Application.targetFrameRate = DevicePerformanceProfile.TargetFrameRate;
         }
 
         private void OnEnable()

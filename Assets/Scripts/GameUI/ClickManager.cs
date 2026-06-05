@@ -1,12 +1,16 @@
-using System.Collections;
-using System.Collections.Generic;
+using Assets.Scripts.Core;
 using UnityEngine;
 
 public class ClickManager : MonoBehaviour
 {
-    // Update is called once per frame
     public void DestroyMe()
     {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.ReturnEffect(gameObject);
+            return;
+        }
+
         Destroy(gameObject);
     }
 }

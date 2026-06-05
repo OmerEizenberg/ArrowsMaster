@@ -76,6 +76,7 @@ namespace Assets.Scripts.Core
         // Pre-allocated buffers for blocked animation history (to avoid GC)
         private readonly List<Vector2Int[]> m_ForwardHistoryBuffer = new List<Vector2Int[]>();
         private static readonly Stack<Vector2Int[]> s_ArrayPool = new Stack<Vector2Int[]>();
+        private const int MaxPooledArrays = 48;
 
         private Vector2Int[] GetArrayFromPool(int size)
         {
@@ -89,6 +90,8 @@ namespace Assets.Scripts.Core
 
         private void ReturnArrayToPool(Vector2Int[] arr)
         {
+            if (arr == null) return;
+            if (s_ArrayPool.Count >= MaxPooledArrays) return;
             s_ArrayPool.Push(arr);
         }
 
@@ -270,10 +273,6 @@ namespace Assets.Scripts.Core
             
             segments.Insert(0, newSeg);
 
-            BoxCollider2D box = newSeg.GetComponent<BoxCollider2D>();
-            if (box == null) box = newSeg.gameObject.AddComponent<BoxCollider2D>();
-            box.size = new Vector2(1f, 1f);
-
             // 2. Determine target positions for all segments in this growth step
             _targetWorldPos.Clear();
             for (int i = 0; i < segments.Count; i++)
@@ -335,6 +334,40 @@ namespace Assets.Scripts.Core
             }
 
             FinalizeEntranceGrowth();
+        }
+
+        /// <summary>Skips smooth entrance on low-end devices — spawns the full arrow in one step.</summary>
+        public void SpawnEntranceInstant()
+        {
+            if (cachedData == null || cachedData.path == null || cachedData.path.Count == 0) return;
+
+            m_IsEntranceGrowing = false;
+            ReleaseGrowthHeadSegment();
+
+            while (segments.Count > 0)
+            {
+                Segment seg = segments[0];
+                segments.RemoveAt(0);
+                if (ArrowPoolManager.Instance != null)
+                {
+                    ArrowPoolManager.Instance.ReturnSegment(seg);
+                }
+                else if (seg != null)
+                {
+                    Destroy(seg.gameObject);
+                }
+            }
+
+            for (int i = 0; i < cachedData.path.Count; i++)
+            {
+                SpawnSegmentStep(i, true);
+            }
+
+            m_LastHeadSegment = null;
+            m_LastAppliedVisualDirection = Vector2Int.zero;
+            forceLineUpdate = true;
+            forceVisualsUpdate = true;
+            UpdateVisuals();
         }
 
         private void EnsureGrowthHeadSegment()
