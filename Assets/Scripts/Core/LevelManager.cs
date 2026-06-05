@@ -13,7 +13,7 @@ namespace Assets.Scripts.Core
         public Color m_CircleColor;
 
         [Header("Drawing Win Reveal")]
-        private const int WinEffectDrawing = 5;
+        private const int WinEffectScratchedDraw = 5;
         private const int DrawingWinEffectMinLevel = 7;
         // Matches GameManager post-win wait before popup / next-level choice.
         private const float PostWinPopupDelaySeconds = 2.5f;
@@ -580,7 +580,7 @@ namespace Assets.Scripts.Core
                     int pick = Random.Range(0, 3);
                     if (pick == 0) return 0;
                     if (pick == 1) return 1;
-                    return WinEffectDrawing;
+                    return WinEffectScratchedDraw;
                 }
 
                 return Random.Range(0, 2);
@@ -593,7 +593,7 @@ namespace Assets.Scripts.Core
                     int pick = Random.Range(0, 3);
                     if (pick == 0) return 0;
                     if (pick == 1) return 4;
-                    return WinEffectDrawing;
+                    return WinEffectScratchedDraw;
                 }
 
                 return Random.Range(0, 2) == 0 ? 0 : 4;
@@ -615,10 +615,10 @@ namespace Assets.Scripts.Core
                 case 2: yield return StartCoroutine(DoDiagonalCascade()); break;
                 case 3: yield return StartCoroutine(DoExplosionEffect()); break;
                 case 4: yield return StartCoroutine(DoRandomPopcorn()); break;
-                case WinEffectDrawing:
-                    bool usedDrawingReveal = false;
-                    yield return StartCoroutine(TryDoDrawingRevealEffect(success => usedDrawingReveal = success));
-                    if (usedDrawingReveal)
+                case WinEffectScratchedDraw:
+                    bool usedScratchedDraw = false;
+                    yield return StartCoroutine(TryDoDrawingRevealEffect(success => usedScratchedDraw = success));
+                    if (usedScratchedDraw)
                     {
                         fadeDelay = 3.0f;
                     }
@@ -641,11 +641,6 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
-            if (HasBackgroundCircles)
-            {
-                m_CirclesMesh.Clear();
-            }
-
             if (!DrawingRevealMesh.TryBuildFromDots(
                     m_SpawnedCirclePositions,
                     m_ArrowPathsForReveal,
@@ -656,6 +651,11 @@ namespace Assets.Scripts.Core
             {
                 onComplete(false);
                 yield break;
+            }
+
+            if (HasBackgroundCircles)
+            {
+                m_CirclesMesh.Clear();
             }
 
             float duration = PostWinPopupDelaySeconds
@@ -673,8 +673,8 @@ namespace Assets.Scripts.Core
                 baseBrushDots,
                 maxBrushDots);
             float brushRadius = brushDots * ArrowController.CellSize;
-            yield return DrawingRevealMesh.AnimateMarkerReveal(m_CircleColor, duration, brushRadius);
-            yield return new WaitForSeconds(0.25f);
+            yield return DrawingRevealMesh.AnimateReveal(m_CircleColor, duration, brushRadius);
+            yield return new WaitForSeconds(DrawingRevealPostPaintSeconds);
             HideArrows();
             onComplete(true);
         }

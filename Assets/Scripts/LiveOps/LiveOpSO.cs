@@ -15,6 +15,9 @@ namespace Assets.Scripts.LiveOps
         [Range(0, 23)]
         public int ActivationHour; // 0-23
         public int DurationHours;
+
+        [Header("Progression")]
+        public int ShowLevel;
         public int UnlockLevel;
         
         [Header("Visuals")]

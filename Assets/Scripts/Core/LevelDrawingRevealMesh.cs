@@ -6,7 +6,7 @@ namespace Assets.Scripts.Core
 {
     /// <summary>
     /// Win reveal inferred from dot layout: outline dots + enclosed interior fill.
-    /// Painted with soft circular brush stamps (not square tiles).
+    /// Painted with soft circular brush stamps (ScratchedDraw).
     /// </summary>
     public class LevelDrawingRevealMesh : MonoBehaviour
     {
@@ -135,19 +135,11 @@ namespace Assets.Scripts.Core
 
             if (included.Count < 8) return false;
 
-            var cellList = new List<RevealCell>(included.Count);
-            _minGridX = int.MaxValue;
-            _minGridY = int.MaxValue;
-            _maxGridX = int.MinValue;
-            _maxGridY = int.MinValue;
+            UpdateGridBounds(included);
 
+            var cellList = new List<RevealCell>(included.Count);
             foreach (Vector2Int gridPos in included)
             {
-                if (gridPos.x < _minGridX) _minGridX = gridPos.x;
-                if (gridPos.y < _minGridY) _minGridY = gridPos.y;
-                if (gridPos.x > _maxGridX) _maxGridX = gridPos.x;
-                if (gridPos.y > _maxGridY) _maxGridY = gridPos.y;
-
                 bool isOutline = dotSet.Contains(gridPos) || bridgeCells.Contains(gridPos);
                 cellList.Add(new RevealCell
                 {
@@ -164,13 +156,13 @@ namespace Assets.Scripts.Core
 
             EnsureComponents(sortingOrder);
             AllocateMeshBuffers(_cells.Length);
+            EnsureMarker();
 
             _faintDotColor = faintDotColor;
             _globalAlpha = 1f;
             _meshDirty = true;
             ApplyIfDirty(faintDotColor);
             _meshRenderer.enabled = true;
-            EnsureMarker();
             return true;
         }
 
@@ -182,9 +174,6 @@ namespace Assets.Scripts.Core
             ApplyIfDirty(_faintDotColor);
         }
 
-        /// <summary>
-        /// Scales brush radius from level size so the reveal can finish inside the post-win window.
-        /// </summary>
         public float ComputeDynamicBrushRadiusInDots(
             float targetDurationSeconds,
             float cellSize,
@@ -210,11 +199,10 @@ namespace Assets.Scripts.Core
 
             float durationFactor = Mathf.Sqrt(referenceDurationSeconds / targetDurationSeconds);
 
-            float pathFactor = 1f;
             if (_pathTotalLength > 0f)
             {
                 float referencePathLength = referenceCellCount * cellSize * 1.15f;
-                pathFactor = Mathf.Sqrt(_pathTotalLength / referencePathLength);
+                float pathFactor = Mathf.Sqrt(_pathTotalLength / referencePathLength);
                 sizeFactor = Mathf.Max(sizeFactor, pathFactor * 0.85f);
             }
 
@@ -224,14 +212,14 @@ namespace Assets.Scripts.Core
 
         private float GetMaxGridSpanWorld(float cellSize)
         {
-            if (_cells == null || _cells.Length == 0) return 0f;
+            if (_maxGridX < _minGridX || _maxGridY < _minGridY) return 0f;
 
             float width = (_maxGridX - _minGridX + 1) * cellSize;
             float height = (_maxGridY - _minGridY + 1) * cellSize;
             return Mathf.Max(width, height);
         }
 
-        public IEnumerator AnimateMarkerReveal(Color faintDotColor, float duration, float brushRadius)
+        public IEnumerator AnimateReveal(Color faintDotColor, float duration, float brushRadius)
         {
             if (_cells == null || _cells.Length == 0 || _pathWaypoints == null || _pathWaypoints.Length == 0)
             {
@@ -244,6 +232,7 @@ namespace Assets.Scripts.Core
             {
                 _markerTransform.gameObject.SetActive(true);
                 _markerTransform.position = _pathWaypoints[0] + Vector3.forward * -0.05f;
+                UpdateBrushMarkerVisual(brushRadius);
             }
 
             float elapsed = 0f;
@@ -259,8 +248,6 @@ namespace Assets.Scripts.Core
                 {
                     _markerTransform.position = markerPos + Vector3.forward * -0.05f;
                 }
-
-                UpdateBrushMarkerVisual(brushRadius);
 
                 for (int i = 0; i < _cells.Length; i++)
                 {
@@ -334,7 +321,22 @@ namespace Assets.Scripts.Core
             _pathTotalLength = _pathCumulativeDist[_pathCumulativeDist.Length - 1];
         }
 
-        /// <summary>Diagonal zigzag from top-left (high y, low x) to bottom-right (low y, high x).</summary>
+        private void UpdateGridBounds(HashSet<Vector2Int> included)
+        {
+            _minGridX = int.MaxValue;
+            _minGridY = int.MaxValue;
+            _maxGridX = int.MinValue;
+            _maxGridY = int.MinValue;
+
+            foreach (Vector2Int gridPos in included)
+            {
+                if (gridPos.x < _minGridX) _minGridX = gridPos.x;
+                if (gridPos.y < _minGridY) _minGridY = gridPos.y;
+                if (gridPos.x > _maxGridX) _maxGridX = gridPos.x;
+                if (gridPos.y > _maxGridY) _maxGridY = gridPos.y;
+            }
+        }
+
         private static void SortDiagonalZigZag(List<RevealCell> cells)
         {
             if (cells.Count <= 1) return;
