@@ -156,16 +156,16 @@ namespace Assets.Scripts.Core
 
             _coinsExplosionPrefab = Resources.Load<GameObject>("CoinsSmallExplosion");
 
-            TermsConsentManager.OnConsentResolved += HandleTermsConsentResolved;
-            if (TermsConsentManager.HasUserDecided)
+            TermsConsentManager.OnSdkInitAllowed += HandleSdkInitAllowed;
+            if (TermsConsentManager.IsSdkInitAllowed && TermsConsentManager.HasAccepted)
                 _ = InitializeSDK();
             else
-                Debug.Log("[AdsManager] Waiting for terms consent before ads/ATT/UMP initialization.");
+                Debug.Log("[AdsManager] Waiting for terms (+ ATT on iOS) before ads initialization.");
 
             StartCoroutine(AdHealthCheckRoutine());
         }
 
-        private void HandleTermsConsentResolved()
+        private void HandleSdkInitAllowed()
         {
             if (!TermsConsentManager.HasAccepted)
             {
@@ -190,7 +190,7 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
-            TermsConsentManager.OnConsentResolved -= HandleTermsConsentResolved;
+            TermsConsentManager.OnSdkInitAllowed -= HandleSdkInitAllowed;
 
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
 
@@ -384,7 +384,7 @@ namespace Assets.Scripts.Core
 
         private async Task InitializeSDK()
         {
-            if (!TermsConsentManager.HasAccepted)
+            if (!TermsConsentManager.HasAccepted || !TermsConsentManager.IsSdkInitAllowed)
                 return;
 
             if (isInitialized || isInitializing) return;
@@ -394,27 +394,6 @@ namespace Assets.Scripts.Core
             {
                 await IAPManager.EnsureUnityServicesInitializedAsync();
                 Debug.Log("[AdsManager] Unity Services Initialized.");
-
-#if UNITY_IOS && !UNITY_EDITOR
-                if (!IOSAttributionBootstrap.IsAttResolved)
-                {
-                    bool attFinished = false;
-                    EnqueueAction(() =>
-                    {
-                        IOSAdsHelper.RequestATT();
-                        StartCoroutine(IOSAdsHelper.PollATTStatus(_ => attFinished = true));
-                    });
-                    float attWaitStart = Time.time;
-                    while (!attFinished && Time.time - attWaitStart < 30f)
-                        await Task.Yield();
-                    if (!attFinished)
-                        Debug.LogWarning("[AdsManager] ATT flow timed out. Proceeding with ads initialization.");
-                }
-                else
-                {
-                    Debug.Log("[AdsManager] ATT already resolved by IOSAttributionBootstrap.");
-                }
-#endif
 
                 bool consentFinished = false;
                 EnqueueAction(() =>
@@ -433,20 +412,30 @@ namespace Assets.Scripts.Core
                 if (!consentFinished)
                     Debug.LogWarning("[AdsManager] Consent flow timed out. Proceeding with SDK initialization anyway.");
 
-                // CCPA: false = user has NOT opted out of sale of personal info
-                MaxSdk.SetDoNotSell(false);
+                bool maxInitDispatched = false;
+                EnqueueAction(() =>
+                {
+                    ConsentManager.ApplyMaxPrivacyFlags();
 
-                Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
+                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
 
-                // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
-                MaxSdkBase.InvokeEventsOnUnityMainThread = true;
+                    // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
+                    MaxSdkBase.InvokeEventsOnUnityMainThread = true;
 
-                MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
-                MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+                    MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
+                    MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
 
-                MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
-                MaxSdk.SetSdkKey(MaxSdkKey);
-                MaxSdk.InitializeSdk();
+                    MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
+                    MaxSdk.SetSdkKey(MaxSdkKey);
+                    MaxSdk.InitializeSdk();
+                    maxInitDispatched = true;
+                });
+
+                float maxInitWaitStart = Time.time;
+                while (!maxInitDispatched && Time.time - maxInitWaitStart < 10f)
+                    await Task.Yield();
+                if (!maxInitDispatched)
+                    Debug.LogWarning("[AdsManager] Timed out waiting to dispatch MAX SDK initialization on main thread.");
             }
             catch (Exception e)
             {

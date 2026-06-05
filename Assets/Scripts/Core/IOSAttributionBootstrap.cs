@@ -3,15 +3,11 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Singular;
 
-#if UNITY_IOS
-using Unity.Advertisement.IosSupport;
-#endif
-
 namespace Assets.Scripts.Core
 {
     /// <summary>
-    /// Ensures ATT is resolved before Singular starts so IDFA/SKAN data reaches the MMP and ad networks.
-    /// SingularSDKObject must have InitializeOnAwake disabled so this bootstrap owns initialization.
+    /// Initializes Singular after the privacy gate passes (terms on all platforms;
+    /// terms + ATT on iOS). SingularSDKObject must have InitializeOnAwake disabled.
     /// </summary>
     [DefaultExecutionOrder(-10000)]
     public class IOSAttributionBootstrap : MonoBehaviour
@@ -19,8 +15,10 @@ namespace Assets.Scripts.Core
         public static bool IsAttResolved { get; private set; }
         public static bool IsAttAuthorized { get; private set; }
 
-        private const float AttWaitTimeoutSeconds = 60f;
         private const int SingularAttWaitIntervalSeconds = 60;
+        private const float SingularInstanceWaitTimeoutSeconds = 30f;
+
+        private bool _singularInitStarted;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Create()
@@ -47,31 +45,63 @@ namespace Assets.Scripts.Core
             // SingularSDK.Awake returns early in Editor and never registers an instance.
             return;
 #endif
-            StartCoroutine(WaitForTermsConsentThenBootstrap());
+            TermsConsentManager.OnSdkInitAllowed += HandleSdkInitAllowed;
+
+            if (TermsConsentManager.IsSdkInitAllowed && TermsConsentManager.HasAccepted)
+                StartCoroutine(InitializeSingularWhenReady());
         }
 
-        private IEnumerator WaitForTermsConsentThenBootstrap()
+        private void OnDestroy()
         {
-            while (!TermsConsentManager.HasUserDecided)
-                yield return null;
+            TermsConsentManager.OnSdkInitAllowed -= HandleSdkInitAllowed;
+        }
 
-            if (!TermsConsentManager.HasAccepted)
-            {
-                Debug.Log("[IOSAttributionBootstrap] Terms not accepted; skipping Singular/ATT bootstrap.");
-                yield break;
-            }
+        private void HandleSdkInitAllowed()
+        {
+            if (!TermsConsentManager.HasAccepted || _singularInitStarted)
+                return;
+
+            StartCoroutine(InitializeSingularWhenReady());
+        }
 
 #if UNITY_IOS && !UNITY_EDITOR
-            yield return BootstrapIOS();
-#else
-            yield return InitializeSingularAfterSceneLoad();
-#endif
-        }
-
-        private const float SingularInstanceWaitTimeoutSeconds = 30f;
-
-        private IEnumerator InitializeSingularAfterSceneLoad()
+        public static void SetAttResolved(bool authorized)
         {
+            if (IsAttResolved)
+                return;
+
+            IsAttAuthorized = authorized;
+            IsAttResolved = true;
+
+            if (authorized)
+                SingularSDK.TrackingOptIn();
+
+            Debug.Log($"[IOSAttributionBootstrap] ATT resolved: authorized={authorized}");
+        }
+#else
+        public static void SetAttResolved(bool authorized)
+        {
+            IsAttResolved = true;
+            IsAttAuthorized = authorized;
+        }
+#endif
+
+        private IEnumerator InitializeSingularWhenReady()
+        {
+            if (_singularInitStarted)
+                yield break;
+
+            _singularInitStarted = true;
+
+#if UNITY_IOS && !UNITY_EDITOR
+            if (!IsAttResolved)
+            {
+                Debug.LogError("[IOSAttributionBootstrap] SDK init allowed before ATT resolved on iOS.");
+                _singularInitStarted = false;
+                yield break;
+            }
+#endif
+
             yield return WaitForSingularInstance();
             TryInitializeSingular();
         }
@@ -94,42 +124,6 @@ namespace Assets.Scripts.Core
             Debug.LogError(
                 $"[IOSAttributionBootstrap] SingularSDKObject not found within {SingularInstanceWaitTimeoutSeconds}s.");
         }
-
-#if UNITY_IOS && !UNITY_EDITOR
-        private IEnumerator BootstrapIOS()
-        {
-            IOSAdsHelper.RequestATT();
-
-            float deadline = Time.realtimeSinceStartup + AttWaitTimeoutSeconds;
-            while (Time.realtimeSinceStartup < deadline)
-            {
-                var status = ATTrackingStatusBinding.GetAuthorizationTrackingStatus();
-                if (status != ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
-                {
-                    IsAttAuthorized = status == ATTrackingStatusBinding.AuthorizationTrackingStatus.AUTHORIZED;
-                    IsAttResolved = true;
-
-                    if (IsAttAuthorized)
-                        SingularSDK.TrackingOptIn();
-
-                    Debug.Log($"[IOSAttributionBootstrap] ATT resolved: authorized={IsAttAuthorized}");
-                    break;
-                }
-
-                yield return null;
-            }
-
-            if (!IsAttResolved)
-            {
-                IsAttResolved = true;
-                Debug.LogWarning("[IOSAttributionBootstrap] ATT timed out; initializing Singular without IDFA.");
-            }
-
-            yield return WaitForSingularInstance();
-
-            TryInitializeSingular();
-        }
-#endif
 
         private static void DisableSingularAutoInitOnAllInstances()
         {

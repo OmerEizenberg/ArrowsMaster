@@ -10,7 +10,7 @@
     <package>com.applovin.mediation:google-ad-manager-adapter:[25.3.0.0]</package>
     <package>com.applovin.mediation:unityads-adapter:4.18.0.0</package>
     <package>com.applovin.mediation:vungle-adapter:7.7.4.0</package>
-    <package>com.applovin:applovin-sdk:13.6.2</package>
+    <package>com.applovin:applovin-sdk:13.6.3</package>
     <package>com.google.android.gms:play-services-ads:25.2.0</package>
     <package>com.google.android.gms:play-services-ads-identifier:18.0.1</package>
     <package>com.google.android.gms:play-services-appset:16.0.0</package>

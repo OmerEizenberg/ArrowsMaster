@@ -5,7 +5,8 @@ namespace Assets.Scripts.Core
 {
     /// <summary>
     /// Persists whether the custom terms popup was shown and the user's decision.
-    /// Undecided state applies only until the first choice; later sessions skip the gate.
+    /// SDK initialization (Singular + ads) is gated separately: Android after terms,
+    /// iOS after terms and ATT.
     /// </summary>
     public static class TermsConsentManager
     {
@@ -20,13 +21,16 @@ namespace Assets.Scripts.Core
         private const string KeyPopupShown = "TermsConsentPopupShown";
         private const string LegacyTermsAgreedKey = "TermsAgreed";
 
-        public static event Action OnConsentResolved;
+        /// <summary>Fired once per session when Singular and ads are allowed to initialize.</summary>
+        public static event Action OnSdkInitAllowed;
 
         public static bool HasUserDecided => GetConsentState() != ConsentState.Undecided;
 
         public static bool HasAccepted => GetConsentState() == ConsentState.Accepted;
 
         public static bool WasPopupShown => PlayerPrefs.GetInt(KeyPopupShown, 0) == 1;
+
+        public static bool IsSdkInitAllowed { get; private set; }
 
         static TermsConsentManager()
         {
@@ -58,6 +62,19 @@ namespace Assets.Scripts.Core
             SetConsentState(ConsentState.Declined);
         }
 
+        /// <summary>
+        /// Unblocks Singular and ads. On iOS this must only be called after ATT is resolved.
+        /// </summary>
+        public static void NotifySdkInitAllowed()
+        {
+            if (IsSdkInitAllowed || !HasAccepted)
+                return;
+
+            IsSdkInitAllowed = true;
+            Debug.Log("[TermsConsentManager] SDK init allowed (terms accepted, ATT resolved on iOS).");
+            OnSdkInitAllowed?.Invoke();
+        }
+
         private static void SetConsentState(ConsentState state)
         {
             if (GetConsentState() == state)
@@ -66,9 +83,6 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(KeyConsentState, (int)state);
             PlayerPrefs.Save();
             Debug.Log($"[TermsConsentManager] Consent state set to {state}.");
-
-            if (state != ConsentState.Undecided)
-                OnConsentResolved?.Invoke();
         }
 
         private static void MigrateLegacyTermsAgreed()

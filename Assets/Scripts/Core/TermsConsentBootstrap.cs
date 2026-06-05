@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using Assets.Scripts.Lobby;
 
 namespace Assets.Scripts.Core
@@ -40,6 +41,8 @@ namespace Assets.Scripts.Core
             if (TermsConsentManager.HasUserDecided)
             {
                 Debug.Log($"[TermsConsentBootstrap] Consent already decided ({TermsConsentManager.GetConsentState()}).");
+                if (TermsConsentManager.HasAccepted)
+                    StartCoroutine(CompletePrivacyFlowForReturningUser());
                 return;
             }
 
@@ -54,6 +57,7 @@ namespace Assets.Scripts.Core
                 yield break;
 
             EnsureOverlayCanvas();
+            EnsureEventSystem();
             var prefab = Resources.Load<GameObject>("TermsAndConditionsPopup");
             if (prefab == null)
             {
@@ -76,7 +80,7 @@ namespace Assets.Scripts.Core
                 rect.offsetMax = Vector2.zero;
             }
 
-            var view = _popupInstance.GetComponent<TermsAndConditionsPopup>();
+            var view = _popupInstance.GetComponentInChildren<TermsAndConditionsPopup>(true);
             if (view == null)
             {
                 Debug.LogError("[TermsConsentBootstrap] TermsAndConditionsPopup component missing on prefab.");
@@ -91,13 +95,37 @@ namespace Assets.Scripts.Core
         {
             if (_popupInstance != null)
             {
-                var view = _popupInstance.GetComponent<TermsAndConditionsPopup>();
+                var view = _popupInstance.GetComponentInChildren<TermsAndConditionsPopup>(true);
                 if (view != null)
                     view.OnAgreed -= HandleConsentAccepted;
                 _popupInstance = null;
             }
 
-            TermsConsentManager.RecordAccepted();
+            StartCoroutine(CompletePrivacyFlowAfterTerms());
+        }
+
+        private static IEnumerator CompletePrivacyFlowAfterTerms()
+        {
+            // Wait one frame so the terms popup is gone before ATT appears on iOS.
+            yield return null;
+            yield return ResolveAttIfNeeded();
+            TermsConsentManager.NotifySdkInitAllowed();
+        }
+
+        private static IEnumerator CompletePrivacyFlowForReturningUser()
+        {
+            yield return null;
+            yield return ResolveAttIfNeeded();
+            TermsConsentManager.NotifySdkInitAllowed();
+        }
+
+        private static IEnumerator ResolveAttIfNeeded()
+        {
+#if UNITY_IOS && !UNITY_EDITOR
+            yield return IOSAdsHelper.ResolveAttBlocking();
+#else
+            yield break;
+#endif
         }
 
         private static void EnsureOverlayCanvas()
@@ -118,6 +146,18 @@ namespace Assets.Scripts.Core
             canvasGo.AddComponent<GraphicRaycaster>();
             DontDestroyOnLoad(canvasGo);
             _overlayRoot = canvasGo.transform;
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (FindFirstObjectByType<EventSystem>() != null)
+                return;
+
+            var eventSystemGo = new GameObject("TermsConsentEventSystem");
+            eventSystemGo.AddComponent<EventSystem>();
+            eventSystemGo.AddComponent<StandaloneInputModule>();
+            DontDestroyOnLoad(eventSystemGo);
+            Debug.Log("[TermsConsentBootstrap] Created EventSystem for terms popup input.");
         }
     }
 }

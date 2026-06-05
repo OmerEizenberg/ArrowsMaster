@@ -39,5 +39,20 @@ namespace Assets.Scripts.Core
                 });
             });
         }
+
+        /// <summary>
+        /// Applies UMP consent results to AppLovin MAX before SDK initialization.
+        /// Required because the built-in AppLovin consent flow is disabled.
+        /// </summary>
+        public static void ApplyMaxPrivacyFlags()
+        {
+            bool canRequestAds = ConsentInformation.CanRequestAds();
+            MaxSdk.SetHasUserConsent(canRequestAds);
+            // false = user has NOT opted out of sale of personal info (CCPA)
+            MaxSdk.SetDoNotSell(false);
+            Debug.Log(
+                $"[ConsentManager] MAX privacy flags applied: hasUserConsent={canRequestAds}, " +
+                $"consentStatus={ConsentInformation.ConsentStatus}");
+        }
     }
 }
