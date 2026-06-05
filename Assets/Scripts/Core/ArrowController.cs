@@ -16,6 +16,8 @@ namespace Assets.Scripts.Core
         public GameObject pointEffectPrefab;
         private List<GameObject> instantiatedEffects = new List<GameObject>();
         private Segment m_LastHeadSegment;
+        private Segment m_GrowthHeadSegment;
+        private bool m_IsEntranceGrowing;
         private Vector2Int m_LastAppliedVisualDirection = Vector2Int.zero;
         private bool forceVisualsUpdate = true;
         
@@ -112,6 +114,8 @@ namespace Assets.Scripts.Core
             isInPool = false;
             m_LastHeadSegment = null;
             m_LastAppliedVisualDirection = Vector2Int.zero;
+            m_IsEntranceGrowing = false;
+            ReleaseGrowthHeadSegment();
             forceVisualsUpdate = true;
             forceLineUpdate = true;
             highlightCoroutine = null;
@@ -306,20 +310,192 @@ namespace Assets.Scripts.Core
             return delta != Vector2Int.zero ? delta : m_LookDirection;
         }
 
-        public IEnumerator UpdateGrowthSlide(int step, float duration)
+        public int PathCount => cachedData?.path?.Count ?? 0;
+
+        /// <summary>
+        /// Smooth entrance growth: interpolates along the path and only materializes segments at the end.
+        /// </summary>
+        public IEnumerator PlayEntranceGrowth(float totalDuration)
         {
-            if (this == null || cachedData == null || step >= cachedData.path.Count) yield break;
+            if (this == null || cachedData == null || cachedData.path.Count == 0) yield break;
 
-            SpawnSegmentStep(step, false);
+            m_IsEntranceGrowing = true;
+            EnsureGrowthHeadSegment();
+            forceLineUpdate = true;
+            forceVisualsUpdate = true;
 
-            // Reuse shared buffer — no allocation
-            _targetWorldPos.Clear();
-            for (int i = 0; i < segments.Count; i++)
+            float elapsed = 0f;
+            while (elapsed < totalDuration)
             {
-                _targetWorldPos.Add(new Vector3(segments[i].GridPosition.x * CellSize, segments[i].GridPosition.y * CellSize, 0));
+                if (this == null) yield break;
+                float growthT = totalDuration > 0f ? Mathf.Clamp01(elapsed / totalDuration) : 1f;
+                UpdateEntranceGrowthVisuals(growthT);
+                elapsed += Time.deltaTime;
+                yield return null;
             }
 
-            yield return StartCoroutine(AnimateAllSegments(_targetWorldPos, duration));
+            FinalizeEntranceGrowth();
+        }
+
+        private void EnsureGrowthHeadSegment()
+        {
+            if (m_GrowthHeadSegment != null) return;
+
+            Vector2Int spawnPos = cachedData.path[0].ToVector2Int();
+            Vector3 worldSpawnPos = new Vector3(spawnPos.x * CellSize, spawnPos.y * CellSize, 0);
+
+            if (ArrowPoolManager.Instance != null)
+            {
+                m_GrowthHeadSegment = ArrowPoolManager.Instance.GetSegment(worldSpawnPos, Quaternion.identity, transform);
+            }
+            else
+            {
+                GameObject segObj = Instantiate(segmentPrefab.gameObject, worldSpawnPos, Quaternion.identity, transform);
+                m_GrowthHeadSegment = segObj.GetComponent<Segment>();
+            }
+
+            m_GrowthHeadSegment.ParentArrow = this;
+            m_GrowthHeadSegment.transform.localScale = Vector3.one;
+        }
+
+        private void ReleaseGrowthHeadSegment()
+        {
+            if (m_GrowthHeadSegment == null) return;
+
+            if (ArrowPoolManager.Instance != null)
+            {
+                ArrowPoolManager.Instance.ReturnSegment(m_GrowthHeadSegment);
+            }
+            else
+            {
+                Destroy(m_GrowthHeadSegment.gameObject);
+            }
+
+            m_GrowthHeadSegment = null;
+        }
+
+        private void ComputeGrowthWorldPoints(float growthT, List<Vector3> outPoints)
+        {
+            outPoints.Clear();
+            if (cachedData == null || cachedData.path == null || cachedData.path.Count == 0) return;
+
+            int pathCount = cachedData.path.Count;
+            float progress = growthT * pathCount;
+            int count = Mathf.CeilToInt(progress);
+            if (count <= 0) return;
+
+            count = Mathf.Min(count, pathCount);
+            for (int i = 0; i < count; i++)
+            {
+                Vector2Int p = cachedData.path[i].ToVector2Int();
+                outPoints.Add(new Vector3(p.x * CellSize, p.y * CellSize, 0f));
+            }
+
+            if (count > 1 && progress < pathCount)
+            {
+                float partial = progress - (count - 1);
+                if (partial > 0f && partial < 1f)
+                {
+                    Vector3 prev = outPoints[outPoints.Count - 2];
+                    Vector3 last = outPoints[outPoints.Count - 1];
+                    outPoints[outPoints.Count - 1] = Vector3.Lerp(prev, last, partial);
+                }
+            }
+        }
+
+        private Vector2Int GetGrowthDirectionAtProgress(float progress)
+        {
+            if (cachedData == null || cachedData.path == null || cachedData.path.Count < 2)
+                return m_LookDirection;
+
+            int pathCount = cachedData.path.Count;
+            int fromIndex = Mathf.Clamp(Mathf.FloorToInt(progress), 0, pathCount - 2);
+            int toIndex = fromIndex + 1;
+
+            Vector2Int delta = cachedData.path[toIndex].ToVector2Int() - cachedData.path[fromIndex].ToVector2Int();
+            return delta != Vector2Int.zero ? delta : m_LookDirection;
+        }
+
+        private void UpdateEntranceGrowthVisuals(float growthT)
+        {
+            ComputeGrowthWorldPoints(growthT, linePoints);
+            if (linePoints.Count == 0)
+            {
+                if (lineRenderer != null) lineRenderer.positionCount = 0;
+                if (m_GrowthHeadSegment != null && m_GrowthHeadSegment.Renderer != null)
+                    m_GrowthHeadSegment.Renderer.enabled = false;
+                return;
+            }
+
+            float pathProgress = growthT * cachedData.path.Count;
+            Vector2Int direction = GetGrowthDirectionAtProgress(pathProgress);
+            m_CurrentVisualDirection = direction;
+
+            Vector3 headPos = linePoints[linePoints.Count - 1];
+            Vector3 headOffset = new Vector3(direction.x, direction.y, 0f) * -0.12f * CellSize;
+            Vector3 lineEnd = headPos + headOffset;
+
+            if (linePoints.Count == 1)
+            {
+                linePoints[0] = lineEnd - new Vector3(direction.x, direction.y, 0f) * 0.1f * CellSize;
+                linePoints.Add(lineEnd);
+            }
+            else
+            {
+                linePoints[linePoints.Count - 1] = lineEnd;
+            }
+
+            if (linePointsArray == null || linePointsArray.Length != linePoints.Count)
+            {
+                linePointsArray = new Vector3[linePoints.Count];
+            }
+
+            linePoints.CopyTo(linePointsArray);
+            if (lineRenderer != null)
+            {
+                lineRenderer.positionCount = linePointsArray.Length;
+                lineRenderer.SetPositions(linePointsArray);
+                if (lineRenderer.sortingOrder != 5) lineRenderer.sortingOrder = 5;
+            }
+
+            UpdateGrowthHeadVisual(headPos, direction);
+        }
+
+        private void UpdateGrowthHeadVisual(Vector3 headPos, Vector2Int direction)
+        {
+            if (m_GrowthHeadSegment == null) return;
+
+            Transform headTransform = m_GrowthHeadSegment.CachedTransform;
+            headTransform.position = headPos;
+            headTransform.localScale = HeadScale;
+
+            if (m_GrowthHeadSegment.Renderer != null)
+            {
+                m_GrowthHeadSegment.Renderer.enabled = true;
+                m_GrowthHeadSegment.Renderer.sprite = HeadSprite;
+                m_GrowthHeadSegment.Renderer.color = currentArrowColor;
+                m_GrowthHeadSegment.Renderer.sortingOrder = 10;
+
+                float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+                headTransform.rotation = Quaternion.Euler(0f, 0f, angle);
+            }
+        }
+
+        private void FinalizeEntranceGrowth()
+        {
+            m_IsEntranceGrowing = false;
+            ReleaseGrowthHeadSegment();
+
+            for (int i = 0; i < cachedData.path.Count; i++)
+            {
+                SpawnSegmentStep(i, true);
+            }
+
+            m_LastHeadSegment = null;
+            m_LastAppliedVisualDirection = Vector2Int.zero;
+            forceLineUpdate = true;
+            forceVisualsUpdate = true;
+            UpdateVisuals();
         }
 
         public Vector2Int GetHeadGridPosition()
@@ -368,9 +544,9 @@ namespace Assets.Scripts.Core
 
         private void UpdateVisuals()
         {
+            if (m_IsEntranceGrowing) return;
+
             UpdateLinePositions();
-            // We only need to update head visuals if something changed, 
-            // but for now let's just make it faster.
             UpdateHeadVisuals();
         }
 
@@ -757,6 +933,8 @@ namespace Assets.Scripts.Core
             CancelInvoke();
             isMoving = false;
             moveCoroutine = null;
+
+            ReleaseGrowthHeadSegment();
 
             while (segments.Count > 0)
             {

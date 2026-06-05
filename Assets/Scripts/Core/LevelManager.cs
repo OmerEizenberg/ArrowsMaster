@@ -27,8 +27,6 @@ namespace Assets.Scripts.Core
         public int TotalPointsInLevel => m_TotalPointsInLevel;
 
         // Cached yield instructions — avoids per-frame allocation
-        private static readonly WaitForSeconds s_GrowthWait = new WaitForSeconds(0.04f);
-
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
         private int m_MaxLevelIndex = -1;
@@ -349,9 +347,18 @@ namespace Assets.Scripts.Core
             }
 
             // 2. Animate Zoom and Arrow Growth in parallel
-            int maxPath = 0;
-            foreach (var arrow in data.arrows) maxPath = Mathf.Max(maxPath, arrow.path.Count);
-            float growthDuration = maxPath * 0.04f;
+            // Keep a constant "cells per second" speed for each arrow:
+            // shorter paths finish faster, longer paths take longer.
+            // Also slightly speed up the whole entrance sequence.
+            const float kEntranceCellDuration = 0.03f; // was 0.04f
+            float maxArrowDuration = 0f;
+            foreach (var arrow in arrows)
+            {
+                if (arrow == null || arrow.PathCount <= 0) continue;
+                float arrowDuration = arrow.PathCount * kEntranceCellDuration;
+                maxArrowDuration = Mathf.Max(maxArrowDuration, arrowDuration);
+            }
+            float growthDuration = maxArrowDuration;
 
             Coroutine zoomCoroutine = null;
             if (CameraController.Instance != null)
@@ -361,15 +368,17 @@ namespace Assets.Scripts.Core
                 zoomCoroutine = StartCoroutine(CameraController.Instance.AnimateToDefaultZoom(levelCenter, growthDuration));
             }
 
-            Debug.Log($"[DIAGNOSTIC] Starting Arrow Growth Animation loop. maxPath: {maxPath}");
-            for (int i = 0; i < maxPath; i++)
+            Debug.Log($"[DIAGNOSTIC] Starting Arrow Growth Animation. maxArrowDuration: {maxArrowDuration}");
+            foreach (var arrow in arrows)
             {
-                foreach (var arrow in arrows)
+                if (arrow.PathCount > 0)
                 {
-                    StartCoroutine(arrow.UpdateGrowthSlide(i, 0.04f));
+                    float arrowDuration = arrow.PathCount * kEntranceCellDuration;
+                    StartCoroutine(arrow.PlayEntranceGrowth(arrowDuration));
                 }
-                yield return s_GrowthWait;
             }
+
+            if (growthDuration > 0f) yield return new WaitForSeconds(growthDuration);
 
             // 3. Ensure camera finishing zoom before spawning background circles
             if (zoomCoroutine != null) yield return zoomCoroutine;
