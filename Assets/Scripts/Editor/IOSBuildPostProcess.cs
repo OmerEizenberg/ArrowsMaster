@@ -651,12 +651,12 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
         EnsureCocoaPodsAvailableOrThrow();
 
         string chosenPod = ResolvePodExecutable();
-        Debug.Log("[IOSBuildPostProcess] Running pod install with UTF-8 environment using: " + chosenPod);
+        Debug.Log("[IOSBuildPostProcess] Running pod install --repo-update with UTF-8 environment using: " + chosenPod);
 
         System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
         startInfo.FileName = "/bin/bash";
         // Force absolute paths for homebrew and exports for UTF-8 and Ruby compatibility
-        startInfo.Arguments = $"-c \"export PATH=\\\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin\\\" && export LANG=en_US.UTF-8 && export LC_ALL=en_US.UTF-8 && export RUBYOPT=\\\"-Eutf-8\\\" && cd \\\"{pathToBuiltProject}\\\" && \\\"{chosenPod}\\\" install\"";
+        startInfo.Arguments = $"-c \"export PATH=\\\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin\\\" && export LANG=en_US.UTF-8 && export LC_ALL=en_US.UTF-8 && export RUBYOPT=\\\"-Eutf-8\\\" && cd \\\"{pathToBuiltProject}\\\" && \\\"{chosenPod}\\\" install --repo-update\"";
         startInfo.UseShellExecute = false;
         startInfo.RedirectStandardOutput = true;
         startInfo.RedirectStandardError = true;
