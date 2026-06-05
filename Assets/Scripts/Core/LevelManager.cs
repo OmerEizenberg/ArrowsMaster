@@ -12,8 +12,21 @@ namespace Assets.Scripts.Core
         public Sprite m_CircleSprite;
         public Color m_CircleColor;
 
+        [Header("Drawing Win Reveal")]
+        private const int WinEffectDrawing = 5;
+        private const int DrawingWinEffectMinLevel = 7;
+        // Matches GameManager post-win wait before popup / next-level choice.
+        private const float PostWinPopupDelaySeconds = 2.5f;
+        private const float DrawingRevealPostPaintSeconds = 0.25f;
+        private const float DrawingRevealSafetyMarginSeconds = 0.05f;
+        [SerializeField] private int m_MaxMissingDotsBetweenPath = 1;
+        [SerializeField] private float m_BrushRadiusInDots = 0f;
+        [SerializeField] private float m_MaxBrushRadiusInDots = 20f;
+
         private List<ArrowController> arrows = new List<ArrowController>();
         private BackgroundCirclesMesh m_CirclesMesh;
+        private LevelDrawingRevealMesh m_DrawingRevealMesh;
+        private readonly List<List<Vector2Int>> m_ArrowPathsForReveal = new List<List<Vector2Int>>();
         private readonly List<Vector3> m_CirclePositionBuffer = new List<Vector3>(512);
         private readonly List<CirclePopAnimation> m_ActivePopAnimations = new List<CirclePopAnimation>(128);
 
@@ -217,6 +230,11 @@ namespace Assets.Scripts.Core
             {
                 m_CirclesMesh.Clear();
             }
+            if (m_DrawingRevealMesh != null)
+            {
+                m_DrawingRevealMesh.Clear();
+            }
+            m_ArrowPathsForReveal.Clear();
             m_ActivePopAnimations.Clear();
             m_SpawnedCirclePositions.Clear();
             GridManager.Instance.InitializeGrid(Vector2Int.zero); // Reset with zero or just clear map
@@ -238,6 +256,7 @@ namespace Assets.Scripts.Core
 
             // Initialize Circles Tracking
             m_SpawnedCirclePositions.Clear();
+            m_ArrowPathsForReveal.Clear();
 
             m_TotalPointsInLevel = 0;
             if (data.arrows != null)
@@ -268,6 +287,22 @@ namespace Assets.Scripts.Core
             if (pickedArrows != null && pickedArrows.Count > 0)
             {
                 pickedArrowSet = new HashSet<int>(pickedArrows);
+            }
+
+            if (data.arrows != null)
+            {
+                foreach (ArrowData arrowData in data.arrows)
+                {
+                    if (pickedArrowSet != null && pickedArrowSet.Contains(arrowData.id)) continue;
+                    if (arrowData.path == null || arrowData.path.Count == 0) continue;
+
+                    var path = new List<Vector2Int>(arrowData.path.Count);
+                    for (int i = 0; i < arrowData.path.Count; i++)
+                    {
+                        path.Add(arrowData.path[i].ToVector2Int());
+                    }
+                    m_ArrowPathsForReveal.Add(path);
+                }
             }
 
             int levelArrowCount = 0;
@@ -344,6 +379,32 @@ namespace Assets.Scripts.Core
         }
 
         private bool HasBackgroundCircles => m_CirclesMesh != null && m_CirclesMesh.Count > 0;
+
+        private LevelDrawingRevealMesh DrawingRevealMesh
+        {
+            get
+            {
+                if (m_DrawingRevealMesh == null)
+                {
+                    Transform child = transform.Find("LevelDrawingRevealMesh");
+                    if (child == null)
+                    {
+                        GameObject go = new GameObject("LevelDrawingRevealMesh");
+                        go.transform.SetParent(transform, false);
+                        m_DrawingRevealMesh = go.AddComponent<LevelDrawingRevealMesh>();
+                    }
+                    else
+                    {
+                        m_DrawingRevealMesh = child.GetComponent<LevelDrawingRevealMesh>();
+                        if (m_DrawingRevealMesh == null)
+                        {
+                            m_DrawingRevealMesh = child.gameObject.AddComponent<LevelDrawingRevealMesh>();
+                        }
+                    }
+                }
+                return m_DrawingRevealMesh;
+            }
+        }
 
         private System.Collections.IEnumerator CoordinatedLevelInitialization(List<ArrowController> arrows, LevelData data)
         {
@@ -498,33 +559,124 @@ namespace Assets.Scripts.Core
                 }
             }
 
-            int levelNum = ExtractNumber(currentLevelId);
-            int animIndex;
+            StartCoroutine(DoWinEffectSequence());
+        }
+
+        private bool IsDrawingWinEffectEligible(int levelNum)
+        {
+            return levelNum >= DrawingWinEffectMinLevel
+                && m_SpawnedCirclePositions.Count > 0
+                && m_ArrowPathsForReveal.Count > 0;
+        }
+
+        private int PickRandomWinEffectIndex(int levelNum)
+        {
+            bool drawingEligible = IsDrawingWinEffectEligible(levelNum);
 
             if (DevicePerformanceProfile.UseSimplifiedWinEffects)
             {
-                animIndex = Random.Range(0, 2); // ripple or explosion only
+                if (drawingEligible)
+                {
+                    int pick = Random.Range(0, 3);
+                    if (pick == 0) return 0;
+                    if (pick == 1) return 1;
+                    return WinEffectDrawing;
+                }
+
+                return Random.Range(0, 2);
             }
-            else if (levelNum > 0 && levelNum < 20)
+
+            if (levelNum > 0 && levelNum < 20)
             {
-                animIndex = Random.Range(0, 2) == 0 ? 0 : 4;
+                if (drawingEligible)
+                {
+                    int pick = Random.Range(0, 3);
+                    if (pick == 0) return 0;
+                    if (pick == 1) return 4;
+                    return WinEffectDrawing;
+                }
+
+                return Random.Range(0, 2) == 0 ? 0 : 4;
             }
-            else
-            {
-                animIndex = Random.Range(0, 5);
-            }
+
+            return drawingEligible ? Random.Range(0, 6) : Random.Range(0, 5);
+        }
+
+        private IEnumerator DoWinEffectSequence()
+        {
+            int levelNum = ExtractNumber(currentLevelId);
+            int animIndex = PickRandomWinEffectIndex(levelNum);
+            float fadeDelay = 10.0f;
 
             switch (animIndex)
             {
-                case 0: StartCoroutine(DoRippleEffect()); break;
-                case 1: StartCoroutine(DoSpiralVortex()); break;
-                case 2: StartCoroutine(DoDiagonalCascade()); break;
-                case 3: StartCoroutine(DoExplosionEffect()); break;
-                case 4: StartCoroutine(DoRandomPopcorn()); break;
-                default: StartCoroutine(DoRippleEffect()); break;
+                case 0: yield return StartCoroutine(DoRippleEffect()); break;
+                case 1: yield return StartCoroutine(DoSpiralVortex()); break;
+                case 2: yield return StartCoroutine(DoDiagonalCascade()); break;
+                case 3: yield return StartCoroutine(DoExplosionEffect()); break;
+                case 4: yield return StartCoroutine(DoRandomPopcorn()); break;
+                case WinEffectDrawing:
+                    bool usedDrawingReveal = false;
+                    yield return StartCoroutine(TryDoDrawingRevealEffect(success => usedDrawingReveal = success));
+                    if (usedDrawingReveal)
+                    {
+                        fadeDelay = 3.0f;
+                    }
+                    else
+                    {
+                        yield return StartCoroutine(DoRippleEffect());
+                    }
+                    break;
+                default: yield return StartCoroutine(DoRippleEffect()); break;
             }
-            
-            StartCoroutine(FadeOutCircles(10.0f)); // Further increased delay to support longer popcorn
+
+            StartCoroutine(FadeOutCircles(fadeDelay));
+        }
+
+        private IEnumerator TryDoDrawingRevealEffect(System.Action<bool> onComplete)
+        {
+            if (!IsDrawingWinEffectEligible(ExtractNumber(currentLevelId)))
+            {
+                onComplete(false);
+                yield break;
+            }
+
+            if (HasBackgroundCircles)
+            {
+                m_CirclesMesh.Clear();
+            }
+
+            if (!DrawingRevealMesh.TryBuildFromDots(
+                    m_SpawnedCirclePositions,
+                    m_ArrowPathsForReveal,
+                    m_CircleColor,
+                    ArrowController.CellSize,
+                    0,
+                    m_MaxMissingDotsBetweenPath))
+            {
+                onComplete(false);
+                yield break;
+            }
+
+            float duration = PostWinPopupDelaySeconds
+                - DrawingRevealPostPaintSeconds
+                - DrawingRevealSafetyMarginSeconds;
+            float baseBrushDots = m_BrushRadiusInDots > 0f
+                ? m_BrushRadiusInDots
+                : LevelDrawingRevealMesh.BrushRadiusInDots;
+            float maxBrushDots = m_MaxBrushRadiusInDots > baseBrushDots
+                ? m_MaxBrushRadiusInDots
+                : baseBrushDots + 12f;
+            float brushDots = DrawingRevealMesh.ComputeDynamicBrushRadiusInDots(
+                duration,
+                ArrowController.CellSize,
+                baseBrushDots,
+                maxBrushDots);
+            float brushRadius = brushDots * ArrowController.CellSize;
+            yield return DrawingRevealMesh.AnimateMarkerReveal(m_CircleColor, duration, brushRadius);
+            yield return new WaitForSeconds(0.25f);
+            HideArrows();
+            onComplete(true);
         }
 
         private System.Collections.IEnumerator FadeOutCircles(float delay)
@@ -540,12 +692,20 @@ namespace Assets.Scripts.Core
                 {
                     m_CirclesMesh.ApplyFinishState(m_CircleColor, m_WinCirclesAlpha, 2.0f);
                 }
+                if (m_DrawingRevealMesh != null && m_DrawingRevealMesh.CellCount > 0)
+                {
+                    m_DrawingRevealMesh.SetGlobalAlpha(m_WinCirclesAlpha, m_CircleColor);
+                }
                 yield return null;
             }
             m_WinCirclesAlpha = 0f;
             if (HasBackgroundCircles)
             {
                 m_CirclesMesh.ApplyFinishState(m_CircleColor, m_WinCirclesAlpha, 2.0f);
+            }
+            if (m_DrawingRevealMesh != null && m_DrawingRevealMesh.CellCount > 0)
+            {
+                m_DrawingRevealMesh.SetGlobalAlpha(m_WinCirclesAlpha, m_CircleColor);
             }
         }
 
