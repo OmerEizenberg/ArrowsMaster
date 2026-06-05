@@ -127,20 +127,13 @@ namespace Assets.Scripts.Core
 
             try
             {
-                // Parallel initialization: Start Unity Services and Store setup concurrently
-                var servicesTask = InitializeUnityServices();
-
-                // We start purchasing initialization. Note: On some platforms,
-                // UnityPurchasing requires UnityServices to be initialized for certain features,
-                // but the native store module can often start its handshake immediately.
+                await InitializeUnityServices();
                 InitializePurchasing();
-
-                await servicesTask;
                 Debug.Log("[IAPManager] All services ready.");
             }
             catch (Exception e)
             {
-                Debug.LogError($"[IAPManager] Initialization Flow Error: {e.Message}");
+                Debug.LogError($"[IAPManager] Initialization Flow Error: {e.Message}\n{e.StackTrace}");
                 storeInitTask = null;
             }
             finally
@@ -203,6 +196,12 @@ namespace Assets.Scripts.Core
         {
             if (IsInitialized()) return;
 
+            ConfigurationBuilder builder;
+#if UNITY_EDITOR
+            // Google Play billing APIs are unavailable in Play Mode; use the Fake Store instead.
+            Debug.Log("[IAPManager] Using Fake Store (Editor Play Mode).");
+            builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance());
+#else
             AppStore store = AppStore.NotSpecified;
 #if UNITY_ANDROID
             store = AppStore.GooglePlay;
@@ -210,11 +209,13 @@ namespace Assets.Scripts.Core
             store = AppStore.AppleAppStore;
 #endif
 
-            var builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance(store));
+            builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance(store));
 
 #if UNITY_ANDROID
             var googleConfig = builder.Configure<IGooglePlayConfiguration>();
             googleConfig.SetDeferredPurchaseListener(OnGooglePlayDeferredPurchase);
+#endif
+            Debug.Log($"[IAPManager] Initializing UnityPurchasing with store: {store}...");
 #endif
 
             // Consumables
@@ -229,7 +230,6 @@ namespace Assets.Scripts.Core
             builder.AddProduct(ProductNoAdsCoins999, ProductType.NonConsumable);
             builder.AddProduct(ProductLegendPass999, ProductType.NonConsumable);
 
-            Debug.Log($"[IAPManager] Initializing UnityPurchasing with store: {store}...");
             UnityPurchasing.Initialize(this, builder);
         }
 
