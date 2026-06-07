@@ -124,6 +124,26 @@ namespace Assets.Scripts.Lobby
             UserDataManager.Instance.OnLevelChanged += OnLevelChangedWhileInLobby;
             UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
             UserDataManager.Instance.OnMonthlyProgressChanged += UpdateChallengeNotification;
+            StartCoroutine(PrewarmBannerAfterLobbySettled());
+        }
+
+        private IEnumerator PrewarmBannerAfterLobbySettled()
+        {
+            // Create the native banner view during lobby idle, not on game-over/settings transitions.
+            yield return new WaitForSeconds(2f);
+
+            const float sdkWaitTimeoutSeconds = 30f;
+            float waited = 0f;
+            while (AdsManager.Instance != null &&
+                   !AdsManager.Instance.IsInitialized &&
+                   waited < sdkWaitTimeoutSeconds)
+            {
+                yield return new WaitForSeconds(0.5f);
+                waited += 0.5f;
+            }
+
+            if (AdsManager.Instance != null)
+                AdsManager.Instance.PrewarmSettingsBanner();
         }
 
         private void OnEnable()
@@ -1498,7 +1518,6 @@ namespace Assets.Scripts.Lobby
                 m_DonateLayer.SetActive(false);
                 m_NoAdsLayer.SetActive(true);
 
-                // Store current time as last seen
                 PlayerPrefs.SetString("LastNoAdsOfferTime", System.DateTime.Now.ToBinary().ToString());
                 PlayerPrefs.Save();
             }

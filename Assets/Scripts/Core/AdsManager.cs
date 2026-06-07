@@ -42,6 +42,14 @@ namespace Assets.Scripts.Core
         private bool _interstitialReady;
         private bool _bannerReady;
         private bool _bannerCreated;
+        private bool _bannerCreateInProgress;
+        private bool _bannerCreateRequestedForShow;
+        private bool _bannerShowRequested;
+        private bool _bannerDestroyPending;
+        private bool _applicationPaused;
+        private Coroutine _bannerCreateCoroutine;
+        private Coroutine _bannerDestroyCoroutine;
+        private Coroutine _bannerResumeSyncCoroutine;
 
         private GameObject _coinsExplosionPrefab;
         private int _bannerRetryAttempt;
@@ -75,6 +83,8 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
+        private const float BannerCreateSettleDelaySeconds = 0.25f;
+        private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
 
         // ──────────────────────────────────────────────────────────────────
         // AppLovin MAX SDK Key
@@ -188,6 +198,13 @@ namespace Assets.Scripts.Core
                 action?.Invoke();
         }
 
+        private void OnApplicationPause(bool paused)
+        {
+            _applicationPaused = paused;
+            if (!paused)
+                ScheduleBannerResumeSync();
+        }
+
         private void OnDestroy()
         {
             TermsConsentManager.OnSdkInitAllowed -= HandleSdkInitAllowed;
@@ -217,7 +234,18 @@ namespace Assets.Scripts.Core
             MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent -= OnBannerAdRevenuePaid;
 
             UnsubscribeFromNoAdsStatus();
-            if (_bannerCreated) MaxSdk.DestroyBanner(BannerAdUnitId);
+            CancelDeferredBannerCreate();
+            if (_bannerResumeSyncCoroutine != null)
+            {
+                StopCoroutine(_bannerResumeSyncCoroutine);
+                _bannerResumeSyncCoroutine = null;
+            }
+            if (_bannerDestroyCoroutine != null)
+            {
+                StopCoroutine(_bannerDestroyCoroutine);
+                _bannerDestroyCoroutine = null;
+            }
+            ExecuteDestroyBannerImmediate();
         }
 
         // ════════════════════════════════════════════
@@ -251,6 +279,70 @@ namespace Assets.Scripts.Core
 
         private void DestroyBanner()
         {
+            CancelDeferredBannerCreate();
+            _bannerShowRequested = false;
+
+            if (!_bannerCreated)
+            {
+                CancelDeferredBannerDestroy();
+                _bannerDestroyPending = false;
+                return;
+            }
+
+            _bannerDestroyPending = true;
+            if (_applicationPaused) return;
+
+            ScheduleDeferredBannerDestroy();
+        }
+
+        private void CancelDeferredBannerDestroy()
+        {
+            if (_bannerDestroyCoroutine == null) return;
+
+            StopCoroutine(_bannerDestroyCoroutine);
+            _bannerDestroyCoroutine = null;
+        }
+
+        private void ScheduleDeferredBannerDestroy()
+        {
+            if (_bannerDestroyCoroutine != null) return;
+            _bannerDestroyCoroutine = StartCoroutine(DestroyBannerDeferred());
+        }
+
+        private IEnumerator DestroyBannerDeferred()
+        {
+            // destroyAdView → ViewGroup.removeView runs on the Android UI thread and can ANR
+            // if called during heavy frames; defer until after the current frame settles.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+
+            _bannerDestroyCoroutine = null;
+
+            if (this == null || !_bannerDestroyPending || _applicationPaused)
+                yield break;
+
+            // Cancel destroy only when the banner is wanted again (not for No Ads teardown).
+            if (_bannerShowRequested && !UserHasNoAds)
+                yield break;
+
+            ExecuteDestroyBannerImmediate();
+        }
+
+        private void ExecuteDestroyBanner()
+        {
+            if (!_bannerCreated) return;
+            if (_applicationPaused)
+            {
+                _bannerDestroyPending = true;
+                return;
+            }
+
+            _bannerDestroyPending = true;
+            ScheduleDeferredBannerDestroy();
+        }
+
+        private void ExecuteDestroyBannerImmediate()
+        {
             if (!_bannerCreated) return;
 
             try
@@ -264,7 +356,81 @@ namespace Assets.Scripts.Core
             }
 
             _bannerCreated = false;
+            _bannerDestroyPending = false;
             SetCachedReady(ref _bannerReady, false);
+        }
+
+        private void ScheduleBannerResumeSync()
+        {
+            if (_bannerResumeSyncCoroutine != null)
+                StopCoroutine(_bannerResumeSyncCoroutine);
+
+            _bannerResumeSyncCoroutine = StartCoroutine(SyncBannerNativeStateAfterResume());
+        }
+
+        private IEnumerator SyncBannerNativeStateAfterResume()
+        {
+            // Wait for Unity/Android to finish the pause handshake before touching native ad views.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+
+            _bannerResumeSyncCoroutine = null;
+            SyncBannerNativeState();
+        }
+
+        /// <summary>
+        /// Applies banner create/show/hide/destroy to MAX. Skipped while the app is paused to avoid
+        /// a Unity/Android deadlock (Unity thread posts to UI thread during Activity.onPause).
+        /// </summary>
+        private void SyncBannerNativeState()
+        {
+            if (_applicationPaused || !isInitialized) return;
+
+            if (UserHasNoAds)
+            {
+                if (_bannerCreated || _bannerDestroyPending)
+                    ExecuteDestroyBanner();
+                return;
+            }
+
+            if (_bannerDestroyPending)
+            {
+                ExecuteDestroyBanner();
+                return;
+            }
+
+            if (_bannerCreateInProgress) return;
+
+            if (!_bannerShowRequested)
+            {
+                if (_bannerCreated)
+                {
+                    try
+                    {
+                        MaxSdk.HideBanner(BannerAdUnitId);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[AdsManager] HideBanner failed: {e.Message}");
+                    }
+                }
+                return;
+            }
+
+            if (!_bannerCreated)
+            {
+                InitializeBannerAds(requestedForShow: true);
+                return;
+            }
+
+            try
+            {
+                MaxSdk.ShowBanner(BannerAdUnitId);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] ShowBanner failed: {e.Message}");
+            }
         }
 
         private void EnqueueAction(Action action) => _mainThreadQueue.Enqueue(action);
@@ -323,25 +489,14 @@ namespace Assets.Scripts.Core
 
             if (!_bannerCreated)
             {
+                if (!_bannerShowRequested) return;
                 LoadSettingsBanner();
                 return;
             }
 
+            // Banner view already exists; MAX retries loading automatically.
+            // Avoid destroy/recreate — that allocates new Android views on the main thread under GC pressure.
             if (_bannerReady) return;
-
-            Debug.Log("[AdsManager] Banner not ready — recreating banner ad unit.");
-            try
-            {
-                MaxSdk.DestroyBanner(BannerAdUnitId);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[AdsManager] DestroyBanner failed: {e.Message}");
-            }
-
-            _bannerCreated = false;
-            SetCachedReady(ref _bannerReady, false);
-            InitializeBannerAds();
         }
 
         private void NotifyAdClosed()
@@ -469,9 +624,18 @@ namespace Assets.Scripts.Core
             InitializeInterstitialAds();
             InitializeRewardedAds();
             SubscribeToNoAdsStatus();
-            if (!UserHasNoAds)
-                InitializeBannerAds();
             RefreshAllReadiness();
+            StartCoroutine(PrewarmSettingsBannerAfterSdkInit());
+        }
+
+        private IEnumerator PrewarmSettingsBannerAfterSdkInit()
+        {
+            // Mirrors old OnMaxSdkInitialized → InitializeBannerAds, but deferred off the init frame.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            PrewarmSettingsBanner();
+            if (_bannerShowRequested)
+                SyncBannerNativeState();
         }
 
         // ════════════════════════════════════════════
@@ -807,17 +971,101 @@ namespace Assets.Scripts.Core
         //  BANNER ADS
         // ════════════════════════════════════════════
 
-        private void InitializeBannerAds()
+        private void SubscribeBannerCallbacks()
         {
+            MaxSdkCallbacks.Banner.OnAdLoadedEvent -= OnBannerAdLoaded;
+            MaxSdkCallbacks.Banner.OnAdLoadFailedEvent -= OnBannerAdLoadFailed;
+            MaxSdkCallbacks.Banner.OnAdClickedEvent -= OnBannerAdClicked;
+            MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent -= OnBannerAdRevenuePaid;
+
             MaxSdkCallbacks.Banner.OnAdLoadedEvent += OnBannerAdLoaded;
             MaxSdkCallbacks.Banner.OnAdLoadFailedEvent += OnBannerAdLoadFailed;
             MaxSdkCallbacks.Banner.OnAdClickedEvent += OnBannerAdClicked;
             MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent += OnBannerAdRevenuePaid;
+        }
 
-            MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
-            MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
-            MaxSdk.HideBanner(BannerAdUnitId);
-            _bannerCreated = true;
+        private void InitializeBannerAds(bool requestedForShow = false)
+        {
+            if (_bannerCreated || _bannerCreateInProgress) return;
+            if (_bannerCreateCoroutine != null) return;
+
+            CancelDeferredBannerDestroy();
+            _bannerDestroyPending = false;
+            _bannerCreateRequestedForShow = requestedForShow;
+
+            _bannerCreateCoroutine = StartCoroutine(CreateBannerDeferred());
+        }
+
+        private void CancelDeferredBannerCreate()
+        {
+            if (_bannerCreateCoroutine == null) return;
+
+            StopCoroutine(_bannerCreateCoroutine);
+            _bannerCreateCoroutine = null;
+            _bannerCreateInProgress = false;
+            _bannerCreateRequestedForShow = false;
+        }
+
+        private IEnumerator CreateBannerDeferred()
+        {
+            _bannerCreateInProgress = true;
+
+            // createAdView allocates on the Android UI thread; under heap pressure the main thread
+            // can block in WaitForGcToComplete. Wait for frames + a settle delay before creating.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            yield return null;
+
+            float settleDelay = DevicePerformanceProfile.IsLowEnd
+                ? BannerCreateSettleDelayLowEndSeconds
+                : BannerCreateSettleDelaySeconds;
+            if (settleDelay > 0f)
+                yield return new WaitForSeconds(settleDelay);
+
+            _bannerCreateCoroutine = null;
+
+            if (this == null || _bannerCreated || UserHasNoAds || !isInitialized)
+            {
+                _bannerCreateInProgress = false;
+                yield break;
+            }
+
+            if (_applicationPaused)
+            {
+                _bannerCreateInProgress = false;
+                yield break;
+            }
+
+            SubscribeBannerCallbacks();
+
+            try
+            {
+                Debug.Log("[AdsManager] Creating Settings Banner Ad (deferred)...");
+                MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
+                MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
+                _bannerCreated = true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] CreateBanner failed: {e.Message}");
+                _bannerCreated = false;
+            }
+            finally
+            {
+                _bannerCreateInProgress = false;
+                _bannerCreateRequestedForShow = false;
+            }
+
+            SyncBannerNativeState();
+        }
+
+        /// <summary>
+        /// Creates the banner ad view during idle time (hidden). Call from lobby after startup settles
+        /// so game-over/settings only need ShowBanner, not createAdView on a heavy frame.
+        /// </summary>
+        public void PrewarmSettingsBanner()
+        {
+            LoadSettingsBanner();
         }
 
         public void LoadSettingsBanner()
@@ -838,9 +1086,12 @@ namespace Assets.Scripts.Core
 
         public void ShowSettingsBanner()
         {
+            _bannerShowRequested = true;
+
             if (!isInitialized)
             {
                 Debug.LogWarning("[AdsManager] Cannot show banner: SDK not initialized.");
+                if (!isInitializing) _ = InitializeSDK();
                 return;
             }
 
@@ -851,20 +1102,22 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            if (!_bannerCreated)
-                InitializeBannerAds();
-
             Debug.Log("[AdsManager] Showing Settings Banner Ad.");
-            MaxSdk.ShowBanner(BannerAdUnitId);
+            SyncBannerNativeState();
         }
 
         public void HideSettingsBanner()
         {
-            if (_bannerCreated)
-            {
+            _bannerShowRequested = false;
+
+            // User closed the screen before deferred create finished — don't allocate a native view.
+            if (_bannerCreateInProgress && _bannerCreateRequestedForShow)
+                CancelDeferredBannerCreate();
+
+            if (_bannerCreated || _bannerCreateInProgress)
                 Debug.Log("[AdsManager] Hiding Settings Banner Ad.");
-                MaxSdk.HideBanner(BannerAdUnitId);
-            }
+
+            SyncBannerNativeState();
         }
 
         #region Banner Callbacks
