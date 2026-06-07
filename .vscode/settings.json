@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "ArrowsLegend.sln"
+    "dotnet.defaultSolution": "ArrowsMasterGit.sln"
 }
