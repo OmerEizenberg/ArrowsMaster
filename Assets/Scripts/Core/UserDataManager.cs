@@ -55,6 +55,7 @@ namespace Assets.Scripts.Core
         private const string MagicBoosterKey = "MagicBoosterBalance";
         private const string HintBoosterKey = "HintBoosterBalance";
         private const string RefillBoosterKey = "RefillBoosterBalance";
+        private const string ShuffleBoosterKey = "ShuffleBoosterBalance";
         private const string BoostersInitializedKey = "BoostersInitialized";
         private const string IsInterstitialActiveKey = "IsInterstitialActive";
         private const string IsDynamicMaxZoomKey = "IsDynamicMaxZoom";
@@ -110,11 +111,13 @@ namespace Assets.Scripts.Core
         public int MagicBoosterCount { get; private set; } = 0;
         public int HintBoosterCount { get; private set; } = 0;
         public int RefillBoosterCount { get; private set; } = 0;
+        public int ShuffleBoosterCount { get; private set; } = 0;
         public int SessionCount { get; private set; } = 0;
         public bool HasSentSession7 { get; private set; } = false;
         public event System.Action<int> OnMagicBoosterChanged;
         public event System.Action<int> OnHintBoosterChanged;
         public event System.Action<int> OnRefillBoosterChanged;
+        public event System.Action<int> OnShuffleBoosterChanged;
 
         private const string LegendPassStepKey = "LegendPass_CurrentStep";
         private const string LegendPassPremiumKey = "LegendPass_PremiumUnlocked";
@@ -202,16 +205,19 @@ namespace Assets.Scripts.Core
             MagicBoosterCount = PlayerPrefs.GetInt(MagicBoosterKey, 0);
             HintBoosterCount = PlayerPrefs.GetInt(HintBoosterKey, 0);
             RefillBoosterCount = PlayerPrefs.GetInt(RefillBoosterKey, 0);
+            ShuffleBoosterCount = PlayerPrefs.GetInt(ShuffleBoosterKey, 0);
 
             if (PlayerPrefs.GetInt(BoostersInitializedKey, 0) == 0)
             {
                 MagicBoosterCount = 1;
                 HintBoosterCount = 1;
                 RefillBoosterCount = 1;
+                ShuffleBoosterCount = 1;
                 PlayerPrefs.SetInt(BoostersInitializedKey, 1);
                 SaveMagicBooster();
                 SaveHintBooster();
                 SaveRefillBooster();
+                SaveShuffleBooster();
             }
 
             LegendPassStep = PlayerPrefs.GetInt(LegendPassStepKey, 0);
@@ -346,6 +352,32 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(RefillBoosterKey, RefillBoosterCount);
             PlayerPrefs.Save();
             OnRefillBoosterChanged?.Invoke(RefillBoosterCount);
+        }
+
+        public void AddShuffleBooster(int amount)
+        {
+            if (amount < 0) return;
+            ShuffleBoosterCount += amount;
+            SaveShuffleBooster();
+        }
+
+        public bool UseShuffleBooster(int amount)
+        {
+            if (amount < 0) return false;
+            if (ShuffleBoosterCount >= amount)
+            {
+                ShuffleBoosterCount -= amount;
+                SaveShuffleBooster();
+                return true;
+            }
+            return false;
+        }
+
+        private void SaveShuffleBooster()
+        {
+            PlayerPrefs.SetInt(ShuffleBoosterKey, ShuffleBoosterCount);
+            PlayerPrefs.Save();
+            OnShuffleBoosterChanged?.Invoke(ShuffleBoosterCount);
         }
 
         public void MarkRateUsSeen()

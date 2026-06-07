@@ -86,6 +86,11 @@ public class MonthlyChallengeController : MonoBehaviour
 
     public void Init(int month, int year)
     {
+        // Drop stale selection before repainting; ClearSelection would otherwise
+        // restore the old grid cell using the new month (e.g. July 5 shown as June 5).
+        m_SelectedDateBg = null;
+        m_SelectedDateTxt = null;
+
         // 1. Get the first day of the month
         DateTime firstDayOfMonth = new DateTime(year, month, 1);
         m_challengeMonthTitle.isRightToLeftText = false;
@@ -289,28 +294,68 @@ public class MonthlyChallengeController : MonoBehaviour
         MarkAsSelected();
     }
 
+    private int GetDayOffset(int year, int month)
+    {
+        DateTime firstDayOfMonth = new DateTime(year, month, 1);
+        int dayOffset = ((int)firstDayOfMonth.DayOfWeek - 1 + 7) % 7;
+        int daysInMonth = DateTime.DaysInMonth(year, month);
+        int requiredSlots = dayOffset + daysInMonth;
+        if (dayImages != null && requiredSlots > dayImages.Length)
+        {
+            dayOffset = Mathf.Max(0, dayImages.Length - daysInMonth);
+        }
+        return dayOffset;
+    }
+
+    private bool IsInMonthCell(Image cell, int year, int month, out int dateNumber)
+    {
+        dateNumber = 0;
+        if (cell == null || dayImages == null) return false;
+
+        int index = Array.IndexOf(dayImages, cell);
+        if (index < 0) return false;
+
+        int dayOffset = GetDayOffset(year, month);
+        int daysInMonth = DateTime.DaysInMonth(year, month);
+        dateNumber = index - dayOffset + 1;
+        return dateNumber >= 1 && dateNumber <= daysInMonth;
+    }
+
     private void ClearSelection()
     {
         if (m_SelectedDateBg != null)
         {
-            // Determine if the day we're unselecting was already passed
-            bool wasPassed = false;
-            if (m_SelectedDateTxt != null && int.TryParse(m_SelectedDateTxt.text, out int dayNum))
+            if (!IsInMonthCell(m_SelectedDateBg, p_CurrentYear, p_CurrentMonth, out int dayNum))
             {
-                wasPassed = UserDataManager.Instance.IsDayCompleted(p_CurrentYear, p_CurrentMonth, dayNum);
-            }
-
-            if (wasPassed)
-            {
-                m_SelectedDateBg.color = m_PassedColor;
-                if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_PassedColorTxt;
+                m_SelectedDateBg.color = m_PaddingDayColor;
+                if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_PaddingDayColorTxt;
                 m_SelectedDateBg.GetComponent<Button>().interactable = false;
             }
             else
             {
-                m_SelectedDateBg.color = m_NormalColor;
-                if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_NormalColorTxt;
-                m_SelectedDateBg.GetComponent<Button>().interactable = true;
+                bool wasPassed = UserDataManager.Instance.IsDayCompleted(p_CurrentYear, p_CurrentMonth, dayNum);
+                bool isFuture = p_CurrentYear == DateTime.Now.Year
+                    && p_CurrentMonth == DateTime.Now.Month
+                    && dayNum > DateTime.Now.Day;
+
+                if (wasPassed)
+                {
+                    m_SelectedDateBg.color = m_PassedColor;
+                    if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_PassedColorTxt;
+                    m_SelectedDateBg.GetComponent<Button>().interactable = false;
+                }
+                else if (isFuture)
+                {
+                    m_SelectedDateBg.color = m_FutureDayColor;
+                    if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_FutureDayColorTxt;
+                    m_SelectedDateBg.GetComponent<Button>().interactable = false;
+                }
+                else
+                {
+                    m_SelectedDateBg.color = m_NormalColor;
+                    if (m_SelectedDateTxt != null) m_SelectedDateTxt.color = m_NormalColorTxt;
+                    m_SelectedDateBg.GetComponent<Button>().interactable = true;
+                }
             }
         }
         m_SelectedDateBg = null;

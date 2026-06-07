@@ -381,3 +381,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_comboNum: {fileID: 3219716776150842327}
+  m_Animator: {fileID: 4917404661158820459}

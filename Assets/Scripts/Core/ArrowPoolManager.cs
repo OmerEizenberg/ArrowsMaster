@@ -12,17 +12,29 @@ namespace Assets.Scripts.Core
         public ArrowController arrowPrefab;
         public Segment segmentPrefab;
 
-        [Header("Settings")]
-        public int targetArrowCount = 500;
-        public int targetSegmentCount = 3000;
+        [Header("Pool Baseline (kept after level clear)")]
+        public int baselineArrowCount = 70;
+        public int baselineSegmentMultiplier = 6;
 
-        public ArrowController ArrowPrefab { get => arrowPrefab; set { arrowPrefab = value; CheckPreWarm(); } }
-        public Segment SegmentPrefab { get => segmentPrefab; set { segmentPrefab = value; CheckPreWarm(); } }
-
-        [SerializeField] private int arrowsCount=0;
+        [SerializeField] private int arrowsCount;
         private Queue<ArrowController> arrowPool = new Queue<ArrowController>();
         private Queue<Segment> segmentPool = new Queue<Segment>();
         private readonly HashSet<ArrowController> pooledArrows = new HashSet<ArrowController>();
+
+        private int ActiveBaselineArrowCount =>
+            DevicePerformanceProfile.BaselineArrowCount > 0
+                ? DevicePerformanceProfile.BaselineArrowCount
+                : baselineArrowCount;
+
+        private int ActiveBaselineSegmentMultiplier =>
+            DevicePerformanceProfile.BaselineSegmentMultiplier > 0
+                ? DevicePerformanceProfile.BaselineSegmentMultiplier
+                : baselineSegmentMultiplier;
+
+        private int BaselineSegmentCount => ActiveBaselineArrowCount * ActiveBaselineSegmentMultiplier;
+
+        public ArrowController ArrowPrefab { get => arrowPrefab; set { arrowPrefab = value; CheckPreWarm(); } }
+        public Segment SegmentPrefab { get => segmentPrefab; set { segmentPrefab = value; CheckPreWarm(); } }
 
         private void Awake()
         {
@@ -32,7 +44,7 @@ namespace Assets.Scripts.Core
                 return;
             }
             Instance = this;
-            
+
             CheckPreWarm();
         }
 
@@ -63,23 +75,52 @@ namespace Assets.Scripts.Core
 
         private IEnumerator InitialPreWarmRoutine()
         {
-            // Give the scene a moment to settle
             yield return null;
 
-            while (arrowPool.Count < targetArrowCount)
+            int arrowBaseline = ActiveBaselineArrowCount;
+            while (arrowPool.Count < arrowBaseline)
             {
                 ReplenishArrow();
                 if (arrowPool.Count % 20 == 0) yield return null;
             }
 
-            while (segmentPool.Count < targetSegmentCount)
+            int baselineSegments = BaselineSegmentCount;
+            while (segmentPool.Count < baselineSegments)
             {
                 ReplenishSegment();
                 if (segmentPool.Count % 100 == 0) yield return null;
             }
-            
+
             EnsureSharedLineMaterial();
             Debug.Log($"[ArrowPoolManager] Buffer initialized: {arrowPool.Count} arrows, {segmentPool.Count} segments.");
+        }
+
+        /// <summary>Grow pools to fit the upcoming level; does not shrink.</summary>
+        public void EnsureCapacityForLevel(int arrowCount, int totalPathPoints)
+        {
+            int requiredArrows = arrowCount + Mathf.Max(8, arrowCount / 10);
+            int requiredSegments = totalPathPoints + arrowCount + Mathf.Max(16, totalPathPoints / 20);
+
+            PruneDestroyedArrowRefs();
+            PruneDestroyedSegmentRefs();
+
+            while (arrowPool.Count < requiredArrows)
+            {
+                ReplenishArrow();
+            }
+
+            while (segmentPool.Count < requiredSegments)
+            {
+                ReplenishSegment();
+            }
+
+            arrowsCount = arrowPool.Count;
+        }
+
+        public void PurgeToBaseline()
+        {
+            PurgeAndReplenishArrows(ActiveBaselineArrowCount);
+            PurgeAndReplenishSegments(BaselineSegmentCount);
         }
 
         private void ReplenishArrow()
@@ -87,7 +128,7 @@ namespace Assets.Scripts.Core
             if (arrowPrefab == null) return;
             ArrowController arrow = Instantiate(arrowPrefab);
             arrow.gameObject.SetActive(false);
-            arrow.transform.SetParent(this.transform);
+            arrow.transform.SetParent(transform);
             arrowPool.Enqueue(arrow);
             arrowsCount = arrowPool.Count;
         }
@@ -97,7 +138,7 @@ namespace Assets.Scripts.Core
             if (segmentPrefab == null) return;
             Segment seg = Instantiate(segmentPrefab);
             seg.gameObject.SetActive(false);
-            seg.transform.SetParent(this.transform);
+            seg.transform.SetParent(transform);
             segmentPool.Enqueue(seg);
         }
 
@@ -106,17 +147,58 @@ namespace Assets.Scripts.Core
             return arrow != null && pooledArrows.Contains(arrow);
         }
 
-        /// <summary>Drop destroyed references and top up the pool after corruption.</summary>
         public void PurgeAndReplenishArrows()
         {
-            PruneDestroyedArrowRefs();
+            PurgeAndReplenishArrows(ActiveBaselineArrowCount);
+        }
 
-            while (arrowPool.Count < targetArrowCount && arrowPrefab != null)
+        public void PurgeAndReplenishArrows(int keepCount)
+        {
+            PruneDestroyedArrowRefs();
+            TrimArrowPoolTo(keepCount);
+
+            while (arrowPool.Count < keepCount && arrowPrefab != null)
             {
                 ReplenishArrow();
             }
 
             arrowsCount = arrowPool.Count;
+        }
+
+        public void PurgeAndReplenishSegments(int keepCount)
+        {
+            PruneDestroyedSegmentRefs();
+            TrimSegmentPoolTo(keepCount);
+
+            while (segmentPool.Count < keepCount && segmentPrefab != null)
+            {
+                ReplenishSegment();
+            }
+        }
+
+        private void TrimArrowPoolTo(int keepCount)
+        {
+            while (arrowPool.Count > keepCount)
+            {
+                ArrowController arrow = arrowPool.Dequeue();
+                if (arrow != null)
+                {
+                    pooledArrows.Remove(arrow);
+                    Destroy(arrow.gameObject);
+                }
+            }
+        }
+
+        private void TrimSegmentPoolTo(int keepCount)
+        {
+            while (segmentPool.Count > keepCount)
+            {
+                Segment seg = segmentPool.Dequeue();
+                if (seg != null)
+                {
+                    Destroy(seg.gameObject);
+                }
+            }
         }
 
         private void PruneDestroyedArrowRefs()
@@ -138,6 +220,19 @@ namespace Assets.Scripts.Core
                 if (!arrow)
                 {
                     pooledArrows.Remove(arrow);
+                }
+            }
+        }
+
+        private void PruneDestroyedSegmentRefs()
+        {
+            int queueSize = segmentPool.Count;
+            for (int i = 0; i < queueSize; i++)
+            {
+                Segment candidate = segmentPool.Dequeue();
+                if (candidate != null)
+                {
+                    segmentPool.Enqueue(candidate);
                 }
             }
         }
@@ -268,7 +363,6 @@ namespace Assets.Scripts.Core
             segmentPool.Enqueue(seg);
         }
 
-        /// <summary>Caches line material from the arrow prefab so runtime Shader.Find is not needed.</summary>
         public static void EnsureSharedLineMaterial()
         {
             ArrowController.EnsureSharedLineMaterialFromPrefab(Instance != null ? Instance.arrowPrefab : null);

@@ -124,6 +124,26 @@ namespace Assets.Scripts.Lobby
             UserDataManager.Instance.OnLevelChanged += OnLevelChangedWhileInLobby;
             UserDataManager.Instance.OnCurrencyChanged += UpdateCurrencyUI;
             UserDataManager.Instance.OnMonthlyProgressChanged += UpdateChallengeNotification;
+            StartCoroutine(PrewarmBannerAfterLobbySettled());
+        }
+
+        private IEnumerator PrewarmBannerAfterLobbySettled()
+        {
+            // Create the native banner view during lobby idle, not on game-over/settings transitions.
+            yield return new WaitForSeconds(2f);
+
+            const float sdkWaitTimeoutSeconds = 30f;
+            float waited = 0f;
+            while (AdsManager.Instance != null &&
+                   !AdsManager.Instance.IsInitialized &&
+                   waited < sdkWaitTimeoutSeconds)
+            {
+                yield return new WaitForSeconds(0.5f);
+                waited += 0.5f;
+            }
+
+            if (AdsManager.Instance != null)
+                AdsManager.Instance.PrewarmSettingsBanner();
         }
 
         private void OnEnable()
@@ -202,7 +222,6 @@ namespace Assets.Scripts.Lobby
                 }
             }
 
-            CheckForTermsAgreement();
             CheckForRateUsPopup();
             UpdateChallengeNotification();
             CheckForNoAdsOffer();
@@ -1228,38 +1247,6 @@ namespace Assets.Scripts.Lobby
             }
         }
 
-        private void CheckForTermsAgreement()
-        {
-            if (PlayerPrefs.GetInt("TermsAgreed", 0) == 0)
-            {
-                GameObject popupPrefab = Resources.Load<GameObject>("TermsAndConditionsPopup");
-                if (popupPrefab != null)
-                {
-                    Transform parent = m_LobbyUI != null ? m_LobbyUI.transform.parent : transform;
-                    GameObject popupInstance = Instantiate(popupPrefab, parent, false);
-                    popupInstance.SetActive(true);
-                    popupInstance.transform.SetAsLastSibling();
-
-                    RectTransform rect = popupInstance.GetComponent<RectTransform>();
-                    if (rect != null)
-                    {
-                        rect.localPosition = Vector3.zero;
-                        rect.localScale = Vector3.one;
-                    }
-                    
-                    TermsAndConditionsPopup view = popupInstance.GetComponent<TermsAndConditionsPopup>();
-                    if (view == null)
-                    {
-                        Debug.LogError("[HomeContoller] TermsAndConditionsPopup component missing on prefab!");
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning("[HomeContoller] TermsAndConditionsPopup prefab not found in Resources!");
-                }
-            }
-        }
-
         /// <summary>
         /// Compares two version strings (format: XX.KK.PP).
         /// Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
@@ -1531,7 +1518,6 @@ namespace Assets.Scripts.Lobby
                 m_DonateLayer.SetActive(false);
                 m_NoAdsLayer.SetActive(true);
 
-                // Store current time as last seen
                 PlayerPrefs.SetString("LastNoAdsOfferTime", System.DateTime.Now.ToBinary().ToString());
                 PlayerPrefs.Save();
             }

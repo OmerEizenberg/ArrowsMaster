@@ -13,9 +13,10 @@ MonoBehaviour:
   m_Name: DailyMissions
   m_EditorClassIdentifier: 
   EventID: DM
-  ActiveDays: 00000000020000000400000006000000
+  ActiveDays: 0000000002000000040000000600000005000000
   ActivationHour: 0
   DurationHours: 24
+  ShowLevel: 16
   UnlockLevel: 25
   IconPrefabName: MissionIcon
   PopupPrefabName: MissionsPopup

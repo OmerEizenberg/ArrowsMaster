@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
 using System;
+using Assets.Scripts.Core;
 
 namespace Assets.Scripts.Lobby
 {
@@ -62,8 +63,7 @@ namespace Assets.Scripts.Lobby
 
         private void OnContinuePressed()
         {
-            PlayerPrefs.SetInt("TermsAgreed", 1);
-            PlayerPrefs.Save();
+            TermsConsentManager.RecordAccepted();
             OnAgreed?.Invoke();
             Destroy(gameObject);
         }

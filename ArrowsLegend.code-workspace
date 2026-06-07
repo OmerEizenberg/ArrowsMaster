@@ -1,0 +1,28 @@
+{
+  "folders": [
+    {
+      "name": "ArrowsMaster (Unity)",
+      "path": "."
+    },
+    {
+      "name": "ArrowsLegendBI",
+      "path": "ArrowsLegendBI"
+    }
+  ],
+  "settings": {
+    "dotnet.defaultSolution": "ArrowsLegend.sln",
+    "files.exclude": {
+      "**/Library": true,
+      "**/Temp": true,
+      "**/Logs": true,
+      "**/obj": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-dotnettools.csdevkit",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode"
+    ]
+  }
+}

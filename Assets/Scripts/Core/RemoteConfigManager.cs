@@ -27,6 +27,9 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_ALL_LEVELS_TIMER = "AllLevelsTimer";
     public const string KEY_PTS_MUL = "PTS_Mul";
     public const string KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED = "isPostWinLevelChoiceEnabled";
+    public const string KEY_ONE_LIFE_PLAY_ON = "OneLifePlayOn";
+    public const string KEY_IS_SHUFFLE_ON = "isShuffleOn";
+    public const string KEY_NETFLIX_EFFECT = "NetflixEffect";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
 
@@ -81,6 +84,9 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_ALL_LEVELS_TIMER] = false;
         defaults[KEY_PTS_MUL] = 0.28d;
         defaults[KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED] = true;
+        defaults[KEY_ONE_LIFE_PLAY_ON] = false;
+        defaults[KEY_IS_SHUFFLE_ON] = true;
+        defaults[KEY_NETFLIX_EFFECT] = false;
     }
 
     /// <summary>
@@ -294,6 +300,9 @@ public class RemoteConfigManager : MonoBehaviour
     public int AdCooldown => (int)GetLong(KEY_AD_COOLDOWN);
     public bool AllLevelsTimer => GetBool(KEY_ALL_LEVELS_TIMER);
     public bool IsPostWinLevelChoiceEnabled => GetBool(KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED);
+    public bool OneLifePlayOn => GetBool(KEY_ONE_LIFE_PLAY_ON);
+    public bool IsShuffleOn => GetBool(KEY_IS_SHUFFLE_ON);
+    public bool IsNetflixEffectEnabled => GetBool(KEY_NETFLIX_EFFECT);
     public float PtsMul => (float)GetDouble(KEY_PTS_MUL);
 
     #endregion

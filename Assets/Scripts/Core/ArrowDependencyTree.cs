@@ -93,7 +93,7 @@ namespace Assets.Scripts.Core
             while (!GridManager.Instance.IsOutOfBounds(checkPos))
             {
                 ArrowController occupant = GridManager.Instance.GetOccupant(checkPos);
-                if (occupant != null && occupant != arrow)
+                if (occupant != null && occupant != arrow && !occupant.IsMoving)
                 {
                     AddDependency(occupant, arrow); // occupant blocks arrow
                 }
@@ -151,14 +151,96 @@ namespace Assets.Scripts.Core
         public List<ArrowController> GetAllFreeArrows()
         {
             List<ArrowController> result = new List<ArrowController>();
-            foreach (var arrow in freeArrows)
+            foreach (var node in nodes.Values)
             {
-                if (arrow != null && !arrow.IsMoving)
+                if (node.Arrow != null && !node.Arrow.IsMoving && node.Blockers.Count == 0)
                 {
-                    result.Add(arrow);
+                    result.Add(node.Arrow);
                 }
             }
             return result;
+        }
+
+        public int GetDependentCount(ArrowController arrow)
+        {
+            if (nodes.TryGetValue(arrow, out var node))
+            {
+                return node.Dependents.Count;
+            }
+            return 0;
+        }
+
+        public IReadOnlyCollection<ArrowController> GetDirectBlockers(ArrowController arrow)
+        {
+            if (nodes.TryGetValue(arrow, out var node))
+            {
+                return node.Blockers;
+            }
+            return System.Array.Empty<ArrowController>();
+        }
+
+        /// <summary>Blockers move before the arrows they block (topological order).</summary>
+        public List<ArrowController> OrderByBlockerChain(List<ArrowController> arrows)
+        {
+            if (arrows == null || arrows.Count <= 1) return arrows;
+
+            var set = new HashSet<ArrowController>(arrows);
+            var inDegree = new Dictionary<ArrowController, int>();
+            foreach (var arrow in arrows)
+            {
+                inDegree[arrow] = 0;
+            }
+
+            foreach (var blocked in arrows)
+            {
+                foreach (var blocker in GetDirectBlockers(blocked))
+                {
+                    if (set.Contains(blocker))
+                    {
+                        inDegree[blocked]++;
+                    }
+                }
+            }
+
+            var queue = new Queue<ArrowController>();
+            foreach (var arrow in arrows)
+            {
+                if (inDegree[arrow] == 0)
+                {
+                    queue.Enqueue(arrow);
+                }
+            }
+
+            var ordered = new List<ArrowController>(arrows.Count);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                ordered.Add(current);
+
+                if (!nodes.TryGetValue(current, out var node)) continue;
+                foreach (var dependent in node.Dependents)
+                {
+                    if (!set.Contains(dependent) || !inDegree.ContainsKey(dependent)) continue;
+                    inDegree[dependent]--;
+                    if (inDegree[dependent] == 0)
+                    {
+                        queue.Enqueue(dependent);
+                    }
+                }
+            }
+
+            if (ordered.Count < arrows.Count)
+            {
+                foreach (var arrow in arrows)
+                {
+                    if (!ordered.Contains(arrow))
+                    {
+                        ordered.Add(arrow);
+                    }
+                }
+            }
+
+            return ordered;
         }
 
         public void Clear()

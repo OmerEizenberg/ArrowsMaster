@@ -34,6 +34,7 @@ namespace Assets.Scripts.Core
         public AudioClip MagicBoosterSound;
         public AudioClip HintBoosterSound;
         public AudioClip RefillBoosterSound;
+        public AudioClip HeartNudgeSound;
 
         private float m_LastNewRecordSoundTime = -30f;
 
@@ -195,6 +196,16 @@ namespace Assets.Scripts.Core
         public void PlayRefillBooster()
         {
             PlaySound(RefillBoosterSound);
+        }
+
+        public void PlayShuffleBooster()
+        {
+            PlaySound(HintBoosterSound != null ? HintBoosterSound : MagicBoosterSound);
+        }
+
+        public void PlayHeartNudge()
+        {
+            PlaySound(HeartNudgeSound != null ? HeartNudgeSound : RefillBoosterSound);
         }
 
         public void SetMute(bool mute)

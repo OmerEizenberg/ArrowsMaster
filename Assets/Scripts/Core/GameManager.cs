@@ -38,6 +38,7 @@ namespace Assets.Scripts.Core
         public const int COINS_START_LEVEL = 5;
         public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;
         public const int REFILL_BOOSTER_UNLOCK_LEVEL = 9;
+        public const int SHUFFLE_BOOSTER_UNLOCK_LEVEL = 14;
 
         public static string GetChallengeLevelId(int month, int day, int year)
         {
@@ -73,6 +74,10 @@ namespace Assets.Scripts.Core
         [SerializeField] private GameObject m_StreakRecordContainer;
         [SerializeField] private TextMeshProUGUI m_ArrowsLeftText;
         [SerializeField] private RectTransform m_ArrowsLeftHolder;
+
+        [Header("Streak Feedback")]
+        [SerializeField] private GameObject m_ComboFeedbackPrefab;
+        [SerializeField] private GameObject m_VoiceFeedbackPrefab;
 
         [Header("Settings")]
         public int maxLives = 3;
@@ -114,6 +119,8 @@ namespace Assets.Scripts.Core
         private bool isHintVisible = false;
         private bool isWinning = false;
         private bool isHintActive = false;
+        private bool isShuffleInProgress = false;
+        private Coroutine m_ShuffleBoosterCoroutine;
         private bool isTimeUp = false;
         public float LastArrowSelectionTime { get; private set; } = -10f;
         public int p_StreakCount { get; private set; } = 0;
@@ -136,8 +143,13 @@ namespace Assets.Scripts.Core
         public bool p_isPlayOnRewarded = false;
         public bool p_isHintRewarded = false;
 
-        private List<RectTransform> m_ActiveCombos = new List<RectTransform>();
-        private List<GameObject> m_ActiveVoices = new List<GameObject>();
+        private ComboController m_ComboFeedback;
+        private RectTransform m_ComboFeedbackRect;
+        private VoiceVibeController m_VoiceFeedback;
+        private RectTransform m_VoiceFeedbackRect;
+        private Transform m_ComboUIParent;
+        private RectTransform m_ComboUIParentRect;
+        private Camera m_UICamera;
         private int m_SuccessSaveCounter = 0;
         private float m_LastSaveTime = 0f;
         private Dictionary<string, Queue<GameObject>> m_EffectPools = new Dictionary<string, Queue<GameObject>>();
@@ -150,7 +162,7 @@ namespace Assets.Scripts.Core
         private Vector2 m_ScreenCenter;
         private Vector2[] m_QuarterCenters = new Vector2[4];
 
-        public bool CanInteract => isEntranceFinished && !isWinning && !isTimeUp &&
+        public bool CanInteract => isEntranceFinished && !isWinning && !isTimeUp && !isShuffleInProgress &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
                                 (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy) &&
                                 (m_FunFact == null || !m_FunFact.activeInHierarchy);
@@ -212,6 +224,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnPlayOnRewardReceived += ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived += HandleMagicRewardReceived;
                 AdsManager.Instance.OnLifeRewardReceived += HandleLifeRewardReceived;
+                AdsManager.Instance.OnShuffleRewardReceived += HandleShuffleRewardReceived;
                 AdsManager.Instance.OnAdOpened += HandleAdOpened;
                 AdsManager.Instance.OnAdClosed += HandleAdClosed;
                 AdsManager.Instance.OnAdReadinessChanged += RefreshHintAdReadyCache;
@@ -233,6 +246,7 @@ namespace Assets.Scripts.Core
             {
                 levelManager.OnEntranceAnimationFinished += () => {
                     isEntranceFinished = true;
+                    if (m_FunFact != null) m_FunFact.SetActive(false);
                     ResetHintTimer();
                 };
 
@@ -280,6 +294,7 @@ namespace Assets.Scripts.Core
                 AdsManager.Instance.OnPlayOnRewardReceived -= ExecutePlayOn;
                 AdsManager.Instance.OnMagicRewardReceived -= HandleMagicRewardReceived;
                 AdsManager.Instance.OnLifeRewardReceived -= HandleLifeRewardReceived;
+                AdsManager.Instance.OnShuffleRewardReceived -= HandleShuffleRewardReceived;
                 AdsManager.Instance.OnAdOpened -= HandleAdOpened;
                 AdsManager.Instance.OnAdClosed -= HandleAdClosed;
                 AdsManager.Instance.OnAdReadinessChanged -= RefreshHintAdReadyCache;
@@ -407,6 +422,14 @@ namespace Assets.Scripts.Core
             else ExecuteRefillLife();
         }
 
+        private void HandleShuffleRewardReceived()
+        {
+            UserDataManager.Instance.AddShuffleBooster(1);
+            UserDataManager.Instance.UseShuffleBooster(1);
+            if (m_GameUI != null) m_GameUI.HandleShuffleRewardReceived();
+            else ExecuteShuffleBooster();
+        }
+
         public void ExecuteRefillLife()
         {
             ResetLives();
@@ -447,8 +470,188 @@ namespace Assets.Scripts.Core
             SaveCurrentProgress();
         }
 
+        public void ExecuteShuffleBooster()
+        {
+            if (!IsShuffleOn) return;
+
+            if (m_ShuffleBoosterCoroutine != null)
+            {
+                StopCoroutine(m_ShuffleBoosterCoroutine);
+                m_ShuffleBoosterCoroutine = null;
+            }
+            m_ShuffleBoosterCoroutine = StartCoroutine(ExecuteShuffleBoosterRoutine());
+        }
+
+        private void CancelShuffleBoosterInteractionLock()
+        {
+            isShuffleInProgress = false;
+            if (m_ShuffleBoosterCoroutine != null)
+            {
+                StopCoroutine(m_ShuffleBoosterCoroutine);
+                m_ShuffleBoosterCoroutine = null;
+            }
+
+            if (GridManager.Instance == null) return;
+            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+            for (int i = 0; i < allArrows.Count; i++)
+            {
+                ArrowController arrow = allArrows[i];
+                if (arrow != null)
+                {
+                    arrow.ResetShuffleInteractionState();
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator ExecuteShuffleBoosterRoutine()
+        {
+            isShuffleInProgress = true;
+
+            if (GridManager.Instance == null)
+            {
+                isShuffleInProgress = false;
+                m_ShuffleBoosterCoroutine = null;
+                yield break;
+            }
+
+            List<ShuffleMovePlan> plans = ShuffleBoosterPlanner.BuildShufflePlans();
+            if (plans.Count == 0)
+            {
+                isShuffleInProgress = false;
+                m_ShuffleBoosterCoroutine = null;
+                yield break;
+            }
+
+            List<List<ShuffleMovePlan>> parallelGroups = ShuffleBoosterPlanner.PartitionIntoParallelGroups(plans);
+            int movedCount = 0;
+
+            for (int g = 0; g < parallelGroups.Count; g++)
+            {
+                List<ShuffleMovePlan> group = parallelGroups[g];
+                if (group == null || group.Count == 0) continue;
+
+                if (group.Count == 1)
+                {
+                    yield return group[0].Arrow.ShuffleRelocateRoutine(group[0].HeadSteps);
+                    movedCount++;
+                }
+                else
+                {
+                    yield return RunShufflePlansInParallel(group);
+                    movedCount += group.Count;
+                }
+
+                if (g < parallelGroups.Count - 1)
+                {
+                    yield return new WaitForSeconds(0.08f);
+                }
+            }
+
+            if (movedCount > 0)
+            {
+                FinalizeShuffleBoardState();
+                RefreshActiveHintPreview();
+                SaveCurrentProgress();
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] Shuffle booster: no arrows could be relocated.");
+            }
+
+            isShuffleInProgress = false;
+            m_ShuffleBoosterCoroutine = null;
+        }
+
+        private void FinalizeShuffleBoardState()
+        {
+            if (GridManager.Instance == null) return;
+
+            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+            for (int i = 0; i < allArrows.Count; i++)
+            {
+                ArrowController arrow = allArrows[i];
+                if (arrow != null)
+                {
+                    arrow.ResetShuffleInteractionState();
+                }
+            }
+
+            GridManager.Instance.RebuildOccupancyFromSegments();
+            GridManager.Instance.RebuildDependencyTree();
+        }
+
+        private System.Collections.IEnumerator RunShufflePlansInParallel(List<ShuffleMovePlan> group)
+        {
+            int remaining = 0;
+            for (int i = 0; i < group.Count; i++)
+            {
+                ShuffleMovePlan plan = group[i];
+                if (plan?.Arrow == null || plan.HeadSteps == null || plan.HeadSteps.Count == 0)
+                {
+                    continue;
+                }
+                remaining++;
+                StartCoroutine(RunSingleShufflePlan(plan, () => remaining--));
+            }
+
+            const float maxWaitSeconds = 12f;
+            float elapsed = 0f;
+            while (remaining > 0 && elapsed < maxWaitSeconds)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (remaining > 0)
+            {
+                Debug.LogWarning("[GameManager] Shuffle parallel group timed out; forcing arrow reset.");
+                for (int i = 0; i < group.Count; i++)
+                {
+                    if (group[i]?.Arrow != null)
+                    {
+                        group[i].Arrow.ResetShuffleInteractionState();
+                    }
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator RunSingleShufflePlan(ShuffleMovePlan plan, System.Action onComplete)
+        {
+            yield return plan.Arrow.ShuffleRelocateRoutine(plan.HeadSteps);
+            onComplete?.Invoke();
+        }
+
+        /// <summary>Re-evaluates hint preview after shuffle without clearing the hint-active state.</summary>
+        public void RefreshActiveHintPreview()
+        {
+            if (!isHintActive || GridManager.Instance == null) return;
+
+            List<ArrowController> allArrows = GridManager.Instance.GetAllArrows();
+            for (int i = 0; i < allArrows.Count; i++)
+            {
+                if (allArrows[i] != null) allArrows[i].HidePreview();
+            }
+
+            List<ArrowController> nonBlocked = GridManager.Instance.GetNonBlockedArrows(1);
+            ArrowController bestArrow = nonBlocked.Count > 0 ? nonBlocked[0] : null;
+            if (bestArrow == null && allArrows.Count > 0)
+            {
+                bestArrow = allArrows[0];
+            }
+
+            if (bestArrow != null && !bestArrow.IsMoving)
+            {
+                bestArrow.ShowPreview();
+            }
+        }
+
         public void PlayOn()
         {
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayClick();
+            }
+
             Debug.Log("[GameManager] PlayOn method called.");
             if (AdsManager.Instance != null)
             {
@@ -480,6 +683,11 @@ namespace Assets.Scripts.Core
 
         public void BuyPlayOn()
         {
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayClick();
+            }
+
             int cost = GetPlayOnCost();
             if (UserDataManager.Instance.ReduceArrowsCurrency(cost))
             {
@@ -519,7 +727,7 @@ namespace Assets.Scripts.Core
             else
             {
                Debug.Log("[GameManager] Out of lives! Refilling lives.");
-               ResetLives();
+               RefillLivesForPlayOn();
                if (IsTimedLevel)
                {
                    isTimerActive = true;
@@ -608,11 +816,13 @@ namespace Assets.Scripts.Core
             // -----------------------------
 
             OnLevelStarted?.Invoke();
+            PrewarmStreakFeedbackUI();
             // Reset UI for level currency
             OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
             
             isEntranceFinished = false;
             isWinning = false;
+            CancelShuffleBoosterInteractionLock();
             if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
@@ -675,9 +885,14 @@ namespace Assets.Scripts.Core
             // ----------------------------------------
 
             OnLevelStarted?.Invoke();
+            PrewarmStreakFeedbackUI();
             // Reset UI for level currency
             OnLevelCurrencyChanged?.Invoke(0, Vector2.zero);
 
+            isEntranceFinished = false;
+            isWinning = false;
+            CancelShuffleBoosterInteractionLock();
+            if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
 
@@ -692,6 +907,28 @@ namespace Assets.Scripts.Core
             SaveCurrentProgress(); // Save restored lives to level state
         }
 
+        public bool IsOneLifePlayOnEnabled()
+        {
+            return !isTimeUp
+                && RemoteConfigManager.Instance != null
+                && RemoteConfigManager.Instance.IsConfigReady
+                && RemoteConfigManager.Instance.OneLifePlayOn;
+        }
+
+        private void RefillLivesForPlayOn()
+        {
+            if (IsOneLifePlayOnEnabled())
+            {
+                CurrentLives = 1;
+                OnLivesChanged?.Invoke(CurrentLives);
+                SaveCurrentProgress();
+            }
+            else
+            {
+                ResetLives();
+            }
+        }
+
         public void ResetLevelState()
         {
             activeArrowsCount = 0;
@@ -700,6 +937,7 @@ namespace Assets.Scripts.Core
             playOnPurchaseCount = 0;
             isWinning = false;
             isEntranceFinished = false;
+            CancelShuffleBoosterInteractionLock();
             
             // Clear timer state so it doesn't carry over from previous levels
             isTimerActive = false;
@@ -710,7 +948,8 @@ namespace Assets.Scripts.Core
 
             if (m_currentArrowNudge != null) { Destroy(m_currentArrowNudge); m_currentArrowNudge = null; }
             m_ArrowNudgeTimer = 0f;
-            
+
+            TeardownStreakFeedbackUI();
             UpdateArrowsLeftUI(false);
         }
 
@@ -857,10 +1096,22 @@ namespace Assets.Scripts.Core
         }
 
 
+        private static int s_LevelsCompletedSinceAssetUnload;
+
         private System.Collections.IEnumerator WinSequence()
         {
             UserDataManager.Instance.ClearLevelProgress(); // Clear backup immediately on win
             if (m_PeriodicSaveCoroutine != null) { StopCoroutine(m_PeriodicSaveCoroutine); m_PeriodicSaveCoroutine = null; }
+
+            if (DevicePerformanceProfile.IsLowEnd)
+            {
+                s_LevelsCompletedSinceAssetUnload++;
+                if (s_LevelsCompletedSinceAssetUnload >= 8)
+                {
+                    s_LevelsCompletedSinceAssetUnload = 0;
+                    Resources.UnloadUnusedAssets();
+                }
+            }
             
             if (m_GameUI != null) m_GameUI.ResetComboIndication();
             ClearActiveCombos();
@@ -1266,6 +1517,7 @@ namespace Assets.Scripts.Core
             hintTimer = 0f;
             hintAdPollTimer = 0f;
             SetHintVisibility(false);
+            if (m_GameUI != null) m_GameUI.ResetIdleBoosterNudgeTimer();
             
             // If there's an active hint, clear it immediately when user starts interacting
             if (clearActiveHint && isHintActive)
@@ -1320,6 +1572,9 @@ namespace Assets.Scripts.Core
             RemoteConfigManager.Instance.AllLevelsTimer &&
             UserDataManager.Instance != null &&
             UserDataManager.Instance.CurrentLevel >= ALL_LEVELS_TIMER_START_LEVEL;
+
+        public bool IsShuffleOn =>
+            RemoteConfigManager.Instance == null || RemoteConfigManager.Instance.IsShuffleOn;
 
         public void InitializeTimer(float durationInSeconds)
         {
@@ -1452,10 +1707,13 @@ namespace Assets.Scripts.Core
             {
                 return "Watch an ad to get 60 seconds\nand Keep Playing!";
             }
-            else
+
+            if (IsOneLifePlayOnEnabled())
             {
-                return "Watch an ad to refill lives\nand Keep Playing!";
+                return "Watch an ad to add 1 live\nand Keep Playing!";
             }
+
+            return "Watch an ad to refill lives\nand Keep Playing!";
         }
 
          public string GetFailureAdText()
@@ -1464,10 +1722,13 @@ namespace Assets.Scripts.Core
             {
                 return "+60 Seconds";
             }
-            else
+
+            if (IsOneLifePlayOnEnabled())
             {
-                return "Add More Lives";
+                return "Add Life";
             }
+
+            return "Add More Lives";
         }
 
         public string GetFailureDescription()
@@ -1476,49 +1737,185 @@ namespace Assets.Scripts.Core
             {
                 return "Time's up! get more 60 seconds with coins or by watching a short ad.";
             }
-            else
+
+            if (IsOneLifePlayOnEnabled())
             {
-                return "Refill lives with coins or by watching a short ad.";
+                return "Add 1 live with coins or by watching a short ad.";
             }
+
+            return "Refill lives with coins or by watching a short ad.";
         }
 
-        public void RegisterCombo(RectTransform rect)
+        public void ShowComboFeedback(int displayStreak, int upcomingStreak)
         {
-            if (rect != null) m_ActiveCombos.Add(rect);
+            if (!EnsureComboFeedback())
+            {
+                return;
+            }
+
+            Vector2 screenPos = GetValidComboPosition(false);
+            if (m_ComboUIParentRect != null &&
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    m_ComboUIParentRect, screenPos, m_UICamera, out Vector2 localPos))
+            {
+                m_ComboFeedbackRect.anchoredPosition = localPos;
+            }
+
+            m_ComboFeedback.Show(displayStreak, upcomingStreak);
+        }
+
+        public void HideComboFeedback()
+        {
+            if (m_ComboFeedback != null)
+            {
+                m_ComboFeedback.Hide();
+            }
         }
 
         public void ClearActiveCombos()
         {
-            foreach (var combo in m_ActiveCombos)
-            {
-                if (combo != null && combo.gameObject != null)
-                {
-                    // OPTIMIZATION #6: Return to pool
-                    ReturnEffect(combo.gameObject);
-                }
-            }
-            m_ActiveCombos.Clear();
+            HideComboFeedback();
         }
 
-        public void RegisterVoice(GameObject voice)
+        private void PrewarmStreakFeedbackUI()
         {
-            if (voice != null)
+            TeardownStreakFeedbackUI();
+            EnsureComboFeedback();
+            EnsureVoiceFeedback();
+        }
+
+        private void TeardownStreakFeedbackUI()
+        {
+            TeardownComboFeedbackInstance();
+            TeardownVoiceFeedbackInstance();
+            m_ComboUIParent = null;
+            m_ComboUIParentRect = null;
+        }
+
+        private void TeardownComboFeedbackInstance()
+        {
+            HideComboFeedback();
+
+            if (m_ComboFeedback != null)
             {
-                m_ActiveVoices.Add(voice);
+                Destroy(m_ComboFeedback.gameObject);
+                m_ComboFeedback = null;
+                m_ComboFeedbackRect = null;
+            }
+        }
+
+        private void TeardownVoiceFeedbackInstance()
+        {
+            HideVoiceFeedback();
+
+            if (m_VoiceFeedback != null)
+            {
+                Destroy(m_VoiceFeedback.gameObject);
+                m_VoiceFeedback = null;
+                m_VoiceFeedbackRect = null;
+            }
+        }
+
+        private bool EnsureComboFeedback()
+        {
+            if (m_ComboFeedback != null)
+            {
+                return true;
+            }
+
+            if (m_ComboFeedbackPrefab == null)
+            {
+                return false;
+            }
+
+            CacheComboUIReferences();
+            if (m_ComboUIParent == null)
+            {
+                return false;
+            }
+
+            GameObject comboObject = Instantiate(m_ComboFeedbackPrefab, m_ComboUIParent);
+            comboObject.SetActive(false);
+            m_ComboFeedback = comboObject.GetComponent<ComboController>();
+            m_ComboFeedbackRect = comboObject.GetComponent<RectTransform>();
+            return m_ComboFeedback != null && m_ComboFeedbackRect != null;
+        }
+
+        private void CacheComboUIReferences()
+        {
+            if (m_GameUI == null)
+            {
+                return;
+            }
+
+            m_ComboUIParent = m_GameUI.GameUIParent;
+            m_ComboUIParentRect = m_ComboUIParent as RectTransform;
+
+            m_UICamera = null;
+            Canvas canvas = m_GameUI.GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                m_UICamera = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+            }
+        }
+
+        public void ShowVoiceFeedback()
+        {
+            if (!EnsureVoiceFeedback())
+            {
+                return;
+            }
+
+            m_VoiceFeedbackRect.anchorMin = new Vector2(0.5f, 0.5f);
+            m_VoiceFeedbackRect.anchorMax = new Vector2(0.5f, 0.5f);
+            m_VoiceFeedbackRect.pivot = new Vector2(0.5f, 0.5f);
+            m_VoiceFeedbackRect.anchoredPosition = Vector2.zero;
+            m_VoiceFeedbackRect.SetAsLastSibling();
+            m_VoiceFeedback.Show();
+        }
+
+        public void HideVoiceFeedback()
+        {
+            if (m_VoiceFeedback != null)
+            {
+                m_VoiceFeedback.Hide();
             }
         }
 
         public void ClearActiveVoices()
         {
-            foreach (var voice in m_ActiveVoices)
+            HideVoiceFeedback();
+        }
+
+        private bool EnsureVoiceFeedback()
+        {
+            if (m_VoiceFeedback != null)
             {
-                if (voice != null)
-                {
-                    // OPTIMIZATION #6: Return to pool
-                    ReturnEffect(voice);
-                }
+                return true;
             }
-            m_ActiveVoices.Clear();
+
+            if (m_VoiceFeedbackPrefab == null)
+            {
+                return false;
+            }
+
+            CacheComboUIReferences();
+            if (m_ComboUIParent == null)
+            {
+                return false;
+            }
+
+            GameObject voiceObject = Instantiate(m_VoiceFeedbackPrefab, m_ComboUIParent);
+            voiceObject.SetActive(false);
+
+            m_VoiceFeedback = voiceObject.GetComponent<VoiceVibeController>();
+            if (m_VoiceFeedback == null)
+            {
+                m_VoiceFeedback = voiceObject.AddComponent<VoiceVibeController>();
+            }
+
+            m_VoiceFeedbackRect = voiceObject.GetComponent<RectTransform>();
+            return m_VoiceFeedback != null && m_VoiceFeedbackRect != null;
         }
 
         public Vector2 GetValidComboPosition(bool isVoice)
@@ -1543,8 +1940,20 @@ namespace Assets.Scripts.Core
             if (m_EffectPools[poolKey].Count > 0)
             {
                 obj = m_EffectPools[poolKey].Dequeue();
-                if (obj == null) return SpawnEffect(prefab, position, rotation, parent); // Handle destroyed objects
-                
+                if (obj == null) return SpawnEffect(prefab, position, rotation, parent);
+
+                if (poolKey == "LikeContainer" && obj.GetComponentInChildren<LikeBehaviour>(true) == null)
+                {
+                    Destroy(obj);
+                    return SpawnEffect(prefab, position, rotation, parent);
+                }
+
+                EffectPoolTag pooledTag = obj.GetComponent<EffectPoolTag>();
+                if (pooledTag != null)
+                {
+                    pooledTag.InPool = false;
+                }
+
                 obj.transform.SetParent(parent);
                 obj.transform.position = position;
                 obj.transform.rotation = rotation;
@@ -1566,8 +1975,22 @@ namespace Assets.Scripts.Core
             EffectPoolTag tag = obj.GetComponent<EffectPoolTag>();
             if (tag != null)
             {
+                if (tag.InPool)
+                {
+                    return;
+                }
+
+                tag.InPool = true;
                 obj.SetActive(false);
                 if (!m_EffectPools.ContainsKey(tag.PoolKey)) m_EffectPools[tag.PoolKey] = new Queue<GameObject>();
+
+                int maxPerKey = DevicePerformanceProfile.MaxEffectPoolPerKey;
+                if (m_EffectPools[tag.PoolKey].Count >= maxPerKey)
+                {
+                    Destroy(obj);
+                    return;
+                }
+
                 m_EffectPools[tag.PoolKey].Enqueue(obj);
             }
             else
@@ -1579,6 +2002,7 @@ namespace Assets.Scripts.Core
         private class EffectPoolTag : MonoBehaviour
         {
             public string PoolKey;
+            public bool InPool;
         }
         #endregion
 
@@ -1664,10 +2088,12 @@ namespace Assets.Scripts.Core
             Debug.Log($"[GameManager] Progress Restored: Level={progress.levelId}, Time={currentTime}/{levelDuration}, Lives={CurrentLives}, Active={isTimerActive}");
 
             OnLevelStarted?.Invoke();
+            PrewarmStreakFeedbackUI();
             OnLevelCurrencyChanged?.Invoke(collectedLevelCurrency, Vector2.zero);
             
             isEntranceFinished = false;
             isWinning = false;
+            CancelShuffleBoosterInteractionLock();
             if (m_FunFact != null) m_FunFact.SetActive(false);
             ResetHintTimer();
             ResetSelectionStates();
@@ -1732,7 +2158,9 @@ namespace Assets.Scripts.Core
             m_LastSaveTime = Time.time;
             m_SuccessSaveCounter = 0; // Reset counter whenever a real disk save occurs
             UserDataManager.Instance.SaveLevelProgress(progress);
+#if UNITY_EDITOR
             Debug.Log($"[GameManager] Progress saved for level {progress.levelId}. Picked arrows: {progress.pickedArrowIds.Count}, Time={currentTime}/{levelDuration}, Active={isTimerActive}");
+#endif
         }
 
         private void CheckAchievements(int completedLevel)

@@ -16,6 +16,7 @@ MonoBehaviour:
   ActiveDays: 
   ActivationHour: 19
   DurationHours: 4
+  ShowLevel: 1
   UnlockLevel: 28
   IconPrefabName: RaceIcon
   PopupPrefabName: MultiplayerPopup

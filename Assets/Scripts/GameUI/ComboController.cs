@@ -1,39 +1,70 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
 public class ComboController : MonoBehaviour
 {
-    [SerializeField]
-    TextMeshProUGUI m_comboNum;
+    private const string ComboAnimationState = "ComboText";
+    private const int ComboAnimationLayer = 0;
 
-    private int m_upComingNum=1;
-    // Start is called before the first frame update
-    void Start()
+    [SerializeField] private TextMeshProUGUI m_comboNum;
+    [SerializeField] private Animator m_Animator;
+
+    private int m_upComingNum = 1;
+    private int m_cachedHash;
+
+    private void Awake()
     {
-        
+        if (m_Animator == null)
+        {
+            m_Animator = GetComponent<Animator>();
+        }
+
+        m_cachedHash = Animator.StringToHash(ComboAnimationState);
     }
 
-    // Update is called once per frame
+    public void Show(int displayStreak, int upcomingStreak)
+    {
+        m_upComingNum = displayStreak;
+        UpdateComboNumber();
+        m_upComingNum = upcomingStreak;
+
+        gameObject.SetActive(true);
+        RestartAnimationFromBeginning();
+    }
+
+    public void Hide()
+    {
+        gameObject.SetActive(false);
+    }
+
     public void UpdateComboNumber()
     {
-        m_comboNum.text = ""+m_upComingNum;
+        if (m_comboNum != null)
+        {
+            m_comboNum.SetText("{0}", m_upComingNum);
+        }
     }
-    public void UpdateUpComingComboNumber(int i_num)
+
+    public void UpdateUpComingComboNumber(int num)
     {
-        m_upComingNum = i_num;
+        m_upComingNum = num;
     }
+
     public void DestroyME()
     {
-        // OPTIMIZATION #6: Return to pool instead of destroying
-        if (Assets.Scripts.Core.GameManager.Instance != null)
+        Hide();
+    }
+
+    private void RestartAnimationFromBeginning()
+    {
+        if (m_Animator == null)
         {
-            Assets.Scripts.Core.GameManager.Instance.ReturnEffect(gameObject);
+            return;
         }
-        else
-        {
-            Destroy(gameObject);
-        }
+
+        m_Animator.Rebind();
+        m_Animator.Update(0f);
+        m_Animator.Play(m_cachedHash, ComboAnimationLayer, 0f);
+        m_Animator.Update(0f);
     }
 }

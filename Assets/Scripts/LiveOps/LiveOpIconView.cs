@@ -25,6 +25,7 @@ namespace Assets.Scripts.LiveOps
         private ALiveOpService service;
         private DailyMissionsLiveOpService dailyMissionsService;
         private bool isLocked = false;
+        private bool m_LevelSubscribed;
         private Coroutine tooltipCoroutine;
         private float m_NextUiRefreshTime;
         private const float UiRefreshInterval = 1f;
@@ -52,14 +53,30 @@ namespace Assets.Scripts.LiveOps
                 EnsureClaimNotification();
             }
 
-            CheckUnlockState();
+            SubscribeLevelChanged();
+            RefreshIconState();
             RefreshUI();
             RefreshClaimNotification();
         }
 
         private void OnDestroy()
         {
+            UnsubscribeLevelChanged();
             UnsubscribeDailyMissions();
+        }
+
+        private void SubscribeLevelChanged()
+        {
+            if (m_LevelSubscribed || UserDataManager.Instance == null) return;
+            UserDataManager.Instance.OnLevelChanged += RefreshIconState;
+            m_LevelSubscribed = true;
+        }
+
+        private void UnsubscribeLevelChanged()
+        {
+            if (!m_LevelSubscribed || UserDataManager.Instance == null) return;
+            UserDataManager.Instance.OnLevelChanged -= RefreshIconState;
+            m_LevelSubscribed = false;
         }
 
         private void UnsubscribeDailyMissions()
@@ -76,7 +93,7 @@ namespace Assets.Scripts.LiveOps
             if (service == null || Time.time < m_NextUiRefreshTime) return;
 
             m_NextUiRefreshTime = Time.time + UiRefreshInterval;
-            CheckUnlockState();
+            RefreshIconState();
             RefreshClaimNotification();
 
             if (m_TimerTexts != null && m_TimerTexts.Count > 0)
@@ -85,22 +102,27 @@ namespace Assets.Scripts.LiveOps
             }
         }
 
-        private void CheckUnlockState()
+        private void RefreshIconState()
         {
+            if (service == null || service.SO == null || UserDataManager.Instance == null) return;
+
             int currentLevel = UserDataManager.Instance.CurrentLevel;
+            bool shouldShow = currentLevel >= service.SO.ShowLevel;
+            if (gameObject.activeSelf != shouldShow)
+                gameObject.SetActive(shouldShow);
+
+            if (!shouldShow) return;
+
             bool newlyUnlocked = isLocked && currentLevel >= service.SO.UnlockLevel;
             isLocked = currentLevel < service.SO.UnlockLevel;
 
             if (m_LockIcon != null) m_LockIcon.SetActive(isLocked);
-            
+
             float targetAlpha = isLocked ? 0.5f : 1.0f;
             ApplyAlpha(targetAlpha);
 
             if (newlyUnlocked)
-            {
-                // Play unlock effect or animation if needed
                 Debug.Log($"[LiveOpIconView] {service.SO.EventID} Unlocked!");
-            }
         }
 
         private void ApplyAlpha(float alpha)

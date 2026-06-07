@@ -20,7 +20,7 @@ namespace Assets.Scripts.Core
         private int interstitialRetryAttempt;
         private int rewardedRetryAttempt;
 
-        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward, LifeReward }
+        private enum RewardAdType { None, GameReward, CoinsReward, MultiplyReward, HintReward, PlayOnReward, MagicReward, LifeReward, ShuffleReward }
         private RewardAdType pendingRewardType = RewardAdType.None;
 
         private readonly ConcurrentQueue<Action> _mainThreadQueue = new ConcurrentQueue<Action>();
@@ -32,6 +32,7 @@ namespace Assets.Scripts.Core
         public event Action OnPlayOnRewardReceived;
         public event Action OnMagicRewardReceived;
         public event Action OnLifeRewardReceived;
+        public event Action OnShuffleRewardReceived;
         public event Action OnAdOpened;
         public event Action OnAdClosed;
         /// <summary>Fired when any cached ad-ready flag changes (avoids per-frame native IsAdReady calls).</summary>
@@ -41,10 +42,17 @@ namespace Assets.Scripts.Core
         private bool _interstitialReady;
         private bool _bannerReady;
         private bool _bannerCreated;
+        private bool _bannerCreateInProgress;
+        private bool _bannerCreateRequestedForShow;
+        private bool _bannerShowRequested;
+        private bool _bannerDestroyPending;
+        private bool _applicationPaused;
+        private Coroutine _bannerCreateCoroutine;
+        private Coroutine _bannerDestroyCoroutine;
+        private Coroutine _bannerResumeSyncCoroutine;
 
         private GameObject _coinsExplosionPrefab;
-        private Coroutine _deferredWorkCoroutine;
-        private float _lastAdCloseTime = -999f;
+        private int _bannerRetryAttempt;
         private bool _showNextInterstitial = true;
         private bool _isFlushingPendingSingularRevenue;
 
@@ -75,8 +83,8 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
-        private const float PostAdLoadCooldownSeconds = 4f;
-        private const float DeferredLoadDelaySeconds = 1.5f;
+        private const float BannerCreateSettleDelaySeconds = 0.25f;
+        private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
 
         // ──────────────────────────────────────────────────────────────────
         // AppLovin MAX SDK Key
@@ -158,8 +166,30 @@ namespace Assets.Scripts.Core
 
             _coinsExplosionPrefab = Resources.Load<GameObject>("CoinsSmallExplosion");
 
-            _ = InitializeSDK();
+            TermsConsentManager.OnSdkInitAllowed += HandleSdkInitAllowed;
+            if (TermsConsentManager.IsSdkInitAllowed && TermsConsentManager.HasAccepted)
+                _ = InitializeSDK();
+            else
+                Debug.Log("[AdsManager] Waiting for terms (+ ATT on iOS) before ads initialization.");
+
             StartCoroutine(AdHealthCheckRoutine());
+        }
+
+        private void HandleSdkInitAllowed()
+        {
+            if (!TermsConsentManager.HasAccepted)
+            {
+                Debug.Log("[AdsManager] Terms not accepted; skipping ads SDK initialization.");
+                return;
+            }
+
+            if (!isInitialized && !isInitializing)
+                _ = InitializeSDK();
+        }
+
+        private void Start()
+        {
+            SubscribeToNoAdsStatus();
         }
 
         private void Update()
@@ -168,13 +198,16 @@ namespace Assets.Scripts.Core
                 action?.Invoke();
         }
 
+        private void OnApplicationPause(bool paused)
+        {
+            _applicationPaused = paused;
+            if (!paused)
+                ScheduleBannerResumeSync();
+        }
+
         private void OnDestroy()
         {
-            if (_deferredWorkCoroutine != null)
-            {
-                StopCoroutine(_deferredWorkCoroutine);
-                _deferredWorkCoroutine = null;
-            }
+            TermsConsentManager.OnSdkInitAllowed -= HandleSdkInitAllowed;
 
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
 
@@ -200,12 +233,205 @@ namespace Assets.Scripts.Core
             MaxSdkCallbacks.Banner.OnAdClickedEvent -= OnBannerAdClicked;
             MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent -= OnBannerAdRevenuePaid;
 
-            if (_bannerCreated) MaxSdk.DestroyBanner(BannerAdUnitId);
+            UnsubscribeFromNoAdsStatus();
+            CancelDeferredBannerCreate();
+            if (_bannerResumeSyncCoroutine != null)
+            {
+                StopCoroutine(_bannerResumeSyncCoroutine);
+                _bannerResumeSyncCoroutine = null;
+            }
+            if (_bannerDestroyCoroutine != null)
+            {
+                StopCoroutine(_bannerDestroyCoroutine);
+                _bannerDestroyCoroutine = null;
+            }
+            ExecuteDestroyBannerImmediate();
         }
 
         // ════════════════════════════════════════════
         //  HELPERS
         // ════════════════════════════════════════════
+
+        private bool UserHasNoAds =>
+            IAPManager.Instance != null && IAPManager.Instance.HasNoAds;
+
+        private void SubscribeToNoAdsStatus()
+        {
+            if (IAPManager.Instance == null) return;
+            IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
+            IAPManager.Instance.OnNoAdsStatusChanged += HandleNoAdsStatusChanged;
+            if (IAPManager.Instance.HasNoAds)
+                HandleNoAdsStatusChanged(true);
+        }
+
+        private void UnsubscribeFromNoAdsStatus()
+        {
+            if (IAPManager.Instance == null) return;
+            IAPManager.Instance.OnNoAdsStatusChanged -= HandleNoAdsStatusChanged;
+        }
+
+        private void HandleNoAdsStatusChanged(bool hasNoAds)
+        {
+            if (!hasNoAds) return;
+            Debug.Log("[AdsManager] No Ads purchased — hiding and destroying banner.");
+            DestroyBanner();
+        }
+
+        private void DestroyBanner()
+        {
+            CancelDeferredBannerCreate();
+            _bannerShowRequested = false;
+
+            if (!_bannerCreated)
+            {
+                CancelDeferredBannerDestroy();
+                _bannerDestroyPending = false;
+                return;
+            }
+
+            _bannerDestroyPending = true;
+            if (_applicationPaused) return;
+
+            ScheduleDeferredBannerDestroy();
+        }
+
+        private void CancelDeferredBannerDestroy()
+        {
+            if (_bannerDestroyCoroutine == null) return;
+
+            StopCoroutine(_bannerDestroyCoroutine);
+            _bannerDestroyCoroutine = null;
+        }
+
+        private void ScheduleDeferredBannerDestroy()
+        {
+            if (_bannerDestroyCoroutine != null) return;
+            _bannerDestroyCoroutine = StartCoroutine(DestroyBannerDeferred());
+        }
+
+        private IEnumerator DestroyBannerDeferred()
+        {
+            // destroyAdView → ViewGroup.removeView runs on the Android UI thread and can ANR
+            // if called during heavy frames; defer until after the current frame settles.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+
+            _bannerDestroyCoroutine = null;
+
+            if (this == null || !_bannerDestroyPending || _applicationPaused)
+                yield break;
+
+            // Cancel destroy only when the banner is wanted again (not for No Ads teardown).
+            if (_bannerShowRequested && !UserHasNoAds)
+                yield break;
+
+            ExecuteDestroyBannerImmediate();
+        }
+
+        private void ExecuteDestroyBanner()
+        {
+            if (!_bannerCreated) return;
+            if (_applicationPaused)
+            {
+                _bannerDestroyPending = true;
+                return;
+            }
+
+            _bannerDestroyPending = true;
+            ScheduleDeferredBannerDestroy();
+        }
+
+        private void ExecuteDestroyBannerImmediate()
+        {
+            if (!_bannerCreated) return;
+
+            try
+            {
+                MaxSdk.HideBanner(BannerAdUnitId);
+                MaxSdk.DestroyBanner(BannerAdUnitId);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] DestroyBanner failed: {e.Message}");
+            }
+
+            _bannerCreated = false;
+            _bannerDestroyPending = false;
+            SetCachedReady(ref _bannerReady, false);
+        }
+
+        private void ScheduleBannerResumeSync()
+        {
+            if (_bannerResumeSyncCoroutine != null)
+                StopCoroutine(_bannerResumeSyncCoroutine);
+
+            _bannerResumeSyncCoroutine = StartCoroutine(SyncBannerNativeStateAfterResume());
+        }
+
+        private IEnumerator SyncBannerNativeStateAfterResume()
+        {
+            // Wait for Unity/Android to finish the pause handshake before touching native ad views.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+
+            _bannerResumeSyncCoroutine = null;
+            SyncBannerNativeState();
+        }
+
+        /// <summary>
+        /// Applies banner create/show/hide/destroy to MAX. Skipped while the app is paused to avoid
+        /// a Unity/Android deadlock (Unity thread posts to UI thread during Activity.onPause).
+        /// </summary>
+        private void SyncBannerNativeState()
+        {
+            if (_applicationPaused || !isInitialized) return;
+
+            if (UserHasNoAds)
+            {
+                if (_bannerCreated || _bannerDestroyPending)
+                    ExecuteDestroyBanner();
+                return;
+            }
+
+            if (_bannerDestroyPending)
+            {
+                ExecuteDestroyBanner();
+                return;
+            }
+
+            if (_bannerCreateInProgress) return;
+
+            if (!_bannerShowRequested)
+            {
+                if (_bannerCreated)
+                {
+                    try
+                    {
+                        MaxSdk.HideBanner(BannerAdUnitId);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[AdsManager] HideBanner failed: {e.Message}");
+                    }
+                }
+                return;
+            }
+
+            if (!_bannerCreated)
+            {
+                InitializeBannerAds(requestedForShow: true);
+                return;
+            }
+
+            try
+            {
+                MaxSdk.ShowBanner(BannerAdUnitId);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] ShowBanner failed: {e.Message}");
+            }
+        }
 
         private void EnqueueAction(Action action) => _mainThreadQueue.Enqueue(action);
 
@@ -238,26 +464,43 @@ namespace Assets.Scripts.Core
             RefreshRewardedReady();
         }
 
-        private void ScheduleDeferredLoad(Action loadAction)
+        /// <summary>
+        /// Preloads the next interstitial, rewarded, and banner after any ad is shown or dismissed.
+        /// MAX recommends loading before the current ad finishes; we also call again on close as a fallback.
+        /// </summary>
+        private void PrepareAllAdsAfterClose()
         {
-            if (loadAction == null) return;
-            if (_deferredWorkCoroutine != null)
-                StopCoroutine(_deferredWorkCoroutine);
-            _deferredWorkCoroutine = StartCoroutine(DeferredLoadRoutine(loadAction));
+            if (!isInitialized)
+            {
+                if (!isInitializing) _ = InitializeSDK();
+                return;
+            }
+
+            Debug.Log("[AdsManager] Preparing next ads (rewarded, interstitial, banner).");
+            LoadRewarded();
+            LoadInterstitial();
+            PrepareBannerAd();
         }
 
-        private IEnumerator DeferredLoadRoutine(Action loadAction)
+        private void PrepareBannerAd()
         {
-            yield return new WaitForSecondsRealtime(DeferredLoadDelaySeconds);
-            if (this == null || loadAction == null) yield break;
-            if (Time.realtimeSinceStartup - _lastAdCloseTime < PostAdLoadCooldownSeconds) yield break;
-            loadAction.Invoke();
-            _deferredWorkCoroutine = null;
+            if (!isInitialized) return;
+            if (UserHasNoAds) return;
+
+            if (!_bannerCreated)
+            {
+                if (!_bannerShowRequested) return;
+                LoadSettingsBanner();
+                return;
+            }
+
+            // Banner view already exists; MAX retries loading automatically.
+            // Avoid destroy/recreate — that allocates new Android views on the main thread under GC pressure.
+            if (_bannerReady) return;
         }
 
         private void NotifyAdClosed()
         {
-            _lastAdCloseTime = Time.realtimeSinceStartup;
             OnAdClosed?.Invoke();
         }
 
@@ -279,12 +522,9 @@ namespace Assets.Scripts.Core
 
                     if (!isInitialized) continue;
 
-                    if (Time.realtimeSinceStartup - _lastAdCloseTime < PostAdLoadCooldownSeconds)
-                        continue;
-
                     if (!_interstitialReady) LoadInterstitial();
                     if (!_rewardedReady) LoadRewarded();
-                    if (!_bannerCreated || !_bannerReady) LoadSettingsBanner();
+                    if (!_bannerCreated || !_bannerReady) PrepareBannerAd();
                 }
                 catch (Exception e)
                 {
@@ -299,6 +539,9 @@ namespace Assets.Scripts.Core
 
         private async Task InitializeSDK()
         {
+            if (!TermsConsentManager.HasAccepted || !TermsConsentManager.IsSdkInitAllowed)
+                return;
+
             if (isInitialized || isInitializing) return;
 
             isInitializing = true;
@@ -306,27 +549,6 @@ namespace Assets.Scripts.Core
             {
                 await IAPManager.EnsureUnityServicesInitializedAsync();
                 Debug.Log("[AdsManager] Unity Services Initialized.");
-
-#if UNITY_IOS && !UNITY_EDITOR
-                if (!IOSAttributionBootstrap.IsAttResolved)
-                {
-                    bool attFinished = false;
-                    EnqueueAction(() =>
-                    {
-                        IOSAdsHelper.RequestATT();
-                        StartCoroutine(IOSAdsHelper.PollATTStatus(_ => attFinished = true));
-                    });
-                    float attWaitStart = Time.time;
-                    while (!attFinished && Time.time - attWaitStart < 30f)
-                        await Task.Yield();
-                    if (!attFinished)
-                        Debug.LogWarning("[AdsManager] ATT flow timed out. Proceeding with ads initialization.");
-                }
-                else
-                {
-                    Debug.Log("[AdsManager] ATT already resolved by IOSAttributionBootstrap.");
-                }
-#endif
 
                 bool consentFinished = false;
                 EnqueueAction(() =>
@@ -345,19 +567,30 @@ namespace Assets.Scripts.Core
                 if (!consentFinished)
                     Debug.LogWarning("[AdsManager] Consent flow timed out. Proceeding with SDK initialization anyway.");
 
-                // CCPA: false = user has NOT opted out of sale of personal info
-                MaxSdk.SetDoNotSell(false);
+                bool maxInitDispatched = false;
+                EnqueueAction(() =>
+                {
+                    ConsentManager.ApplyMaxPrivacyFlags();
 
-                Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
+                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
 
-                // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
-                MaxSdkBase.InvokeEventsOnUnityMainThread = true;
+                    // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
+                    MaxSdkBase.InvokeEventsOnUnityMainThread = true;
 
-                MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
-                MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+                    MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
+                    MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
 
-                MaxSdk.SetSdkKey(MaxSdkKey);
-                MaxSdk.InitializeSdk();
+                    MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
+                    MaxSdk.SetSdkKey(MaxSdkKey);
+                    MaxSdk.InitializeSdk();
+                    maxInitDispatched = true;
+                });
+
+                float maxInitWaitStart = Time.time;
+                while (!maxInitDispatched && Time.time - maxInitWaitStart < 10f)
+                    await Task.Yield();
+                if (!maxInitDispatched)
+                    Debug.LogWarning("[AdsManager] Timed out waiting to dispatch MAX SDK initialization on main thread.");
             }
             catch (Exception e)
             {
@@ -390,8 +623,19 @@ namespace Assets.Scripts.Core
 
             InitializeInterstitialAds();
             InitializeRewardedAds();
-            InitializeBannerAds();
+            SubscribeToNoAdsStatus();
             RefreshAllReadiness();
+            StartCoroutine(PrewarmSettingsBannerAfterSdkInit());
+        }
+
+        private IEnumerator PrewarmSettingsBannerAfterSdkInit()
+        {
+            // Mirrors old OnMaxSdkInitialized → InitializeBannerAds, but deferred off the init frame.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            PrewarmSettingsBanner();
+            if (_bannerShowRequested)
+                SyncBannerNativeState();
         }
 
         // ════════════════════════════════════════════
@@ -418,19 +662,12 @@ namespace Assets.Scripts.Core
                 if (!isInitializing) _ = InitializeSDK();
                 return;
             }
-            if (IAPManager.Instance == null)
-                Debug.LogWarning("[AdsManager] IAPManager.Instance is null. Proceeding without IAP check.");
-
-            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
-            {
-                Debug.Log("[AdsManager] Skipping Interstitial Load: User has No Ads.");
-                return;
-            }
             if (UserDataManager.Instance != null && !UserDataManager.Instance.IsInterstitialActive)
             {
                 Debug.Log("[AdsManager] Skipping Interstitial Load: IsInterstitialActive is false (Remote Config).");
                 return;
             }
+            // Loaded even for No Ads buyers so interstitials remain available as a rewarded fallback.
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
             MaxSdk.LoadInterstitial(InterstitialAdUnitId);
         }
@@ -520,6 +757,7 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Interstitial Ad Displayed.");
             SetCachedReady(ref _interstitialReady, false);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnInterstitialDisplayFailed(string adUnitId, MaxSdkBase.ErrorInfo errorInfo, MaxSdkBase.AdInfo adInfo)
@@ -531,12 +769,12 @@ namespace Assets.Scripts.Core
             if (pendingRewardType != RewardAdType.None)
                 pendingRewardType = RewardAdType.None;
 
-            ScheduleDeferredLoad(LoadInterstitial);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnInterstitialHidden(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
-            Debug.Log("[AdsManager] Interstitial Ad Closed. Scheduling reload.");
+            Debug.Log("[AdsManager] Interstitial Ad Closed. Preparing next ads.");
             lastAdShowTime = Time.time;
             SetCachedReady(ref _interstitialReady, false);
             NotifyAdClosed();
@@ -547,7 +785,7 @@ namespace Assets.Scripts.Core
                 ProcessPendingReward();
             }
 
-            ScheduleDeferredLoad(LoadInterstitial);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnInterstitialClicked(string adUnitId, MaxSdkBase.AdInfo adInfo)
@@ -609,9 +847,12 @@ namespace Assets.Scripts.Core
 
         public void ShowRewardedForLife() => ShowRewardedForType(RewardAdType.LifeReward);
 
+        public void ShowRewardedForShuffle() => ShowRewardedForType(RewardAdType.ShuffleReward);
+
         /// <summary>
         /// Shows the best ad for a user-initiated reward: interstitial when its eCPM beats rewarded
         /// (shorter ad, higher revenue), otherwise rewarded, with interstitial as a readiness fallback.
+        /// Intentionally bypasses the No Ads gate — interstitials here are opt-in substitutes for rewarded.
         /// </summary>
         private void ShowRewardedForType(RewardAdType rewardType)
         {
@@ -686,6 +927,7 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Rewarded Ad Displayed.");
             SetCachedReady(ref _rewardedReady, false);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnRewardedAdDisplayFailed(string adUnitId, MaxSdkBase.ErrorInfo errorInfo, MaxSdkBase.AdInfo adInfo)
@@ -694,16 +936,16 @@ namespace Assets.Scripts.Core
             pendingRewardType = RewardAdType.None;
             SetCachedReady(ref _rewardedReady, false);
             NotifyAdClosed();
-            ScheduleDeferredLoad(LoadRewarded);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnRewardedAdHidden(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
-            Debug.Log("[AdsManager] Rewarded Ad Closed. Scheduling reload.");
+            Debug.Log("[AdsManager] Rewarded Ad Closed. Preparing next ads.");
             lastAdShowTime = Time.time;
             SetCachedReady(ref _rewardedReady, false);
             NotifyAdClosed();
-            ScheduleDeferredLoad(LoadRewarded);
+            PrepareAllAdsAfterClose();
         }
 
         private void OnRewardedAdClicked(string adUnitId, MaxSdkBase.AdInfo adInfo)
@@ -729,21 +971,107 @@ namespace Assets.Scripts.Core
         //  BANNER ADS
         // ════════════════════════════════════════════
 
-        private void InitializeBannerAds()
+        private void SubscribeBannerCallbacks()
         {
+            MaxSdkCallbacks.Banner.OnAdLoadedEvent -= OnBannerAdLoaded;
+            MaxSdkCallbacks.Banner.OnAdLoadFailedEvent -= OnBannerAdLoadFailed;
+            MaxSdkCallbacks.Banner.OnAdClickedEvent -= OnBannerAdClicked;
+            MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent -= OnBannerAdRevenuePaid;
+
             MaxSdkCallbacks.Banner.OnAdLoadedEvent += OnBannerAdLoaded;
             MaxSdkCallbacks.Banner.OnAdLoadFailedEvent += OnBannerAdLoadFailed;
             MaxSdkCallbacks.Banner.OnAdClickedEvent += OnBannerAdClicked;
             MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent += OnBannerAdRevenuePaid;
+        }
 
-            MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
-            MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
-            MaxSdk.HideBanner(BannerAdUnitId);
-            _bannerCreated = true;
+        private void InitializeBannerAds(bool requestedForShow = false)
+        {
+            if (_bannerCreated || _bannerCreateInProgress) return;
+            if (_bannerCreateCoroutine != null) return;
+
+            CancelDeferredBannerDestroy();
+            _bannerDestroyPending = false;
+            _bannerCreateRequestedForShow = requestedForShow;
+
+            _bannerCreateCoroutine = StartCoroutine(CreateBannerDeferred());
+        }
+
+        private void CancelDeferredBannerCreate()
+        {
+            if (_bannerCreateCoroutine == null) return;
+
+            StopCoroutine(_bannerCreateCoroutine);
+            _bannerCreateCoroutine = null;
+            _bannerCreateInProgress = false;
+            _bannerCreateRequestedForShow = false;
+        }
+
+        private IEnumerator CreateBannerDeferred()
+        {
+            _bannerCreateInProgress = true;
+
+            // createAdView allocates on the Android UI thread; under heap pressure the main thread
+            // can block in WaitForGcToComplete. Wait for frames + a settle delay before creating.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            yield return null;
+
+            float settleDelay = DevicePerformanceProfile.IsLowEnd
+                ? BannerCreateSettleDelayLowEndSeconds
+                : BannerCreateSettleDelaySeconds;
+            if (settleDelay > 0f)
+                yield return new WaitForSeconds(settleDelay);
+
+            _bannerCreateCoroutine = null;
+
+            if (this == null || _bannerCreated || UserHasNoAds || !isInitialized)
+            {
+                _bannerCreateInProgress = false;
+                yield break;
+            }
+
+            if (_applicationPaused)
+            {
+                _bannerCreateInProgress = false;
+                yield break;
+            }
+
+            SubscribeBannerCallbacks();
+
+            try
+            {
+                Debug.Log("[AdsManager] Creating Settings Banner Ad (deferred)...");
+                MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
+                MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
+                _bannerCreated = true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] CreateBanner failed: {e.Message}");
+                _bannerCreated = false;
+            }
+            finally
+            {
+                _bannerCreateInProgress = false;
+                _bannerCreateRequestedForShow = false;
+            }
+
+            SyncBannerNativeState();
+        }
+
+        /// <summary>
+        /// Creates the banner ad view during idle time (hidden). Call from lobby after startup settles
+        /// so game-over/settings only need ShowBanner, not createAdView on a heavy frame.
+        /// </summary>
+        public void PrewarmSettingsBanner()
+        {
+            LoadSettingsBanner();
         }
 
         public void LoadSettingsBanner()
         {
+            if (UserHasNoAds) return;
+
             if (!isInitialized)
             {
                 if (!isInitializing) _ = InitializeSDK();
@@ -758,32 +1086,38 @@ namespace Assets.Scripts.Core
 
         public void ShowSettingsBanner()
         {
+            _bannerShowRequested = true;
+
             if (!isInitialized)
             {
                 Debug.LogWarning("[AdsManager] Cannot show banner: SDK not initialized.");
+                if (!isInitializing) _ = InitializeSDK();
                 return;
             }
 
-            if (IAPManager.Instance != null && IAPManager.Instance.HasNoAds)
+            if (UserHasNoAds)
             {
                 Debug.Log("[AdsManager] Skipping Banner Show: User has No Ads.");
+                HideSettingsBanner();
                 return;
             }
 
-            if (!_bannerCreated)
-                InitializeBannerAds();
-
             Debug.Log("[AdsManager] Showing Settings Banner Ad.");
-            MaxSdk.ShowBanner(BannerAdUnitId);
+            SyncBannerNativeState();
         }
 
         public void HideSettingsBanner()
         {
-            if (_bannerCreated)
-            {
+            _bannerShowRequested = false;
+
+            // User closed the screen before deferred create finished — don't allocate a native view.
+            if (_bannerCreateInProgress && _bannerCreateRequestedForShow)
+                CancelDeferredBannerCreate();
+
+            if (_bannerCreated || _bannerCreateInProgress)
                 Debug.Log("[AdsManager] Hiding Settings Banner Ad.");
-                MaxSdk.HideBanner(BannerAdUnitId);
-            }
+
+            SyncBannerNativeState();
         }
 
         #region Banner Callbacks
@@ -791,6 +1125,7 @@ namespace Assets.Scripts.Core
         private void OnBannerAdLoaded(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
             Debug.Log("[AdsManager] Settings Banner Loaded.");
+            _bannerRetryAttempt = 0;
             SetCachedReady(ref _bannerReady, true);
         }
 
@@ -798,6 +1133,16 @@ namespace Assets.Scripts.Core
         {
             Debug.LogWarning($"[AdsManager] Settings Banner Load Failed (code: {errorInfo.Code}).");
             SetCachedReady(ref _bannerReady, false);
+            _bannerRetryAttempt++;
+            double retryDelay = Math.Pow(2, Math.Min(6, _bannerRetryAttempt));
+            _ = RetryPrepareBanner((int)(retryDelay * 1000));
+        }
+
+        private async Task RetryPrepareBanner(int delayMs)
+        {
+            await Task.Delay(delayMs);
+            if (this != null && !_bannerReady)
+                EnqueueAction(PrepareBannerAd);
         }
 
         private void OnBannerAdClicked(string adUnitId, MaxSdkBase.AdInfo adInfo)
@@ -881,6 +1226,11 @@ namespace Assets.Scripts.Core
                     OnLifeRewardReceived?.Invoke();
                     break;
 
+                case RewardAdType.ShuffleReward:
+                    Debug.Log("[AdsManager] ProcessPendingReward: ShuffleReward → firing OnShuffleRewardReceived.");
+                    OnShuffleRewardReceived?.Invoke();
+                    break;
+
                 default:
                     Debug.Log("[AdsManager] ProcessPendingReward: No pending reward (None). Ignoring.");
                     break;
@@ -911,7 +1261,8 @@ namespace Assets.Scripts.Core
                 Debug.LogWarning(
                     $"[AdsManager] TrackAdRevenue: no revenue (network={adInfo.NetworkName}, " +
                     $"unit={adInfo.AdUnitIdentifier}, format={resolvedFormat}, precision={adInfo.RevenuePrecision}). " +
-                    "Enable Impression-Level User Revenue (ILRD) in the AppLovin MAX dashboard.");
+                    "ILRD is delivered via OnAdRevenuePaidEvent when MAX has revenue data—common causes: test ads, " +
+                    "revenue=-1 (error), or network not fully configured in MAX Mediation.");
                 return;
             }
 
@@ -979,6 +1330,15 @@ namespace Assets.Scripts.Core
                 $"network={payload.NetworkName}, format={payload.AdFormat}");
         }
 
+        /// <summary>Called by IOSAttributionBootstrap after SingularSDK.InitializeSingularSDK succeeds.</summary>
+        public static void NotifySingularSdkInitialized()
+        {
+            if (Instance == null)
+                return;
+
+            Instance.EnqueueAction(Instance.FlushPendingSingularRevenueIfReady);
+        }
+
         private void EnsurePendingSingularRevenueFlushScheduled()
         {
             if (_isFlushingPendingSingularRevenue)
@@ -990,7 +1350,7 @@ namespace Assets.Scripts.Core
 
         private IEnumerator FlushPendingSingularRevenueWhenReady()
         {
-            const float timeoutSeconds = 60f;
+            const float timeoutSeconds = 120f;
             float deadline = Time.realtimeSinceStartup + timeoutSeconds;
 
             while (!SingularSDK.Initialized && Time.realtimeSinceStartup < deadline)
@@ -1006,6 +1366,16 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
+            FlushPendingSingularRevenueIfReady();
+            _isFlushingPendingSingularRevenue = false;
+        }
+
+        private void FlushPendingSingularRevenueIfReady()
+        {
+#if !UNITY_EDITOR
+            if (!SingularSDK.Initialized)
+                return;
+
             int flushedCount = 0;
             while (_pendingSingularRevenue.TryDequeue(out SingularAdRevenuePayload payload))
             {
@@ -1015,8 +1385,7 @@ namespace Assets.Scripts.Core
 
             if (flushedCount > 0)
                 Debug.Log($"[AdsManager] Flushed {flushedCount} queued Singular ad revenue event(s).");
-
-            _isFlushingPendingSingularRevenue = false;
+#endif
         }
 
         // ════════════════════════════════════════════

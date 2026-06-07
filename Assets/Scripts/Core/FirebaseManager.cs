@@ -16,6 +16,7 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
 {
     public static FirebaseManager Instance { get; private set; }
     private bool isInitialized = false;
+    private string pendingAnalyticsUserId;
 
     // Event Names
     public const string EVENT_LEVEL_START = "level_start";
@@ -32,6 +33,10 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string EVENT_RET_30 = "Ret_30";
     public const string EVENT_RET_60 = "Ret_60";
     public const string EVENT_RET_90 = "Ret_90";
+    public const string EVENT_BOOSTER_HINT_CLICKED = "booster_hint_clicked";
+    public const string EVENT_BOOSTER_MAGIC_CLICKED = "booster_magic_clicked";
+    public const string EVENT_BOOSTER_REFILL_CLICKED = "booster_refill_clicked";
+    public const string EVENT_BOOSTER_SHUFFLE_CLICKED = "booster_shuffle_clicked";
 
     // Parameter Names
     public const string PARAM_LEVEL_ID = "level_id";
@@ -131,6 +136,9 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
 
                 isInitialized = true;
                 Debug.Log("[FirebaseManager] Firebase App, Crashlytics, Analytics, and Messaging are ready.");
+
+                SingularAttributionBridge.NotifyFirebaseReady(this);
+                SingularAttributionBridge.EnsureAnalyticsUserIdLinked();
 
                 // Initialize Remote Config
                 RemoteConfigManager.Instance.Initialize();
@@ -316,18 +324,75 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
 
     public void SetUserProperty(string propertyName, string propertyValue)
     {
-        if (!isInitialized) return;
-        FirebaseAnalytics.SetUserProperty(propertyName, propertyValue);
+        if (!isInitialized || string.IsNullOrWhiteSpace(propertyName))
+            return;
+
+        FirebaseAnalytics.SetUserProperty(propertyName, TruncateForFirebaseUserProperty(propertyValue));
     }
 
+    /// <summary>Sets Firebase user id when ready; also queues for Singular via SingularAttributionBridge.</summary>
     public void SetUserId(string userId)
     {
-        if (!isInitialized) return;
-        FirebaseAnalytics.SetUserId(userId);
-        SingularSDK.SetCustomUserId(userId);
-        
-        // --- Singular: Track standard login event ---
-        SingularSDK.Event(Events.sngLogin);
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
+
+        pendingAnalyticsUserId = userId.Trim();
+        ApplyAnalyticsUserId(pendingAnalyticsUserId, fireLoginEvent: true);
+    }
+
+    internal void ApplyAnalyticsUserId(string userId, bool fireLoginEvent)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
+
+        pendingAnalyticsUserId = userId.Trim();
+
+#if !UNITY_EDITOR
+        if (SingularSDK.Initialized)
+            SingularSDK.SetCustomUserId(pendingAnalyticsUserId);
+#endif
+
+        if (!isInitialized)
+            return;
+
+        FirebaseAnalytics.SetUserId(pendingAnalyticsUserId);
+
+        if (fireLoginEvent)
+            LogEvent(Events.sngLogin);
+    }
+
+    internal void ApplyAttributionUserProperties(SingularAttributionSnapshot snapshot)
+    {
+        if (!isInitialized || snapshot == null || !snapshot.HasAnyData)
+            return;
+
+        SetUserPropertyIfNotEmpty("acquisition_network", snapshot.Network);
+        SetUserPropertyIfNotEmpty("acquisition_campaign", snapshot.Campaign);
+        SetUserPropertyIfNotEmpty("acquisition_source", snapshot.SubAdNetwork);
+        SetUserPropertyIfNotEmpty("acquisition_sub_campaign", snapshot.SubCampaign);
+        SetUserPropertyIfNotEmpty("acquisition_campaign_id", snapshot.CampaignId);
+        SetUserPropertyIfNotEmpty("acquisition_type", snapshot.AcquisitionType);
+        SetUserPropertyIfNotEmpty("acquisition_creative", snapshot.Creative);
+        SetUserPropertyIfNotEmpty("acquisition_tracker", snapshot.TrackerName);
+        SetUserPropertyIfNotEmpty("acquisition_view_through", snapshot.IsViewThrough);
+    }
+
+    private void SetUserPropertyIfNotEmpty(string propertyName, string propertyValue)
+    {
+        if (string.IsNullOrWhiteSpace(propertyValue))
+            return;
+
+        SetUserProperty(propertyName, propertyValue);
+    }
+
+    private static string TruncateForFirebaseUserProperty(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        value = value.Trim();
+        const int maxLen = 36;
+        return value.Length <= maxLen ? value : value.Substring(0, maxLen);
     }
 
     // --- Singular Link Handlers ---
@@ -351,25 +416,7 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public void OnSingularDeviceAttributionCallback(Dictionary<string, object> attributionInfo)
     {
         Debug.Log("[Singular] Device Attribution Callback Triggered.");
-        if (attributionInfo != null)
-        {
-            foreach (var kvp in attributionInfo)
-            {
-                Debug.Log($"[Singular] Attribution Data - {kvp.Key}: {kvp.Value}");
-            }
-
-            // You can extract specific fields like network, campaign, sub_adnetwork, etc.
-            string network = attributionInfo.ContainsKey("network") ? attributionInfo["network"].ToString() : "organic";
-            string campaign = attributionInfo.ContainsKey("campaign") ? attributionInfo["campaign"].ToString() : "unknown";
-            string subAdNetwork = attributionInfo.ContainsKey("sub_adnetwork") ? attributionInfo["sub_adnetwork"].ToString() : "unknown";
-
-            Debug.Log($"[Singular] User Acquired via Network: {network}, Campaign: {campaign}, Source: {subAdNetwork}");
-            
-            // Note: You can log this data to Firebase Analytics as User Properties if you'd like
-            SetUserProperty("acquisition_network", network);
-            SetUserProperty("acquisition_campaign", campaign);
-            SetUserProperty("acquisition_source", subAdNetwork);
-        }
+        SingularAttributionBridge.HandleDeviceAttributionCallback(attributionInfo);
     }
     // ----------------------------
     #endregion

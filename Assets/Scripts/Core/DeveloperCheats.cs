@@ -199,6 +199,19 @@ namespace Assets.Scripts.Core
             OnLevelInputChanged("100");
         }
 
+        /// <summary>Adds 5 shuffle boosters to the player balance (dev / test UI).</summary>
+        public void AddShuffleBoosters()
+        {
+            if (UserDataManager.Instance == null)
+            {
+                Debug.LogWarning("[CHEAT] UserDataManager not found. Cannot add shuffle boosters.");
+                return;
+            }
+
+            UserDataManager.Instance.AddShuffleBooster(5);
+            Debug.Log($"[CHEAT] Added 5 Shuffle Boosters. New balance: {UserDataManager.Instance.ShuffleBoosterCount}");
+        }
+
         [ContextMenu("Cheat: Add 5 Magic Boosters")]
         private void CheatAddMagicBooster()
         {
@@ -207,6 +220,12 @@ namespace Assets.Scripts.Core
                 UserDataManager.Instance.AddMagicBooster(5);
                 Debug.Log($"[CHEAT] Added 5 Magic Boosters. New balance: {UserDataManager.Instance.MagicBoosterCount}");
             }
+        }
+
+        [ContextMenu("Cheat: Add 5 Shuffle Boosters")]
+        private void CheatAddShuffleBooster()
+        {
+            AddShuffleBoosters();
         }
 
         #endregion
