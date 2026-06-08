@@ -74,6 +74,18 @@ namespace LiftEngine
         [Tooltip("Seconds between readiness checks while waiting for an ad load to complete.")]
         public float readinessCheckIntervalSeconds = 2f;
 
+        [Tooltip("Max seconds for a full predict+load prewarm cycle before marking the format as failed.")]
+        public float prewarmMaxDurationSeconds = 90f;
+
+        [Tooltip("Seconds between automatic retries when a format did not get a fill.")]
+        public float prewarmRetryIntervalSeconds = 20f;
+
+        [Tooltip("Max bid-0 load rounds per prewarm before giving up until the next retry.")]
+        public int maxBidZeroRounds = 5;
+
+        [Tooltip("Max seconds ShowAd waits for a fill before reporting display failed.")]
+        public float showWaitMaxSeconds = 30f;
+
         [Header("Runtime")]
         [Tooltip("If enabled, LiftEngineSdk.Initialize() runs automatically at app start. Usually leave off and call Initialize from AdsManager after consent.")]
         public bool autoInitialize = false;

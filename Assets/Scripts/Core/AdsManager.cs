@@ -88,8 +88,16 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
+        private const float RewardedPlacementWaitSeconds = 12f;
         private const float BannerCreateSettleDelaySeconds = 0.25f;
         private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
+
+        private enum FullscreenAdChoice
+        {
+            None = 0,
+            Interstitial = 1,
+            Rewarded = 2
+        }
 
         // ──────────────────────────────────────────────────────────────────
         // AppLovin MAX SDK Key
@@ -633,8 +641,7 @@ namespace Assets.Scripts.Core
 
                     if (!isInitialized) continue;
 
-                    if (!_interstitialReady) LoadInterstitial();
-                    if (!_rewardedReady) LoadRewarded();
+                    EnsureFullscreenAdsLoaded();
                     if (!_bannerCreated || !_bannerReady) PrepareBannerAd();
                 }
                 catch (Exception e)
@@ -988,54 +995,114 @@ namespace Assets.Scripts.Core
         private void ShowRewardedForType(RewardAdType rewardType)
         {
             pendingRewardType = rewardType;
+            StartCoroutine(ShowRewardedPlacementRoutine(rewardType));
+        }
 
+        private IEnumerator ShowRewardedPlacementRoutine(RewardAdType rewardType)
+        {
+            float deadline = Time.time + RewardedPlacementWaitSeconds;
+
+            while (Time.time <= deadline)
+            {
+                RefreshAllReadiness();
+                var choice = ResolveBestRewardAdChoice();
+                if (choice != FullscreenAdChoice.None)
+                {
+                    ShowFullscreenAdChoice(choice, rewardType);
+                    yield break;
+                }
+
+                EnsureFullscreenAdsLoaded();
+                yield return new WaitForSeconds(0.5f);
+            }
+
+            Debug.LogWarning(
+                $"[AdsManager] Rewarded placement timed out for {rewardType} — no interstitial or rewarded fill.");
+            pendingRewardType = RewardAdType.None;
+
+            if (!isInitialized && !isInitializing)
+                _ = InitializeSDK();
+        }
+
+        /// <summary>
+        /// Picks interstitial when it pays more and both are ready; otherwise rewarded, then interstitial fallback.
+        /// </summary>
+        private FullscreenAdChoice ResolveBestRewardAdChoice()
+        {
             bool interstitialReady = IsInterstitialReady;
             bool rewardedReady = IsRewardedReady;
 
             if (AdMonetizationOptimizer.ShouldShowInterstitialInsteadOfRewarded(interstitialReady, rewardedReady))
-            {
-                Debug.Log(
-                    $"[AdsManager] Monetization optimizer: interstitial eCPM ${AdMonetizationOptimizer.InterstitialEcpm:F2} > " +
-                    $"rewarded ${AdMonetizationOptimizer.RewardedEcpm:F2}. Showing interstitial for {rewardType}.");
-                OnAdOpened?.Invoke();
-                if (_liftEngineReady)
-                    ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
-                else
-                    MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-                return;
-            }
+                return FullscreenAdChoice.Interstitial;
 
             if (rewardedReady)
-            {
-                Debug.Log($"[AdsManager] Showing Rewarded Ad ({rewardType}).");
-                OnAdOpened?.Invoke();
-                if (_liftEngineReady)
-                    ShowLiftEngineAd(LiftEngineAdFormat.Rewarded);
-                else
-                    MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-                return;
-            }
+                return FullscreenAdChoice.Rewarded;
 
             if (interstitialReady)
+                return FullscreenAdChoice.Interstitial;
+
+            return FullscreenAdChoice.None;
+        }
+
+        private void ShowFullscreenAdChoice(FullscreenAdChoice choice, RewardAdType rewardType)
+        {
+            switch (choice)
             {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad is not ready for {rewardType}. Falling back to Interstitial.");
-                OnAdOpened?.Invoke();
-                if (_liftEngineReady)
-                    ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
-                else
-                    MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                case FullscreenAdChoice.Interstitial:
+                    if (AdMonetizationOptimizer.ShouldShowInterstitialInsteadOfRewarded(
+                            IsInterstitialReady, IsRewardedReady))
+                    {
+                        Debug.Log(
+                            $"[AdsManager] Monetization optimizer: interstitial eCPM ${AdMonetizationOptimizer.InterstitialEcpm:F2} > " +
+                            $"rewarded ${AdMonetizationOptimizer.RewardedEcpm:F2}. Showing interstitial for {rewardType}.");
+                    }
+                    else
+                    {
+                        Debug.LogWarning(
+                            $"[AdsManager] Rewarded not ready for {rewardType}. Falling back to interstitial.");
+                    }
+
+                    OnAdOpened?.Invoke();
+                    if (_liftEngineReady)
+                        ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
+                    else
+                        MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                    break;
+
+                case FullscreenAdChoice.Rewarded:
+                    Debug.Log($"[AdsManager] Showing Rewarded Ad ({rewardType}).");
+                    OnAdOpened?.Invoke();
+                    if (_liftEngineReady)
+                        ShowLiftEngineAd(LiftEngineAdFormat.Rewarded);
+                    else
+                        MaxSdk.ShowRewardedAd(RewardedAdUnitId);
+                    break;
+            }
+        }
+
+        private void EnsureFullscreenAdsLoaded()
+        {
+            if (_liftEngineReady)
+            {
+                EnsureLiftEngineFormatLoaded(LiftEngineAdFormat.Interstitial, LoadInterstitial);
+                EnsureLiftEngineFormatLoaded(LiftEngineAdFormat.Rewarded, LoadRewarded);
                 return;
             }
 
-            Debug.LogWarning($"[AdsManager] Rewarded and Interstitial are not ready for {rewardType}. Initialized: {isInitialized}");
-            pendingRewardType = RewardAdType.None;
-            if (!isInitialized && !isInitializing)
-                _ = InitializeSDK();
-            else
-            {
-                LoadRewarded();
-                LoadInterstitial();
-            }
+            if (!_interstitialReady) LoadInterstitial();
+            if (!_rewardedReady) LoadRewarded();
+        }
+
+        private void EnsureLiftEngineFormatLoaded(LiftEngineAdFormat format, Action loadAction)
+        {
+            if (LiftEngineSdk.IsAdReady(format))
+                return;
+
+            var state = LiftEngineSdk.GetPrewarmState(format);
+            if (state == AdPrewarmState.Predicting || state == AdPrewarmState.Loading)
+                return;
+
+            loadAction?.Invoke();
         }
 
         #region Rewarded Callbacks
@@ -1603,6 +1670,18 @@ namespace Assets.Scripts.Core
         private void HandleLiftEngineAdDisplayFailed(LiftEngineAdFormat format, string message)
         {
             Debug.LogError($"[AdsManager] {format} display failed (LiftEngine): {message}");
+
+            if (format == LiftEngineAdFormat.Rewarded && pendingRewardType != RewardAdType.None)
+            {
+                RefreshAllReadiness();
+                if (IsInterstitialReady)
+                {
+                    Debug.LogWarning(
+                        $"[AdsManager] Rewarded display failed ({message}); falling back to interstitial for pending reward.");
+                    ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
+                    return;
+                }
+            }
 
             if (format == LiftEngineAdFormat.Interstitial)
                 SetCachedReady(ref _interstitialReady, false);

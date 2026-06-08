@@ -95,11 +95,11 @@ namespace LiftEngine.Ads
         private IEnumerator BidZeroUntilFill(LiftEngineAdFormat format, string adUnitId, string paramName,
             Action<bool> onComplete)
         {
-            var bidZeroRound = 0;
-            while (true)
+            var maxRounds = Mathf.Max(1, _settings.maxBidZeroRounds);
+            for (var bidZeroRound = 0; bidZeroRound < maxRounds; bidZeroRound++)
             {
                 LiftEngineLogger.LogAttempt(BidZeroAttempt,
-                    $"{format} — bid-0 load round {bidZeroRound}, {paramName ?? "(no param)"}=0");
+                    $"{format} — bid-0 load round {bidZeroRound + 1}/{maxRounds}, {paramName ?? "(no param)"}=0");
 
                 _mediation.SetBidFloorExtra(format, adUnitId, paramName, "0");
                 _mediation.RequestLoad(format, adUnitId);
@@ -115,10 +115,13 @@ namespace LiftEngine.Ads
                 }
 
                 LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
-                    $"{format} — bid-0 round {bidZeroRound} failed, retrying in {_settings.readinessCheckIntervalSeconds}s.");
-                bidZeroRound++;
+                    $"{format} — bid-0 round {bidZeroRound + 1} failed, retrying in {_settings.readinessCheckIntervalSeconds}s.");
                 yield return new WaitForSeconds(_settings.readinessCheckIntervalSeconds);
             }
+
+            LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
+                $"{format} — bid-0 exhausted after {maxRounds} round(s); no fill.");
+            onComplete?.Invoke(false);
         }
 
         private IEnumerator WaitForLoad(LiftEngineAdFormat format, string adUnitId, int attempt,

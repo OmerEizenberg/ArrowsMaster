@@ -83,6 +83,8 @@ namespace LiftEngine
             IsInitialized = true;
             LiftEngineSdkCallbacks.RaiseInitialized(LiftEngineInitializationStatus.Success);
 
+            _prewarm.StartBackgroundRefill();
+
             if (_settings.prewarmOnInit)
                 _prewarm.PrewarmAll();
         }
@@ -182,15 +184,20 @@ namespace LiftEngine
             if (_prewarm.GetState(format) == AdPrewarmState.Idle || _prewarm.GetState(format) == AdPrewarmState.Failed)
                 _prewarm.Prewarm(format);
 
-            while (!IsAdReady(format))
+            var elapsed = 0f;
+            while (!IsAdReady(format) && elapsed < _settings.showWaitMaxSeconds)
             {
                 yield return new WaitForSeconds(_settings.readinessCheckIntervalSeconds);
+                elapsed += _settings.readinessCheckIntervalSeconds;
 
                 if (_prewarm.GetState(format) == AdPrewarmState.Failed)
-                {
-                    callbacks?.OnAdDisplayFailed?.Invoke("Ad prewarm failed.");
-                    yield break;
-                }
+                    _prewarm.Prewarm(format);
+            }
+
+            if (!IsAdReady(format))
+            {
+                callbacks?.OnAdDisplayFailed?.Invoke($"Ad not ready after {elapsed:F0}s.");
+                yield break;
             }
 
             _mediation.Show(format, _settings.GetAdUnitId(format));
