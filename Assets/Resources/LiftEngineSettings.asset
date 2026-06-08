@@ -25,8 +25,8 @@ MonoBehaviour:
   bannerPlacementId: banner-default
   interstitialPlacementId: interstitial-default
   rewardedPlacementId: rewarded-default
-  predictTimeoutSeconds: 1
-  defaultPredictionFallback: 1
+  predictTimeoutSeconds: 3
+  defaultPredictionFallback: 0
   treatEditorLoadAsFilledForMultiplierPhase: 1
   loadAttemptTimeoutSeconds: 15
   prewarmOnInit: 1
