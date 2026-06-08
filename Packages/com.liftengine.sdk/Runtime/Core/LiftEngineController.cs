@@ -203,6 +203,13 @@ namespace LiftEngine
                 _mediation.HideBanner(adUnitId);
         }
 
+        public void DestroyBanner()
+        {
+            var adUnitId = _settings.GetAdUnitId(LiftEngineAdFormat.Banner);
+            if (!string.IsNullOrEmpty(adUnitId))
+                _mediation.DestroyAd(LiftEngineAdFormat.Banner, adUnitId);
+        }
+
         public void ClearDebugContext() => _context.ClearContextData();
 
         public ReportContextService ContextService => _context;

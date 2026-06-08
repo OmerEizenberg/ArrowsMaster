@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: LiftEngine.Runtime::LiftEngine.LiftEngineSettings
   environment: 0
   customApiBaseUrl: https://api-stg.liftengine.ai/
-  apiKey: test-api-key
+  apiKey: 8ed93dcf-62fe-43b0-a16b-8d9d9b674836
   mediationPlatform: 1
   iosBannerAdUnitId: b4b98419050ba611
   iosInterstitialAdUnitId: 9625ca772cf7c819

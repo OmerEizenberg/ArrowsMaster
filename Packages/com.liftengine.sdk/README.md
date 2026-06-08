@@ -39,11 +39,13 @@ if (CanShowRewarded())
 
 ### Editor — no device
 
-| Test | How |
-|------|-----|
-| Settings asset | Integration Manager → Create Settings Asset |
-| Payload shape | Debug tab → Preview Predict Payload (edit mode OK) |
-| Checklist | Integration tab |
+
+| Test           | How                                                |
+| -------------- | -------------------------------------------------- |
+| Settings asset | Integration Manager → Create Settings Asset        |
+| Payload shape  | Debug tab → Preview Predict Payload (edit mode OK) |
+| Checklist      | Integration tab                                    |
+
 
 ### Play Mode — staging API
 
@@ -52,21 +54,23 @@ if (CanShowRewarded())
 3. Enter Play Mode
 4. Call `LiftEngineSdk.Initialize()` from test script or enable `autoInitialize`
 
-| Test | Steps | Expected |
-|------|-------|----------|
-| Health | Debug → Ping Health | `OK`, console `{"status":"ok"}` |
-| Predict + prewarm | Debug → Run Predict | Console logs multiplier attempts, state → Ready |
-| Show rewarded | Debug → Show Ad (Rewarded) | MAX ad displays |
-| Attribution | Set Organic + media source | Next predict payload has `install_type: organic` |
-| Purchase | Simulate Purchase 4.99 | Payload shows `ltv_gross_up_to_date`, `payer_ind: 1` |
-| Counters | Show 2 ads | `ad_number_*` fields increment (+1 rule on wire) |
-| Clear state | Clear Context Prefs | Counters reset |
+
+| Test              | Steps                      | Expected                                             |
+| ----------------- | -------------------------- | ---------------------------------------------------- |
+| Health            | Debug → Ping Health        | `OK`, console `{"status":"ok"}`                      |
+| Predict + prewarm | Debug → Run Predict        | Console logs multiplier attempts, state → Ready      |
+| Show rewarded     | Debug → Show Ad (Rewarded) | MAX ad displays                                      |
+| Attribution       | Set Organic + media source | Next predict payload has `install_type: organic`     |
+| Purchase          | Simulate Purchase 4.99     | Payload shows `ltv_gross_up_to_date`, `payer_ind: 1` |
+| Counters          | Show 2 ads                 | `ad_number_`* fields increment (+1 rule on wire)     |
+| Clear state       | Clear Context Prefs        | Counters reset                                       |
+
 
 ### Device build (Android / iOS)
 
 1. Build development build with test API key
 2. Watch logcat / Xcode for `[LiftEngine]` tags
-3. Verify sequence: **Predict → jC7Fp floor → Load → Show → Track**
+3. Verify sequence: **prewarm→ Load → Show → Track**
 4. After dismiss: auto prewarm starts (next predict from multipliers)
 
 ### SignalBus (optional subscribe)
@@ -80,20 +84,12 @@ LiftEngineSignalBus.AdPrewarmCompleted += s => Debug.Log($"Prewarm {s.Format}: {
 
 - **LiftEngineSdk** — static facade
 - **ReportContextService** — PlayerPrefs counters, LTV, eCPM history
-- **AdPrewarmService** — predict → multiplier waterfall → bid-0 loop
-- **MaxMediationAdapter** — MAX wrapper, `jC7Fp` bid floor param
-
-## Bid Floor Flow
-
-1. POST predict with full `data` payload
-2. For each multiplier: `floor = prediction × multipliers[i]`, set `jC7Fp`, load
-3. If loaded with revenue → ready
-4. Else try next multiplier
-5. If all fail → bid `0`, retry until fill
-6. Next prewarm → predict + multipliers from start
+- **AdPrewarmService** —  waterfall 
+- **MaxMediationAdapter** — MAX wrapper
 
 ## Notes
 
 - Game business rules (cooldowns, level gates, no-ads IAP) stay in client code
 - LevelPlay adapter is stubbed
 - Mock API may omit `prediction` field — SDK uses `defaultPredictionFallback` (settings)
+

@@ -495,6 +495,7 @@ namespace Assets.Scripts.Core
             // ------------------------------------------------
 
             Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyPurchaseMade();
+            LiftEngine.LiftEngineSdk.NotifyPurchase((float)metadataSingular.localizedPrice);
             OnPurchaseSuccess?.Invoke(id);
             SpawnCoinsExplosion();
         }

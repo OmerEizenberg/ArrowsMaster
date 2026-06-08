@@ -88,6 +88,8 @@ namespace LiftEngine
 
         public static void HideBanner() => _controller?.HideBanner();
 
+        public static void DestroyBanner() => _controller?.DestroyBanner();
+
         public static void ClearDebugContext() => _controller?.ClearDebugContext();
 
         public static void SetVerboseLogging(bool enabled) => LiftEngineLogger.SetVerbose(enabled);

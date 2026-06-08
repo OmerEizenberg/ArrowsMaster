@@ -14,6 +14,9 @@ namespace Assets.Scripts.Core
         public static void RecordInterstitialAd(MaxSdkBase.AdInfo adInfo) => RecordRevenue(adInfo, isInterstitial: true);
         public static void RecordRewardedAd(MaxSdkBase.AdInfo adInfo) => RecordRevenue(adInfo, isInterstitial: false);
 
+        public static void RecordInterstitialRevenue(double revenueUsd) => RecordRevenueUsd(revenueUsd, isInterstitial: true);
+        public static void RecordRewardedRevenue(double revenueUsd) => RecordRevenueUsd(revenueUsd, isInterstitial: false);
+
         /// <summary>
         /// True when a user-initiated rewarded placement should show an interstitial instead.
         /// </summary>
@@ -39,7 +42,11 @@ namespace Assets.Scripts.Core
             if (adInfo == null)
                 return;
 
-            double revenue = adInfo.Revenue;
+            RecordRevenueUsd(adInfo.Revenue, isInterstitial);
+        }
+
+        private static void RecordRevenueUsd(double revenue, bool isInterstitial)
+        {
             if (revenue < MinRevenueUsd)
                 return;
 
