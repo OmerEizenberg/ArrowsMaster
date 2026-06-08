@@ -95,7 +95,7 @@ namespace LiftEngine.Ads
                 if (prediction.prediction <= 0f)
                     prediction.prediction = _settings.defaultPredictionFallback;
 
-                _context.SetAuctionContext(format, prediction.keyword, prediction.auction_id);
+                _context.SetAuctionContext(format, prediction.keyword, prediction.auction_id, prediction.param);
                 LiftEngineSdkCallbacks.RaisePredictSuccess(prediction);
             }
             else

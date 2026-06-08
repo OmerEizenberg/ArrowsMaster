@@ -33,14 +33,15 @@ namespace LiftEngine.Api
         {
             var body = new PredictRequestBody
             {
-                model = _settings.GetModelName(format),
+                models = _settings.GetAllModelNames(),
                 data = data
             };
 
             var json = JsonConvert.SerializeObject(body);
             var path = $"/api/v1/predict/{deviceId}";
-            var model = body.model;
-            _host.StartCoroutine(PostPredict(path, model, json, (code, response) =>
+            var modelsLabel = string.Join(",", body.models);
+            var targetModel = _settings.GetModelName(format);
+            _host.StartCoroutine(PostPredict(path, modelsLabel, json, (code, response) =>
             {
                 if (code == 204)
                 {
@@ -63,7 +64,22 @@ namespace LiftEngine.Api
                         return;
                     }
 
-                    var result = results[0];
+                    LiftEnginePredictResult result = null;
+                    foreach (var item in results)
+                    {
+                        if (item.model == targetModel)
+                        {
+                            result = item;
+                            break;
+                        }
+                    }
+
+                    if (result == null)
+                    {
+                        onFailure?.Invoke(new LiftEngineError(code, $"No predict result for model '{targetModel}'"));
+                        return;
+                    }
+
                     if (result.prediction <= 0f)
                         result.prediction = _settings.defaultPredictionFallback;
 
@@ -86,32 +102,34 @@ namespace LiftEngine.Api
             }));
         }
 
-        public void TrackView(string bundleId, string placementId, string keyword, string auctionId,
-            string timestamp, float? rev)
+        public void TrackView(string bundleId, string deviceId, string placementId, string keyword, string auctionId,
+            long timestamp, float? rev)
         {
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
                 ["bundle_id"] = bundleId,
+                ["device_id"] = deviceId,
                 ["placement_id"] = placementId,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
-                ["timestamp"] = timestamp
+                ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
             }, rev);
 
             _host.StartCoroutine(Get("GET", "/v1/track/view" + query, true, null));
         }
 
-        public void TrackActiveView(string bundleId, string adType, string placementId, string keyword,
-            string auctionId, string timestamp, float? rev)
+        public void TrackActiveView(string bundleId, string deviceId, string adType, string placementId,
+            string keyword, string auctionId, long timestamp, float? rev)
         {
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
                 ["bundle_id"] = bundleId,
+                ["device_id"] = deviceId,
                 ["ad_type"] = adType,
                 ["placement_id"] = placementId,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
-                ["timestamp"] = timestamp
+                ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
             }, rev);
 
             _host.StartCoroutine(Get("GET", "/v1/track/activeview" + query, true, null));
@@ -168,10 +186,10 @@ namespace LiftEngine.Api
             callback?.Invoke(code, body);
         }
 
-        private IEnumerator PostPredict(string path, string model, string json, Action<int, string> callback)
+        private IEnumerator PostPredict(string path, string modelsLabel, string json, Action<int, string> callback)
         {
             var url = _settings.ApiBaseUrl.TrimEnd('/') + path;
-            LiftEngineLogger.LogClient($"POST {path} model={model} ({json.Length} bytes)");
+            LiftEngineLogger.LogClient($"POST {path} models={modelsLabel} ({json.Length} bytes)");
 
             using var request = new UnityWebRequest(url, "POST");
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
@@ -184,8 +202,27 @@ namespace LiftEngine.Api
 
             var body = request.downloadHandler?.text ?? string.Empty;
             var code = (int)request.responseCode;
-            LogBackendResponse("POST", $"{path} model={model}", code, body);
-            callback?.Invoke(code, body);
+
+            if (code == 200)
+            {
+                if (LiftEngineXorCipher.TryDecodePredictResponse(body, out var decrypted))
+                {
+                    LogBackendResponse("POST", $"{path} models={modelsLabel}", code, decrypted);
+                    callback?.Invoke(code, decrypted);
+                }
+                else
+                {
+                    LogBackendResponse("POST", $"{path} models={modelsLabel}", code, body);
+                    LiftEngineLogger.LogBackendWarning(
+                        $"POST {path} models={modelsLabel} → failed to decrypt predict response");
+                    callback?.Invoke(code, body);
+                }
+            }
+            else
+            {
+                LogBackendResponse("POST", $"{path} models={modelsLabel}", code, body);
+                callback?.Invoke(code, body);
+            }
         }
 
         private IEnumerator Post(string path, string json, Action<int, string> callback)

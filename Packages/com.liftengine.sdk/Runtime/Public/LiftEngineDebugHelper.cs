@@ -12,11 +12,13 @@ namespace LiftEngine
             service.SetAttribution(installType, mediaSource);
 
             var settings = UnityEngine.Resources.Load<LiftEngineSettings>(LiftEngineSettings.DefaultResourcePath);
-            var model = settings != null ? settings.GetModelName(format) : format.ToString().ToLowerInvariant();
+            var models = settings != null
+                ? settings.GetAllModelNames()
+                : new[] { "banner", "interstitial", "rewarded" };
 
             return JsonConvert.SerializeObject(new
             {
-                model,
+                models,
                 data = service.BuildPayload(format)
             }, Formatting.Indented);
         }

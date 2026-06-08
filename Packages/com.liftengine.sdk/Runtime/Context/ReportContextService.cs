@@ -138,16 +138,18 @@ namespace LiftEngine.Context
         }
 
         public (string keyword, string auctionId) GetAuctionContext(LiftEngineAdFormat format) =>
-            (_auctionKeyword.TryGetValue(format, out var kw) ? kw : null,
-             _auctionId.TryGetValue(format, out var id) ? id : null);
+            _store.GetAuctionContext(format);
 
-        private readonly System.Collections.Generic.Dictionary<LiftEngineAdFormat, string> _auctionKeyword = new();
-        private readonly System.Collections.Generic.Dictionary<LiftEngineAdFormat, string> _auctionId = new();
+        public string GetBidFloorParam(LiftEngineAdFormat format) =>
+            _bidFloorParam.TryGetValue(format, out var param) ? param : null;
 
-        public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId)
+        private readonly System.Collections.Generic.Dictionary<LiftEngineAdFormat, string> _bidFloorParam = new();
+
+        public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId, string param)
         {
-            _auctionKeyword[format] = keyword;
-            _auctionId[format] = auctionId;
+            _store.SaveAuctionContext(format, keyword, auctionId);
+            if (!string.IsNullOrEmpty(param))
+                _bidFloorParam[format] = param;
         }
 
         public void ClearContextData() => _store.ClearAll();

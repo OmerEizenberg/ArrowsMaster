@@ -114,7 +114,9 @@ namespace LiftEngine.Context
                 "ltv", "ftd_amount", "daily_date", "ecpm", "install_type", "media_source", "idfa_override",
                 "life_banner", "life_interstitial", "life_rewarded",
                 "daily_banner", "daily_interstitial", "daily_rewarded",
-                "sess_banner", "sess_interstitial", "sess_rewarded"
+                "sess_banner", "sess_interstitial", "sess_rewarded",
+                "auction_kw_banner", "auction_kw_interstitial", "auction_kw_rewarded",
+                "auction_id_banner", "auction_id_interstitial", "auction_id_rewarded"
             })
             {
                 PlayerPrefs.DeleteKey(Prefix + suffix);
@@ -181,6 +183,24 @@ namespace LiftEngine.Context
             IncrementRawCount(DailyKey(format));
             IncrementRawCount(SessionKey(format));
             LastAdUtc = DateTime.UtcNow;
+        }
+
+        public void SaveAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId)
+        {
+            var suffix = format.ToString().ToLowerInvariant();
+            PlayerPrefs.SetString(Prefix + "auction_kw_" + suffix, keyword ?? string.Empty);
+            PlayerPrefs.SetString(Prefix + "auction_id_" + suffix, auctionId ?? string.Empty);
+            PlayerPrefs.Save();
+        }
+
+        public (string keyword, string auctionId) GetAuctionContext(LiftEngineAdFormat format)
+        {
+            var suffix = format.ToString().ToLowerInvariant();
+            var keyword = PlayerPrefs.GetString(Prefix + "auction_kw_" + suffix, string.Empty);
+            var auctionId = PlayerPrefs.GetString(Prefix + "auction_id_" + suffix, string.Empty);
+            return (
+                string.IsNullOrEmpty(keyword) ? null : keyword,
+                string.IsNullOrEmpty(auctionId) ? null : auctionId);
         }
     }
 }

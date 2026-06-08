@@ -142,5 +142,15 @@ namespace LiftEngine
                 _ => "interstitial"
             };
         }
+
+        public string[] GetAllModelNames()
+        {
+            return new[]
+            {
+                GetModelName(LiftEngineAdFormat.Banner),
+                GetModelName(LiftEngineAdFormat.Interstitial),
+                GetModelName(LiftEngineAdFormat.Rewarded)
+            };
+        }
     }
 }

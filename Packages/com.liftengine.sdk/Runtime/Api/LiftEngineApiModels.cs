@@ -9,6 +9,7 @@ namespace LiftEngine.Api
         public string model;
         public string keyword;
         public string auction_id;
+        public string param;
         public float prediction;
         public float[] multipliers;
 
@@ -31,7 +32,7 @@ namespace LiftEngine.Api
 
     internal class PredictRequestBody
     {
-        public string model;
+        public string[] models;
         public Context.PredictDataPayload data;
     }
 

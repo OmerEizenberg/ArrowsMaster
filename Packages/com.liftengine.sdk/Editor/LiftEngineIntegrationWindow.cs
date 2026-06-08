@@ -124,7 +124,8 @@ namespace LiftEngine.Editor
         {
             _lastPredictResult = $"Predict OK — model={result.model}, prediction={result.prediction}, multipliers={result.multipliers?.Length ?? 0}";
             Log($"[BE] Predict response received — model={result.model}, prediction={result.prediction}, " +
-                $"keyword={result.keyword}, auction_id={result.auction_id}, multipliers=[{FormatMultipliers(result.multipliers)}]");
+                $"param={result.param}, keyword={result.keyword}, auction_id={result.auction_id}, " +
+                $"multipliers=[{FormatMultipliers(result.multipliers)}]");
             Repaint();
         }
 

@@ -5,8 +5,6 @@ namespace LiftEngine.Context
 {
     public static class PredictDataNormalizers
     {
-        public const string BidFloorExtraParamKey = "jC7Fp";
-
         public static string NormalizeInstallType(string appsFlyerValue)
         {
             if (string.IsNullOrEmpty(appsFlyerValue))
@@ -44,5 +42,8 @@ namespace LiftEngine.Context
 
         public static string FormatBidFloor(float bidFloor) =>
             bidFloor.ToString(CultureInfo.InvariantCulture);
+
+        public static long UnixTimestampSeconds() =>
+            (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
     }
 }

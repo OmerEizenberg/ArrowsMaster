@@ -34,8 +34,8 @@ namespace LiftEngine.Mediation
         public virtual void Initialize(LiftEngineSettings settings, Action<bool> onComplete) =>
             onComplete?.Invoke(false);
 
-        public void SetBidFloorExtra(LiftEngineAdFormat format, string adUnitId, string floorValue) { }
-        public void ClearBidFloorExtra(LiftEngineAdFormat format, string adUnitId) { }
+        public void SetBidFloorExtra(LiftEngineAdFormat format, string adUnitId, string paramName, string floorValue) { }
+        public void ClearBidFloorExtra(LiftEngineAdFormat format, string adUnitId, string paramName) { }
         public void RequestLoad(LiftEngineAdFormat format, string adUnitId) { }
         public bool IsReady(LiftEngineAdFormat format, string adUnitId) => false;
         public bool HasLoadedWithRevenue(LiftEngineAdFormat format, string adUnitId) => false;

@@ -27,6 +27,7 @@ MonoBehaviour:
   rewardedPlacementId: rewarded-default
   predictTimeoutSeconds: 1
   defaultPredictionFallback: 1
+  treatEditorLoadAsFilledForMultiplierPhase: 1
   loadAttemptTimeoutSeconds: 15
   prewarmOnInit: 1
   prewarmAfterShow: 1

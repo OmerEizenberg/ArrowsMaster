@@ -53,15 +53,28 @@ namespace LiftEngine
 
                 if (_settings.runHealthCheckOnInit)
                 {
-                    _api.CheckHealth((ok, body) =>
-                    {
-                        CompleteInit();
-                    });
+                    _api.CheckHealth((_, _) => SendInitReport());
                 }
                 else
                 {
-                    CompleteInit();
+                    SendInitReport();
                 }
+            });
+        }
+
+        private void SendInitReport()
+        {
+            var deviceId = Ads.DeviceIdProvider.GetDeviceId();
+            var payload = _context.BuildPayload(LiftEngineAdFormat.Interstitial);
+            LiftEngineLogger.LogClient("Init report — sending context");
+            _api.Report(deviceId, payload, success =>
+            {
+                if (success)
+                    LiftEngineLogger.LogBackend("Init report — OK");
+                else
+                    LiftEngineLogger.LogBackendWarning("Init report — failed (init continues)");
+
+                CompleteInit();
             });
         }
 
@@ -199,18 +212,26 @@ namespace LiftEngine
         private void TrackDisplay(MediationAdInfo info)
         {
             var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
-            var timestamp = DateTime.UtcNow.ToString("o");
+            var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
+            var deviceId = Ads.DeviceIdProvider.GetDeviceId();
             var placementId = _settings.GetPlacementId(info.Format);
             var rev = info.Revenue > 0 ? (float?)info.Revenue : null;
 
+            if (string.IsNullOrEmpty(auctionId))
+                LiftEngineLogger.LogBackendWarning(
+                    $"Track {info.Format} — missing auction_id for placement={placementId}");
+
             if (info.Format == LiftEngineAdFormat.Banner)
             {
-                _api.TrackView(bundleId, placementId, keyword, auctionId, timestamp, rev);
+                LiftEngineLogger.LogClient(
+                    $"Track view — bundle={bundleId}, device={deviceId}, placement={placementId}, " +
+                    $"keyword={keyword}, auction_id={auctionId}, timestamp={timestamp}, rev={rev}");
+                _api.TrackView(bundleId, deviceId, placementId, keyword, auctionId, timestamp, rev);
             }
             else
             {
-                _api.TrackActiveView(bundleId, _settings.GetModelName(info.Format), placementId, keyword,
+                _api.TrackActiveView(bundleId, deviceId, _settings.GetModelName(info.Format), placementId, keyword,
                     auctionId, timestamp, rev);
             }
         }
