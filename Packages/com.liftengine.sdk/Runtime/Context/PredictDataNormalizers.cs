@@ -22,6 +22,11 @@ namespace LiftEngine.Context
 
         public static int PayerInd(float ltv) => ltv > 0f ? 1 : 0;
 
+        public static int HasMadeDeposit(long daysFromInstallToFtd) => daysFromInstallToFtd >= 0 ? 1 : 0;
+
+        public static float DailyAdTypeShare(int dailyAdNumberWire, int dailyAdNumberByTypeWire) =>
+            dailyAdNumberByTypeWire / (float)Math.Max(dailyAdNumberWire, 1);
+
         public static long SecFromLastAd(DateTime? lastAdUtc)
         {
             if (!lastAdUtc.HasValue)

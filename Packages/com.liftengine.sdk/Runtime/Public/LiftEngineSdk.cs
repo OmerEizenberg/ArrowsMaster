@@ -70,6 +70,9 @@ namespace LiftEngine
         public static void SetIdfaApproved(bool approved) =>
             _controller?.SetIdfaApproved(approved);
 
+        public static void SetCountryCode(string countryCode) =>
+            _controller?.SetCountryCode(countryCode);
+
         public static void NotifyPurchase(float amountUsd) =>
             _controller?.NotifyPurchase(amountUsd);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -8,12 +9,17 @@ namespace LiftEngine.Context
     [Serializable]
     public class PredictDataPayload
     {
+        public string os;
+        public string country_code;
         public string install_type;
         public string brand;
         public string device_model;
+        public int day_num;
+        public int hour_of_day;
         public string media_source;
         public int wifi;
         public int idfa_approved;
+        public int has_made_deposit;
         public int days_since_installed;
         public float ltv_gross_up_to_date;
         public long days_from_install_to_FTD;
@@ -24,6 +30,7 @@ namespace LiftEngine.Context
         public int ad_number_life_time_ad_type;
         public int daily_ad_number;
         public int daily_ad_number_ad_type;
+        public float daily_ad_type_share;
         public int session_ad_number;
         public int session_ad_number_ad_type;
         public float[] ecpm_history;
@@ -96,6 +103,106 @@ namespace LiftEngine.Context
 #else
             return SystemInfo.deviceModel?.Split(' ')?[0]?.ToLowerInvariant() ?? "unknown";
 #endif
+        }
+    }
+
+    internal static class DeviceOsProvider
+    {
+        public static string GetOs()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return "android";
+#elif UNITY_IOS && !UNITY_EDITOR
+            return "ios";
+#elif UNITY_EDITOR
+            return UnityEditor.EditorUserBuildSettings.activeBuildTarget switch
+            {
+                UnityEditor.BuildTarget.Android => "android",
+                UnityEditor.BuildTarget.iOS => "ios",
+                _ => "unknown"
+            };
+#else
+            return Application.platform switch
+            {
+                RuntimePlatform.Android => "android",
+                RuntimePlatform.IPhonePlayer => "ios",
+                _ => "unknown"
+            };
+#endif
+        }
+    }
+
+    internal static class DeviceCountryProvider
+    {
+        public static string DetectCountryCode()
+        {
+            var code = GetAndroidCountryCode() ?? GetCultureCountryCode();
+            return NormalizeCountryCode(code);
+        }
+
+        public static string NormalizeCountryCode(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+                return null;
+
+            code = code.Trim().ToUpperInvariant();
+            return code.Length == 2 ? code : null;
+        }
+
+        private static string GetAndroidCountryCode()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using var localeClass = new AndroidJavaClass("java.util.Locale");
+                using var defaultLocale = localeClass.CallStatic<AndroidJavaObject>("getDefault");
+                var country = defaultLocale.Call<string>("getCountry");
+                if (!string.IsNullOrWhiteSpace(country))
+                    return country;
+            }
+            catch
+            {
+                // Fall through to telephony lookup.
+            }
+
+            try
+            {
+                using var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+                using var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+                using var telephony = activity.Call<AndroidJavaObject>("getSystemService", "phone");
+                var simCountry = telephony.Call<string>("getSimCountryIso");
+                if (!string.IsNullOrWhiteSpace(simCountry))
+                    return simCountry;
+
+                var networkCountry = telephony.Call<string>("getNetworkCountryIso");
+                if (!string.IsNullOrWhiteSpace(networkCountry))
+                    return networkCountry;
+            }
+            catch
+            {
+                // Fall through to culture lookup.
+            }
+#endif
+            return null;
+        }
+
+        private static string GetCultureCountryCode()
+        {
+            try
+            {
+                var culture = CultureInfo.CurrentCulture;
+                if (!string.IsNullOrWhiteSpace(culture.Name) && culture.Name.Contains("-", StringComparison.Ordinal))
+                {
+                    var region = new RegionInfo(culture.Name);
+                    return region.TwoLetterISORegionName;
+                }
+
+                return RegionInfo.CurrentRegion.TwoLetterISORegionName;
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

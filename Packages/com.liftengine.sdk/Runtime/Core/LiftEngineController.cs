@@ -136,6 +136,8 @@ namespace LiftEngine
 
         public void SetIdfaApproved(bool approved) => _context.SetIdfaApproved(approved);
 
+        public void SetCountryCode(string countryCode) => _context.SetCountryCode(countryCode);
+
         public void NotifyPurchase(float amountUsd) => _context.NotifyPurchase(amountUsd);
 
         public void CheckHealth(Action<bool> callback) =>

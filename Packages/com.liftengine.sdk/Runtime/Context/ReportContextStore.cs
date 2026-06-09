@@ -10,6 +10,7 @@ namespace LiftEngine.Context
 
         public string InstallTypeRaw { get; set; }
         public string MediaSource { get; set; }
+        public string CountryCodeOverride { get; set; }
         public int? IdfaApprovedOverride { get; set; }
 
         public DateTime? InstallUtc
@@ -64,10 +65,29 @@ namespace LiftEngine.Context
             }
         }
 
+        public int ActiveDayCount
+        {
+            get => GetRawCount("active_day_count", 0);
+            set => SetRawCount("active_day_count", value);
+        }
+
+        public string LastActiveDateKey
+        {
+            get => PlayerPrefs.GetString(Prefix + "last_active_date", string.Empty);
+            set
+            {
+                PlayerPrefs.SetString(Prefix + "last_active_date", value ?? string.Empty);
+                PlayerPrefs.Save();
+            }
+        }
+
         public void Load()
         {
             InstallTypeRaw = PlayerPrefs.GetString(Prefix + "install_type", null);
             MediaSource = PlayerPrefs.GetString(Prefix + "media_source", null);
+            CountryCodeOverride = PlayerPrefs.GetString(Prefix + "country_code", null);
+            if (string.IsNullOrEmpty(CountryCodeOverride))
+                CountryCodeOverride = null;
             if (PlayerPrefs.HasKey(Prefix + "idfa_override"))
                 IdfaApprovedOverride = PlayerPrefs.GetInt(Prefix + "idfa_override");
         }
@@ -86,6 +106,31 @@ namespace LiftEngine.Context
             IdfaApprovedOverride = approved ? 1 : 0;
             PlayerPrefs.SetInt(Prefix + "idfa_override", approved ? 1 : 0);
             PlayerPrefs.Save();
+        }
+
+        public void SaveCountryCode(string countryCode)
+        {
+            CountryCodeOverride = DeviceCountryProvider.NormalizeCountryCode(countryCode);
+            PlayerPrefs.SetString(Prefix + "country_code", CountryCodeOverride ?? string.Empty);
+            PlayerPrefs.Save();
+        }
+
+        public void RecordActiveDay()
+        {
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var lastKey = LastActiveDateKey;
+            if (string.IsNullOrEmpty(lastKey))
+            {
+                ActiveDayCount = 1;
+                LastActiveDateKey = today;
+                return;
+            }
+
+            if (lastKey == today)
+                return;
+
+            ActiveDayCount = Math.Max(1, ActiveDayCount) + 1;
+            LastActiveDateKey = today;
         }
 
         public int GetRawCount(string key, int defaultValue = 0)
@@ -111,7 +156,8 @@ namespace LiftEngine.Context
             foreach (var suffix in new[]
             {
                 "install_utc", "last_ad_utc", "last_purchase_utc", "first_purchase_utc",
-                "ltv", "ftd_amount", "daily_date", "ecpm", "install_type", "media_source", "idfa_override",
+                "ltv", "ftd_amount", "daily_date", "ecpm", "install_type", "media_source", "country_code",
+                "idfa_override", "active_day_count", "last_active_date",
                 "life_banner", "life_interstitial", "life_rewarded",
                 "daily_banner", "daily_interstitial", "daily_rewarded",
                 "sess_banner", "sess_interstitial", "sess_rewarded",

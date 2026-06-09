@@ -50,6 +50,7 @@ namespace LiftEngine.Context
             if (!_store.InstallUtc.HasValue)
                 _store.InstallUtc = DateTime.UtcNow;
 
+            _store.RecordActiveDay();
             _session.EnsureDailyRollover(_store);
         }
 
@@ -60,6 +61,8 @@ namespace LiftEngine.Context
         }
 
         public void SetIdfaApproved(bool approved) => _store.SetIdfaOverride(approved);
+
+        public void SetCountryCode(string countryCode) => _store.SaveCountryCode(countryCode);
 
         public void NotifyPurchase(float amountUsd)
         {
@@ -94,9 +97,11 @@ namespace LiftEngine.Context
         public PredictDataPayload BuildPayload(LiftEngineAdFormat format)
         {
             _session.EnsureDailyRollover(_store);
+            _store.RecordActiveDay();
 
-            var installUtc = _store.InstallUtc ?? DateTime.UtcNow;
-            var daysSinceInstall = Math.Max(0, (int)(DateTime.UtcNow - installUtc).TotalDays);
+            var nowUtc = DateTime.UtcNow;
+            var installUtc = _store.InstallUtc ?? nowUtc;
+            var daysSinceInstall = Math.Max(0, (int)(nowUtc - installUtc).TotalDays);
 
             long daysToFtd = -1;
             if (_store.FirstPurchaseUtc.HasValue)
@@ -104,21 +109,31 @@ namespace LiftEngine.Context
 
             int daysSinceLastPurchase = -1;
             if (_store.LastPurchaseUtc.HasValue)
-                daysSinceLastPurchase = Math.Max(0, (int)(DateTime.UtcNow - _store.LastPurchaseUtc.Value).TotalDays);
+                daysSinceLastPurchase = Math.Max(0, (int)(nowUtc - _store.LastPurchaseUtc.Value).TotalDays);
 
             var ltv = _store.LtvGross;
             var typeRaw = _store.GetLifetimeRaw(format);
             var typeDailyRaw = _store.GetDailyRaw(format);
             var typeSessionRaw = _store.GetSessionRaw(format);
+            var dailyAdNumberWire = PredictDataNormalizers.ToWireCount(_store.GetDailyTotalRaw());
+            var dailyAdNumberByTypeWire = PredictDataNormalizers.ToWireCount(typeDailyRaw);
+            var countryCode = !string.IsNullOrEmpty(_store.CountryCodeOverride)
+                ? _store.CountryCodeOverride
+                : DeviceCountryProvider.DetectCountryCode();
 
             return new PredictDataPayload
             {
+                os = DeviceOsProvider.GetOs(),
+                country_code = countryCode,
                 install_type = string.IsNullOrEmpty(_store.InstallTypeRaw) ? null : _store.InstallTypeRaw,
                 brand = DeviceBrandProvider.GetBrand(),
                 device_model = SystemInfo.deviceModel,
+                day_num = Math.Max(1, _store.ActiveDayCount),
+                hour_of_day = nowUtc.Hour,
                 media_source = string.IsNullOrEmpty(_store.MediaSource) ? null : _store.MediaSource,
                 wifi = PredictDataNormalizers.WifiFlag(),
                 idfa_approved = ResolveIdfaApproved(),
+                has_made_deposit = PredictDataNormalizers.HasMadeDeposit(daysToFtd),
                 days_since_installed = daysSinceInstall,
                 ltv_gross_up_to_date = ltv,
                 days_from_install_to_FTD = daysToFtd,
@@ -127,8 +142,10 @@ namespace LiftEngine.Context
                 payer_ind = PredictDataNormalizers.PayerInd(ltv),
                 ad_number_life_time = PredictDataNormalizers.ToWireCount(_store.GetLifetimeTotalRaw()),
                 ad_number_life_time_ad_type = PredictDataNormalizers.ToWireCount(typeRaw),
-                daily_ad_number = PredictDataNormalizers.ToWireCount(_store.GetDailyTotalRaw()),
-                daily_ad_number_ad_type = PredictDataNormalizers.ToWireCount(typeDailyRaw),
+                daily_ad_number = dailyAdNumberWire,
+                daily_ad_number_ad_type = dailyAdNumberByTypeWire,
+                daily_ad_type_share = PredictDataNormalizers.DailyAdTypeShare(
+                    dailyAdNumberWire, dailyAdNumberByTypeWire),
                 session_ad_number = PredictDataNormalizers.ToWireCount(_store.GetSessionTotalRaw()),
                 session_ad_number_ad_type = PredictDataNormalizers.ToWireCount(typeSessionRaw),
                 ecpm_history = EcpmHistoryBuffer.GetForFormat(_store.EcpmHistory, format),
