@@ -458,22 +458,22 @@ namespace Assets.Scripts.Core
                     break;
                 case ProductNoAdsCoins999:
                     SetNoAds(true);
-                    UserDataManager.Instance.AddArrowsCurrency(25000);
+                    UserDataManager.Instance.AddArrowsCurrency(25000, ResourceAnalyticsReasons.IapNoAdsCoins999);
                     break;
                 case ProductCoins199:
-                    UserDataManager.Instance.AddArrowsCurrency(4500);
+                    UserDataManager.Instance.AddArrowsCurrency(4500, ResourceAnalyticsReasons.IapCoins199);
                     break;
                 case ProductCoins499:
-                    UserDataManager.Instance.AddArrowsCurrency(12000);
+                    UserDataManager.Instance.AddArrowsCurrency(12000, ResourceAnalyticsReasons.IapCoins499);
                     break;
                 case ProductCoins999:
-                    UserDataManager.Instance.AddArrowsCurrency(25000);
+                    UserDataManager.Instance.AddArrowsCurrency(25000, ResourceAnalyticsReasons.IapCoins999);
                     break;
                 case ProductCoins1999:
-                    UserDataManager.Instance.AddArrowsCurrency(60000);
+                    UserDataManager.Instance.AddArrowsCurrency(60000, ResourceAnalyticsReasons.IapCoins1999);
                     break;
                 case ProductCoins4999:
-                    UserDataManager.Instance.AddArrowsCurrency(150000);
+                    UserDataManager.Instance.AddArrowsCurrency(150000, ResourceAnalyticsReasons.IapCoins4999);
                     break;
                 case ProductLegendPass999:
                     if (LegendPassManager.Instance != null) LegendPassManager.Instance.UnlockPremium();

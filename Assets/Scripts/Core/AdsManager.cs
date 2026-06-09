@@ -1422,7 +1422,7 @@ namespace Assets.Scripts.Core
                     Debug.Log($"[AdsManager] ProcessPendingReward: CoinsReward → granting {rewardAmount} coins.");
                     if (UserDataManager.Instance != null)
                     {
-                        UserDataManager.Instance.AddArrowsCurrency(rewardAmount);
+                        UserDataManager.Instance.AddArrowsCurrency(rewardAmount, ResourceAnalyticsReasons.CoinsAdBtn);
                     }
                     OnCoinsRewardReceived?.Invoke();
                     StartCoroutine(SpawnCoinsExplosionDeferred());

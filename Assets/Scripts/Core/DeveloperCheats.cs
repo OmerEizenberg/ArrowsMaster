@@ -208,7 +208,7 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            UserDataManager.Instance.AddShuffleBooster(5);
+            UserDataManager.Instance.AddShuffleBooster(5, ResourceAnalyticsReasons.DevCheat);
             Debug.Log($"[CHEAT] Added 5 Shuffle Boosters. New balance: {UserDataManager.Instance.ShuffleBoosterCount}");
         }
 
@@ -217,7 +217,7 @@ namespace Assets.Scripts.Core
         {
             if (UserDataManager.Instance != null)
             {
-                UserDataManager.Instance.AddMagicBooster(5);
+                UserDataManager.Instance.AddMagicBooster(5, ResourceAnalyticsReasons.DevCheat);
                 Debug.Log($"[CHEAT] Added 5 Magic Boosters. New balance: {UserDataManager.Instance.MagicBoosterCount}");
             }
         }

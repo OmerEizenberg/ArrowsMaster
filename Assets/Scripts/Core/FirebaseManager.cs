@@ -37,6 +37,8 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string EVENT_BOOSTER_MAGIC_CLICKED = "booster_magic_clicked";
     public const string EVENT_BOOSTER_REFILL_CLICKED = "booster_refill_clicked";
     public const string EVENT_BOOSTER_SHUFFLE_CLICKED = "booster_shuffle_clicked";
+    public const string EVENT_EARN = "earn";
+    public const string EVENT_SPEND = "spend";
 
     // Parameter Names
     public const string PARAM_LEVEL_ID = "level_id";
@@ -50,6 +52,12 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string PARAM_AD_SOURCE = "ad_source";
     public const string PARAM_AD_UNIT_NAME = "ad_unit_name";
     public const string PARAM_AD_FORMAT = "ad_format";
+    public const string PARAM_COINS = "coins";
+    public const string PARAM_HINT = "hint";
+    public const string PARAM_SHUFFLE = "shuffle";
+    public const string PARAM_MAGICWAND = "magicwand";
+    public const string PARAM_REFILL = "refill";
+    public const string PARAM_REASON = "reason";
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoInitialize()
@@ -306,6 +314,28 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
         if (!string.IsNullOrEmpty(singularEvent)) {
             SingularSDK.Event(singularEvent);
         }
+    }
+
+    public void LogEarnEvent(string reason, int shuffle = 0, int hint = 0, int magicwand = 0, int refill = 0, int coins = 0)
+    {
+        LogResourceEvent(EVENT_EARN, reason, shuffle, hint, magicwand, refill, coins);
+    }
+
+    public void LogSpendEvent(string reason, int shuffle = 0, int hint = 0, int magicwand = 0, int refill = 0, int coins = 0)
+    {
+        LogResourceEvent(EVENT_SPEND, reason, shuffle, hint, magicwand, refill, coins);
+    }
+
+    private void LogResourceEvent(string eventName, string reason, int shuffle, int hint, int magicwand, int refill, int coins)
+    {
+        if (!isInitialized || string.IsNullOrEmpty(reason)) return;
+        LogEvent(eventName,
+            new Parameter(PARAM_REASON, reason),
+            new Parameter(PARAM_SHUFFLE, shuffle),
+            new Parameter(PARAM_HINT, hint),
+            new Parameter(PARAM_MAGICWAND, magicwand),
+            new Parameter(PARAM_REFILL, refill),
+            new Parameter(PARAM_COINS, coins));
     }
 
     private string MapToSingularEvent(string eventName)

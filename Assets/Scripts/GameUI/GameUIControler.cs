@@ -1014,7 +1014,7 @@ public class GameUIContoleer : MonoBehaviour
 
         if (UserDataManager.Instance.HintBoosterCount > 0)
         {
-            if (UserDataManager.Instance.UseHintBooster(1))
+            if (UserDataManager.Instance.UseHintBooster(1, ResourceAnalyticsReasons.HintBtn))
             {
                 StartCoroutine(BoosterSequence(m_HintBoosterFeedbackSprite, BoosterType.Hint, () => {
                     GameManager.Instance.ShowHint();
@@ -1161,7 +1161,7 @@ public class GameUIContoleer : MonoBehaviour
 
         if (UserDataManager.Instance.MagicBoosterCount > 0)
         {
-            if (UserDataManager.Instance.UseMagicBooster(1))
+            if (UserDataManager.Instance.UseMagicBooster(1, ResourceAnalyticsReasons.MagicBtn))
             {
                 StartCoroutine(BoosterSequence(m_MagicBoosterFeedbackSprite, BoosterType.Magic, () => {
                     GameManager.Instance.ExecuteMagicBooster();
@@ -1216,7 +1216,7 @@ public class GameUIContoleer : MonoBehaviour
 
         if (UserDataManager.Instance.RefillBoosterCount > 0)
         {
-            if (UserDataManager.Instance.UseRefillBooster(1))
+            if (UserDataManager.Instance.UseRefillBooster(1, ResourceAnalyticsReasons.RefillBtn))
             {
                 StartCoroutine(BoosterSequence(m_RefillBoosterFeedbackSprite, BoosterType.Refill, () => {
                     GameManager.Instance.ExecuteRefillLife();
@@ -1255,7 +1255,7 @@ public class GameUIContoleer : MonoBehaviour
 
         if (UserDataManager.Instance.ShuffleBoosterCount > 0)
         {
-            if (UserDataManager.Instance.UseShuffleBooster(1))
+            if (UserDataManager.Instance.UseShuffleBooster(1, ResourceAnalyticsReasons.ShuffleBtn))
             {
                 StartCoroutine(BoosterSequence(m_ShuffleBoosterFeedbackSprite, BoosterType.Shuffle, () => {
                     GameManager.Instance.ExecuteShuffleBooster();

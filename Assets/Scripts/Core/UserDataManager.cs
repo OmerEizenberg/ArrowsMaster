@@ -141,6 +141,7 @@ namespace Assets.Scripts.Core
         // LevelProgress is written frequently (periodic autosave), so throttle flushes.
         private const float LevelProgressPrefsFlushIntervalSeconds = 30f;
         private float m_LastLevelProgressPrefsFlushRealtime = -999f;
+        private bool m_SuppressResourceAnalytics;
 
         private void MaybeFlushPrefsForLevelProgress(bool force)
         {
@@ -165,6 +166,7 @@ namespace Assets.Scripts.Core
 
         private void LoadData()
         {
+            m_SuppressResourceAnalytics = true;
             CurrentLevel = PlayerPrefs.GetInt(LevelKey, 1);
             ArrowsCurrency = PlayerPrefs.GetInt(ArrowsCurrencyKey, 0);
             CurrentLevelAttempts = PlayerPrefs.GetInt(CurrentLevelAttemptsKey, 0);
@@ -233,6 +235,24 @@ namespace Assets.Scripts.Core
             PlayerPrefs.SetInt(SessionCountKey, SessionCount);
             HasSentSession7 = PlayerPrefs.GetInt(HasSentSession7Key, 0) == 1;
             PlayerPrefs.Save();
+            m_SuppressResourceAnalytics = false;
+        }
+
+        private void LogEarn(string reason, int shuffle = 0, int hint = 0, int magicwand = 0, int refill = 0, int coins = 0)
+        {
+            if (m_SuppressResourceAnalytics || string.IsNullOrEmpty(reason) || AmountIsZero(shuffle, hint, magicwand, refill, coins)) return;
+            FirebaseManager.Instance?.LogEarnEvent(reason, shuffle, hint, magicwand, refill, coins);
+        }
+
+        private void LogSpend(string reason, int shuffle = 0, int hint = 0, int magicwand = 0, int refill = 0, int coins = 0)
+        {
+            if (m_SuppressResourceAnalytics || string.IsNullOrEmpty(reason) || AmountIsZero(shuffle, hint, magicwand, refill, coins)) return;
+            FirebaseManager.Instance?.LogSpendEvent(reason, shuffle, hint, magicwand, refill, coins);
+        }
+
+        private static bool AmountIsZero(int shuffle, int hint, int magicwand, int refill, int coins)
+        {
+            return shuffle == 0 && hint == 0 && magicwand == 0 && refill == 0 && coins == 0;
         }
 
 
@@ -249,14 +269,15 @@ namespace Assets.Scripts.Core
             SaveData();
         }
 
-        public void AddArrowsCurrency(int amount)
+        public void AddArrowsCurrency(int amount, string reason)
         {
             if (amount < 0) return; // Prevent negative addition
             ArrowsCurrency += amount;
             SaveCurrency();
+            LogEarn(reason, coins: amount);
         }
 
-        public bool ReduceArrowsCurrency(int amount)
+        public bool ReduceArrowsCurrency(int amount, string reason)
         {
             if (amount < 0) return false;
             
@@ -264,6 +285,7 @@ namespace Assets.Scripts.Core
             {
                 ArrowsCurrency -= amount;
                 SaveCurrency();
+                LogSpend(reason, coins: amount);
                 return true;
             }
             return false;
@@ -276,20 +298,22 @@ namespace Assets.Scripts.Core
             OnCurrencyChanged?.Invoke(ArrowsCurrency);
         }
 
-        public void AddMagicBooster(int amount)
+        public void AddMagicBooster(int amount, string reason)
         {
             if (amount < 0) return;
             MagicBoosterCount += amount;
             SaveMagicBooster();
+            LogEarn(reason, magicwand: amount);
         }
 
-        public bool UseMagicBooster(int amount)
+        public bool UseMagicBooster(int amount, string reason)
         {
             if (amount < 0) return false;
             if (MagicBoosterCount >= amount)
             {
                 MagicBoosterCount -= amount;
                 SaveMagicBooster();
+                LogSpend(reason, magicwand: amount);
                 return true;
             }
             return false;
@@ -302,20 +326,22 @@ namespace Assets.Scripts.Core
             OnMagicBoosterChanged?.Invoke(MagicBoosterCount);
         }
 
-        public void AddHintBooster(int amount)
+        public void AddHintBooster(int amount, string reason)
         {
             if (amount < 0) return;
             HintBoosterCount += amount;
             SaveHintBooster();
+            LogEarn(reason, hint: amount);
         }
 
-        public bool UseHintBooster(int amount)
+        public bool UseHintBooster(int amount, string reason)
         {
             if (amount < 0) return false;
             if (HintBoosterCount >= amount)
             {
                 HintBoosterCount -= amount;
                 SaveHintBooster();
+                LogSpend(reason, hint: amount);
                 return true;
             }
             return false;
@@ -328,20 +354,22 @@ namespace Assets.Scripts.Core
             OnHintBoosterChanged?.Invoke(HintBoosterCount);
         }
 
-        public void AddRefillBooster(int amount)
+        public void AddRefillBooster(int amount, string reason)
         {
             if (amount < 0) return;
             RefillBoosterCount += amount;
             SaveRefillBooster();
+            LogEarn(reason, refill: amount);
         }
 
-        public bool UseRefillBooster(int amount)
+        public bool UseRefillBooster(int amount, string reason)
         {
             if (amount < 0) return false;
             if (RefillBoosterCount >= amount)
             {
                 RefillBoosterCount -= amount;
                 SaveRefillBooster();
+                LogSpend(reason, refill: amount);
                 return true;
             }
             return false;
@@ -354,20 +382,22 @@ namespace Assets.Scripts.Core
             OnRefillBoosterChanged?.Invoke(RefillBoosterCount);
         }
 
-        public void AddShuffleBooster(int amount)
+        public void AddShuffleBooster(int amount, string reason)
         {
             if (amount < 0) return;
             ShuffleBoosterCount += amount;
             SaveShuffleBooster();
+            LogEarn(reason, shuffle: amount);
         }
 
-        public bool UseShuffleBooster(int amount)
+        public bool UseShuffleBooster(int amount, string reason)
         {
             if (amount < 0) return false;
             if (ShuffleBoosterCount >= amount)
             {
                 ShuffleBoosterCount -= amount;
                 SaveShuffleBooster();
+                LogSpend(reason, shuffle: amount);
                 return true;
             }
             return false;
