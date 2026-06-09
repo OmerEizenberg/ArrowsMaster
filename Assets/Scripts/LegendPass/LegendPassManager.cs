@@ -140,22 +140,23 @@ public class LegendPassManager : MonoBehaviour
         {
             string rewardKey = isPremium ? config.premiumRewards[step] : config.freeRewards[step];
             Reward reward = config.ParseReward(rewardKey);
-            GrantReward(reward);
+            string reason = isPremium ? ResourceAnalyticsReasons.PassClaimPremium : ResourceAnalyticsReasons.PassClaim;
+            GrantReward(reward, reason);
             OnRewardClaimed?.Invoke(reward);
         }
 
         NotifyStateChanged();
     }
 
-    private void GrantReward(Reward reward)
+    private void GrantReward(Reward reward, string reason)
     {
         var userData = UserDataManager.Instance;
         switch (reward.type)
         {
-            case RewardType.Coin: userData.AddArrowsCurrency(reward.amount); break;
-            case RewardType.Hint: userData.AddHintBooster(reward.amount); break;
-            case RewardType.MagicWand: userData.AddMagicBooster(reward.amount); break;
-            case RewardType.RefillLife: userData.AddRefillBooster(reward.amount); break;
+            case RewardType.Coin: userData.AddArrowsCurrency(reward.amount, reason); break;
+            case RewardType.Hint: userData.AddHintBooster(reward.amount, reason); break;
+            case RewardType.MagicWand: userData.AddMagicBooster(reward.amount, reason); break;
+            case RewardType.RefillLife: userData.AddRefillBooster(reward.amount, reason); break;
         }
     }
 

@@ -400,32 +400,32 @@ namespace Assets.Scripts.Core
 
         private void HandleHintRewardReceived()
         {
-            UserDataManager.Instance.AddHintBooster(1);
-            UserDataManager.Instance.UseHintBooster(1);
+            UserDataManager.Instance.AddHintBooster(1, ResourceAnalyticsReasons.HintAdBtn);
+            UserDataManager.Instance.UseHintBooster(1, ResourceAnalyticsReasons.HintAdBtn);
             if (m_GameUI != null) m_GameUI.HandleHintRewardReceived();
             else ShowHint();
         }
 
         private void HandleMagicRewardReceived()
         {
-            UserDataManager.Instance.AddMagicBooster(1);
-            UserDataManager.Instance.UseMagicBooster(1);
+            UserDataManager.Instance.AddMagicBooster(1, ResourceAnalyticsReasons.MagicAdBtn);
+            UserDataManager.Instance.UseMagicBooster(1, ResourceAnalyticsReasons.MagicAdBtn);
             if (m_GameUI != null) m_GameUI.HandleMagicRewardReceived();
             else ExecuteMagicBooster();
         }
 
         private void HandleLifeRewardReceived()
         {
-            UserDataManager.Instance.AddRefillBooster(1);
-            UserDataManager.Instance.UseRefillBooster(1);
+            UserDataManager.Instance.AddRefillBooster(1, ResourceAnalyticsReasons.RefillAdBtn);
+            UserDataManager.Instance.UseRefillBooster(1, ResourceAnalyticsReasons.RefillAdBtn);
             if (m_GameUI != null) m_GameUI.HandleRefillRewardReceived();
             else ExecuteRefillLife();
         }
 
         private void HandleShuffleRewardReceived()
         {
-            UserDataManager.Instance.AddShuffleBooster(1);
-            UserDataManager.Instance.UseShuffleBooster(1);
+            UserDataManager.Instance.AddShuffleBooster(1, ResourceAnalyticsReasons.ShuffleAdBtn);
+            UserDataManager.Instance.UseShuffleBooster(1, ResourceAnalyticsReasons.ShuffleAdBtn);
             if (m_GameUI != null) m_GameUI.HandleShuffleRewardReceived();
             else ExecuteShuffleBooster();
         }
@@ -689,7 +689,7 @@ namespace Assets.Scripts.Core
             }
 
             int cost = GetPlayOnCost();
-            if (UserDataManager.Instance.ReduceArrowsCurrency(cost))
+            if (UserDataManager.Instance.ReduceArrowsCurrency(cost, ResourceAnalyticsReasons.PlayOnBtn))
             {
                 Debug.Log($"[GameManager] Bought PlayOn for {cost}.");
                 UpdateUserBalanceUI(UserDataManager.Instance.ArrowsCurrency);
@@ -1120,7 +1120,7 @@ namespace Assets.Scripts.Core
             // Award Collected Currency
             if (collectedLevelCurrency > 0)
             {
-                UserDataManager.Instance.AddArrowsCurrency(collectedLevelCurrency);
+                UserDataManager.Instance.AddArrowsCurrency(collectedLevelCurrency, ResourceAnalyticsReasons.LevelWin);
             }
 
             if(p_isLevelProgression)

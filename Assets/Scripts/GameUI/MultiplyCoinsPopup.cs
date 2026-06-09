@@ -285,7 +285,7 @@ namespace Assets.Scripts.GameUI
             }
             else if (AdsManager.Instance == null)
             {
-                StartCoroutine(RewardAnimationRoutine());
+                StartCoroutine(RewardAnimationRoutine(ResourceAnalyticsReasons.CoinsMultiplyFallback));
             }
             else
             {
@@ -400,7 +400,7 @@ namespace Assets.Scripts.GameUI
         {
             Debug.Log("[SlotMachine] Ad Reward Received! Starting count-up...");
             m_IsAdShowing = false;
-            StartCoroutine(RewardAnimationRoutine());
+            StartCoroutine(RewardAnimationRoutine(ResourceAnalyticsReasons.CoinsMultiplyAd));
         }
 
         private void HandleAdClosed()
@@ -412,7 +412,7 @@ namespace Assets.Scripts.GameUI
             }
         }
 
-        private IEnumerator RewardAnimationRoutine()
+        private IEnumerator RewardAnimationRoutine(string earnReason)
         {
             m_RewardClaimed = true;
             m_IsAdShowing = false;
@@ -462,7 +462,7 @@ namespace Assets.Scripts.GameUI
             
             if (UserDataManager.Instance != null && additionalCoins > 0)
             {
-                UserDataManager.Instance.AddArrowsCurrency(additionalCoins);
+                UserDataManager.Instance.AddArrowsCurrency(additionalCoins, earnReason);
             }
             
             if (AdsManager.Instance != null) AdsManager.Instance.SpawnCoinsSmallExplosion();

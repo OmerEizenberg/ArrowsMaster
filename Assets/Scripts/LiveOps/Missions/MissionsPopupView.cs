@@ -247,7 +247,7 @@ namespace Assets.Scripts.LiveOps.Missions
                 SoundManager.Instance.PlayMediumCheer();
 
             if (UserDataManager.Instance != null)
-                UserDataManager.Instance.AddArrowsCurrency(coins);
+                UserDataManager.Instance.AddArrowsCurrency(coins, ResourceAnalyticsReasons.MissionClaim);
 
             if (AdsManager.Instance != null)
                 AdsManager.Instance.SpawnCoinsSmallExplosion();
