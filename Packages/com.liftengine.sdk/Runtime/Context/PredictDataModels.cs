@@ -22,7 +22,7 @@ namespace LiftEngine.Context
         public int has_made_deposit;
         public int days_since_installed;
         public float ltv_gross_up_to_date;
-        public long days_from_install_to_FTD;
+        public long days_from_install_to_ftd;
         public float ftd_amount;
         public int days_since_last_purchase;
         public int payer_ind;
@@ -33,6 +33,7 @@ namespace LiftEngine.Context
         public float daily_ad_type_share;
         public int session_ad_number;
         public int session_ad_number_ad_type;
+        /// <summary>Recent eCPM values (USD per 1,000 impressions), newest first. Not per-impression revenue.</summary>
         public float[] ecpm_history;
         public long sec_from_last_ad;
         public int device_memory;

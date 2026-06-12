@@ -62,7 +62,7 @@ if (CanShowRewarded())
 | Show rewarded     | Debug → Show Ad (Rewarded) | MAX ad displays                                      |
 | Attribution       | Set Organic + media source | Next predict payload has `install_type: organic`     |
 | Purchase          | Simulate Purchase 4.99     | Payload shows `ltv_gross_up_to_date`, `payer_ind: 1` |
-| Counters          | Show 2 ads                 | `ad_number_`* fields increment (+1 rule on wire)     |
+| Counters          | Show 2 ads                 | `ad_number_*` / `daily_ad_number` increment (0-based) |
 | Clear state       | Clear Context Prefs        | Counters reset                                       |
 
 

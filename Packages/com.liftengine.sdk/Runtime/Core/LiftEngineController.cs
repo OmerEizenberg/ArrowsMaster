@@ -20,6 +20,8 @@ namespace LiftEngine
 
         private LiftEngineShowAdCallbacks _activeCallbacks;
         private LiftEngineAdFormat? _activeFormat;
+        private LiftEngineAdFormat? _pendingReportFormat;
+        private Coroutine _reportDebounceCoroutine;
 
         public bool IsInitialized { get; private set; }
 
@@ -52,29 +54,28 @@ namespace LiftEngine
                 }
 
                 if (_settings.runHealthCheckOnInit)
-                {
-                    _api.CheckHealth((_, _) => SendInitReport());
-                }
+                    _api.CheckHealth((_, _) => CompleteInit());
                 else
-                {
-                    SendInitReport();
-                }
+                    CompleteInit();
             });
         }
 
-        private void SendInitReport()
+        public void SendReport(Action<bool> callback = null) =>
+            SendReport(LiftEngineAdFormat.Interstitial, callback);
+
+        public void SendReport(LiftEngineAdFormat format, Action<bool> callback = null)
         {
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
-            var payload = _context.BuildPayload(LiftEngineAdFormat.Interstitial);
-            LiftEngineLogger.LogClient("Init report — sending context");
+            var payload = _context.BuildPayload(format);
+            LiftEngineLogger.LogClient($"Report — sending context ({format})");
             _api.Report(deviceId, payload, success =>
             {
                 if (success)
-                    LiftEngineLogger.LogBackend("Init report — OK");
+                    LiftEngineLogger.LogBackend("Report — OK");
                 else
-                    LiftEngineLogger.LogBackendWarning("Init report — failed (init continues)");
+                    LiftEngineLogger.LogBackendWarning("Report — failed");
 
-                CompleteInit();
+                callback?.Invoke(success);
             });
         }
 
@@ -94,8 +95,11 @@ namespace LiftEngine
             _mediation.AdLoaded += info => LiftEngineSdkCallbacks.RaiseAdLoaded(info);
             _mediation.AdDisplayed += info =>
             {
-                _context.RecordAdDisplayed(info.Format, info.Revenue);
+                _context.RecordAdImpression(info.Format);
                 TrackDisplay(info);
+                if (info.Format == LiftEngineAdFormat.Banner)
+                    QueueReportAfterAdDisplay(info.Format);
+
                 LiftEngineSdkCallbacks.RaiseAdDisplayed(info);
                 _activeCallbacks?.OnAdDisplayed?.Invoke();
             };
@@ -105,6 +109,8 @@ namespace LiftEngine
                 _activeCallbacks?.OnAdHidden?.Invoke();
                 _activeCallbacks = null;
                 _activeFormat = null;
+
+                QueueReportAfterAdDisplay(info.Format);
 
                 if (_settings.prewarmAfterShow)
                     _prewarm.Prewarm(info.Format);
@@ -117,7 +123,8 @@ namespace LiftEngine
             };
             _mediation.AdRevenuePaid += info =>
             {
-                _context.RecordAdDisplayed(info.Format, info.Revenue);
+                _context.RecordAdRevenue(info.Format, info.Revenue);
+                QueueReportAfterAdDisplay(info.Format);
                 LiftEngineSdkCallbacks.RaiseAdRevenue(info);
             };
             _mediation.AdDisplayFailed += err =>
@@ -234,28 +241,46 @@ namespace LiftEngine
             var placementId = _settings.GetPlacementId(info.Format);
             var rev = info.Revenue > 0 ? (float?)info.Revenue : null;
 
+            var adType = _settings.GetModelName(info.Format);
+
             if (string.IsNullOrEmpty(auctionId))
                 LiftEngineLogger.LogBackendWarning(
                     $"Track {info.Format} — missing auction_id for placement={placementId}");
 
-            if (info.Format == LiftEngineAdFormat.Banner)
-            {
-                LiftEngineLogger.LogClient(
-                    $"Track view — bundle={bundleId}, device={deviceId}, placement={placementId}, " +
-                    $"keyword={keyword}, auction_id={auctionId}, timestamp={timestamp}, rev={rev}");
-                _api.TrackView(bundleId, deviceId, placementId, keyword, auctionId, timestamp, rev);
-            }
-            else
-            {
-                _api.TrackActiveView(bundleId, deviceId, _settings.GetModelName(info.Format), placementId, keyword,
-                    auctionId, timestamp, rev);
-            }
+            LiftEngineLogger.LogClient(
+                $"Track activeview — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
+                $"placement={placementId}, keyword={keyword}, auction_id={auctionId}, " +
+                $"timestamp={timestamp}, rev={rev}");
+            _api.TrackActiveView(bundleId, deviceId, adType, placementId, keyword, auctionId, timestamp, rev);
         }
 
         private void TrackError(LiftEngineAdFormat format, string code, string message)
         {
             var (_, auctionId) = _context.GetAuctionContext(format);
             _api.TrackError(Application.identifier, auctionId, code, message);
+        }
+
+        private void QueueReportAfterAdDisplay(LiftEngineAdFormat format)
+        {
+            _pendingReportFormat = format;
+            if (_reportDebounceCoroutine != null)
+                _host.StopCoroutine(_reportDebounceCoroutine);
+
+            _reportDebounceCoroutine = _host.StartCoroutine(SendReportDebounced());
+        }
+
+        private IEnumerator SendReportDebounced()
+        {
+            yield return new WaitForSeconds(2f);
+
+            if (_pendingReportFormat.HasValue)
+            {
+                var format = _pendingReportFormat.Value;
+                _pendingReportFormat = null;
+                SendReport(format);
+            }
+
+            _reportDebounceCoroutine = null;
         }
     }
 }

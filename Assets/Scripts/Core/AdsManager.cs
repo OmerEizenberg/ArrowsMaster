@@ -60,6 +60,7 @@ namespace Assets.Scripts.Core
         private bool _liftEngineReady;
         private bool _liftEngineInitSettled;
         private bool _liftEngineCallbacksSubscribed;
+        private bool _fullscreenMaxCallbacksSubscribed;
 
         private static readonly ConcurrentQueue<SingularAdRevenuePayload> _pendingSingularRevenue =
             new ConcurrentQueue<SingularAdRevenuePayload>();
@@ -752,10 +753,11 @@ namespace Assets.Scripts.Core
             sdkInitRetryCount = 0;
 
             TryStartLiftEngine();
+            EnsureFullscreenMaxCallbacks();
             if (!_liftEngineEnabled)
             {
-                InitializeInterstitialAds();
-                InitializeRewardedAds();
+                LoadInterstitial();
+                LoadRewarded();
             }
 
             SubscribeToNoAdsStatus();
@@ -777,8 +779,12 @@ namespace Assets.Scripts.Core
         //  INTERSTITIAL ADS
         // ════════════════════════════════════════════
 
-        private void InitializeInterstitialAds()
+        private void EnsureFullscreenMaxCallbacks()
         {
+            if (_fullscreenMaxCallbacksSubscribed)
+                return;
+
+            _fullscreenMaxCallbacksSubscribed = true;
             MaxSdkCallbacks.Interstitial.OnAdLoadedEvent += OnInterstitialLoaded;
             MaxSdkCallbacks.Interstitial.OnAdLoadFailedEvent += OnInterstitialLoadFailed;
             MaxSdkCallbacks.Interstitial.OnAdDisplayedEvent += OnInterstitialDisplayed;
@@ -787,6 +793,19 @@ namespace Assets.Scripts.Core
             MaxSdkCallbacks.Interstitial.OnAdClickedEvent += OnInterstitialClicked;
             MaxSdkCallbacks.Interstitial.OnAdRevenuePaidEvent += OnInterstitialRevenuePaid;
 
+            MaxSdkCallbacks.Rewarded.OnAdLoadedEvent += OnRewardedAdLoaded;
+            MaxSdkCallbacks.Rewarded.OnAdLoadFailedEvent += OnRewardedAdLoadFailed;
+            MaxSdkCallbacks.Rewarded.OnAdDisplayedEvent += OnRewardedAdDisplayed;
+            MaxSdkCallbacks.Rewarded.OnAdDisplayFailedEvent += OnRewardedAdDisplayFailed;
+            MaxSdkCallbacks.Rewarded.OnAdHiddenEvent += OnRewardedAdHidden;
+            MaxSdkCallbacks.Rewarded.OnAdClickedEvent += OnRewardedAdClicked;
+            MaxSdkCallbacks.Rewarded.OnAdReceivedRewardEvent += OnRewardedAdReceivedReward;
+            MaxSdkCallbacks.Rewarded.OnAdRevenuePaidEvent += OnRewardedAdRevenuePaid;
+        }
+
+        private void InitializeInterstitialAds()
+        {
+            EnsureFullscreenMaxCallbacks();
             LoadInterstitial();
         }
 
@@ -951,15 +970,7 @@ namespace Assets.Scripts.Core
 
         private void InitializeRewardedAds()
         {
-            MaxSdkCallbacks.Rewarded.OnAdLoadedEvent += OnRewardedAdLoaded;
-            MaxSdkCallbacks.Rewarded.OnAdLoadFailedEvent += OnRewardedAdLoadFailed;
-            MaxSdkCallbacks.Rewarded.OnAdDisplayedEvent += OnRewardedAdDisplayed;
-            MaxSdkCallbacks.Rewarded.OnAdDisplayFailedEvent += OnRewardedAdDisplayFailed;
-            MaxSdkCallbacks.Rewarded.OnAdHiddenEvent += OnRewardedAdHidden;
-            MaxSdkCallbacks.Rewarded.OnAdClickedEvent += OnRewardedAdClicked;
-            MaxSdkCallbacks.Rewarded.OnAdReceivedRewardEvent += OnRewardedAdReceivedReward;
-            MaxSdkCallbacks.Rewarded.OnAdRevenuePaidEvent += OnRewardedAdRevenuePaid;
-
+            EnsureFullscreenMaxCallbacks();
             LoadRewarded();
         }
 
@@ -1075,21 +1086,30 @@ namespace Assets.Scripts.Core
                     }
 
                     OnAdOpened?.Invoke();
-                    if (_liftEngineReady)
-                        ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
-                    else
-                        MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                    ShowFullscreenAd(LiftEngineAdFormat.Interstitial);
                     break;
 
                 case FullscreenAdChoice.Rewarded:
                     Debug.Log($"[AdsManager] Showing Rewarded Ad ({rewardType}).");
                     OnAdOpened?.Invoke();
-                    if (_liftEngineReady)
-                        ShowLiftEngineAd(LiftEngineAdFormat.Rewarded);
-                    else
-                        MaxSdk.ShowRewardedAd(RewardedAdUnitId);
+                    ShowFullscreenAd(LiftEngineAdFormat.Rewarded);
                     break;
             }
+        }
+
+        private void ShowFullscreenAd(LiftEngineAdFormat format)
+        {
+            if (_liftEngineEnabled && _liftEngineReady)
+            {
+                ShowLiftEngineAd(format);
+                return;
+            }
+
+            EnsureFullscreenMaxCallbacks();
+            if (format == LiftEngineAdFormat.Interstitial)
+                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+            else
+                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
         }
 
         private void EnsureFullscreenAdsLoaded()
@@ -1520,6 +1540,7 @@ namespace Assets.Scripts.Core
                 LiftEngineSdk.SetIdfaApproved(IOSAttributionBootstrap.IsAttAuthorized);
 #endif
             ApplyLiftEngineAttributionFromSnapshot();
+            LiftEngineSdk.SendReport();
         }
 
         private void ApplyLiftEngineAttributionFromSnapshot()
@@ -1551,7 +1572,11 @@ namespace Assets.Scripts.Core
             if (Instance == null)
                 return;
 
-            Instance.EnqueueAction(() => Instance.ApplyLiftEngineAttributionFromSnapshot());
+            Instance.EnqueueAction(() =>
+            {
+                Instance.ApplyLiftEngineAttributionFromSnapshot();
+                LiftEngineSdk.SendReport();
+            });
         }
 
         private void SubscribeLiftEngineCallbacks()
@@ -1562,6 +1587,7 @@ namespace Assets.Scripts.Core
             LiftEngineSdkCallbacks.OnSdkInitializedEvent += OnLiftEngineSdkInitialized;
             LiftEngineSdkCallbacks.OnAdLoadedEvent += OnLiftEngineAdLoaded;
             LiftEngineSdkCallbacks.OnAdRevenuePaidEvent += OnLiftEngineAdRevenuePaid;
+            LiftEngineSignalBus.AdReadyStateChanged += OnLiftEngineAdReadyStateChanged;
             _liftEngineCallbacksSubscribed = true;
         }
 
@@ -1573,7 +1599,16 @@ namespace Assets.Scripts.Core
             LiftEngineSdkCallbacks.OnSdkInitializedEvent -= OnLiftEngineSdkInitialized;
             LiftEngineSdkCallbacks.OnAdLoadedEvent -= OnLiftEngineAdLoaded;
             LiftEngineSdkCallbacks.OnAdRevenuePaidEvent -= OnLiftEngineAdRevenuePaid;
+            LiftEngineSignalBus.AdReadyStateChanged -= OnLiftEngineAdReadyStateChanged;
             _liftEngineCallbacksSubscribed = false;
+        }
+
+        private void OnLiftEngineAdReadyStateChanged(AdReadyStateChangedSignal signal)
+        {
+            if (!_liftEngineReady || signal == null)
+                return;
+
+            RefreshAllReadiness();
         }
 
         private void OnLiftEngineSdkInitialized(LiftEngineInitializationStatus status)
@@ -1590,8 +1625,9 @@ namespace Assets.Scripts.Core
             else
             {
                 Debug.LogWarning("[AdsManager] LiftEngine init failed — falling back to direct MAX for fullscreen ads.");
-                InitializeInterstitialAds();
-                InitializeRewardedAds();
+                EnsureFullscreenMaxCallbacks();
+                LoadInterstitial();
+                LoadRewarded();
             }
 
             RefreshAllReadiness();
@@ -1644,13 +1680,18 @@ namespace Assets.Scripts.Core
                 OnAdDisplayed = () => HandleLiftEngineAdDisplayed(format),
                 OnAdHidden = () => HandleLiftEngineAdHidden(format),
                 OnAdDisplayFailed = message => HandleLiftEngineAdDisplayFailed(format, message),
-                OnAdRewarded = () =>
-                {
-                    if (format == LiftEngineAdFormat.Rewarded)
-                        ProcessPendingReward();
-                },
+                OnAdRewarded = () => HandleLiftEngineAdRewarded(format),
                 OnAdClicked = () => Debug.Log($"[AdsManager] {format} ad clicked (LiftEngine).")
             });
+        }
+
+        private void HandleLiftEngineAdRewarded(LiftEngineAdFormat format)
+        {
+            if (format != LiftEngineAdFormat.Rewarded || pendingRewardType == RewardAdType.None)
+                return;
+
+            Debug.Log($"[AdsManager] Rewarded ad completed for {pendingRewardType} (LiftEngine).");
+            ProcessPendingReward();
         }
 
         private void HandleLiftEngineAdDisplayed(LiftEngineAdFormat format)
@@ -1676,9 +1717,11 @@ namespace Assets.Scripts.Core
 
             NotifyAdClosed();
 
-            if (format == LiftEngineAdFormat.Interstitial && pendingRewardType != RewardAdType.None)
+            if (pendingRewardType != RewardAdType.None &&
+                format == LiftEngineAdFormat.Interstitial)
             {
-                Debug.Log("[AdsManager] Interstitial fulfilled a rewarded placement. Granting pending reward.");
+                Debug.Log(
+                    $"[AdsManager] Interstitial fulfilled rewarded placement ({pendingRewardType}). Granting reward.");
                 ProcessPendingReward();
             }
 

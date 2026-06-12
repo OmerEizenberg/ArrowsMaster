@@ -36,11 +36,6 @@ namespace LiftEngine.Api
         public Context.PredictDataPayload data;
     }
 
-    internal class ReportRequestBody
-    {
-        public Context.PredictDataPayload data;
-    }
-
     internal class ApiResponseArrayWrapper
     {
         // Newtonsoft parses top-level arrays directly

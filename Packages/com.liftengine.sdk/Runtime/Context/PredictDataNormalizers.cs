@@ -18,14 +18,16 @@ namespace LiftEngine.Context
             };
         }
 
-        public static int ToWireCount(int rawCount) => rawCount + 1;
+        /// <summary>Converts per-impression revenue (USD) to eCPM (USD per 1,000 impressions).</summary>
+        public static float RevenuePerImpressionToEcpm(double revenueUsd) =>
+            revenueUsd > 0d ? (float)(revenueUsd * 1000d) : 0f;
 
         public static int PayerInd(float ltv) => ltv > 0f ? 1 : 0;
 
         public static int HasMadeDeposit(long daysFromInstallToFtd) => daysFromInstallToFtd >= 0 ? 1 : 0;
 
-        public static float DailyAdTypeShare(int dailyAdNumberWire, int dailyAdNumberByTypeWire) =>
-            dailyAdNumberByTypeWire / (float)Math.Max(dailyAdNumberWire, 1);
+        public static float DailyAdTypeShare(int dailyAdNumber, int dailyAdNumberByType) =>
+            dailyAdNumber <= 0 ? 0f : dailyAdNumberByType / (float)dailyAdNumber;
 
         public static long SecFromLastAd(DateTime? lastAdUtc)
         {

@@ -81,17 +81,22 @@ namespace LiftEngine.Context
             _store.LastPurchaseUtc = now;
         }
 
-        public void RecordAdDisplayed(LiftEngineAdFormat format, double revenueUsd)
+        public void RecordAdImpression(LiftEngineAdFormat format)
         {
             _session.EnsureDailyRollover(_store);
             _store.IncrementAdShown(format);
+        }
 
-            if (revenueUsd > 0)
-            {
-                var history = _store.EcpmHistory;
-                EcpmHistoryBuffer.Push(history, format, (float)(revenueUsd * 1000d));
-                _store.EcpmHistory = history;
-            }
+        /// <param name="revenueUsd">Per-impression revenue in USD (same unit as track <c>rev</c>).</param>
+        public void RecordAdRevenue(LiftEngineAdFormat format, double revenueUsd)
+        {
+            if (revenueUsd <= 0d)
+                return;
+
+            var ecpm = PredictDataNormalizers.RevenuePerImpressionToEcpm(revenueUsd);
+            var history = _store.EcpmHistory;
+            EcpmHistoryBuffer.Push(history, format, ecpm);
+            _store.EcpmHistory = history;
         }
 
         public PredictDataPayload BuildPayload(LiftEngineAdFormat format)
@@ -115,8 +120,8 @@ namespace LiftEngine.Context
             var typeRaw = _store.GetLifetimeRaw(format);
             var typeDailyRaw = _store.GetDailyRaw(format);
             var typeSessionRaw = _store.GetSessionRaw(format);
-            var dailyAdNumberWire = PredictDataNormalizers.ToWireCount(_store.GetDailyTotalRaw());
-            var dailyAdNumberByTypeWire = PredictDataNormalizers.ToWireCount(typeDailyRaw);
+            var dailyAdNumber = _store.GetDailyTotalRaw();
+            var dailyAdNumberByType = typeDailyRaw;
             var countryCode = !string.IsNullOrEmpty(_store.CountryCodeOverride)
                 ? _store.CountryCodeOverride
                 : DeviceCountryProvider.DetectCountryCode();
@@ -136,18 +141,18 @@ namespace LiftEngine.Context
                 has_made_deposit = PredictDataNormalizers.HasMadeDeposit(daysToFtd),
                 days_since_installed = daysSinceInstall,
                 ltv_gross_up_to_date = ltv,
-                days_from_install_to_FTD = daysToFtd,
+                days_from_install_to_ftd = daysToFtd,
                 ftd_amount = _store.FtdAmount,
                 days_since_last_purchase = daysSinceLastPurchase,
                 payer_ind = PredictDataNormalizers.PayerInd(ltv),
-                ad_number_life_time = PredictDataNormalizers.ToWireCount(_store.GetLifetimeTotalRaw()),
-                ad_number_life_time_ad_type = PredictDataNormalizers.ToWireCount(typeRaw),
-                daily_ad_number = dailyAdNumberWire,
-                daily_ad_number_ad_type = dailyAdNumberByTypeWire,
+                ad_number_life_time = _store.GetLifetimeTotalRaw(),
+                ad_number_life_time_ad_type = typeRaw,
+                daily_ad_number = dailyAdNumber,
+                daily_ad_number_ad_type = dailyAdNumberByType,
                 daily_ad_type_share = PredictDataNormalizers.DailyAdTypeShare(
-                    dailyAdNumberWire, dailyAdNumberByTypeWire),
-                session_ad_number = PredictDataNormalizers.ToWireCount(_store.GetSessionTotalRaw()),
-                session_ad_number_ad_type = PredictDataNormalizers.ToWireCount(typeSessionRaw),
+                    dailyAdNumber, dailyAdNumberByType),
+                session_ad_number = _store.GetSessionTotalRaw(),
+                session_ad_number_ad_type = typeSessionRaw,
                 ecpm_history = EcpmHistoryBuffer.GetForFormat(_store.EcpmHistory, format),
                 sec_from_last_ad = PredictDataNormalizers.SecFromLastAd(_store.LastAdUtc),
                 device_memory = PredictDataNormalizers.DeviceMemoryGb()

@@ -94,8 +94,7 @@ namespace LiftEngine.Api
 
         public void Report(string deviceId, PredictDataPayload data, Action<bool> callback)
         {
-            var body = new ReportRequestBody { data = data };
-            var json = JsonConvert.SerializeObject(body);
+            var json = JsonConvert.SerializeObject(data);
             _host.StartCoroutine(Post($"/api/v1/report/{deviceId}", json, (code, _) =>
             {
                 callback?.Invoke(code == 200);

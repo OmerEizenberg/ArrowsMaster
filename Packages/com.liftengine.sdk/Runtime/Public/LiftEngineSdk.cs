@@ -73,6 +73,9 @@ namespace LiftEngine
         public static void SetCountryCode(string countryCode) =>
             _controller?.SetCountryCode(countryCode);
 
+        public static void SendReport(System.Action<bool> callback = null) =>
+            _controller?.SendReport(callback);
+
         public static void NotifyPurchase(float amountUsd) =>
             _controller?.NotifyPurchase(amountUsd);
 
