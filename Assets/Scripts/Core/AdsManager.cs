@@ -255,6 +255,8 @@ namespace Assets.Scripts.Core
         private bool UserHasNoAds =>
             IAPManager.Instance != null && IAPManager.Instance.HasNoAds;
 
+        private bool AreBannerAdsSupported => AndroidWebViewSupport.AreBannerAdsSupported;
+
         private void SubscribeToNoAdsStatus()
         {
             if (IAPManager.Instance == null) return;
@@ -386,6 +388,16 @@ namespace Assets.Scripts.Core
         {
             if (_applicationPaused || !isInitialized) return;
 
+            if (!AreBannerAdsSupported)
+            {
+                if (_bannerCreated || _bannerDestroyPending || _bannerCreateInProgress)
+                {
+                    CancelDeferredBannerCreate();
+                    ExecuteDestroyBanner();
+                }
+                return;
+            }
+
             if (UserHasNoAds)
             {
                 if (_bannerCreated || _bannerDestroyPending)
@@ -485,7 +497,7 @@ namespace Assets.Scripts.Core
         private void PrepareBannerAd()
         {
             if (!isInitialized) return;
-            if (UserHasNoAds) return;
+            if (!AreBannerAdsSupported || UserHasNoAds) return;
 
             if (!_bannerCreated)
             {
@@ -986,6 +998,7 @@ namespace Assets.Scripts.Core
 
         private void InitializeBannerAds(bool requestedForShow = false)
         {
+            if (!AreBannerAdsSupported) return;
             if (_bannerCreated || _bannerCreateInProgress) return;
             if (_bannerCreateCoroutine != null) return;
 
@@ -1024,7 +1037,7 @@ namespace Assets.Scripts.Core
 
             _bannerCreateCoroutine = null;
 
-            if (this == null || _bannerCreated || UserHasNoAds || !isInitialized)
+            if (this == null || _bannerCreated || !AreBannerAdsSupported || UserHasNoAds || !isInitialized)
             {
                 _bannerCreateInProgress = false;
                 yield break;
@@ -1070,7 +1083,7 @@ namespace Assets.Scripts.Core
 
         public void LoadSettingsBanner()
         {
-            if (UserHasNoAds) return;
+            if (!AreBannerAdsSupported || UserHasNoAds) return;
 
             if (!isInitialized)
             {
@@ -1092,6 +1105,12 @@ namespace Assets.Scripts.Core
             {
                 Debug.LogWarning("[AdsManager] Cannot show banner: SDK not initialized.");
                 if (!isInitializing) _ = InitializeSDK();
+                return;
+            }
+
+            if (!AreBannerAdsSupported)
+            {
+                Debug.Log("[AdsManager] Skipping Banner Show: system WebView is too old for banner ads.");
                 return;
             }
 
