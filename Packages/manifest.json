@@ -59,8 +59,8 @@
         "com.applovin.mediation.adapters.vungle.android": "7070400.0.0",
         "com.applovin.mediation.adapters.bytedance.ios": "800010000.0.0",
         "com.applovin.mediation.adapters.bytedance.android": "800000500.0.0",
-        "com.applovin.mediation.adapters.unityads.ios": "4180000.0.0",
-        "com.applovin.mediation.adapters.unityads.android": "4180000.0.0",
+        "com.applovin.mediation.adapters.unityads.ios": "4180100.0.0",
+        "com.applovin.mediation.adapters.unityads.android": "4180100.0.0",
         "com.applovin.mediation.adapters.googleadmanager.ios": "13040000.0.0",
         "com.applovin.mediation.adapters.googleadmanager.android": "25030000.0.0"
     },

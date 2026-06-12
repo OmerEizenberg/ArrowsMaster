@@ -57,14 +57,14 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.unityads.android": {
-      "version": "4180000.0.0",
+      "version": "4180100.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.unityads.ios": {
-      "version": "4180000.0.0",
+      "version": "4180100.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},

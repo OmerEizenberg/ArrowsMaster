@@ -14,7 +14,7 @@ dependencies {
     implementation 'com.applovin.mediation:facebook-adapter:[6.21.0.0]' // Packages/com.applovin.mediation.adapters.facebook.android/Editor/Dependencies.xml:7
     implementation 'com.applovin.mediation:google-adapter:[25.3.0.0]' // Packages/com.applovin.mediation.adapters.google.android/Editor/Dependencies.xml:4
     implementation 'com.applovin.mediation:google-ad-manager-adapter:[25.3.0.0]' // Packages/com.applovin.mediation.adapters.googleadmanager.android/Editor/Dependencies.xml:4
-    implementation 'com.applovin.mediation:unityads-adapter:4.18.0.0' // Packages/com.applovin.mediation.adapters.unityads.android/Editor/Dependencies.xml:4
+    implementation 'com.applovin.mediation:unityads-adapter:4.18.1.0' // Packages/com.applovin.mediation.adapters.unityads.android/Editor/Dependencies.xml:4
     implementation 'com.applovin.mediation:vungle-adapter:7.7.4.0' // Packages/com.applovin.mediation.adapters.vungle.android/Editor/Dependencies.xml:4
     implementation 'com.applovin:applovin-sdk:13.6.3' // Packages/com.applovin.mediation.ads/AppLovin/Editor/Dependencies.xml:4
     implementation 'com.google.android.gms:play-services-ads:25.2.0' // Packages/com.google.ads.mobile/GoogleMobileAds/Editor/GoogleMobileAdsDependencies.xml:7

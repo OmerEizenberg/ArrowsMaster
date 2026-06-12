@@ -32,9 +32,12 @@ public class IOSBuildPostProcess : IPreprocessBuildWithReport
 
     private static void DisableEngineDiagnostics()
     {
-        // Unity 6 Engine Diagnostics hooks NSURLSession metrics and can crash on iOS when
-        // AppLovin Quality Service (SafeDK) also swizzles NSURLSession:
-        // NetworkTransactionDiagnosticAdapter.convertToDiagnosticEvent EXC_BREAKPOINT.
+        // NOTE: The NetworkTransactionDiagnosticAdapter.convertToDiagnosticEvent EXC_BREAKPOINT
+        // crash on com.apple.NSURLSession-delegate is NOT Engine Diagnostics - it's a known bug
+        // inside the Unity Ads iOS SDK 4.17.0/4.18.0 (URLSessionTaskMetrics -> diagnostic event
+        // conversion), pulled in via the AppLovin MAX UnityAds adapter. Fixed by Unity in
+        // UnityAds 4.18.1 (adapter 4180100.0.0 in Packages/manifest.json). Keep that adapter
+        // at >= 4.18.1. Disabling Engine Diagnostics below is kept as cheap belt-and-braces.
         EnsureUnityConnectDiagnosticsDisabled();
 
         try
