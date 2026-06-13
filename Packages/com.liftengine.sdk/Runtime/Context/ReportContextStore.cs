@@ -248,5 +248,13 @@ namespace LiftEngine.Context
                 string.IsNullOrEmpty(keyword) ? null : keyword,
                 string.IsNullOrEmpty(auctionId) ? null : auctionId);
         }
+
+        public void ClearAuctionContext(LiftEngineAdFormat format)
+        {
+            var suffix = format.ToString().ToLowerInvariant();
+            PlayerPrefs.DeleteKey(Prefix + "auction_kw_" + suffix);
+            PlayerPrefs.DeleteKey(Prefix + "auction_id_" + suffix);
+            PlayerPrefs.Save();
+        }
     }
 }

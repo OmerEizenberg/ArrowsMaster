@@ -53,7 +53,7 @@ namespace LiftEngine
 
         [Header("Predict & Load")]
         [Tooltip("Max seconds to wait for LiftEngine predict HTTP response before failing over to bid-floor fallback.")]
-        public float predictTimeoutSeconds = 3f;
+        public float predictTimeoutSeconds = 8f;
 
         [Tooltip("Base eCPM prediction used when the API response omits the prediction field (e.g. staging mock). Bid floor = this value × each multiplier.")]
         public float defaultPredictionFallback = 1f;

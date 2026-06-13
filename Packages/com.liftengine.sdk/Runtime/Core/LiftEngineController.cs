@@ -22,6 +22,7 @@ namespace LiftEngine
         private LiftEngineAdFormat? _activeFormat;
         private LiftEngineAdFormat? _pendingReportFormat;
         private Coroutine _reportDebounceCoroutine;
+        private bool _displayRevenueRecordedThisImpression;
 
         public bool IsInitialized { get; private set; }
 
@@ -95,7 +96,9 @@ namespace LiftEngine
             _mediation.AdLoaded += info => LiftEngineSdkCallbacks.RaiseAdLoaded(info);
             _mediation.AdDisplayed += info =>
             {
+                _displayRevenueRecordedThisImpression = false;
                 _context.RecordAdImpression(info.Format);
+                TryRecordImpressionRevenue(info.Format, info.Revenue, fromDisplay: true);
                 TrackDisplay(info);
                 if (info.Format == LiftEngineAdFormat.Banner)
                     QueueReportAfterAdDisplay(info.Format);
@@ -105,6 +108,7 @@ namespace LiftEngine
             };
             _mediation.AdHidden += info =>
             {
+                _displayRevenueRecordedThisImpression = false;
                 LiftEngineSdkCallbacks.RaiseAdHidden(info);
                 _activeCallbacks?.OnAdHidden?.Invoke();
                 _activeCallbacks = null;
@@ -123,7 +127,7 @@ namespace LiftEngine
             };
             _mediation.AdRevenuePaid += info =>
             {
-                _context.RecordAdRevenue(info.Format, info.Revenue);
+                TryRecordImpressionRevenue(info.Format, info.Revenue, fromDisplay: false);
                 QueueReportAfterAdDisplay(info.Format);
                 LiftEngineSdkCallbacks.RaiseAdRevenue(info);
             };
@@ -232,8 +236,37 @@ namespace LiftEngine
         public LiftEngineApiClient ApiClient => _api;
         public LiftEngineSettings Settings => _settings;
 
+        /// <summary>
+        /// Records per-impression revenue into ecpm_history. Display is the primary source (same rev as
+        /// track/activeview); AdRevenuePaid is a fallback when MAX omits revenue on display.
+        /// </summary>
+        private void TryRecordImpressionRevenue(LiftEngineAdFormat format, double revenueUsd, bool fromDisplay)
+        {
+            if (revenueUsd <= 0d)
+            {
+                if (fromDisplay)
+                    LiftEngineLogger.Log(
+                        $"ecpm_history {format} — display had no revenue; waiting for AdRevenuePaid");
+                return;
+            }
+
+            if (!fromDisplay && _displayRevenueRecordedThisImpression)
+                return;
+
+            _context.RecordAdRevenue(format, revenueUsd);
+            if (fromDisplay)
+                _displayRevenueRecordedThisImpression = true;
+        }
+
         private void TrackDisplay(MediationAdInfo info)
         {
+            if (!_context.HasValidAuctionContext(info.Format))
+            {
+                LiftEngineLogger.LogBackendWarning(
+                    $"Track {info.Format} — skipped (no auction_id; predict did not succeed for this load)");
+                return;
+            }
+
             var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
@@ -242,10 +275,6 @@ namespace LiftEngine
             var rev = info.Revenue > 0 ? (float?)info.Revenue : null;
 
             var adType = _settings.GetModelName(info.Format);
-
-            if (string.IsNullOrEmpty(auctionId))
-                LiftEngineLogger.LogBackendWarning(
-                    $"Track {info.Format} — missing auction_id for placement={placementId}");
 
             LiftEngineLogger.LogClient(
                 $"Track activeview — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +

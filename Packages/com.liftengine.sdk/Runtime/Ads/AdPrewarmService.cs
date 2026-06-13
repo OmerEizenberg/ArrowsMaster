@@ -97,6 +97,10 @@ namespace LiftEngine.Ads
             LiftEnginePredictResult prediction = null;
             LiftEngineError predictError = null;
             var deviceId = DeviceIdProvider.GetDeviceId();
+
+            _context.ClearAuctionContext(format);
+            LiftEngineLogger.LogClient($"Prewarm {format} — cleared auction context, starting predict");
+
             var payload = _context.BuildPayload(format);
             var predictDone = false;
 
@@ -125,15 +129,19 @@ namespace LiftEngine.Ads
                     prediction.prediction = _settings.defaultPredictionFallback;
 
                 _context.SetAuctionContext(format, prediction.keyword, prediction.auction_id, prediction.param);
+                LiftEngineLogger.LogBackend(
+                    $"{format} predict OK — auction_id={prediction.auction_id}, keyword={prediction.keyword}, " +
+                    $"prediction={prediction.prediction}, multipliers={prediction.multipliers?.Length ?? 0}");
                 LiftEngineSdkCallbacks.RaisePredictSuccess(prediction);
             }
             else
             {
                 var reason = predictError != null
                     ? $"{predictError.StatusCode}: {predictError.Message}"
-                    : "timeout waiting for response";
+                    : $"timeout after {_settings.predictTimeoutSeconds:F0}s";
 
-                LiftEngineLogger.LogBackendWarning($"{format} predict failed ({reason})");
+                LiftEngineLogger.LogBackendWarning(
+                    $"{format} predict failed ({reason}) — auction context cleared, falling back to bid-0");
                 LiftEngineLogger.LogAttemptWarning(-1,
                     $"{format} — no multipliers available → [Attempt -1] bid-0 only");
 

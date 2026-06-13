@@ -102,7 +102,7 @@ namespace LiftEngine.Mediation
         {
             if (string.IsNullOrEmpty(paramName))
             {
-                LiftEngineLogger.LogWarning($"Missing bid floor param name for {format}; skipping MAX extra parameter.");
+                LiftEngineLogger.LogWarning($"Missing param name for {format}; skipping MAX extra parameter.");
                 return;
             }
 

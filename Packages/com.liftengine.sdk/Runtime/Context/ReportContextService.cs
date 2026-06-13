@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using LiftEngine;
 using UnityEngine;
 
 namespace LiftEngine.Context
@@ -91,12 +93,20 @@ namespace LiftEngine.Context
         public void RecordAdRevenue(LiftEngineAdFormat format, double revenueUsd)
         {
             if (revenueUsd <= 0d)
+            {
+                LiftEngineLogger.Log($"ecpm_history {format} — skipped (revenue <= 0)");
                 return;
+            }
 
             var ecpm = PredictDataNormalizers.RevenuePerImpressionToEcpm(revenueUsd);
             var history = _store.EcpmHistory;
             EcpmHistoryBuffer.Push(history, format, ecpm);
             _store.EcpmHistory = history;
+
+            var snapshot = EcpmHistoryBuffer.GetForFormat(history, format);
+            LiftEngineLogger.Log(
+                $"ecpm_history {format} — rev={revenueUsd.ToString(CultureInfo.InvariantCulture)} → " +
+                $"ecpm={ecpm.ToString(CultureInfo.InvariantCulture)}, history=[{FormatHistory(snapshot)}]");
         }
 
         public PredictDataPayload BuildPayload(LiftEngineAdFormat format)
@@ -162,6 +172,12 @@ namespace LiftEngine.Context
         public (string keyword, string auctionId) GetAuctionContext(LiftEngineAdFormat format) =>
             _store.GetAuctionContext(format);
 
+        public bool HasValidAuctionContext(LiftEngineAdFormat format)
+        {
+            var (_, auctionId) = _store.GetAuctionContext(format);
+            return !string.IsNullOrEmpty(auctionId);
+        }
+
         public string GetBidFloorParam(LiftEngineAdFormat format) =>
             _bidFloorParam.TryGetValue(format, out var param) ? param : null;
 
@@ -174,6 +190,12 @@ namespace LiftEngine.Context
                 _bidFloorParam[format] = param;
         }
 
+        public void ClearAuctionContext(LiftEngineAdFormat format)
+        {
+            _store.ClearAuctionContext(format);
+            _bidFloorParam.Remove(format);
+        }
+
         public void ClearContextData() => _store.ClearAll();
 
         public ReportContextStore StoreForDebug => _store;
@@ -184,6 +206,18 @@ namespace LiftEngine.Context
                 return _store.IdfaApprovedOverride.Value;
 
             return 0;
+        }
+
+        private static string FormatHistory(float[] history)
+        {
+            if (history == null || history.Length == 0)
+                return string.Empty;
+
+            var parts = new string[history.Length];
+            for (var i = 0; i < history.Length; i++)
+                parts[i] = history[i].ToString(CultureInfo.InvariantCulture);
+
+            return string.Join(", ", parts);
         }
     }
 }
