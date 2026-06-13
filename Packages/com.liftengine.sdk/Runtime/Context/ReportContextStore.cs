@@ -11,6 +11,7 @@ namespace LiftEngine.Context
         public string InstallTypeRaw { get; set; }
         public string MediaSource { get; set; }
         public string CountryCodeOverride { get; set; }
+        public string IpCountryCode { get; set; }
         public int? IdfaApprovedOverride { get; set; }
 
         public DateTime? InstallUtc
@@ -88,6 +89,10 @@ namespace LiftEngine.Context
             CountryCodeOverride = PlayerPrefs.GetString(Prefix + "country_code", null);
             if (string.IsNullOrEmpty(CountryCodeOverride))
                 CountryCodeOverride = null;
+
+            IpCountryCode = PlayerPrefs.GetString(Prefix + "country_code_ip", null);
+            if (string.IsNullOrEmpty(IpCountryCode))
+                IpCountryCode = null;
             if (PlayerPrefs.HasKey(Prefix + "idfa_override"))
                 IdfaApprovedOverride = PlayerPrefs.GetInt(Prefix + "idfa_override");
         }
@@ -112,6 +117,13 @@ namespace LiftEngine.Context
         {
             CountryCodeOverride = DeviceCountryProvider.NormalizeCountryCode(countryCode);
             PlayerPrefs.SetString(Prefix + "country_code", CountryCodeOverride ?? string.Empty);
+            PlayerPrefs.Save();
+        }
+
+        public void SaveIpCountryCode(string countryCode)
+        {
+            IpCountryCode = DeviceCountryProvider.NormalizeCountryCode(countryCode);
+            PlayerPrefs.SetString(Prefix + "country_code_ip", IpCountryCode ?? string.Empty);
             PlayerPrefs.Save();
         }
 
@@ -157,6 +169,7 @@ namespace LiftEngine.Context
             {
                 "install_utc", "last_ad_utc", "last_purchase_utc", "first_purchase_utc",
                 "ltv", "ftd_amount", "daily_date", "ecpm", "install_type", "media_source", "country_code",
+                "country_code_ip",
                 "idfa_override", "active_day_count", "last_active_date",
                 "life_banner", "life_interstitial", "life_rewarded",
                 "daily_banner", "daily_interstitial", "daily_rewarded",

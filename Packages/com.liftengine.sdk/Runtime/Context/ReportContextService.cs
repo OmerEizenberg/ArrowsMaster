@@ -56,6 +56,21 @@ namespace LiftEngine.Context
             _session.EnsureDailyRollover(_store);
         }
 
+        public void BeginIpCountryLookup(MonoBehaviour host)
+        {
+            if (host == null || !string.IsNullOrEmpty(_store.CountryCodeOverride))
+                return;
+
+            host.StartCoroutine(IpCountryResolver.FetchCountryCode(code =>
+            {
+                if (string.IsNullOrEmpty(code))
+                    return;
+
+                _store.SaveIpCountryCode(code);
+                LiftEngineLogger.Log($"Country code resolved from IP: {code}");
+            }));
+        }
+
         public void SetAttribution(string appsFlyerInstallType, string mediaSource)
         {
             var normalized = PredictDataNormalizers.NormalizeInstallType(appsFlyerInstallType);
@@ -132,9 +147,7 @@ namespace LiftEngine.Context
             var typeSessionRaw = _store.GetSessionRaw(format);
             var dailyAdNumber = _store.GetDailyTotalRaw();
             var dailyAdNumberByType = typeDailyRaw;
-            var countryCode = !string.IsNullOrEmpty(_store.CountryCodeOverride)
-                ? _store.CountryCodeOverride
-                : DeviceCountryProvider.DetectCountryCode();
+            var countryCode = ResolveCountryCode();
 
             return new PredictDataPayload
             {
@@ -199,6 +212,17 @@ namespace LiftEngine.Context
         public void ClearContextData() => _store.ClearAll();
 
         public ReportContextStore StoreForDebug => _store;
+
+        private string ResolveCountryCode()
+        {
+            if (!string.IsNullOrEmpty(_store.CountryCodeOverride))
+                return _store.CountryCodeOverride;
+
+            if (!string.IsNullOrEmpty(_store.IpCountryCode))
+                return _store.IpCountryCode;
+
+            return DeviceCountryProvider.DetectCountryCode();
+        }
 
         private int ResolveIdfaApproved()
         {

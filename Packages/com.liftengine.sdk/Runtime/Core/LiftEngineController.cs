@@ -37,6 +37,7 @@ namespace LiftEngine
 
             _context = new ReportContextService();
             _context.Initialize();
+            _context.BeginIpCountryLookup(_host);
 
             _api = new LiftEngineApiClient(_settings, _host);
             _mediation = MediationAdapterFactory.Create(_settings.mediationPlatform);
