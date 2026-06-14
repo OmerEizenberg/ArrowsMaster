@@ -61,6 +61,7 @@ namespace Assets.Scripts.Core
         private const string IsDynamicMaxZoomKey = "IsDynamicMaxZoom";
         private const string SessionCountKey = "TotalSessionCount";
         private const string HasSentSession7Key = "HasSentSession7Event";
+        private const string GAEProgressKey = "GAEProgress";
 
 
 
@@ -689,6 +690,27 @@ namespace Assets.Scripts.Core
         {
             LegendPassStartDate = dateStr;
             PlayerPrefs.SetString(LegendPassStartDateKey, LegendPassStartDate);
+            PlayerPrefs.Save();
+        }
+
+        #endregion
+
+        #region GAE Persistence
+
+        public string GetGAEProgressJson()
+        {
+            return PlayerPrefs.GetString(GAEProgressKey, string.Empty);
+        }
+
+        public void SaveGAEProgressJson(string json)
+        {
+            PlayerPrefs.SetString(GAEProgressKey, json);
+            PlayerPrefs.Save();
+        }
+
+        public void ClearGAEProgress()
+        {
+            PlayerPrefs.DeleteKey(GAEProgressKey);
             PlayerPrefs.Save();
         }
 

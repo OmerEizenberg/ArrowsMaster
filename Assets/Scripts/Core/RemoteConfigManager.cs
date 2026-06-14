@@ -33,6 +33,7 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_ONE_LIFE_PLAY_ON = "OneLifePlayOn";
     public const string KEY_IS_SHUFFLE_ON = "isShuffleOn";
     public const string KEY_NETFLIX_EFFECT = "NetflixEffect";
+    public const string KEY_IS_GAE = "isGAE";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
     private readonly Dictionary<string, object> activeValues = new Dictionary<string, object>();
@@ -103,6 +104,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_ONE_LIFE_PLAY_ON] = false;
         defaults[KEY_IS_SHUFFLE_ON] = true;
         defaults[KEY_NETFLIX_EFFECT] = false;
+        defaults[KEY_IS_GAE] = true;
     }
 
     private void InitializeActiveValuesFromDefaults()
@@ -496,6 +498,7 @@ public class RemoteConfigManager : MonoBehaviour
     public bool OneLifePlayOn => GetBool(KEY_ONE_LIFE_PLAY_ON);
     public bool IsShuffleOn => GetBool(KEY_IS_SHUFFLE_ON);
     public bool IsNetflixEffectEnabled => GetBool(KEY_NETFLIX_EFFECT);
+    public bool IsGAEEnabled => GetBool(KEY_IS_GAE);
     public float PtsMul => (float)GetDouble(KEY_PTS_MUL);
 
     #endregion
