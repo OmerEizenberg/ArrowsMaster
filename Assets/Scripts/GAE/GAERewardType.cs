@@ -4,6 +4,8 @@ namespace Assets.Scripts.GAE
     {
         Coin,
         Hint,
-        Shuffle
+        Shuffle,
+        MagicWand,
+        RefillLife
     }
 }

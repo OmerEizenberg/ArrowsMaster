@@ -9203,8 +9203,10 @@ MonoBehaviour:
   m_ProgressTextSecondary: {fileID: 1522400183}
   m_ProgressSlider: {fileID: 1948707621}
   m_CoinSprite: {fileID: 21300000, guid: 780862a05578141fd9bd3ee1a28f17ee, type: 3}
-  m_HintSprite: {fileID: 21300000, guid: 3812f483a0c184624bc642c93721af12, type: 3}
+  m_HintSprite: {fileID: 21300000, guid: da653c99511e0479da64ad11a1b4cc56, type: 3}
   m_ShuffleSprite: {fileID: -5701939674179512019, guid: 3f71ed385a786447c9422e705c34e0ad, type: 3}
+  m_WandSprite: {fileID: 21300000, guid: 9aa6aac210b1f44499288385f2a5890b, type: 3}
+  m_LifeSprite: {fileID: 21300000, guid: 08d3bf6c5323a4938ade7b9fbd1734d3, type: 3}
   m_ProgressAnimDuration: 0.75
   m_TimerUpdateInterval: 1
   m_VisibilityRoot: {fileID: 1146720103}
@@ -26438,7 +26440,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -112.00001}
+  m_AnchoredPosition: {x: 0, y: -112}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1020522770
@@ -60248,7 +60250,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -98.00001}
+  m_AnchoredPosition: {x: 0, y: -98}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2146398783

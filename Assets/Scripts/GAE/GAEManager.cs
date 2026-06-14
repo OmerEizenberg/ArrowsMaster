@@ -26,8 +26,10 @@ namespace Assets.Scripts.GAE
         }
 
         [SerializeField] private GAEConfigSO m_Config;
+        [SerializeField] private int m_UnlockLevel = 5;
 
         public GAEConfigSO Config => m_Config;
+        public int UnlockLevel => m_UnlockLevel;
         public GAEProgressData Progress { get; private set; }
 
         public event Action OnStateChanged;
@@ -40,7 +42,13 @@ namespace Assets.Scripts.GAE
         public bool IsFeatureEnabled =>
             RemoteConfigManager.Instance == null || RemoteConfigManager.Instance.IsGAEEnabled;
 
+        public bool IsUnlocked =>
+            UserDataManager.Instance != null &&
+            UserDataManager.Instance.CurrentLevel >= m_UnlockLevel;
+
         public bool IsEventActive => IsFeatureEnabled && !string.IsNullOrEmpty(m_ActiveEventInstanceId);
+
+        public bool ShouldShowUI => IsEventActive && IsUnlocked;
 
         private void Awake()
         {
@@ -124,7 +132,7 @@ namespace Assets.Scripts.GAE
 
         public void AddGoldenArrows(int amount)
         {
-            if (!IsEventActive || amount <= 0 || m_Config == null || m_Config.Stages == null || m_Config.Stages.Count == 0)
+            if (!IsEventActive || !IsUnlocked || amount <= 0 || m_Config == null || m_Config.Stages == null || m_Config.Stages.Count == 0)
             {
                 return;
             }
@@ -284,6 +292,12 @@ namespace Assets.Scripts.GAE
                     break;
                 case GAERewardType.Shuffle:
                     userData.AddShuffleBooster(amount, ResourceAnalyticsReasons.GaeStageReward);
+                    break;
+                case GAERewardType.MagicWand:
+                    userData.AddMagicBooster(amount, ResourceAnalyticsReasons.GaeStageReward);
+                    break;
+                case GAERewardType.RefillLife:
+                    userData.AddRefillBooster(amount, ResourceAnalyticsReasons.GaeStageReward);
                     break;
             }
         }

@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Assets.Scripts.Core;
 
 namespace Assets.Scripts.GAE
 {
@@ -24,6 +25,8 @@ namespace Assets.Scripts.GAE
         [SerializeField] private Sprite m_CoinSprite;
         [SerializeField] private Sprite m_HintSprite;
         [SerializeField] private Sprite m_ShuffleSprite;
+        [SerializeField] private Sprite m_WandSprite;
+        [SerializeField] private Sprite m_LifeSprite;
 
         [Header("Animation")]
         [SerializeField] private float m_ProgressAnimDuration = 0.75f;
@@ -33,21 +36,25 @@ namespace Assets.Scripts.GAE
         private Coroutine m_ProgressAnimCoroutine;
         private float m_NextTimerRefreshTime;
         private bool m_IsSubscribed;
+        private bool m_LevelSubscribed;
 
         private GameObject VisibilityTarget => m_VisibilityRoot != null ? m_VisibilityRoot : gameObject;
 
         private void Awake()
         {
             Subscribe();
+            SubscribeLevelChanged();
         }
 
         private void OnDestroy()
         {
             Unsubscribe();
+            UnsubscribeLevelChanged();
         }
 
         private void OnEnable()
         {
+            SubscribeLevelChanged();
             GAEManager.Instance.SyncEventState(forceResetOnMismatch: true);
             RefreshVisibility();
             RefreshStaticUI();
@@ -105,6 +112,33 @@ namespace Assets.Scripts.GAE
             m_IsSubscribed = false;
         }
 
+        private void SubscribeLevelChanged()
+        {
+            if (m_LevelSubscribed || UserDataManager.Instance == null)
+            {
+                return;
+            }
+
+            UserDataManager.Instance.OnLevelChanged += HandleLevelChanged;
+            m_LevelSubscribed = true;
+        }
+
+        private void UnsubscribeLevelChanged()
+        {
+            if (!m_LevelSubscribed || UserDataManager.Instance == null)
+            {
+                return;
+            }
+
+            UserDataManager.Instance.OnLevelChanged -= HandleLevelChanged;
+            m_LevelSubscribed = false;
+        }
+
+        private void HandleLevelChanged()
+        {
+            RefreshVisibility();
+        }
+
         private void HandleStateChanged()
         {
             RefreshVisibility();
@@ -130,7 +164,7 @@ namespace Assets.Scripts.GAE
 
         private bool IsViewActive()
         {
-            return GAEManager.Instance != null && GAEManager.Instance.IsEventActive;
+            return GAEManager.Instance != null && GAEManager.Instance.ShouldShowUI;
         }
 
         private void RefreshStaticUI()
@@ -318,6 +352,8 @@ namespace Assets.Scripts.GAE
                 case GAERewardType.Coin: return m_CoinSprite;
                 case GAERewardType.Hint: return m_HintSprite;
                 case GAERewardType.Shuffle: return m_ShuffleSprite;
+                case GAERewardType.MagicWand: return m_WandSprite;
+                case GAERewardType.RefillLife: return m_LifeSprite;
                 default: return null;
             }
         }
