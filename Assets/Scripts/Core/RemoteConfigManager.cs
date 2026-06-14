@@ -2,12 +2,15 @@ using Firebase.RemoteConfig;
 using Firebase.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
-using System.Threading.Tasks;
 
 public class RemoteConfigManager : MonoBehaviour
 {
     public static RemoteConfigManager Instance { get; private set; }
+
+    private const string PREF_KEY_HAS_CACHE = "RC_HasCache";
+    private const string PREF_PREFIX = "RC_";
 
     // Remote Config Keys
     public const string KEY_FORCE_UPDATE_VERSION_ANDROID = "ForceUpdateVersionAndroid";
@@ -32,13 +35,14 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_NETFLIX_EFFECT = "NetflixEffect";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
+    private readonly Dictionary<string, object> activeValues = new Dictionary<string, object>();
 
     private bool isConfigReady = false;
     private bool isFirebaseNativeReady = false;
+    private bool configInitializedEventFired = false;
 
     public bool IsConfigReady => isConfigReady;
     public bool IsFirebaseNativeReady => isFirebaseNativeReady;
-
 
     public event Action OnConfigInitialized;
 
@@ -52,6 +56,18 @@ public class RemoteConfigManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
         BuildDefaultValues();
+        InitializeActiveValuesFromDefaults();
+
+#if !UNITY_EDITOR
+        TryLoadCachedValuesFromPlayerPrefs();
+        if (HasCachedConfig())
+        {
+            isConfigReady = true;
+            ApplyUserDataFromActiveValues();
+            FireConfigInitializedOnce();
+            Debug.Log("[RemoteConfigManager] Loaded cached remote config from PlayerPrefs.");
+        }
+#endif
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -89,6 +105,202 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_NETFLIX_EFFECT] = false;
     }
 
+    private void InitializeActiveValuesFromDefaults()
+    {
+        activeValues.Clear();
+        foreach (KeyValuePair<string, object> kvp in defaults)
+        {
+            activeValues[kvp.Key] = kvp.Value;
+        }
+    }
+
+    private static string GetPrefKey(string key) => PREF_PREFIX + key;
+
+    private bool HasCachedConfig() => PlayerPrefs.GetInt(PREF_KEY_HAS_CACHE, 0) == 1;
+
+    private void TryLoadCachedValuesFromPlayerPrefs()
+    {
+        foreach (KeyValuePair<string, object> kvp in defaults)
+        {
+            string prefKey = GetPrefKey(kvp.Key);
+            if (!PlayerPrefs.HasKey(prefKey))
+            {
+                continue;
+            }
+
+            if (TryReadValueFromPlayerPrefs(kvp.Key, kvp.Value, out object loaded))
+            {
+                activeValues[kvp.Key] = loaded;
+            }
+        }
+    }
+
+    private static bool TryReadValueFromPlayerPrefs(string key, object defaultValue, out object loaded)
+    {
+        loaded = null;
+        string prefKey = GetPrefKey(key);
+
+        try
+        {
+            switch (defaultValue)
+            {
+                case bool _:
+                    loaded = PlayerPrefs.GetInt(prefKey, 0) == 1;
+                    return true;
+                case long _:
+                    loaded = long.Parse(PlayerPrefs.GetString(prefKey, "0"), CultureInfo.InvariantCulture);
+                    return true;
+                case double _:
+                    loaded = double.Parse(PlayerPrefs.GetString(prefKey, "0"), CultureInfo.InvariantCulture);
+                    return true;
+                case string _:
+                    loaded = PlayerPrefs.GetString(prefKey, string.Empty);
+                    return true;
+                default:
+                    Debug.LogWarning($"[RemoteConfigManager] Unsupported cached type for '{key}'.");
+                    return false;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[RemoteConfigManager] Failed to read cached value for '{key}': {e.Message}");
+            return false;
+        }
+    }
+
+    private void SaveValueToPlayerPrefs(string key, object value)
+    {
+        string prefKey = GetPrefKey(key);
+
+        switch (value)
+        {
+            case bool boolValue:
+                PlayerPrefs.SetInt(prefKey, boolValue ? 1 : 0);
+                break;
+            case long longValue:
+                PlayerPrefs.SetString(prefKey, longValue.ToString(CultureInfo.InvariantCulture));
+                break;
+            case double doubleValue:
+                PlayerPrefs.SetString(prefKey, doubleValue.ToString(CultureInfo.InvariantCulture));
+                break;
+            case string stringValue:
+                PlayerPrefs.SetString(prefKey, stringValue);
+                break;
+            default:
+                Debug.LogWarning($"[RemoteConfigManager] Unsupported type when saving '{key}'.");
+                break;
+        }
+    }
+
+    private static bool ValuesEqual(object current, object incoming)
+    {
+        if (current == null && incoming == null) return true;
+        if (current == null || incoming == null) return false;
+
+        if (current is double currentDouble && incoming is double incomingDouble)
+        {
+            return Math.Abs(currentDouble - incomingDouble) < 0.000001d;
+        }
+
+        return current.Equals(incoming);
+    }
+
+    private object ReadRemoteValue(string key)
+    {
+        if (!defaults.TryGetValue(key, out object defaultValue))
+        {
+            return null;
+        }
+
+        try
+        {
+            ConfigValue configValue = FirebaseRemoteConfig.DefaultInstance.GetValue(key);
+            switch (defaultValue)
+            {
+                case bool _:
+                    return configValue.BooleanValue;
+                case long _:
+                    return configValue.LongValue;
+                case double _:
+                    return configValue.DoubleValue;
+                case string _:
+                    return configValue.StringValue;
+                default:
+                    return null;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[RemoteConfigManager] Failed to read remote value for '{key}': {e.Message}");
+            return null;
+        }
+    }
+
+    private void SyncFromFirebase()
+    {
+        if (!isFirebaseNativeReady)
+        {
+            return;
+        }
+
+        int changedCount = 0;
+
+        foreach (string key in defaults.Keys)
+        {
+            object remoteValue = ReadRemoteValue(key);
+            if (remoteValue == null)
+            {
+                continue;
+            }
+
+            if (!activeValues.TryGetValue(key, out object currentValue) || !ValuesEqual(currentValue, remoteValue))
+            {
+                activeValues[key] = remoteValue;
+                SaveValueToPlayerPrefs(key, remoteValue);
+                changedCount++;
+                Debug.Log($"[RemoteConfigManager] Remote config updated: {key}");
+            }
+        }
+
+        if (!HasCachedConfig() || changedCount > 0)
+        {
+            PlayerPrefs.SetInt(PREF_KEY_HAS_CACHE, 1);
+            PlayerPrefs.Save();
+        }
+
+        if (changedCount > 0)
+        {
+            Debug.Log($"[RemoteConfigManager] Synced {changedCount} remote config value(s) to PlayerPrefs.");
+        }
+        else
+        {
+            Debug.Log("[RemoteConfigManager] Remote config sync complete. No PlayerPrefs changes needed.");
+        }
+    }
+
+    private void MarkConfigReadyForNewUserIfNeeded()
+    {
+        if (isConfigReady)
+        {
+            return;
+        }
+
+        isConfigReady = true;
+        ApplyUserDataFromActiveValues();
+        FireConfigInitializedOnce();
+    }
+
+    private void FireConfigInitializedOnce()
+    {
+        if (configInitializedEventFired)
+        {
+            return;
+        }
+
+        configInitializedEventFired = true;
+        OnConfigInitialized?.Invoke();
+    }
+
     /// <summary>
     /// Use baked-in defaults when Firebase native libs are missing (common in Editor on macOS).
     /// </summary>
@@ -100,9 +312,7 @@ public class RemoteConfigManager : MonoBehaviour
         }
 
         isFirebaseNativeReady = false;
-        isConfigReady = true;
-        ApplyUserDataFromDefaults();
-        OnConfigInitialized?.Invoke();
+        MarkConfigReadyForNewUserIfNeeded();
     }
 
     public void Initialize()
@@ -115,6 +325,12 @@ public class RemoteConfigManager : MonoBehaviour
             {
                 if (task.IsFaulted)
                 {
+                    if (isConfigReady)
+                    {
+                        Debug.LogWarning($"[RemoteConfigManager] SetDefaults failed, keeping cached values. {task.Exception?.GetBaseException()?.Message}");
+                        return;
+                    }
+
                     ApplyDefaultsOnly(task.Exception?.GetBaseException()?.Message);
                     return;
                 }
@@ -125,6 +341,12 @@ public class RemoteConfigManager : MonoBehaviour
         }
         catch (Exception e)
         {
+            if (isConfigReady)
+            {
+                Debug.LogWarning($"[RemoteConfigManager] Initialize failed, keeping cached values. {e.Message}");
+                return;
+            }
+
             ApplyDefaultsOnly(e.Message);
         }
     }
@@ -133,7 +355,10 @@ public class RemoteConfigManager : MonoBehaviour
     {
         if (!isFirebaseNativeReady)
         {
-            ApplyDefaultsOnly("Firebase native layer unavailable.");
+            if (!isConfigReady)
+            {
+                ApplyDefaultsOnly("Firebase native layer unavailable.");
+            }
             return;
         }
 
@@ -151,14 +376,18 @@ public class RemoteConfigManager : MonoBehaviour
                 else
                 {
                     Debug.LogError($"[RemoteConfigManager] Fetch failed: {fetchTask.Exception}");
-                    isConfigReady = true;
-                    ApplyUserDataFromDefaults();
-                    OnConfigInitialized?.Invoke();
+                    MarkConfigReadyForNewUserIfNeeded();
                 }
             });
         }
         catch (Exception e)
         {
+            if (isConfigReady)
+            {
+                Debug.LogWarning($"[RemoteConfigManager] Fetch failed, keeping cached values. {e.Message}");
+                return;
+            }
+
             ApplyDefaultsOnly(e.Message);
         }
     }
@@ -167,7 +396,10 @@ public class RemoteConfigManager : MonoBehaviour
     {
         if (!isFirebaseNativeReady)
         {
-            ApplyDefaultsOnly("Firebase native layer unavailable.");
+            if (!isConfigReady)
+            {
+                ApplyDefaultsOnly("Firebase native layer unavailable.");
+            }
             return;
         }
 
@@ -178,25 +410,29 @@ public class RemoteConfigManager : MonoBehaviour
                 if (activateTask.IsCompleted && !activateTask.IsFaulted)
                 {
                     Debug.Log($"[RemoteConfigManager] Activate completed. Result: {activateTask.Result}");
-                    ApplyUserDataFromRemoteOrDefaults();
+                    SyncFromFirebase();
                 }
                 else
                 {
                     Debug.LogError($"[RemoteConfigManager] Activate failed: {activateTask.Exception}");
-                    ApplyUserDataFromDefaults();
                 }
 
-                isConfigReady = true;
-                OnConfigInitialized?.Invoke();
+                MarkConfigReadyForNewUserIfNeeded();
             });
         }
         catch (Exception e)
         {
+            if (isConfigReady)
+            {
+                Debug.LogWarning($"[RemoteConfigManager] Activate failed, keeping cached values. {e.Message}");
+                return;
+            }
+
             ApplyDefaultsOnly(e.Message);
         }
     }
 
-    private void ApplyUserDataFromDefaults()
+    private void ApplyUserDataFromActiveValues()
     {
         if (Assets.Scripts.Core.UserDataManager.Instance == null) return;
 
@@ -204,83 +440,40 @@ public class RemoteConfigManager : MonoBehaviour
         Assets.Scripts.Core.UserDataManager.Instance.IsDynamicMaxZoom = GetBool(KEY_IS_DYNAMIC_MAX_ZOOM);
     }
 
-    private void ApplyUserDataFromRemoteOrDefaults()
-    {
-        ApplyUserDataFromDefaults();
-    }
-
     #region Accessors
+
+    private object GetActiveValue(string key)
+    {
+        if (activeValues.TryGetValue(key, out object value))
+        {
+            return value;
+        }
+
+        return defaults.TryGetValue(key, out object defaultValue) ? defaultValue : null;
+    }
 
     public string GetString(string key)
     {
-        if (!isFirebaseNativeReady)
-        {
-            return defaults.TryGetValue(key, out object value) ? Convert.ToString(value) : string.Empty;
-        }
-
-        try
-        {
-            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).StringValue;
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[RemoteConfigManager] GetString fallback for '{key}': {e.Message}");
-            return defaults.TryGetValue(key, out object value) ? Convert.ToString(value) : string.Empty;
-        }
+        object value = GetActiveValue(key);
+        return value != null ? Convert.ToString(value) : string.Empty;
     }
 
     public bool GetBool(string key)
     {
-        if (!isFirebaseNativeReady)
-        {
-            return defaults.TryGetValue(key, out object value) && Convert.ToBoolean(value);
-        }
-
-        try
-        {
-            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).BooleanValue;
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[RemoteConfigManager] GetBool fallback for '{key}': {e.Message}");
-            return defaults.TryGetValue(key, out object value) && Convert.ToBoolean(value);
-        }
+        object value = GetActiveValue(key);
+        return value != null && Convert.ToBoolean(value);
     }
 
     public long GetLong(string key)
     {
-        if (!isFirebaseNativeReady)
-        {
-            return defaults.TryGetValue(key, out object value) ? Convert.ToInt64(value) : 0L;
-        }
-
-        try
-        {
-            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).LongValue;
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[RemoteConfigManager] GetLong fallback for '{key}': {e.Message}");
-            return defaults.TryGetValue(key, out object value) ? Convert.ToInt64(value) : 0L;
-        }
+        object value = GetActiveValue(key);
+        return value != null ? Convert.ToInt64(value) : 0L;
     }
 
     public double GetDouble(string key)
     {
-        if (!isFirebaseNativeReady)
-        {
-            return defaults.TryGetValue(key, out object value) ? Convert.ToDouble(value) : 0.0;
-        }
-
-        try
-        {
-            return FirebaseRemoteConfig.DefaultInstance.GetValue(key).DoubleValue;
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[RemoteConfigManager] GetDouble fallback for '{key}': {e.Message}");
-            return defaults.TryGetValue(key, out object value) ? Convert.ToDouble(value) : 0.0;
-        }
+        object value = GetActiveValue(key);
+        return value != null ? Convert.ToDouble(value) : 0.0;
     }
 
     public string ForceUpdateVersionAndroid => GetString(KEY_FORCE_UPDATE_VERSION_ANDROID);

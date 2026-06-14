@@ -173,6 +173,7 @@ namespace Assets.Scripts.Core
 
             ApplySnapshotToFirebase();
             ApplySnapshotToSingularGlobals();
+            AdsManager.NotifyAttributionUpdated(snapshot);
         }
 
         private void LoadSnapshotFromPrefs()

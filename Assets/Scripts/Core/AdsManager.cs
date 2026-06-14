@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using LiftEngine;
 using Singular;
 
 namespace Assets.Scripts.Core
@@ -55,6 +56,11 @@ namespace Assets.Scripts.Core
         private int _bannerRetryAttempt;
         private bool _showNextInterstitial = true;
         private bool _isFlushingPendingSingularRevenue;
+        private bool _liftEngineEnabled;
+        private bool _liftEngineReady;
+        private bool _liftEngineInitSettled;
+        private bool _liftEngineCallbacksSubscribed;
+        private bool _fullscreenMaxCallbacksSubscribed;
 
         private static readonly ConcurrentQueue<SingularAdRevenuePayload> _pendingSingularRevenue =
             new ConcurrentQueue<SingularAdRevenuePayload>();
@@ -83,8 +89,16 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
+        private const float RewardedPlacementWaitSeconds = 12f;
         private const float BannerCreateSettleDelaySeconds = 0.25f;
         private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
+
+        private enum FullscreenAdChoice
+        {
+            None = 0,
+            Interstitial = 1,
+            Rewarded = 2
+        }
 
         // ──────────────────────────────────────────────────────────────────
         // AppLovin MAX SDK Key
@@ -208,6 +222,8 @@ namespace Assets.Scripts.Core
         private void OnDestroy()
         {
             TermsConsentManager.OnSdkInitAllowed -= HandleSdkInitAllowed;
+
+            UnsubscribeLiftEngineCallbacks();
 
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
 
@@ -345,12 +361,17 @@ namespace Assets.Scripts.Core
 
         private void ExecuteDestroyBannerImmediate()
         {
-            if (!_bannerCreated) return;
+            if (!_bannerCreated && !_liftEngineReady) return;
 
             try
             {
-                MaxSdk.HideBanner(BannerAdUnitId);
-                MaxSdk.DestroyBanner(BannerAdUnitId);
+                if (_liftEngineReady)
+                    LiftEngineSdk.DestroyBanner();
+                else
+                {
+                    MaxSdk.HideBanner(BannerAdUnitId);
+                    MaxSdk.DestroyBanner(BannerAdUnitId);
+                }
             }
             catch (Exception e)
             {
@@ -398,6 +419,51 @@ namespace Assets.Scripts.Core
                 return;
             }
 
+            if (_liftEngineReady)
+            {
+                SyncLiftEngineBannerState();
+                return;
+            }
+
+            SyncLegacyBannerState();
+        }
+
+        private void SyncLiftEngineBannerState()
+        {
+            if (UserHasNoAds)
+            {
+                if (_bannerCreated || _bannerDestroyPending)
+                    ExecuteDestroyBanner();
+                return;
+            }
+
+            if (_bannerDestroyPending)
+            {
+                ExecuteDestroyBanner();
+                return;
+            }
+
+            if (_bannerCreateInProgress)
+                return;
+
+            if (!_bannerShowRequested)
+            {
+                if (_bannerCreated)
+                    LiftEngineSdk.HideBanner();
+                return;
+            }
+
+            if (!LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Banner))
+            {
+                InitializeBannerAds(requestedForShow: true);
+                return;
+            }
+
+            ShowLiftEngineBanner();
+        }
+
+        private void SyncLegacyBannerState()
+        {
             if (UserHasNoAds)
             {
                 if (_bannerCreated || _bannerDestroyPending)
@@ -445,6 +511,21 @@ namespace Assets.Scripts.Core
             }
         }
 
+        private void ShowLiftEngineBanner()
+        {
+            _bannerCreated = true;
+            LiftEngineSdk.ShowAd(LiftEngineAdFormat.Banner, null, new LiftEngineShowAdCallbacks
+            {
+                OnAdDisplayed = () =>
+                {
+                    SetCachedReady(ref _bannerReady, true);
+                    Debug.Log("[AdsManager] Settings Banner displayed (LiftEngine).");
+                },
+                OnAdDisplayFailed = message =>
+                    Debug.LogWarning($"[AdsManager] Settings Banner display failed (LiftEngine): {message}")
+            });
+        }
+
         private void EnqueueAction(Action action) => _mainThreadQueue.Enqueue(action);
 
         private void SetCachedReady(ref bool field, bool value)
@@ -457,7 +538,12 @@ namespace Assets.Scripts.Core
         private void RefreshInterstitialReady()
         {
             bool ready = false;
-            try { ready = MaxSdk.IsInterstitialReady(InterstitialAdUnitId); }
+            try
+            {
+                ready = _liftEngineReady
+                    ? LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Interstitial)
+                    : MaxSdk.IsInterstitialReady(InterstitialAdUnitId);
+            }
             catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking interstitial readiness: {e.Message}"); }
             SetCachedReady(ref _interstitialReady, ready);
         }
@@ -465,15 +551,37 @@ namespace Assets.Scripts.Core
         private void RefreshRewardedReady()
         {
             bool ready = false;
-            try { ready = MaxSdk.IsRewardedAdReady(RewardedAdUnitId); }
+            try
+            {
+                ready = _liftEngineReady
+                    ? LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Rewarded)
+                    : MaxSdk.IsRewardedAdReady(RewardedAdUnitId);
+            }
             catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking rewarded readiness: {e.Message}"); }
             SetCachedReady(ref _rewardedReady, ready);
+        }
+
+        private void RefreshBannerReady()
+        {
+            if (_liftEngineReady)
+            {
+                bool ready = false;
+                try { ready = LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Banner); }
+                catch (Exception e) { Debug.LogWarning($"[AdsManager] Error checking banner readiness: {e.Message}"); }
+                SetCachedReady(ref _bannerReady, ready);
+                _bannerCreated = ready || _bannerCreated;
+                return;
+            }
+
+            if (!_bannerCreated)
+                SetCachedReady(ref _bannerReady, false);
         }
 
         private void RefreshAllReadiness()
         {
             RefreshInterstitialReady();
             RefreshRewardedReady();
+            RefreshBannerReady();
         }
 
         /// <summary>
@@ -498,6 +606,18 @@ namespace Assets.Scripts.Core
         {
             if (!isInitialized) return;
             if (!AreBannerAdsSupported || UserHasNoAds) return;
+
+            if (_liftEngineReady)
+            {
+                if (!_bannerShowRequested && !_bannerCreated)
+                    return;
+
+                if (LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Banner))
+                    return;
+
+                LoadSettingsBanner();
+                return;
+            }
 
             if (!_bannerCreated)
             {
@@ -534,8 +654,7 @@ namespace Assets.Scripts.Core
 
                     if (!isInitialized) continue;
 
-                    if (!_interstitialReady) LoadInterstitial();
-                    if (!_rewardedReady) LoadRewarded();
+                    EnsureFullscreenAdsLoaded();
                     if (!_bannerCreated || !_bannerReady) PrepareBannerAd();
                 }
                 catch (Exception e)
@@ -633,8 +752,14 @@ namespace Assets.Scripts.Core
             isInitializing = false;
             sdkInitRetryCount = 0;
 
-            InitializeInterstitialAds();
-            InitializeRewardedAds();
+            TryStartLiftEngine();
+            EnsureFullscreenMaxCallbacks();
+            if (!_liftEngineEnabled)
+            {
+                LoadInterstitial();
+                LoadRewarded();
+            }
+
             SubscribeToNoAdsStatus();
             RefreshAllReadiness();
             StartCoroutine(PrewarmSettingsBannerAfterSdkInit());
@@ -654,8 +779,12 @@ namespace Assets.Scripts.Core
         //  INTERSTITIAL ADS
         // ════════════════════════════════════════════
 
-        private void InitializeInterstitialAds()
+        private void EnsureFullscreenMaxCallbacks()
         {
+            if (_fullscreenMaxCallbacksSubscribed)
+                return;
+
+            _fullscreenMaxCallbacksSubscribed = true;
             MaxSdkCallbacks.Interstitial.OnAdLoadedEvent += OnInterstitialLoaded;
             MaxSdkCallbacks.Interstitial.OnAdLoadFailedEvent += OnInterstitialLoadFailed;
             MaxSdkCallbacks.Interstitial.OnAdDisplayedEvent += OnInterstitialDisplayed;
@@ -664,6 +793,19 @@ namespace Assets.Scripts.Core
             MaxSdkCallbacks.Interstitial.OnAdClickedEvent += OnInterstitialClicked;
             MaxSdkCallbacks.Interstitial.OnAdRevenuePaidEvent += OnInterstitialRevenuePaid;
 
+            MaxSdkCallbacks.Rewarded.OnAdLoadedEvent += OnRewardedAdLoaded;
+            MaxSdkCallbacks.Rewarded.OnAdLoadFailedEvent += OnRewardedAdLoadFailed;
+            MaxSdkCallbacks.Rewarded.OnAdDisplayedEvent += OnRewardedAdDisplayed;
+            MaxSdkCallbacks.Rewarded.OnAdDisplayFailedEvent += OnRewardedAdDisplayFailed;
+            MaxSdkCallbacks.Rewarded.OnAdHiddenEvent += OnRewardedAdHidden;
+            MaxSdkCallbacks.Rewarded.OnAdClickedEvent += OnRewardedAdClicked;
+            MaxSdkCallbacks.Rewarded.OnAdReceivedRewardEvent += OnRewardedAdReceivedReward;
+            MaxSdkCallbacks.Rewarded.OnAdRevenuePaidEvent += OnRewardedAdRevenuePaid;
+        }
+
+        private void InitializeInterstitialAds()
+        {
+            EnsureFullscreenMaxCallbacks();
             LoadInterstitial();
         }
 
@@ -681,6 +823,12 @@ namespace Assets.Scripts.Core
             }
             // Loaded even for No Ads buyers so interstitials remain available as a rewarded fallback.
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
+            if (_liftEngineReady)
+            {
+                LiftEngineSdk.LoadAd(LiftEngineAdFormat.Interstitial);
+                return;
+            }
+
             MaxSdk.LoadInterstitial(InterstitialAdUnitId);
         }
 
@@ -730,7 +878,10 @@ namespace Assets.Scripts.Core
             {
                 Debug.Log("[AdsManager] Showing Interstitial Ad.");
                 OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                if (_liftEngineReady)
+                    ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
+                else
+                    MaxSdk.ShowInterstitial(InterstitialAdUnitId);
             }
             else
             {
@@ -819,15 +970,7 @@ namespace Assets.Scripts.Core
 
         private void InitializeRewardedAds()
         {
-            MaxSdkCallbacks.Rewarded.OnAdLoadedEvent += OnRewardedAdLoaded;
-            MaxSdkCallbacks.Rewarded.OnAdLoadFailedEvent += OnRewardedAdLoadFailed;
-            MaxSdkCallbacks.Rewarded.OnAdDisplayedEvent += OnRewardedAdDisplayed;
-            MaxSdkCallbacks.Rewarded.OnAdDisplayFailedEvent += OnRewardedAdDisplayFailed;
-            MaxSdkCallbacks.Rewarded.OnAdHiddenEvent += OnRewardedAdHidden;
-            MaxSdkCallbacks.Rewarded.OnAdClickedEvent += OnRewardedAdClicked;
-            MaxSdkCallbacks.Rewarded.OnAdReceivedRewardEvent += OnRewardedAdReceivedReward;
-            MaxSdkCallbacks.Rewarded.OnAdRevenuePaidEvent += OnRewardedAdRevenuePaid;
-
+            EnsureFullscreenMaxCallbacks();
             LoadRewarded();
         }
 
@@ -839,6 +982,12 @@ namespace Assets.Scripts.Core
                 return;
             }
             Debug.Log("[AdsManager] Loading Rewarded Ad...");
+            if (_liftEngineReady)
+            {
+                LiftEngineSdk.LoadAd(LiftEngineAdFormat.Rewarded);
+                return;
+            }
+
             MaxSdk.LoadRewardedAd(RewardedAdUnitId);
         }
 
@@ -869,45 +1018,123 @@ namespace Assets.Scripts.Core
         private void ShowRewardedForType(RewardAdType rewardType)
         {
             pendingRewardType = rewardType;
+            StartCoroutine(ShowRewardedPlacementRoutine(rewardType));
+        }
 
+        private IEnumerator ShowRewardedPlacementRoutine(RewardAdType rewardType)
+        {
+            float deadline = Time.time + RewardedPlacementWaitSeconds;
+
+            while (Time.time <= deadline)
+            {
+                RefreshAllReadiness();
+                var choice = ResolveBestRewardAdChoice();
+                if (choice != FullscreenAdChoice.None)
+                {
+                    ShowFullscreenAdChoice(choice, rewardType);
+                    yield break;
+                }
+
+                EnsureFullscreenAdsLoaded();
+                yield return new WaitForSeconds(0.5f);
+            }
+
+            Debug.LogWarning(
+                $"[AdsManager] Rewarded placement timed out for {rewardType} — no interstitial or rewarded fill.");
+            pendingRewardType = RewardAdType.None;
+
+            if (!isInitialized && !isInitializing)
+                _ = InitializeSDK();
+        }
+
+        /// <summary>
+        /// Picks interstitial when it pays more and both are ready; otherwise rewarded, then interstitial fallback.
+        /// </summary>
+        private FullscreenAdChoice ResolveBestRewardAdChoice()
+        {
             bool interstitialReady = IsInterstitialReady;
             bool rewardedReady = IsRewardedReady;
 
             if (AdMonetizationOptimizer.ShouldShowInterstitialInsteadOfRewarded(interstitialReady, rewardedReady))
-            {
-                Debug.Log(
-                    $"[AdsManager] Monetization optimizer: interstitial eCPM ${AdMonetizationOptimizer.InterstitialEcpm:F2} > " +
-                    $"rewarded ${AdMonetizationOptimizer.RewardedEcpm:F2}. Showing interstitial for {rewardType}.");
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
-                return;
-            }
+                return FullscreenAdChoice.Interstitial;
 
             if (rewardedReady)
-            {
-                Debug.Log($"[AdsManager] Showing Rewarded Ad ({rewardType}).");
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
-                return;
-            }
+                return FullscreenAdChoice.Rewarded;
 
             if (interstitialReady)
+                return FullscreenAdChoice.Interstitial;
+
+            return FullscreenAdChoice.None;
+        }
+
+        private void ShowFullscreenAdChoice(FullscreenAdChoice choice, RewardAdType rewardType)
+        {
+            switch (choice)
             {
-                Debug.LogWarning($"[AdsManager] Rewarded Ad is not ready for {rewardType}. Falling back to Interstitial.");
-                OnAdOpened?.Invoke();
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                case FullscreenAdChoice.Interstitial:
+                    if (AdMonetizationOptimizer.ShouldShowInterstitialInsteadOfRewarded(
+                            IsInterstitialReady, IsRewardedReady))
+                    {
+                        Debug.Log(
+                            $"[AdsManager] Monetization optimizer: interstitial eCPM ${AdMonetizationOptimizer.InterstitialEcpm:F2} > " +
+                            $"rewarded ${AdMonetizationOptimizer.RewardedEcpm:F2}. Showing interstitial for {rewardType}.");
+                    }
+                    else
+                    {
+                        Debug.LogWarning(
+                            $"[AdsManager] Rewarded not ready for {rewardType}. Falling back to interstitial.");
+                    }
+
+                    OnAdOpened?.Invoke();
+                    ShowFullscreenAd(LiftEngineAdFormat.Interstitial);
+                    break;
+
+                case FullscreenAdChoice.Rewarded:
+                    Debug.Log($"[AdsManager] Showing Rewarded Ad ({rewardType}).");
+                    OnAdOpened?.Invoke();
+                    ShowFullscreenAd(LiftEngineAdFormat.Rewarded);
+                    break;
+            }
+        }
+
+        private void ShowFullscreenAd(LiftEngineAdFormat format)
+        {
+            if (_liftEngineEnabled && _liftEngineReady)
+            {
+                ShowLiftEngineAd(format);
                 return;
             }
 
-            Debug.LogWarning($"[AdsManager] Rewarded and Interstitial are not ready for {rewardType}. Initialized: {isInitialized}");
-            pendingRewardType = RewardAdType.None;
-            if (!isInitialized && !isInitializing)
-                _ = InitializeSDK();
+            EnsureFullscreenMaxCallbacks();
+            if (format == LiftEngineAdFormat.Interstitial)
+                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
             else
+                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
+        }
+
+        private void EnsureFullscreenAdsLoaded()
+        {
+            if (_liftEngineReady)
             {
-                LoadRewarded();
-                LoadInterstitial();
+                EnsureLiftEngineFormatLoaded(LiftEngineAdFormat.Interstitial, LoadInterstitial);
+                EnsureLiftEngineFormatLoaded(LiftEngineAdFormat.Rewarded, LoadRewarded);
+                return;
             }
+
+            if (!_interstitialReady) LoadInterstitial();
+            if (!_rewardedReady) LoadRewarded();
+        }
+
+        private void EnsureLiftEngineFormatLoaded(LiftEngineAdFormat format, Action loadAction)
+        {
+            if (LiftEngineSdk.IsAdReady(format))
+                return;
+
+            var state = LiftEngineSdk.GetPrewarmState(format);
+            if (state == AdPrewarmState.Predicting || state == AdPrewarmState.Loading)
+                return;
+
+            loadAction?.Invoke();
         }
 
         #region Rewarded Callbacks
@@ -1049,14 +1276,28 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
-            SubscribeBannerCallbacks();
+            if (_liftEngineEnabled && !_liftEngineInitSettled)
+            {
+                float deadline = Time.realtimeSinceStartup + 30f;
+                while (!_liftEngineInitSettled && Time.realtimeSinceStartup < deadline)
+                    yield return new WaitForSeconds(0.1f);
+            }
 
             try
             {
-                Debug.Log("[AdsManager] Creating Settings Banner Ad (deferred)...");
-                MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
-                MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
-                _bannerCreated = true;
+                if (_liftEngineReady)
+                {
+                    Debug.Log("[AdsManager] Loading Settings Banner via LiftEngine (predict + multipliers)...");
+                    LiftEngineSdk.LoadAd(LiftEngineAdFormat.Banner);
+                }
+                else
+                {
+                    SubscribeBannerCallbacks();
+                    Debug.Log("[AdsManager] Creating Settings Banner Ad (deferred)...");
+                    MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
+                    MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
+                    _bannerCreated = true;
+                }
             }
             catch (Exception e)
             {
@@ -1069,7 +1310,8 @@ namespace Assets.Scripts.Core
                 _bannerCreateRequestedForShow = false;
             }
 
-            SyncBannerNativeState();
+            if (!_liftEngineReady)
+                SyncBannerNativeState();
         }
 
         /// <summary>
@@ -1090,6 +1332,17 @@ namespace Assets.Scripts.Core
                 if (!isInitializing) _ = InitializeSDK();
                 return;
             }
+
+            if (_liftEngineReady)
+            {
+                if (LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Banner))
+                    return;
+
+                Debug.Log("[AdsManager] Loading Settings Banner via LiftEngine...");
+                LiftEngineSdk.LoadAd(LiftEngineAdFormat.Banner);
+                return;
+            }
+
             if (!_bannerCreated)
             {
                 Debug.Log("[AdsManager] Creating Settings Banner Ad...");
@@ -1254,6 +1507,278 @@ namespace Assets.Scripts.Core
                     Debug.Log("[AdsManager] ProcessPendingReward: No pending reward (None). Ignoring.");
                     break;
             }
+        }
+
+        // ════════════════════════════════════════════
+        //  LIFTENGINE
+        // ════════════════════════════════════════════
+
+        private void TryStartLiftEngine()
+        {
+            var settings = Resources.Load<LiftEngineSettings>(LiftEngineSettings.DefaultResourcePath);
+            if (settings == null || string.IsNullOrWhiteSpace(settings.apiKey))
+            {
+                _liftEngineEnabled = false;
+                Debug.Log("[AdsManager] LiftEngine settings missing or apiKey empty — using direct MAX for fullscreen ads.");
+                return;
+            }
+
+            _liftEngineEnabled = true;
+            SubscribeLiftEngineCallbacks();
+            LiftEngineSdk.Initialize(settings);
+            ApplyLiftEngineContext();
+            Debug.Log("[AdsManager] LiftEngine init requested (report/predict run inside SDK).");
+        }
+
+        private void ApplyLiftEngineContext()
+        {
+            if (!_liftEngineEnabled)
+                return;
+
+#if UNITY_IOS && !UNITY_EDITOR
+            if (IOSAttributionBootstrap.IsAttResolved)
+                LiftEngineSdk.SetIdfaApproved(IOSAttributionBootstrap.IsAttAuthorized);
+#endif
+            ApplyLiftEngineAttributionFromSnapshot();
+            LiftEngineSdk.SendReport();
+        }
+
+        private void ApplyLiftEngineAttributionFromSnapshot()
+        {
+            if (!_liftEngineEnabled)
+                return;
+
+            if (!SingularAttributionBridge.TryGetCachedSnapshot(out SingularAttributionSnapshot snapshot))
+                return;
+
+            string installType = IsOrganicAttribution(snapshot) ? "Organic" : "Non-organic";
+            LiftEngineSdk.SetAttribution(installType, snapshot.Network);
+        }
+
+        private static bool IsOrganicAttribution(SingularAttributionSnapshot snapshot)
+        {
+            if (snapshot == null)
+                return true;
+
+            string network = snapshot.Network?.Trim();
+            if (string.IsNullOrEmpty(network))
+                return true;
+
+            return network.Equals("Organic", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static void NotifyAttributionUpdated(SingularAttributionSnapshot snapshot)
+        {
+            if (Instance == null)
+                return;
+
+            Instance.EnqueueAction(() =>
+            {
+                Instance.ApplyLiftEngineAttributionFromSnapshot();
+                LiftEngineSdk.SendReport();
+            });
+        }
+
+        private void SubscribeLiftEngineCallbacks()
+        {
+            if (_liftEngineCallbacksSubscribed)
+                return;
+
+            LiftEngineSdkCallbacks.OnSdkInitializedEvent += OnLiftEngineSdkInitialized;
+            LiftEngineSdkCallbacks.OnAdLoadedEvent += OnLiftEngineAdLoaded;
+            LiftEngineSdkCallbacks.OnAdRevenuePaidEvent += OnLiftEngineAdRevenuePaid;
+            LiftEngineSignalBus.AdReadyStateChanged += OnLiftEngineAdReadyStateChanged;
+            _liftEngineCallbacksSubscribed = true;
+        }
+
+        private void UnsubscribeLiftEngineCallbacks()
+        {
+            if (!_liftEngineCallbacksSubscribed)
+                return;
+
+            LiftEngineSdkCallbacks.OnSdkInitializedEvent -= OnLiftEngineSdkInitialized;
+            LiftEngineSdkCallbacks.OnAdLoadedEvent -= OnLiftEngineAdLoaded;
+            LiftEngineSdkCallbacks.OnAdRevenuePaidEvent -= OnLiftEngineAdRevenuePaid;
+            LiftEngineSignalBus.AdReadyStateChanged -= OnLiftEngineAdReadyStateChanged;
+            _liftEngineCallbacksSubscribed = false;
+        }
+
+        private void OnLiftEngineAdReadyStateChanged(AdReadyStateChangedSignal signal)
+        {
+            if (!_liftEngineReady || signal == null)
+                return;
+
+            RefreshAllReadiness();
+        }
+
+        private void OnLiftEngineSdkInitialized(LiftEngineInitializationStatus status)
+        {
+            _liftEngineInitSettled = true;
+            _liftEngineReady = status == LiftEngineInitializationStatus.Success;
+            if (_liftEngineReady)
+            {
+                Debug.Log("[AdsManager] LiftEngine SDK initialized — all ad formats routed through predict/track flow.");
+                PrewarmSettingsBanner();
+                if (_bannerShowRequested)
+                    SyncBannerNativeState();
+            }
+            else
+            {
+                Debug.LogWarning("[AdsManager] LiftEngine init failed — falling back to direct MAX for fullscreen ads.");
+                EnsureFullscreenMaxCallbacks();
+                LoadInterstitial();
+                LoadRewarded();
+            }
+
+            RefreshAllReadiness();
+        }
+
+        private void OnLiftEngineAdLoaded(LiftEngineAdInfo info)
+        {
+            if (info == null)
+                return;
+
+            if (info.Format == LiftEngineAdFormat.Interstitial)
+            {
+                interstitialRetryAttempt = 0;
+                AdMonetizationOptimizer.RecordInterstitialRevenue(info.Revenue);
+            }
+            else if (info.Format == LiftEngineAdFormat.Rewarded)
+            {
+                rewardedRetryAttempt = 0;
+                AdMonetizationOptimizer.RecordRewardedRevenue(info.Revenue);
+            }
+            else if (info.Format == LiftEngineAdFormat.Banner)
+            {
+                _bannerRetryAttempt = 0;
+                _bannerCreated = true;
+                SetCachedReady(ref _bannerReady, true);
+                if (_bannerShowRequested)
+                    EnqueueAction(SyncBannerNativeState);
+            }
+
+            RefreshAllReadiness();
+        }
+
+        private void OnLiftEngineAdRevenuePaid(LiftEngineAdInfo info)
+        {
+            if (info == null)
+                return;
+
+            if (info.Format == LiftEngineAdFormat.Interstitial)
+                AdMonetizationOptimizer.RecordInterstitialRevenue(info.Revenue);
+            else if (info.Format == LiftEngineAdFormat.Rewarded)
+                AdMonetizationOptimizer.RecordRewardedRevenue(info.Revenue);
+
+            TrackLiftEngineAdRevenue(info);
+        }
+
+        private void ShowLiftEngineAd(LiftEngineAdFormat format)
+        {
+            LiftEngineSdk.ShowAd(format, null, new LiftEngineShowAdCallbacks
+            {
+                OnAdDisplayed = () => HandleLiftEngineAdDisplayed(format),
+                OnAdHidden = () => HandleLiftEngineAdHidden(format),
+                OnAdDisplayFailed = message => HandleLiftEngineAdDisplayFailed(format, message),
+                OnAdRewarded = () => HandleLiftEngineAdRewarded(format),
+                OnAdClicked = () => Debug.Log($"[AdsManager] {format} ad clicked (LiftEngine).")
+            });
+        }
+
+        private void HandleLiftEngineAdRewarded(LiftEngineAdFormat format)
+        {
+            if (format != LiftEngineAdFormat.Rewarded || pendingRewardType == RewardAdType.None)
+                return;
+
+            Debug.Log($"[AdsManager] Rewarded ad completed for {pendingRewardType} (LiftEngine).");
+            ProcessPendingReward();
+        }
+
+        private void HandleLiftEngineAdDisplayed(LiftEngineAdFormat format)
+        {
+            Debug.Log($"[AdsManager] {format} displayed (LiftEngine).");
+            if (format == LiftEngineAdFormat.Interstitial)
+                SetCachedReady(ref _interstitialReady, false);
+            else if (format == LiftEngineAdFormat.Rewarded)
+                SetCachedReady(ref _rewardedReady, false);
+
+            PrepareAllAdsAfterClose();
+        }
+
+        private void HandleLiftEngineAdHidden(LiftEngineAdFormat format)
+        {
+            Debug.Log($"[AdsManager] {format} hidden (LiftEngine).");
+            lastAdShowTime = Time.time;
+
+            if (format == LiftEngineAdFormat.Interstitial)
+                SetCachedReady(ref _interstitialReady, false);
+            else if (format == LiftEngineAdFormat.Rewarded)
+                SetCachedReady(ref _rewardedReady, false);
+
+            NotifyAdClosed();
+
+            if (pendingRewardType != RewardAdType.None &&
+                format == LiftEngineAdFormat.Interstitial)
+            {
+                Debug.Log(
+                    $"[AdsManager] Interstitial fulfilled rewarded placement ({pendingRewardType}). Granting reward.");
+                ProcessPendingReward();
+            }
+
+            PrepareAllAdsAfterClose();
+            RefreshAllReadiness();
+        }
+
+        private void HandleLiftEngineAdDisplayFailed(LiftEngineAdFormat format, string message)
+        {
+            Debug.LogError($"[AdsManager] {format} display failed (LiftEngine): {message}");
+
+            if (format == LiftEngineAdFormat.Rewarded && pendingRewardType != RewardAdType.None)
+            {
+                RefreshAllReadiness();
+                if (IsInterstitialReady)
+                {
+                    Debug.LogWarning(
+                        $"[AdsManager] Rewarded display failed ({message}); falling back to interstitial for pending reward.");
+                    ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
+                    return;
+                }
+            }
+
+            if (format == LiftEngineAdFormat.Interstitial)
+                SetCachedReady(ref _interstitialReady, false);
+            else if (format == LiftEngineAdFormat.Rewarded)
+            {
+                pendingRewardType = RewardAdType.None;
+                SetCachedReady(ref _rewardedReady, false);
+            }
+
+            NotifyAdClosed();
+            PrepareAllAdsAfterClose();
+            RefreshAllReadiness();
+        }
+
+        private void TrackLiftEngineAdRevenue(LiftEngineAdInfo info)
+        {
+            if (info == null || info.Revenue <= 0)
+                return;
+
+            string adFormat = info.Format switch
+            {
+                LiftEngineAdFormat.Interstitial => "interstitial",
+                LiftEngineAdFormat.Rewarded => "rewarded",
+                LiftEngineAdFormat.Banner => "banner",
+                _ => "unknown"
+            };
+
+            var payload = new SingularAdRevenuePayload(
+                info.Revenue,
+                info.NetworkName,
+                info.AdUnitId,
+                adFormat,
+                string.Empty);
+
+            EnqueueAction(() => ReportAdRevenueOnMainThread(payload));
         }
 
         // ════════════════════════════════════════════

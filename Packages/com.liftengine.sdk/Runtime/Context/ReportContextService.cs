@@ -1,0 +1,247 @@
+using System;
+using System.Globalization;
+using LiftEngine;
+using UnityEngine;
+
+namespace LiftEngine.Context
+{
+    internal sealed class SessionTracker
+    {
+        private bool _sessionStarted;
+
+        public void BeginSession()
+        {
+            if (_sessionStarted)
+                return;
+
+            _sessionStarted = true;
+            ResetSessionCounters();
+        }
+
+        public void EnsureDailyRollover(ReportContextStore store)
+        {
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            if (store.DailyDateKey == today)
+                return;
+
+            store.DailyDateKey = today;
+            store.SetRawCount("daily_banner", 0);
+            store.SetRawCount("daily_interstitial", 0);
+            store.SetRawCount("daily_rewarded", 0);
+        }
+
+        private static void ResetSessionCounters()
+        {
+            PlayerPrefs.SetInt("le_ctx_sess_banner", 0);
+            PlayerPrefs.SetInt("le_ctx_sess_interstitial", 0);
+            PlayerPrefs.SetInt("le_ctx_sess_rewarded", 0);
+            PlayerPrefs.Save();
+        }
+    }
+
+    internal sealed class ReportContextService
+    {
+        private readonly ReportContextStore _store = new ReportContextStore();
+        private readonly SessionTracker _session = new SessionTracker();
+
+        public void Initialize()
+        {
+            _store.Load();
+            _session.BeginSession();
+
+            if (!_store.InstallUtc.HasValue)
+                _store.InstallUtc = DateTime.UtcNow;
+
+            _store.RecordActiveDay();
+            _session.EnsureDailyRollover(_store);
+        }
+
+        public void BeginIpCountryLookup(MonoBehaviour host)
+        {
+            if (host == null || !string.IsNullOrEmpty(_store.CountryCodeOverride))
+                return;
+
+            host.StartCoroutine(IpCountryResolver.FetchCountryCode(code =>
+            {
+                if (string.IsNullOrEmpty(code))
+                    return;
+
+                _store.SaveIpCountryCode(code);
+                LiftEngineLogger.Log($"Country code resolved from IP: {code}");
+            }));
+        }
+
+        public void SetAttribution(string appsFlyerInstallType, string mediaSource)
+        {
+            var normalized = PredictDataNormalizers.NormalizeInstallType(appsFlyerInstallType);
+            _store.SaveAttribution(normalized, mediaSource);
+        }
+
+        public void SetIdfaApproved(bool approved) => _store.SetIdfaOverride(approved);
+
+        public void SetCountryCode(string countryCode) => _store.SaveCountryCode(countryCode);
+
+        public void NotifyPurchase(float amountUsd)
+        {
+            if (amountUsd <= 0f)
+                return;
+
+            var now = DateTime.UtcNow;
+            _store.LtvGross += amountUsd;
+
+            if (!_store.FirstPurchaseUtc.HasValue)
+            {
+                _store.FirstPurchaseUtc = now;
+                _store.FtdAmount = amountUsd;
+            }
+
+            _store.LastPurchaseUtc = now;
+        }
+
+        public void RecordAdImpression(LiftEngineAdFormat format)
+        {
+            _session.EnsureDailyRollover(_store);
+            _store.IncrementAdShown(format);
+        }
+
+        /// <param name="revenueUsd">Per-impression revenue in USD (same unit as track <c>rev</c>).</param>
+        public void RecordAdRevenue(LiftEngineAdFormat format, double revenueUsd)
+        {
+            if (revenueUsd <= 0d)
+            {
+                LiftEngineLogger.Log($"ecpm_history {format} — skipped (revenue <= 0)");
+                return;
+            }
+
+            var ecpm = PredictDataNormalizers.RevenuePerImpressionToEcpm(revenueUsd);
+            var history = _store.EcpmHistory;
+            EcpmHistoryBuffer.Push(history, format, ecpm);
+            _store.EcpmHistory = history;
+
+            var snapshot = EcpmHistoryBuffer.GetForFormat(history, format);
+            LiftEngineLogger.Log(
+                $"ecpm_history {format} — rev={revenueUsd.ToString(CultureInfo.InvariantCulture)} → " +
+                $"ecpm={ecpm.ToString(CultureInfo.InvariantCulture)}, history=[{FormatHistory(snapshot)}]");
+        }
+
+        public PredictDataPayload BuildPayload(LiftEngineAdFormat format)
+        {
+            _session.EnsureDailyRollover(_store);
+            _store.RecordActiveDay();
+
+            var nowUtc = DateTime.UtcNow;
+            var installUtc = _store.InstallUtc ?? nowUtc;
+            var daysSinceInstall = Math.Max(0, (int)(nowUtc - installUtc).TotalDays);
+
+            long daysToFtd = -1;
+            if (_store.FirstPurchaseUtc.HasValue)
+                daysToFtd = (long)(_store.FirstPurchaseUtc.Value - installUtc).TotalDays;
+
+            int daysSinceLastPurchase = -1;
+            if (_store.LastPurchaseUtc.HasValue)
+                daysSinceLastPurchase = Math.Max(0, (int)(nowUtc - _store.LastPurchaseUtc.Value).TotalDays);
+
+            var ltv = _store.LtvGross;
+            var typeRaw = _store.GetLifetimeRaw(format);
+            var typeDailyRaw = _store.GetDailyRaw(format);
+            var typeSessionRaw = _store.GetSessionRaw(format);
+            var dailyAdNumber = _store.GetDailyTotalRaw();
+            var dailyAdNumberByType = typeDailyRaw;
+            var countryCode = ResolveCountryCode();
+
+            return new PredictDataPayload
+            {
+                os = DeviceOsProvider.GetOs(),
+                country_code = countryCode,
+                install_type = string.IsNullOrEmpty(_store.InstallTypeRaw) ? null : _store.InstallTypeRaw,
+                brand = DeviceBrandProvider.GetBrand(),
+                device_model = SystemInfo.deviceModel,
+                day_num = Math.Max(1, _store.ActiveDayCount),
+                hour_of_day = nowUtc.Hour,
+                media_source = string.IsNullOrEmpty(_store.MediaSource) ? null : _store.MediaSource,
+                wifi = PredictDataNormalizers.WifiFlag(),
+                idfa_approved = ResolveIdfaApproved(),
+                has_made_deposit = PredictDataNormalizers.HasMadeDeposit(daysToFtd),
+                days_since_installed = daysSinceInstall,
+                ltv_gross_up_to_date = ltv,
+                days_from_install_to_ftd = daysToFtd,
+                ftd_amount = _store.FtdAmount,
+                days_since_last_purchase = daysSinceLastPurchase,
+                payer_ind = PredictDataNormalizers.PayerInd(ltv),
+                ad_number_life_time = _store.GetLifetimeTotalRaw(),
+                ad_number_life_time_ad_type = typeRaw,
+                daily_ad_number = dailyAdNumber,
+                daily_ad_number_ad_type = dailyAdNumberByType,
+                daily_ad_type_share = PredictDataNormalizers.DailyAdTypeShare(
+                    dailyAdNumber, dailyAdNumberByType),
+                session_ad_number = _store.GetSessionTotalRaw(),
+                session_ad_number_ad_type = typeSessionRaw,
+                ecpm_history = EcpmHistoryBuffer.GetForFormat(_store.EcpmHistory, format),
+                sec_from_last_ad = PredictDataNormalizers.SecFromLastAd(_store.LastAdUtc),
+                device_memory = PredictDataNormalizers.DeviceMemoryGb()
+            };
+        }
+
+        public (string keyword, string auctionId) GetAuctionContext(LiftEngineAdFormat format) =>
+            _store.GetAuctionContext(format);
+
+        public bool HasValidAuctionContext(LiftEngineAdFormat format)
+        {
+            var (_, auctionId) = _store.GetAuctionContext(format);
+            return !string.IsNullOrEmpty(auctionId);
+        }
+
+        public string GetBidFloorParam(LiftEngineAdFormat format) =>
+            _bidFloorParam.TryGetValue(format, out var param) ? param : null;
+
+        private readonly System.Collections.Generic.Dictionary<LiftEngineAdFormat, string> _bidFloorParam = new();
+
+        public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId, string param)
+        {
+            _store.SaveAuctionContext(format, keyword, auctionId);
+            if (!string.IsNullOrEmpty(param))
+                _bidFloorParam[format] = param;
+        }
+
+        public void ClearAuctionContext(LiftEngineAdFormat format)
+        {
+            _store.ClearAuctionContext(format);
+            _bidFloorParam.Remove(format);
+        }
+
+        public void ClearContextData() => _store.ClearAll();
+
+        public ReportContextStore StoreForDebug => _store;
+
+        private string ResolveCountryCode()
+        {
+            if (!string.IsNullOrEmpty(_store.CountryCodeOverride))
+                return _store.CountryCodeOverride;
+
+            if (!string.IsNullOrEmpty(_store.IpCountryCode))
+                return _store.IpCountryCode;
+
+            return DeviceCountryProvider.DetectCountryCode();
+        }
+
+        private int ResolveIdfaApproved()
+        {
+            if (_store.IdfaApprovedOverride.HasValue)
+                return _store.IdfaApprovedOverride.Value;
+
+            return 0;
+        }
+
+        private static string FormatHistory(float[] history)
+        {
+            if (history == null || history.Length == 0)
+                return string.Empty;
+
+            var parts = new string[history.Length];
+            for (var i = 0; i < history.Length; i++)
+                parts[i] = history[i].ToString(CultureInfo.InvariantCulture);
+
+            return string.Join(", ", parts);
+        }
+    }
+}
