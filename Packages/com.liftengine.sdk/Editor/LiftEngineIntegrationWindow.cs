@@ -12,6 +12,7 @@ namespace LiftEngine.Editor
         private Vector2 _scroll;
         private string _debugStatus = "";
         private string _lastHealthResult = "";
+        private string _lastIpCountryResult = "";
         private string _lastPredictResult = "";
         private string _predictPreviewJson = "";
         private LiftEngineAdFormat _debugFormat = LiftEngineAdFormat.Rewarded;
@@ -359,6 +360,20 @@ namespace LiftEngine.Editor
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("API", EditorStyles.boldLabel);
+
+            if (GUILayout.Button("Test IP Country Lookup (Edit Mode OK)"))
+            {
+                Log("Test IP Country Lookup — fetching from Cloudflare trace…");
+                _lastIpCountryResult = LiftEngineDebugHelper.TestIpCountryLookup();
+                if (_lastIpCountryResult == "IL")
+                    Log($"Test IP Country Lookup — OK: {_lastIpCountryResult}");
+                else if (_lastIpCountryResult.StartsWith("FAILED"))
+                    LogWarning($"Test IP Country Lookup — {_lastIpCountryResult}");
+                else
+                    Log($"Test IP Country Lookup — resolved: {_lastIpCountryResult}");
+            }
+
+            EditorGUILayout.LabelField("IP country:", string.IsNullOrEmpty(_lastIpCountryResult) ? "—" : _lastIpCountryResult);
 
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {

@@ -57,5 +57,7 @@ namespace LiftEngine.Context
 
             return null;
         }
+
+        internal static string ParseTraceResponse(string body) => ParseCloudflareTrace(body);
     }
 }
