@@ -1120,7 +1120,14 @@ namespace Assets.Scripts.Core
             // Award Collected Currency
             if (collectedLevelCurrency > 0)
             {
-                UserDataManager.Instance.AddArrowsCurrency(collectedLevelCurrency, ResourceAnalyticsReasons.LevelWin);
+                if (Assets.Scripts.GAE.GAEManager.Instance.IsGameplayGaeCurrencyActive)
+                {
+                    Assets.Scripts.GAE.GAEManager.Instance.QueueLevelWinArrows(collectedLevelCurrency);
+                }
+                else
+                {
+                    UserDataManager.Instance.AddArrowsCurrency(collectedLevelCurrency, ResourceAnalyticsReasons.LevelWin);
+                }
             }
 
             if(p_isLevelProgression)

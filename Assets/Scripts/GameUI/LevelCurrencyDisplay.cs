@@ -1,6 +1,8 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 using Assets.Scripts.Core;
+using Assets.Scripts.GAE;
 
 namespace Assets.Scripts.GameUI
 {
@@ -8,6 +10,11 @@ namespace Assets.Scripts.GameUI
     {
         [Header("UI References")]
         [SerializeField] private TextMeshProUGUI m_CurrencyText;
+        [SerializeField] private Image m_CurrencyIcon;
+        [SerializeField] private Sprite m_CoinSprite;
+        [SerializeField] private Sprite m_GaeSprite;
+        [SerializeField] private Vector3 m_CoinIconScale = Vector3.one;
+        [SerializeField] private Vector3 m_GaeIconScale = Vector3.one;
         [SerializeField] private GameObject m_FloatingTextPrefab;
         
         [Header("Animation Settings")]
@@ -25,7 +32,9 @@ namespace Assets.Scripts.GameUI
 
         private RectTransform m_FloatingParentRect;
         private RectTransform m_CurrencyTextRect;
+        private RectTransform m_CurrencyIconRect;
         private Camera m_UICamera;
+        private Canvas m_UICanvas;
         private CoinsRewardFloatingView m_FloatingView;
 
         private void Start()
@@ -45,15 +54,23 @@ namespace Assets.Scripts.GameUI
                 m_CurrentAmount = GameManager.Instance.CollectedLevelCurrency;
                 if (m_CurrencyText != null) m_CurrencyText.text = m_CurrentAmount.ToString("N0");
             }
+
+            RefreshCurrencyIcon();
         }
 
         private void CacheUICanvasReferences()
         {
             m_CurrencyTextRect = m_CurrencyText.rectTransform;
+            if (m_CurrencyIcon != null)
+            {
+                m_CurrencyIconRect = m_CurrencyIcon.rectTransform;
+            }
+
             Transform floatingParent = m_CurrencyText.transform.parent;
             m_FloatingParentRect = floatingParent as RectTransform;
 
             Canvas canvas = m_CurrencyText.GetComponentInParent<Canvas>();
+            m_UICanvas = canvas;
             m_UICamera = null;
             if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
             {
@@ -85,6 +102,8 @@ namespace Assets.Scripts.GameUI
                 m_CurrentAmount = GameManager.Instance.CollectedLevelCurrency;
                 m_CurrencyText.text = m_CurrentAmount.ToString("N0");
             }
+
+            RefreshCurrencyIcon();
         }
 
         private void OnDestroy()
@@ -125,6 +144,22 @@ namespace Assets.Scripts.GameUI
             {
                 m_CurrencyText.text = newAmount.ToString("N0");
             }
+
+            RefreshCurrencyIcon();
+        }
+
+        private void RefreshCurrencyIcon()
+        {
+            if (m_CurrencyIcon == null)
+            {
+                return;
+            }
+
+            bool useGae = GAEManager.Instance != null && GAEManager.Instance.IsGameplayGaeCurrencyActive;
+            Sprite sprite = useGae ? m_GaeSprite : m_CoinSprite;
+            m_CurrencyIcon.sprite = sprite;
+            m_CurrencyIcon.enabled = sprite != null;
+            m_CurrencyIcon.transform.localScale = useGae ? m_GaeIconScale : m_CoinIconScale;
         }
 
         private void ShowFloatingText(int amount, Vector2 clickPos)

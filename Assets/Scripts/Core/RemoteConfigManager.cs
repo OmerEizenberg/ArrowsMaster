@@ -58,9 +58,8 @@ public class RemoteConfigManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         BuildDefaultValues();
         InitializeActiveValuesFromDefaults();
-
-#if !UNITY_EDITOR
         TryLoadCachedValuesFromPlayerPrefs();
+
         if (HasCachedConfig())
         {
             isConfigReady = true;
@@ -68,7 +67,6 @@ public class RemoteConfigManager : MonoBehaviour
             FireConfigInitializedOnce();
             Debug.Log("[RemoteConfigManager] Loaded cached remote config from PlayerPrefs.");
         }
-#endif
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

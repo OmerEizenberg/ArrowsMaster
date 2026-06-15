@@ -4,11 +4,16 @@ using TMPro;
 using System.Collections;
 using System.Collections.Generic;
 using Assets.Scripts.Core;
+using Assets.Scripts.GAE;
 
 namespace Assets.Scripts.GameUI
 {
     public class MultiplyCoinsPopup : MonoBehaviour
     {
+        private static int s_ActivePopupCount;
+
+        public static bool IsAnyVisible => s_ActivePopupCount > 0;
+
         [Header("Slot Machine UI")]
         [SerializeField] private RectTransform[] m_ReelParents; // Array of containers for the 3 reels
         [SerializeField] private TextMeshProUGUI m_SymbolTemplate; // Template for the multipliers
@@ -31,6 +36,16 @@ namespace Assets.Scripts.GameUI
 
         [Header("Config")]
         [SerializeField] private MultiplyRewardConfig m_Config;
+
+        [Header("GAE Fly Animation")]
+        [SerializeField] private Sprite m_GaeFlyIconSprite;
+        [SerializeField] private int m_GaeFlyIconCount = 10;
+        [SerializeField] private float m_GaeFlyIconScale = 0.38f;
+        [SerializeField] private float m_GaeFlyStaggerDelay = 0.09f;
+        [SerializeField] private float m_GaeFlySpawnGap = 26f;
+        [SerializeField] private float m_GaeFlyDuration = 0.65f;
+        [SerializeField] private float m_GaeFlyScatterRadius = 8f;
+        [SerializeField] private RectTransform m_GaeFlySource;
 
         private List<TextMeshProUGUI>[] m_AllReelSymbols;
         private int[] m_AvailableMultipliers;
@@ -71,6 +86,7 @@ namespace Assets.Scripts.GameUI
 
         private void OnEnable()
         {
+            s_ActivePopupCount++;
             // Ensure the Canvas has a camera reference for ScreenSpaceCamera mode
             m_Canvas.worldCamera = Camera.main;
 
@@ -192,6 +208,7 @@ namespace Assets.Scripts.GameUI
 
         private void OnDestroy()
         {
+            s_ActivePopupCount = Mathf.Max(0, s_ActivePopupCount - 1);
             if (AdsManager.Instance != null)
             {
                 AdsManager.Instance.OnMultiplyRewardReceived -= HandleRewardReceived;
@@ -462,14 +479,63 @@ namespace Assets.Scripts.GameUI
             
             if (UserDataManager.Instance != null && additionalCoins > 0)
             {
-                UserDataManager.Instance.AddArrowsCurrency(additionalCoins, earnReason);
+                if (IsGaeMultiplyMode())
+                {
+                    GAEManager.Instance.AddPendingLevelArrows(additionalCoins);
+                }
+                else
+                {
+                    UserDataManager.Instance.AddArrowsCurrency(additionalCoins, earnReason);
+                }
             }
-            
-            if (AdsManager.Instance != null) AdsManager.Instance.SpawnCoinsSmallExplosion();
+
+            if (IsGaeMultiplyMode())
+            {
+                yield return PlayGaeFlyAnimationRoutine();
+            }
+            else if (AdsManager.Instance != null)
+            {
+                AdsManager.Instance.SpawnCoinsSmallExplosion();
+            }
             if (SoundManager.Instance != null) SoundManager.Instance.PlayMediumCheer();
 
             yield return new WaitForSeconds(2.5f);
             Close();
+        }
+
+        private bool IsGaeMultiplyMode()
+        {
+            return GAEManager.Instance != null && GAEManager.Instance.IsGameplayGaeCurrencyActive;
+        }
+
+        private IEnumerator PlayGaeFlyAnimationRoutine()
+        {
+            RectTransform source = m_GaeFlySource;
+            if (source == null && m_AnimatedCoinsText != null)
+            {
+                source = m_AnimatedCoinsText.rectTransform;
+            }
+
+            RectTransform target = GAEManager.Instance != null ? GAEManager.Instance.GetBarAnimationTarget() : null;
+            if (source == null || target == null || m_Canvas == null || m_GaeFlyIconSprite == null)
+            {
+                yield break;
+            }
+
+            GAEFlyEffectRunner runner = GAEFlyEffectRunner.Create(m_Canvas.transform, 3f);
+
+            yield return GAECurrencyFlyAnimation.PlayStaggered(
+                source,
+                target,
+                m_Canvas,
+                m_GaeFlyIconSprite,
+                m_GaeFlyIconCount,
+                m_GaeFlyIconScale,
+                m_GaeFlyStaggerDelay,
+                m_GaeFlySpawnGap,
+                m_GaeFlyDuration,
+                m_GaeFlyScatterRadius,
+                runner);
         }
 
         public void OnNoThanksClicked()

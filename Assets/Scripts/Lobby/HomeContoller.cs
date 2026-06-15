@@ -9,6 +9,7 @@ using Assets.Scripts.Data;
 
 using Assets.Scripts.Utils;
 using Assets.Scripts.LiveOps;
+using Assets.Scripts.GAE;
 
 namespace Assets.Scripts.Lobby
 {
@@ -109,13 +110,43 @@ namespace Assets.Scripts.Lobby
         private Coroutine m_TooltipCoroutine;
         private int m_LastToggleFrame = -1;
 
+        public bool IsNoAdsLayerVisible => m_NoAdsLayer != null && m_NoAdsLayer.activeInHierarchy;
+
+        public static bool IsNoAdsOfferVisible
+        {
+            get
+            {
+                HomeContoller home = FindFirstObjectByType<HomeContoller>();
+                return home != null && home.IsNoAdsLayerVisible;
+            }
+        }
+
+        private static void NotifyGaePendingCommit()
+        {
+            if (GAEManager.Instance != null)
+            {
+                GAEManager.Instance.TryCommitPendingArrows();
+            }
+        }
+
+        private void HideNoAdsLayer()
+        {
+            if (m_NoAdsLayer == null || !m_NoAdsLayer.activeInHierarchy)
+            {
+                return;
+            }
+
+            m_NoAdsLayer.SetActive(false);
+            NotifyGaePendingCommit();
+        }
+
 
         private void Awake()
         {
             if (m_CalanderLayer != null) m_CalanderLayer.SetActive(false);
             if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
             if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
-            if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+            if (m_NoAdsLayer != null) HideNoAdsLayer();
             if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
         }
 
@@ -234,6 +265,14 @@ namespace Assets.Scripts.Lobby
                 LiveOpManager.Instance.SyncLobbyIcons();
             }
 
+            StartCoroutine(DeferredGaeCommitAfterLobbyPopups());
+        }
+
+        private IEnumerator DeferredGaeCommitAfterLobbyPopups()
+        {
+            yield return null;
+            yield return null;
+            NotifyGaePendingCommit();
         }
 
         private void OnDisable()
@@ -487,7 +526,7 @@ namespace Assets.Scripts.Lobby
         {
             if (hasNoAds)
             {
-                if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+                if (m_NoAdsLayer != null) HideNoAdsLayer();
             }
             RefreshLobbyUI();
         }
@@ -863,7 +902,7 @@ namespace Assets.Scripts.Lobby
 
             if(m_NoAdsLayer.activeInHierarchy)
             {
-                m_NoAdsLayer.SetActive(false);
+                HideNoAdsLayer();
             }else{
                 m_SettingsLayer.SetActive(false);
                 m_CalanderLayer.SetActive(false);
@@ -883,7 +922,7 @@ namespace Assets.Scripts.Lobby
         {
             SoundManager.Instance.PlayClick();
             IAPManager.Instance.PurchaseNoAds(ProductTypeID.NoAds999);
-            m_NoAdsLayer.SetActive(false);
+            HideNoAdsLayer();
         }
 
         public void OnCalanderButtonClicked()
@@ -910,7 +949,7 @@ namespace Assets.Scripts.Lobby
                 // Deactivate ALL other layers to ensure a clean state
                 if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
                 if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
-                if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+                if (m_NoAdsLayer != null) HideNoAdsLayer();
                 if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
 
                 m_CalanderLayer.SetActive(true);
@@ -938,7 +977,7 @@ namespace Assets.Scripts.Lobby
             if (m_CalanderLayer != null) m_CalanderLayer.SetActive(false);
             if (m_ShopLayer != null) m_ShopLayer.SetActive(false);
             if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
-            if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+            if (m_NoAdsLayer != null) HideNoAdsLayer();
 
             if (GameManager.Instance != null) GameManager.Instance.p_isLevelProgression = true;
             SlideTabBackground(m_HomeTab);
@@ -983,7 +1022,7 @@ namespace Assets.Scripts.Lobby
             if (m_SettingsLayer != null) m_SettingsLayer.SetActive(false);
             if (m_CalanderLayer != null) m_CalanderLayer.SetActive(false);
             if (m_DonateLayer != null) m_DonateLayer.SetActive(false);
-            if (m_NoAdsLayer != null) m_NoAdsLayer.SetActive(false);
+            if (m_NoAdsLayer != null) HideNoAdsLayer();
             
             if (m_ShopLayer != null) m_ShopLayer.SetActive(true);
 

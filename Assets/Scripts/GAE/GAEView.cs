@@ -32,6 +32,20 @@ namespace Assets.Scripts.GAE
         [SerializeField] private float m_ProgressAnimDuration = 0.75f;
         [SerializeField] private float m_TimerUpdateInterval = 1f;
         [SerializeField] private GameObject m_VisibilityRoot;
+        [SerializeField] private RectTransform m_BarAnimationTarget;
+
+        [Header("Stage Reward Fly")]
+        [SerializeField] private RectTransform m_CoinBalanceTarget;
+        [SerializeField] private RectTransform m_BoosterRewardTarget;
+        [SerializeField] private Canvas m_FlyCanvas;
+        [SerializeField] private int m_CoinRewardFlyCount = 8;
+        [SerializeField] private float m_CoinRewardFlyIconScale = 0.35f;
+        [SerializeField] private float m_CoinRewardFlyStaggerDelay = 0.08f;
+        [SerializeField] private float m_CoinRewardFlySpawnGap = 22f;
+        [SerializeField] private float m_CoinRewardFlyDuration = 0.6f;
+        [SerializeField] private float m_BoosterRewardFlyIconScale = 0.55f;
+        [SerializeField] private float m_BoosterRewardFlyDuration = 0.7f;
+        [SerializeField] private float m_FlyEffectMaxLifetime = 3f;
 
         private Coroutine m_ProgressAnimCoroutine;
         private float m_NextTimerRefreshTime;
@@ -56,9 +70,18 @@ namespace Assets.Scripts.GAE
         {
             SubscribeLevelChanged();
             GAEManager.Instance.SyncEventState(forceResetOnMismatch: true);
+            GAEManager.Instance.RegisterBarAnimationTarget(GetBarAnimationTarget());
             RefreshVisibility();
             RefreshStaticUI();
-            TryPlayProgressAnimation(immediateIfNoChange: true);
+            GAEManager.Instance.TryCommitPendingArrows();
+            if (!CanAnimateProgress())
+            {
+                ShowLastPresentedProgress();
+            }
+            else
+            {
+                TryPlayProgressAnimation(immediateIfNoChange: true);
+            }
             m_NextTimerRefreshTime = Time.time;
             UpdateTimerText();
         }
@@ -74,6 +97,14 @@ namespace Assets.Scripts.GAE
 
         private void Update()
         {
+            GAEManager manager = GAEManager.Instance;
+            if (manager != null &&
+                manager.HasPendingLevelArrows &&
+                !manager.IsProgressAnimationBlocked())
+            {
+                manager.TryCommitPendingArrows();
+            }
+
             if (!VisibilityTarget.activeInHierarchy || !IsViewActive())
             {
                 return;
@@ -94,6 +125,7 @@ namespace Assets.Scripts.GAE
             }
 
             GAEManager.Instance.OnStateChanged += HandleStateChanged;
+            GAEManager.Instance.OnStageRewardGranted += HandleStageRewardGranted;
             m_IsSubscribed = true;
         }
 
@@ -107,6 +139,7 @@ namespace Assets.Scripts.GAE
             if (GAEManager.Instance != null)
             {
                 GAEManager.Instance.OnStateChanged -= HandleStateChanged;
+                GAEManager.Instance.OnStageRewardGranted -= HandleStageRewardGranted;
             }
 
             m_IsSubscribed = false;
@@ -148,8 +181,86 @@ namespace Assets.Scripts.GAE
             }
 
             RefreshStaticUI();
-            TryPlayProgressAnimation(immediateIfNoChange: false);
+            if (!CanAnimateProgress())
+            {
+                ShowLastPresentedProgress();
+            }
+            else
+            {
+                TryPlayProgressAnimation(immediateIfNoChange: true);
+            }
+
             UpdateTimerText();
+        }
+
+        private void HandleStageRewardGranted(int stageIndex, GAERewardType rewardType, int amount)
+        {
+            if (!IsViewActive())
+            {
+                return;
+            }
+
+            StartCoroutine(PlayStageRewardFlyRoutine(rewardType));
+        }
+
+        private IEnumerator PlayStageRewardFlyRoutine(GAERewardType rewardType)
+        {
+            RectTransform source = m_RewardIcon != null ? m_RewardIcon.rectTransform : null;
+            RectTransform target = rewardType == GAERewardType.Coin
+                ? m_CoinBalanceTarget
+                : m_BoosterRewardTarget;
+
+            if (target == null)
+            {
+                target = m_CoinBalanceTarget;
+            }
+
+            Canvas canvas = m_FlyCanvas;
+            if (canvas == null && source != null)
+            {
+                canvas = source.GetComponentInParent<Canvas>();
+            }
+
+            Sprite sprite = GetRewardSprite(rewardType);
+            if (source == null || target == null || canvas == null || sprite == null)
+            {
+                yield break;
+            }
+
+            GAEFlyEffectRunner runner = GAEFlyEffectRunner.Create(canvas.transform, m_FlyEffectMaxLifetime);
+
+            if (rewardType == GAERewardType.Coin)
+            {
+                yield return GAECurrencyFlyAnimation.PlayStaggered(
+                    source,
+                    target,
+                    canvas,
+                    sprite,
+                    m_CoinRewardFlyCount,
+                    m_CoinRewardFlyIconScale,
+                    m_CoinRewardFlyStaggerDelay,
+                    m_CoinRewardFlySpawnGap,
+                    m_CoinRewardFlyDuration,
+                    scatterRadius: 8f,
+                    effectRunner: runner);
+            }
+            else
+            {
+                yield return GAECurrencyFlyAnimation.PlayStaggered(
+                    source,
+                    target,
+                    canvas,
+                    sprite,
+                    iconCount: 1,
+                    iconScale: m_BoosterRewardFlyIconScale,
+                    staggerDelay: 0.02f,
+                    spawnGap: 0f,
+                    flyDuration: m_BoosterRewardFlyDuration,
+                    scatterRadius: 0f,
+                    effectRunner: runner);
+            }
+
+            m_RewardFlyCoroutine = null;
         }
 
         private void RefreshVisibility()
@@ -189,6 +300,37 @@ namespace Assets.Scripts.GAE
             string amountText = FormatRewardAmount(type, amount);
             SetText(m_RewardAmountText, amountText);
             SetText(m_RewardAmountTextSecondary, amountText);
+        }
+
+        private bool CanAnimateProgress()
+        {
+            GAEManager manager = GAEManager.Instance;
+            return manager != null &&
+                   !manager.HasPendingLevelArrows &&
+                   !manager.IsProgressAnimationBlocked();
+        }
+
+        private RectTransform GetBarAnimationTarget()
+        {
+            if (m_BarAnimationTarget != null)
+            {
+                return m_BarAnimationTarget;
+            }
+
+            if (m_ProgressSlider != null)
+            {
+                return m_ProgressSlider.transform as RectTransform;
+            }
+
+            return VisibilityTarget.transform as RectTransform;
+        }
+
+        private void ShowLastPresentedProgress()
+        {
+            GAEManager manager = GAEManager.Instance;
+            manager.GetLastPresentedProgress(out int collected, out int stageIndex);
+            GetStageRelativeProgress(collected, stageIndex, out int current, out int target);
+            ApplyProgressPresentation(current, target, stageIndex);
         }
 
         private void TryPlayProgressAnimation(bool immediateIfNoChange)

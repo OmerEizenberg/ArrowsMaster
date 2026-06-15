@@ -1,12 +1,17 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using Assets.Scripts.GAE;
 
 namespace Assets.Scripts.GameUI
 {
     public class CoinsRewardFloatingView : MonoBehaviour
     {
         [SerializeField] private TextMeshProUGUI m_Text;
+        [SerializeField] private Image m_Icon;
+        [SerializeField] private Sprite m_CoinSprite;
+        [SerializeField] private Sprite m_GaeSprite;
 
         private RectTransform m_RectTransform;
         private Coroutine m_AnimateCoroutine;
@@ -44,8 +49,7 @@ namespace Assets.Scripts.GameUI
                 m_AnimateCoroutine = null;
             }
 
-            m_Text.text = "+" + amount.ToString("N0");
-            m_Text.color = new Color(m_Text.color.r, m_Text.color.g, m_Text.color.b, 1f);
+            SetupRewardVisuals(amount);
 
             PositionAtClickOrFallback(
                 clickPos,
@@ -69,6 +73,33 @@ namespace Assets.Scripts.GameUI
             }
 
             gameObject.SetActive(false);
+        }
+
+        private void SetupRewardVisuals(int amount)
+        {
+            m_Text.gameObject.SetActive(true);
+            m_Text.text = "+" + amount.ToString("N0");
+            m_Text.color = new Color(m_Text.color.r, m_Text.color.g, m_Text.color.b, 1f);
+
+            if (m_Icon == null)
+            {
+                return;
+            }
+
+            bool useGae = GAEManager.Instance != null && GAEManager.Instance.IsGameplayGaeCurrencyActive;
+            Sprite sprite = useGae ? m_GaeSprite : m_CoinSprite;
+            if (sprite == null && !useGae)
+            {
+                sprite = m_Icon.sprite;
+            }
+
+            m_Icon.sprite = sprite;
+            m_Icon.enabled = sprite != null;
+            if (sprite != null)
+            {
+                Color iconColor = m_Icon.color;
+                m_Icon.color = new Color(iconColor.r, iconColor.g, iconColor.b, 1f);
+            }
         }
 
         private void PositionAtClickOrFallback(
@@ -113,7 +144,8 @@ namespace Assets.Scripts.GameUI
         private IEnumerator AnimateFloat(float duration, float distance)
         {
             float elapsed = 0f;
-            Color startColor = m_Text.color;
+            Color startTextColor = m_Text.color;
+            Color startIconColor = m_Icon != null ? m_Icon.color : Color.white;
             Vector2 startPos = m_RectTransform.anchoredPosition;
             Vector2 endPos = startPos + new Vector2(0f, distance);
 
@@ -124,10 +156,19 @@ namespace Assets.Scripts.GameUI
 
                 m_RectTransform.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
                 m_Text.color = new Color(
-                    startColor.r,
-                    startColor.g,
-                    startColor.b,
-                    Mathf.Lerp(startColor.a, 0f, t));
+                    startTextColor.r,
+                    startTextColor.g,
+                    startTextColor.b,
+                    Mathf.Lerp(startTextColor.a, 0f, t));
+
+                if (m_Icon != null && m_Icon.enabled)
+                {
+                    m_Icon.color = new Color(
+                        startIconColor.r,
+                        startIconColor.g,
+                        startIconColor.b,
+                        Mathf.Lerp(startIconColor.a, 0f, t));
+                }
 
                 yield return null;
             }

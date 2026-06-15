@@ -9118,6 +9118,7 @@ GameObject:
   - component: {fileID: 265233135}
   - component: {fileID: 265233134}
   - component: {fileID: 265233136}
+  - component: {fileID: 265233137}
   m_Layer: 5
   m_Name: GAE_Holder
   m_TagString: Untagged
@@ -9210,6 +9211,21 @@ MonoBehaviour:
   m_ProgressAnimDuration: 0.75
   m_TimerUpdateInterval: 1
   m_VisibilityRoot: {fileID: 1146720103}
+  m_BarAnimationTarget: {fileID: 0}
+--- !u!114 &265233137
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 265233132}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8abf6cdc177f41a7bce0a29e739091e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Assets.Scripts.GAE.GAEManager
+  m_Config: {fileID: 11400000, guid: 4d3a5efa02d8a43e3bbe6064263c6c98, type: 2}
+  m_UnlockLevel: 5
 --- !u!1 &272907775
 GameObject:
   m_ObjectHideFlags: 0
@@ -9652,7 +9668,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 79.666664, y: -40}
+  m_AnchoredPosition: {x: 79.66666, y: -40}
   m_SizeDelta: {x: 128, y: 128}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &289754028
@@ -11216,7 +11232,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 66.666664, y: -40}
+  m_AnchoredPosition: {x: 66.66666, y: -40}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &344433170
@@ -11425,7 +11441,7 @@ GameObject:
   - component: {fileID: 368736396}
   - component: {fileID: 368736395}
   m_Layer: 5
-  m_Name: Coins
+  m_Name: Currency
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16729,7 +16745,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 1250, y: -81.55}
+  m_AnchoredPosition: {x: 1250, y: -81.54999}
   m_SizeDelta: {x: 800, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &603927629
@@ -35859,6 +35875,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_CurrencyText: {fileID: 617787523}
+  m_CurrencyIcon: {fileID: 368736395}
+  m_CoinSprite: {fileID: 21300000, guid: 780862a05578141fd9bd3ee1a28f17ee, type: 3}
+  m_GaeSprite: {fileID: 6680456413420582483, guid: 89ac2ba3cf3dc48279f2ff697bc80ce2, type: 3}
+  m_CoinIconScale: {x: 1, y: 1, z: 1}
+  m_GaeIconScale: {x: 1.4, y: 1.4, z: 1.4}
   m_FloatingTextPrefab: {fileID: 8349427356215753371, guid: 6a40524c680c64825b3a6d73654a1c7d, type: 3}
   m_TextPunchScale: 1.2
   m_PunchDuration: 0.2

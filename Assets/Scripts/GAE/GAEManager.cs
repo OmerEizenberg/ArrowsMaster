@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
 using Assets.Scripts.Core;
+using Assets.Scripts.GameUI;
+using Assets.Scripts.Lobby;
 
 namespace Assets.Scripts.GAE
 {
@@ -50,6 +52,17 @@ namespace Assets.Scripts.GAE
 
         public bool ShouldShowUI => IsEventActive && IsUnlocked;
 
+        /// <summary>
+        /// When true, level picks award GAE arrows instead of coins.
+        /// </summary>
+        public bool IsGameplayGaeCurrencyActive => ShouldShowUI;
+
+        private int m_PendingLevelArrows;
+        private RectTransform m_BarAnimationTarget;
+
+        public bool HasPendingLevelArrows => m_PendingLevelArrows > 0;
+        public int PendingLevelArrows => m_PendingLevelArrows;
+
         private void Awake()
         {
             if (_instance != null && _instance != this)
@@ -73,6 +86,7 @@ namespace Assets.Scripts.GAE
 
             m_NextScheduleCheckTime = Time.time + ScheduleCheckInterval;
             SyncEventState(forceResetOnMismatch: false);
+            TryCommitPendingArrows();
         }
 
         private void LoadConfig()
@@ -142,6 +156,68 @@ namespace Assets.Scripts.GAE
             SaveProgress();
             ProcessStageRewards();
             NotifyStateChanged();
+        }
+
+        public void RegisterBarAnimationTarget(RectTransform target)
+        {
+            m_BarAnimationTarget = target;
+        }
+
+        public RectTransform GetBarAnimationTarget()
+        {
+            return m_BarAnimationTarget;
+        }
+
+        public void QueueLevelWinArrows(int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            m_PendingLevelArrows += amount;
+        }
+
+        public void AddPendingLevelArrows(int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            m_PendingLevelArrows += amount;
+        }
+
+        public void ClearPendingLevelArrows()
+        {
+            m_PendingLevelArrows = 0;
+        }
+
+        public bool IsProgressAnimationBlocked()
+        {
+            if (MultiplyCoinsPopup.IsAnyVisible)
+            {
+                return true;
+            }
+
+            if (HomeContoller.IsNoAdsOfferVisible)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public void TryCommitPendingArrows()
+        {
+            if (m_PendingLevelArrows <= 0 || IsProgressAnimationBlocked())
+            {
+                return;
+            }
+
+            int amount = m_PendingLevelArrows;
+            m_PendingLevelArrows = 0;
+            AddGoldenArrows(amount);
         }
 
         public int GetCurrentStageIndex()
@@ -307,6 +383,7 @@ namespace Assets.Scripts.GAE
             Debug.Log($"[GAEManager] {reason}");
             Progress = null;
             m_ActiveEventInstanceId = null;
+            m_PendingLevelArrows = 0;
             UserDataManager.Instance.ClearGAEProgress();
         }
 
