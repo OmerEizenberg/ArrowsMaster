@@ -98,34 +98,34 @@ namespace LiftEngine.Mediation
             MaxSdkCallbacks.Banner.OnAdRevenuePaidEvent += (id, info) => HandleRevenue(LiftEngineAdFormat.Banner, id, info);
         }
 
-        public void SetBidFloorExtra(LiftEngineAdFormat format, string adUnitId, string paramName, string floorValue)
+        public void AddPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey, string payloadValue)
         {
-            if (string.IsNullOrEmpty(paramName))
+            if (string.IsNullOrEmpty(payloadKey))
             {
-                LiftEngineLogger.LogWarning($"Missing param name for {format}; skipping MAX extra parameter.");
+                LiftEngineLogger.LogWarning($"Missing payload key for {format}; skipping mediation payload.");
                 return;
             }
 
             switch (format)
             {
                 case LiftEngineAdFormat.Interstitial:
-                    MaxSdk.SetInterstitialLocalExtraParameter(adUnitId, paramName, floorValue);
+                    MaxSdk.SetInterstitialLocalExtraParameter(adUnitId, payloadKey, payloadValue);
                     break;
                 case LiftEngineAdFormat.Rewarded:
-                    MaxSdk.SetRewardedAdLocalExtraParameter(adUnitId, paramName, floorValue);
+                    MaxSdk.SetRewardedAdLocalExtraParameter(adUnitId, payloadKey, payloadValue);
                     break;
                 case LiftEngineAdFormat.Banner:
                     if (_bannerCreated)
                         MaxSdk.DestroyBanner(adUnitId);
                     _bannerCreated = false;
-                    MaxSdk.SetBannerExtraParameter(adUnitId, paramName, floorValue);
+                    MaxSdk.SetBannerExtraParameter(adUnitId, payloadKey, payloadValue);
                     break;
             }
         }
 
-        public void ClearBidFloorExtra(LiftEngineAdFormat format, string adUnitId, string paramName)
+        public void ClearPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey)
         {
-            SetBidFloorExtra(format, adUnitId, paramName, "0");
+            AddPayload(format, adUnitId, payloadKey, "0");
         }
 
         public void RequestLoad(LiftEngineAdFormat format, string adUnitId)

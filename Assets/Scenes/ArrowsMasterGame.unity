@@ -9211,7 +9211,18 @@ MonoBehaviour:
   m_ProgressAnimDuration: 0.75
   m_TimerUpdateInterval: 1
   m_VisibilityRoot: {fileID: 1146720103}
-  m_BarAnimationTarget: {fileID: 0}
+  m_BarAnimationTarget: {fileID: 1017200092}
+  m_CoinBalanceTarget: {fileID: 505547370}
+  m_BoosterRewardTarget: {fileID: 1784389506}
+  m_FlyCanvas: {fileID: 0}
+  m_CoinRewardFlyCount: 8
+  m_CoinRewardFlyIconScale: 0.35
+  m_CoinRewardFlyStaggerDelay: 0.08
+  m_CoinRewardFlySpawnGap: 22
+  m_CoinRewardFlyDuration: 0.6
+  m_BoosterRewardFlyIconScale: 0.55
+  m_BoosterRewardFlyDuration: 0.7
+  m_FlyEffectMaxLifetime: 3
 --- !u!114 &265233137
 MonoBehaviour:
   m_ObjectHideFlags: 0

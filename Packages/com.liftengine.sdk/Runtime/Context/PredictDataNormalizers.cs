@@ -47,8 +47,8 @@ namespace LiftEngine.Context
             return UnityEngine.Application.internetReachability == UnityEngine.NetworkReachability.ReachableViaLocalAreaNetwork ? 1 : 0;
         }
 
-        public static string FormatBidFloor(float bidFloor) =>
-            bidFloor.ToString(CultureInfo.InvariantCulture);
+        public static string FormatPayloadValue(float value) =>
+            value.ToString(CultureInfo.InvariantCulture);
 
         public static long UnixTimestampSeconds() =>
             (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;

@@ -259,8 +259,6 @@ namespace Assets.Scripts.GAE
                     scatterRadius: 0f,
                     effectRunner: runner);
             }
-
-            m_RewardFlyCoroutine = null;
         }
 
         private void RefreshVisibility()
@@ -280,6 +278,12 @@ namespace Assets.Scripts.GAE
 
         private void RefreshStaticUI()
         {
+            if (IsAllStagesComplete())
+            {
+                ApplyCompletedPresentation();
+                return;
+            }
+
             GAEStageDefinition stage = GAEManager.Instance.GetCurrentStageDefinition();
             if (stage == null)
             {
@@ -287,6 +291,26 @@ namespace Assets.Scripts.GAE
             }
 
             UpdateRewardVisuals(stage.RewardType, stage.RewardAmount);
+        }
+
+        private static bool IsAllStagesComplete()
+        {
+            return GAEManager.Instance != null && GAEManager.Instance.AreAllStagesComplete();
+        }
+
+        private void ApplyCompletedPresentation()
+        {
+            SetText(m_ProgressText, "Completed");
+            SetText(m_ProgressTextSecondary, "Completed");
+            SetText(m_RewardAmountText, string.Empty);
+            SetText(m_RewardAmountTextSecondary, string.Empty);
+
+            if (m_ProgressSlider != null)
+            {
+                m_ProgressSlider.minValue = 0f;
+                m_ProgressSlider.maxValue = 1f;
+                m_ProgressSlider.value = 1f;
+            }
         }
 
         private void UpdateRewardVisuals(GAERewardType type, int amount)
@@ -410,6 +434,12 @@ namespace Assets.Scripts.GAE
 
         private void ApplyProgressPresentation(int current, int target, int stageIndex)
         {
+            if (IsAllStagesComplete())
+            {
+                ApplyCompletedPresentation();
+                return;
+            }
+
             string progressText = FormatProgressPair(current, target);
             SetText(m_ProgressText, progressText);
             SetText(m_ProgressTextSecondary, progressText);

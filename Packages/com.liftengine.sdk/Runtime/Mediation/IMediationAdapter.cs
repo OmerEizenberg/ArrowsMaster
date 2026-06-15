@@ -25,8 +25,8 @@ namespace LiftEngine.Mediation
         bool IsInitialized { get; }
 
         void Initialize(LiftEngineSettings settings, Action<bool> onComplete);
-        void SetBidFloorExtra(LiftEngineAdFormat format, string adUnitId, string paramName, string floorValue);
-        void ClearBidFloorExtra(LiftEngineAdFormat format, string adUnitId, string paramName);
+        void AddPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey, string payloadValue);
+        void ClearPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey);
         void RequestLoad(LiftEngineAdFormat format, string adUnitId);
         bool IsReady(LiftEngineAdFormat format, string adUnitId);
         bool HasLoadedWithRevenue(LiftEngineAdFormat format, string adUnitId);

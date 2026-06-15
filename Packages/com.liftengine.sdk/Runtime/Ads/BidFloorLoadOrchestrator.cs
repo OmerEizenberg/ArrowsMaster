@@ -39,14 +39,14 @@ namespace LiftEngine.Ads
                 yield break;
             }
 
-            var paramName = prediction?.param;
+            var payloadKey = prediction?.param;
 
             if (prediction == null || prediction.multipliers == null || prediction.multipliers.Length == 0)
             {
                 LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
                     $"{format} — no predict multipliers available → skipping [Attempt 0..N] → [Attempt -1]");
                 LiftEngineSignalBus.Publish(new BidFloorPredictionFailedSignal(format));
-                yield return BidZeroUntilFill(format, adUnitId, paramName, onComplete);
+                yield return BidZeroUntilFill(format, adUnitId, payloadKey, onComplete);
                 yield break;
             }
 
@@ -54,13 +54,13 @@ namespace LiftEngine.Ads
 
             for (var i = 0; i < prediction.multipliers.Length; i++)
             {
-                var bidFloor = prediction.prediction * prediction.multipliers[i];
-                var floorStr = PredictDataNormalizers.FormatBidFloor(bidFloor);
+                var scaledValue = prediction.prediction * prediction.multipliers[i];
+                var payloadValue = PredictDataNormalizers.FormatPayloadValue(scaledValue);
                 LiftEngineLogger.LogAttempt(i,
                     $"{format} — loading with multiplier[{i}]={prediction.multipliers[i]}, " +
-                    $"prediction={prediction.prediction}, {paramName}={floorStr}, requireRevenue={requireRevenue}");
+                    $"prediction={prediction.prediction}, payload={payloadValue}, requireRevenue={requireRevenue}");
 
-                _mediation.SetBidFloorExtra(format, adUnitId, paramName, floorStr);
+                _mediation.AddPayload(format, adUnitId, payloadKey, payloadValue);
                 _mediation.RequestLoad(format, adUnitId);
 
                 var success = false;
@@ -80,7 +80,7 @@ namespace LiftEngine.Ads
 
             LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
                 $"{format} — all multipliers exhausted → [Attempt -1]");
-            yield return BidZeroUntilFill(format, adUnitId, paramName, onComplete);
+            yield return BidZeroUntilFill(format, adUnitId, payloadKey, onComplete);
         }
 
         private bool RequiresRevenueForMultiplierPhase(LiftEngineAdFormat format)
@@ -92,16 +92,16 @@ namespace LiftEngine.Ads
             return true;
         }
 
-        private IEnumerator BidZeroUntilFill(LiftEngineAdFormat format, string adUnitId, string paramName,
+        private IEnumerator BidZeroUntilFill(LiftEngineAdFormat format, string adUnitId, string payloadKey,
             Action<bool> onComplete)
         {
             var maxRounds = Mathf.Max(1, _settings.maxBidZeroRounds);
             for (var bidZeroRound = 0; bidZeroRound < maxRounds; bidZeroRound++)
             {
                 LiftEngineLogger.LogAttempt(BidZeroAttempt,
-                    $"{format} — bid-0 load round {bidZeroRound + 1}/{maxRounds}, {paramName ?? "(no param)"}=0");
+                    $"{format} — fallback load round {bidZeroRound + 1}/{maxRounds}, payload=0");
 
-                _mediation.SetBidFloorExtra(format, adUnitId, paramName, "0");
+                _mediation.AddPayload(format, adUnitId, payloadKey, "0");
                 _mediation.RequestLoad(format, adUnitId);
 
                 var success = false;
