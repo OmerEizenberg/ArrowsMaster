@@ -72,6 +72,10 @@ namespace Assets.Scripts.Core
 
             IsSdkInitAllowed = true;
             Debug.Log("[TermsConsentManager] SDK init allowed (terms accepted, ATT resolved on iOS).");
+
+            if (FirebaseManager.Instance != null)
+                FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_PASSED_TERMS);
+
             OnSdkInitAllowed?.Invoke();
         }
 

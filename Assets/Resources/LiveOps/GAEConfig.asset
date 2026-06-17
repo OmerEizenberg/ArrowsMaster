@@ -13,21 +13,27 @@ MonoBehaviour:
   m_Name: GAEConfig
   m_EditorClassIdentifier: Assembly-CSharp::Assets.Scripts.GAE.GAEConfigSO
   Stages:
+  - ArrowTarget: 60
+    RewardType: 0
+    RewardAmount: 40
   - ArrowTarget: 100
     RewardType: 0
     RewardAmount: 75
-  - ArrowTarget: 250
+  - ArrowTarget: 200
     RewardType: 0
-    RewardAmount: 200
+    RewardAmount: 150
+  - ArrowTarget: 300
+    RewardType: 0
+    RewardAmount: 250
   - ArrowTarget: 500
     RewardType: 0
     RewardAmount: 500
+  - ArrowTarget: 600
+    RewardType: 0
+    RewardAmount: 700
+  - ArrowTarget: 850
+    RewardType: 0
+    RewardAmount: 1000
   - ArrowTarget: 1000
     RewardType: 0
     RewardAmount: 1250
-  - ArrowTarget: 1500
-    RewardType: 0
-    RewardAmount: 2000
-  - ArrowTarget: 3500
-    RewardType: 0
-    RewardAmount: 5000

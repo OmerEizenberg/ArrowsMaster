@@ -37,6 +37,7 @@ namespace LiftEngine.Context
         public float[] ecpm_history;
         public long sec_from_last_ad;
         public int device_memory;
+        public string app_version;
     }
 
     internal static class EcpmHistoryBuffer

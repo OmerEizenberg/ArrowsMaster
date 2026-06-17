@@ -17,6 +17,19 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public static FirebaseManager Instance { get; private set; }
     private bool isInitialized = false;
     private string pendingAnalyticsUserId;
+    private static readonly Queue<PendingFunnelEvent> pendingFunnelEvents = new Queue<PendingFunnelEvent>();
+
+    private readonly struct PendingFunnelEvent
+    {
+        public readonly string EventName;
+        public readonly Parameter[] Parameters;
+
+        public PendingFunnelEvent(string eventName, Parameter[] parameters)
+        {
+            EventName = eventName;
+            Parameters = parameters;
+        }
+    }
 
     // Event Names
     public const string EVENT_LEVEL_START = "level_start";
@@ -39,6 +52,12 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string EVENT_BOOSTER_SHUFFLE_CLICKED = "booster_shuffle_clicked";
     public const string EVENT_EARN = "earn";
     public const string EVENT_SPEND = "spend";
+    public const string EVENT_PASSED_TERMS = "passed_terms";
+    public const string EVENT_PASSED_CONSENT_APPROVE = "passed_consent_approve";
+    public const string EVENT_PASSED_CONSENT_DENY = "passed_consent_deny";
+    public const string EVENT_MAX_SDK_INITIALIZED = "max_sdk_initialized";
+    public const string EVENT_MAX_SDK_INIT_FAILED = "max_sdk_init_failed";
+    public const string EVENT_LIFTENGINE_SAFEGUARD = "liftengine_safeguard";
 
     // Parameter Names
     public const string PARAM_LEVEL_ID = "level_id";
@@ -144,6 +163,8 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
 
                 isInitialized = true;
                 Debug.Log("[FirebaseManager] Firebase App, Crashlytics, Analytics, and Messaging are ready.");
+
+                FlushPendingFunnelEvents();
 
                 SingularAttributionBridge.NotifyFirebaseReady(this);
                 SingularAttributionBridge.EnsureAnalyticsUserIdLinked();
@@ -301,6 +322,43 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
         string singularEvent = MapToSingularEvent(eventName);
         if (!string.IsNullOrEmpty(singularEvent)) {
             SingularSDK.Event(new Dictionary<string, object> { { parameterName, parameterValue } }, singularEvent);
+        }
+    }
+
+    public void LogFunnelEvent(string eventName)
+    {
+        LogFunnelEvent(eventName, null);
+    }
+
+    /// <summary>
+    /// Logs a funnel event once per call. Queues until Firebase Analytics is ready (terms/consent can fire first).
+    /// </summary>
+    public void LogFunnelEvent(string eventName, params Parameter[] parameters)
+    {
+        if (string.IsNullOrEmpty(eventName))
+            return;
+
+        if (!isInitialized)
+        {
+            pendingFunnelEvents.Enqueue(new PendingFunnelEvent(eventName, parameters));
+            return;
+        }
+
+        if (parameters == null || parameters.Length == 0)
+            LogEvent(eventName);
+        else
+            LogEvent(eventName, parameters);
+    }
+
+    private void FlushPendingFunnelEvents()
+    {
+        while (pendingFunnelEvents.Count > 0)
+        {
+            var pending = pendingFunnelEvents.Dequeue();
+            if (pending.Parameters == null || pending.Parameters.Length == 0)
+                LogEvent(pending.EventName);
+            else
+                LogEvent(pending.EventName, pending.Parameters);
         }
     }
 

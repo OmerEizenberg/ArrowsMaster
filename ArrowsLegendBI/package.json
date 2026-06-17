@@ -10,7 +10,8 @@
     "build": "npm run build --prefix web",
     "setup:server": "python3 -m venv server/.venv && server/.venv/bin/pip install -r server/requirements.txt",
     "setup": "npm run setup:server && npm install --prefix web && npm install",
-    "check:bq": "server/.venv/bin/python scripts/check_bigquery.py"
+    "check:bq": "server/.venv/bin/python scripts/check_bigquery.py",
+    "query:level-above-13": "server/.venv/bin/python scripts/query_level_above_13.py"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -178,7 +178,8 @@ namespace LiftEngine.Context
                 session_ad_number_ad_type = typeSessionRaw,
                 ecpm_history = EcpmHistoryBuffer.GetForFormat(_store.EcpmHistory, format),
                 sec_from_last_ad = PredictDataNormalizers.SecFromLastAd(_store.LastAdUtc),
-                device_memory = PredictDataNormalizers.DeviceMemoryGb()
+                device_memory = PredictDataNormalizers.DeviceMemoryGb(),
+                app_version = Application.version
             };
         }
 

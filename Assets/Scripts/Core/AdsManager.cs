@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using Firebase.Analytics;
 using LiftEngine;
 using Singular;
 
@@ -61,6 +62,10 @@ namespace Assets.Scripts.Core
         private bool _liftEngineInitSettled;
         private bool _liftEngineCallbacksSubscribed;
         private bool _fullscreenMaxCallbacksSubscribed;
+        private bool _maxSdkInitSuccessLogged;
+        private bool _maxSdkInitFailedLogged;
+        private bool _safeguardSdkInitTriggered;
+        private Coroutine _safeguardSdkInitCoroutine;
 
         private static readonly ConcurrentQueue<SingularAdRevenuePayload> _pendingSingularRevenue =
             new ConcurrentQueue<SingularAdRevenuePayload>();
@@ -89,6 +94,9 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
+        private const float ConsentWaitTimeoutSeconds = 30f;
+        private const float MaxSdkInitCallbackTimeoutSeconds = 30f;
+        private const float SafeguardSdkInitDelaySeconds = 60f;
         private const float RewardedPlacementWaitSeconds = 12f;
         private const float BannerCreateSettleDelaySeconds = 0.25f;
         private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
@@ -187,6 +195,7 @@ namespace Assets.Scripts.Core
                 Debug.Log("[AdsManager] Waiting for terms (+ ATT on iOS) before ads initialization.");
 
             StartCoroutine(AdHealthCheckRoutine());
+            StartSafeguardSdkInitWatchdog();
         }
 
         private void HandleSdkInitAllowed()
@@ -691,16 +700,23 @@ namespace Assets.Scripts.Core
                     });
                 });
 
-                float waitTimeout = 60.0f;
                 float waitStart = Time.time;
-                while (!consentFinished && Time.time - waitStart < waitTimeout)
+                while (!consentFinished && Time.time - waitStart < ConsentWaitTimeoutSeconds)
                     await Task.Yield();
                 if (!consentFinished)
-                    Debug.LogWarning("[AdsManager] Consent flow timed out. Proceeding with SDK initialization anyway.");
+                {
+                    Debug.LogWarning(
+                        $"[AdsManager] Consent flow timed out after {ConsentWaitTimeoutSeconds}s. " +
+                        "Initializing MAX SDK anyway (non-personalized ads when consent denied).");
+                }
 
                 bool maxInitDispatched = false;
+                bool consentTimedOut = !consentFinished;
                 EnqueueAction(() =>
                 {
+                    if (consentTimedOut)
+                        ConsentManager.LogConsentResultAnalytics();
+
                     ConsentManager.ApplyMaxPrivacyFlags();
 
                     Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
@@ -715,20 +731,142 @@ namespace Assets.Scripts.Core
                     MaxSdk.SetSdkKey(MaxSdkKey);
                     MaxSdk.InitializeSdk();
                     maxInitDispatched = true;
+                    StartCoroutine(WaitForMaxSdkInitCallback());
                 });
 
                 float maxInitWaitStart = Time.time;
                 while (!maxInitDispatched && Time.time - maxInitWaitStart < 10f)
                     await Task.Yield();
                 if (!maxInitDispatched)
+                {
                     Debug.LogWarning("[AdsManager] Timed out waiting to dispatch MAX SDK initialization on main thread.");
+                    LogMaxSdkInitFailed("main_thread_dispatch_timeout");
+                    isInitializing = false;
+                }
             }
             catch (Exception e)
             {
                 Debug.LogError($"[AdsManager] SDK Initialization Process Failed: {e.Message}");
+                LogMaxSdkInitFailed(e.Message);
                 isInitializing = false;
                 _ = RetrySDKInitialization(20000);
             }
+        }
+
+        private IEnumerator WaitForMaxSdkInitCallback()
+        {
+            float deadline = Time.realtimeSinceStartup + MaxSdkInitCallbackTimeoutSeconds;
+            while (!isInitialized && Time.realtimeSinceStartup < deadline)
+                yield return null;
+
+            if (isInitialized)
+                yield break;
+
+            Debug.LogWarning(
+                $"[AdsManager] MAX SDK init callback timed out after {MaxSdkInitCallbackTimeoutSeconds}s.");
+            LogMaxSdkInitFailed("callback_timeout");
+            isInitializing = false;
+        }
+
+        // ════════════════════════════════════════════
+        //  SAFEGUARD — force MAX + LiftEngine if still not up after 60s
+        // ════════════════════════════════════════════
+
+        private void StartSafeguardSdkInitWatchdog()
+        {
+            StopSafeguardSdkInitWatchdog();
+            _safeguardSdkInitCoroutine = StartCoroutine(SafeguardSdkInitRoutine());
+        }
+
+        private void StopSafeguardSdkInitWatchdog()
+        {
+            if (_safeguardSdkInitCoroutine == null)
+                return;
+
+            StopCoroutine(_safeguardSdkInitCoroutine);
+            _safeguardSdkInitCoroutine = null;
+        }
+
+        private IEnumerator SafeguardSdkInitRoutine()
+        {
+            yield return new WaitForSeconds(SafeguardSdkInitDelaySeconds);
+            _safeguardSdkInitCoroutine = null;
+
+            if (isInitialized)
+                yield break;
+
+            TriggerSafeguardSdkInit();
+        }
+
+        private void TriggerSafeguardSdkInit()
+        {
+            if (isInitialized || _safeguardSdkInitTriggered)
+                return;
+
+            _safeguardSdkInitTriggered = true;
+
+            Debug.LogWarning(
+                $"[AdsManager] Safeguard: MAX SDK not initialized after {SafeguardSdkInitDelaySeconds}s. Forcing recovery.");
+
+            if (FirebaseManager.Instance != null)
+                FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_LIFTENGINE_SAFEGUARD);
+
+            if (MaxSdk.IsInitialized())
+            {
+                EnqueueAction(() => OnMaxSdkInitialized(null));
+                return;
+            }
+
+            if (!TermsConsentManager.HasAccepted)
+            {
+                Debug.LogWarning("[AdsManager] Safeguard: skipping force init — terms not accepted.");
+                return;
+            }
+
+            isInitializing = false;
+
+            EnqueueAction(() =>
+            {
+                ConsentManager.ApplyMaxPrivacyFlags();
+
+                Debug.Log("[AdsManager] Safeguard: initializing AppLovin MAX SDK...");
+
+                MaxSdkBase.InvokeEventsOnUnityMainThread = true;
+                MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
+                MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+                MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
+                MaxSdk.SetSdkKey(MaxSdkKey);
+                MaxSdk.InitializeSdk();
+                StartCoroutine(WaitForMaxSdkInitCallback());
+            });
+        }
+
+        private void LogMaxSdkInitialized()
+        {
+            if (_maxSdkInitSuccessLogged)
+                return;
+
+            _maxSdkInitSuccessLogged = true;
+            if (FirebaseManager.Instance != null)
+                FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_MAX_SDK_INITIALIZED);
+        }
+
+        private void LogMaxSdkInitFailed(string reason)
+        {
+            if (_maxSdkInitSuccessLogged || _maxSdkInitFailedLogged)
+                return;
+
+            _maxSdkInitFailedLogged = true;
+            if (FirebaseManager.Instance == null)
+                return;
+
+            string safeReason = string.IsNullOrWhiteSpace(reason) ? "unknown" : reason.Trim();
+            if (safeReason.Length > 100)
+                safeReason = safeReason.Substring(0, 100);
+
+            FirebaseManager.Instance.LogFunnelEvent(
+                FirebaseManager.EVENT_MAX_SDK_INIT_FAILED,
+                new Parameter(FirebaseManager.PARAM_REASON, safeReason));
         }
 
         private async Task RetrySDKInitialization(int delayMs)
@@ -751,6 +889,7 @@ namespace Assets.Scripts.Core
             isInitialized = true;
             isInitializing = false;
             sdkInitRetryCount = 0;
+            LogMaxSdkInitialized();
 
             TryStartLiftEngine();
             EnsureFullscreenMaxCallbacks();
