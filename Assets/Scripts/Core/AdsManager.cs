@@ -231,6 +231,7 @@ namespace Assets.Scripts.Core
         private void OnDestroy()
         {
             TermsConsentManager.OnSdkInitAllowed -= HandleSdkInitAllowed;
+            StopSafeguardSdkInitWatchdog();
 
             UnsubscribeLiftEngineCallbacks();
 
