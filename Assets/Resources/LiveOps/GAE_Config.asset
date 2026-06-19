@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 245cdee0ec53047a28e910e790ab0119, type: 3}
-  m_Name: GAEConfig
+  m_Name: GAE_Config
   m_EditorClassIdentifier: Assembly-CSharp::Assets.Scripts.GAE.GAEConfigSO
   Stages:
   - ArrowTarget: 60

@@ -134,12 +134,7 @@ namespace LiftEngine
             };
             _mediation.AdDisplayFailed += err =>
             {
-                TrackError(err.Format, err.Code.ToString(), err.Message);
                 _activeCallbacks?.OnAdDisplayFailed?.Invoke(err.Message);
-            };
-            _mediation.AdLoadFailed += err =>
-            {
-                TrackError(err.Format, err.Code.ToString(), err.Message);
             };
         }
 
@@ -282,16 +277,6 @@ namespace LiftEngine
                 $"placement={placementId}, keyword={keyword}, auction_id={auctionId}, " +
                 $"timestamp={timestamp}, rev={rev}");
             _api.TrackActiveView(bundleId, deviceId, adType, placementId, keyword, auctionId, timestamp, rev);
-        }
-
-        private void TrackError(LiftEngineAdFormat format, string code, string message)
-        {
-            var (_, auctionId) = _context.GetAuctionContext(format);
-            var deviceId = Ads.DeviceIdProvider.GetDeviceId();
-            LiftEngineLogger.LogClient(
-                $"Track error — format={format}, bundle={Application.identifier}, device={deviceId}, " +
-                $"auction_id={auctionId}, code={code}, message={message}");
-            _api.TrackError(Application.identifier, deviceId, auctionId, code, message);
         }
 
         private void QueueReportAfterAdDisplay(LiftEngineAdFormat format)
