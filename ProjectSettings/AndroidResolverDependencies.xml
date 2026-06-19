@@ -4,10 +4,13 @@
     <package>androidx.lifecycle:lifecycle-process:2.6.2</package>
     <package>com.android.billingclient:billing:7.1.1</package>
     <package>com.android.installreferrer:installreferrer:2.2</package>
-    <package>com.applovin.mediation:bytedance-adapter:8.0.0.5.0</package>
+    <package>com.android.support:customtabs:28.+</package>
+    <package>com.android.support:recyclerview-v7:28.+</package>
+    <package>com.applovin.mediation:bytedance-adapter:8.1.0.3.0</package>
     <package>com.applovin.mediation:facebook-adapter:[6.21.0.0]</package>
-    <package>com.applovin.mediation:google-adapter:[25.3.0.0]</package>
-    <package>com.applovin.mediation:google-ad-manager-adapter:[25.3.0.0]</package>
+    <package>com.applovin.mediation:google-adapter:[25.4.0.0]</package>
+    <package>com.applovin.mediation:google-ad-manager-adapter:[25.4.0.0]</package>
+    <package>com.applovin.mediation:inmobi-adapter:11.3.0.0</package>
     <package>com.applovin.mediation:unityads-adapter:4.18.1.0</package>
     <package>com.applovin.mediation:vungle-adapter:7.7.4.0</package>
     <package>com.applovin:applovin-sdk:13.6.3</package>
@@ -30,6 +33,7 @@
     <package>com.google.flatbuffers:flatbuffers-java:1.12.0</package>
     <package>com.google.games:gpgs-plugin-support:2.1.0</package>
     <package>com.singular.sdk:singular_sdk:12.11.0</package>
+    <package>com.squareup.picasso:picasso:2.71828</package>
   </packages>
   <files>
     <file>Assets/GeneratedLocalRepo/Firebase/m2repository/com/google/firebase/firebase-analytics-unity/13.7.0/firebase-analytics-unity-13.7.0.aar</file>
