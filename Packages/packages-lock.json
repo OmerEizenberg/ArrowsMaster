@@ -1,14 +1,14 @@
 {
   "dependencies": {
     "com.applovin.mediation.adapters.bytedance.android": {
-      "version": "800000500.0.0",
+      "version": "801000300.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.bytedance.ios": {
-      "version": "800010000.0.0",
+      "version": "801000900.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -29,28 +29,42 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.google.android": {
-      "version": "25030000.0.0",
+      "version": "25040000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.google.ios": {
-      "version": "13040000.0.0",
+      "version": "13050000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.googleadmanager.android": {
-      "version": "25030000.0.0",
+      "version": "25040000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.googleadmanager.ios": {
-      "version": "13040000.0.0",
+      "version": "13050000.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://unity.packages.applovin.com"
+    },
+    "com.applovin.mediation.adapters.inmobi.android": {
+      "version": "11030000.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://unity.packages.applovin.com"
+    },
+    "com.applovin.mediation.adapters.inmobi.ios": {
+      "version": "11030000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -78,7 +92,7 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.vungle.ios": {
-      "version": "7070300.0.0",
+      "version": "7070400.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},

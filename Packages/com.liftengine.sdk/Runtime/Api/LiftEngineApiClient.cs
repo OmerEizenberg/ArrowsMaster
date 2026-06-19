@@ -134,12 +134,18 @@ namespace LiftEngine.Api
             _host.StartCoroutine(Get("GET", "/v1/track/activeview" + query, true, null));
         }
 
-        public void TrackError(string bundleId, string auctionId, string errorCode, string errorMessage)
+        public void TrackError(string bundleId, string deviceId, string auctionId, string errorCode,
+            string errorMessage)
         {
-            var query = "?bundle_id=" + Uri.EscapeDataString(bundleId)
-                        + "&auction_id=" + Uri.EscapeDataString(auctionId ?? string.Empty)
-                        + "&error_code=" + Uri.EscapeDataString(errorCode)
-                        + "&error_message=" + Uri.EscapeDataString(errorMessage);
+            var query = BuildTrackQuery(new Dictionary<string, string>
+            {
+                ["bundle_id"] = bundleId,
+                ["device_id"] = deviceId,
+                ["auction_id"] = auctionId ?? string.Empty,
+                ["error_code"] = errorCode,
+                ["error_message"] = errorMessage
+            }, null);
+
             _host.StartCoroutine(Get("GET", "/v1/track/error" + query, true, null));
         }
 

@@ -53,16 +53,18 @@
         "com.applovin.mediation.ads": "8.6.3",
         "com.applovin.mediation.adapters.facebook.ios": "6210100.0.0",
         "com.applovin.mediation.adapters.facebook.android": "6210000.0.0",
-        "com.applovin.mediation.adapters.google.ios": "13040000.0.0",
-        "com.applovin.mediation.adapters.google.android": "25030000.0.0",
-        "com.applovin.mediation.adapters.vungle.ios": "7070300.0.0",
+        "com.applovin.mediation.adapters.google.ios": "13050000.0.0",
+        "com.applovin.mediation.adapters.google.android": "25040000.0.0",
+        "com.applovin.mediation.adapters.vungle.ios": "7070400.0.0",
         "com.applovin.mediation.adapters.vungle.android": "7070400.0.0",
-        "com.applovin.mediation.adapters.bytedance.ios": "800010000.0.0",
-        "com.applovin.mediation.adapters.bytedance.android": "800000500.0.0",
+        "com.applovin.mediation.adapters.bytedance.ios": "801000900.0.0",
+        "com.applovin.mediation.adapters.bytedance.android": "801000300.0.0",
         "com.applovin.mediation.adapters.unityads.ios": "4180100.0.0",
         "com.applovin.mediation.adapters.unityads.android": "4180100.0.0",
-        "com.applovin.mediation.adapters.googleadmanager.ios": "13040000.0.0",
-        "com.applovin.mediation.adapters.googleadmanager.android": "25030000.0.0"
+        "com.applovin.mediation.adapters.googleadmanager.ios": "13050000.0.0",
+        "com.applovin.mediation.adapters.googleadmanager.android": "25040000.0.0",
+        "com.applovin.mediation.adapters.inmobi.ios": "11030000.0.0",
+        "com.applovin.mediation.adapters.inmobi.android": "11030000.0.0"
     },
     "scopedRegistries": [
         {

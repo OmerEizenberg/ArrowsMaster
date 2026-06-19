@@ -10,6 +10,11 @@ namespace Assets.Scripts.Core
 {
     public class IOSAdsHelper
     {
+        // Hard cap on how long SDK init waits for the ATT decision. iOS normally resolves this within
+        // seconds; if the prompt is deferred/stuck and never answered, we proceed as unauthorized so the
+        // privacy gate opens and MAX (plus the rest of the ads chain) is never blocked indefinitely.
+        private const float AttResolutionTimeoutSeconds = 30f;
+
         public static void RequestATT(Action<bool> onComplete = null)
         {
 #if UNITY_IOS && !UNITY_EDITOR
@@ -66,9 +71,19 @@ namespace Assets.Scripts.Core
             if (status == ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
                 ATTrackingStatusBinding.RequestAuthorizationTracking();
 
+            float deadline = Time.realtimeSinceStartup + AttResolutionTimeoutSeconds;
             while (ATTrackingStatusBinding.GetAuthorizationTrackingStatus() ==
                    ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
             {
+                if (Time.realtimeSinceStartup >= deadline)
+                {
+                    Debug.LogWarning(
+                        $"[IOSAdsHelper] ATT not answered within {AttResolutionTimeoutSeconds}s; proceeding " +
+                        "with SDK init as unauthorized so ads are never blocked.");
+                    IOSAttributionBootstrap.SetAttResolved(false);
+                    yield break;
+                }
+
                 yield return null;
             }
 

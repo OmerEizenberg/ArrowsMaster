@@ -287,7 +287,11 @@ namespace LiftEngine
         private void TrackError(LiftEngineAdFormat format, string code, string message)
         {
             var (_, auctionId) = _context.GetAuctionContext(format);
-            _api.TrackError(Application.identifier, auctionId, code, message);
+            var deviceId = Ads.DeviceIdProvider.GetDeviceId();
+            LiftEngineLogger.LogClient(
+                $"Track error — format={format}, bundle={Application.identifier}, device={deviceId}, " +
+                $"auction_id={auctionId}, code={code}, message={message}");
+            _api.TrackError(Application.identifier, deviceId, auctionId, code, message);
         }
 
         private void QueueReportAfterAdDisplay(LiftEngineAdFormat format)

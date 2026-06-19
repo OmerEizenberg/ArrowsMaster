@@ -64,7 +64,7 @@ namespace Assets.Scripts.Core
         private bool _fullscreenMaxCallbacksSubscribed;
         private bool _maxSdkInitSuccessLogged;
         private bool _maxSdkInitFailedLogged;
-        private bool _safeguardSdkInitTriggered;
+        private bool _safeguardSdkInitLogged;
         private Coroutine _safeguardSdkInitCoroutine;
 
         private static readonly ConcurrentQueue<SingularAdRevenuePayload> _pendingSingularRevenue =
@@ -94,7 +94,6 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
-        private const float ConsentWaitTimeoutSeconds = 30f;
         private const float MaxSdkInitCallbackTimeoutSeconds = 30f;
         private const float SafeguardSdkInitDelaySeconds = 60f;
         private const float RewardedPlacementWaitSeconds = 12f;
@@ -688,39 +687,22 @@ namespace Assets.Scripts.Core
             isInitializing = true;
             try
             {
-                await IAPManager.EnsureUnityServicesInitializedAsync();
-                Debug.Log("[AdsManager] Unity Services Initialized.");
+                // Unity Gaming Services is only required for IAP, NOT for AppLovin MAX.
+                // It is warmed up independently by IAPManager; never block MAX init on it.
+                // A hanging/slow UGS init previously stalled the whole ads chain (major Android init blocker).
+                _ = WarmUpUnityServicesInBackground();
 
-                bool consentFinished = false;
-                EnqueueAction(() =>
-                {
-                    ConsentManager.RequestConsent(() =>
-                    {
-                        consentFinished = true;
-                        Debug.Log("[AdsManager] Consent gathering finished. Continuing SDK Init.");
-                    });
-                });
-
-                float waitStart = Time.time;
-                while (!consentFinished && Time.time - waitStart < ConsentWaitTimeoutSeconds)
-                    await Task.Yield();
-                if (!consentFinished)
-                {
-                    Debug.LogWarning(
-                        $"[AdsManager] Consent flow timed out after {ConsentWaitTimeoutSeconds}s. " +
-                        "Initializing MAX SDK anyway (non-personalized ads when consent denied).");
-                }
-
+                // GDPR/CMP consent + ATT are handled by AppLovin's built-in Terms & Privacy Policy Flow
+                // (enabled via AppLovinInternalSettings). That flow runs during InitializeSdk() and writes
+                // the IAB TCF consent string every mediated network reads — including for users who decline,
+                // which is what lets non-approving tier-1 users keep receiving (non-personalized) ads.
                 bool maxInitDispatched = false;
-                bool consentTimedOut = !consentFinished;
                 EnqueueAction(() =>
                 {
-                    if (consentTimedOut)
-                        ConsentManager.LogConsentResultAnalytics();
+                    // CCPA: false = user has NOT opted out of sale of personal info.
+                    MaxSdk.SetDoNotSell(false);
 
-                    ConsentManager.ApplyMaxPrivacyFlags();
-
-                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
+                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (AppLovin consent flow handles GDPR/ATT)...");
 
                     // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
                     MaxSdkBase.InvokeEventsOnUnityMainThread = true;
@@ -728,7 +710,6 @@ namespace Assets.Scripts.Core
                     MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
                     MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
 
-                    MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
                     MaxSdk.SetSdkKey(MaxSdkKey);
                     MaxSdk.InitializeSdk();
                     maxInitDispatched = true;
@@ -751,6 +732,23 @@ namespace Assets.Scripts.Core
                 LogMaxSdkInitFailed(e.Message);
                 isInitializing = false;
                 _ = RetrySDKInitialization(20000);
+            }
+        }
+
+        /// <summary>
+        /// Fire-and-forget Unity Gaming Services warmup. Kept off the MAX init path so a slow or
+        /// hanging UGS init can never block AppLovin initialization (it only matters for IAP).
+        /// </summary>
+        private static async Task WarmUpUnityServicesInBackground()
+        {
+            try
+            {
+                await IAPManager.EnsureUnityServicesInitializedAsync();
+                Debug.Log("[AdsManager] Unity Services warmed up (background, non-blocking).");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] Unity Services background warmup failed (non-fatal): {e.Message}");
             }
         }
 
@@ -790,27 +788,28 @@ namespace Assets.Scripts.Core
 
         private IEnumerator SafeguardSdkInitRoutine()
         {
-            yield return new WaitForSeconds(SafeguardSdkInitDelaySeconds);
+            // Re-arming backstop: keeps retrying until MAX is up. Previously this fired exactly once and
+            // was consumed even when it skipped (e.g. terms not yet accepted at 60s, or iOS ATT still
+            // pending), which could leave a user with no path to ever initialize MAX. Now it retries
+            // every cycle and only stops once initialization succeeds.
+            var wait = new WaitForSeconds(SafeguardSdkInitDelaySeconds);
+            while (!isInitialized)
+            {
+                yield return wait;
+
+                if (isInitialized)
+                    break;
+
+                TriggerSafeguardSdkInit();
+            }
+
             _safeguardSdkInitCoroutine = null;
-
-            if (isInitialized)
-                yield break;
-
-            TriggerSafeguardSdkInit();
         }
 
         private void TriggerSafeguardSdkInit()
         {
-            if (isInitialized || _safeguardSdkInitTriggered)
+            if (isInitialized)
                 return;
-
-            _safeguardSdkInitTriggered = true;
-
-            Debug.LogWarning(
-                $"[AdsManager] Safeguard: MAX SDK not initialized after {SafeguardSdkInitDelaySeconds}s. Forcing recovery.");
-
-            if (FirebaseManager.Instance != null)
-                FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_LIFTENGINE_SAFEGUARD);
 
             if (MaxSdk.IsInitialized())
             {
@@ -818,24 +817,41 @@ namespace Assets.Scripts.Core
                 return;
             }
 
+            // Do NOT consume the backstop here. If terms aren't accepted yet, simply wait and let the
+            // next safeguard cycle try again once the user has decided — the backstop stays armed.
             if (!TermsConsentManager.HasAccepted)
             {
-                Debug.LogWarning("[AdsManager] Safeguard: skipping force init — terms not accepted.");
+                Debug.LogWarning("[AdsManager] Safeguard: terms not accepted yet — will retry next cycle.");
                 return;
             }
 
-            isInitializing = false;
+            // A normal init attempt is already in flight (it self-resets on its own timeouts). Don't
+            // stomp it; the next safeguard cycle will force init only if it's still down.
+            if (isInitializing)
+                return;
+
+            if (!_safeguardSdkInitLogged)
+            {
+                _safeguardSdkInitLogged = true;
+
+                Debug.LogWarning(
+                    $"[AdsManager] Safeguard: MAX SDK not initialized after {SafeguardSdkInitDelaySeconds}s. Forcing recovery.");
+
+                if (FirebaseManager.Instance != null)
+                    FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_LIFTENGINE_SAFEGUARD);
+            }
 
             EnqueueAction(() =>
             {
-                ConsentManager.ApplyMaxPrivacyFlags();
+                // CCPA: false = user has NOT opted out of sale of personal info. GDPR/ATT consent is
+                // handled by AppLovin's built-in flow during InitializeSdk().
+                MaxSdk.SetDoNotSell(false);
 
                 Debug.Log("[AdsManager] Safeguard: initializing AppLovin MAX SDK...");
 
                 MaxSdkBase.InvokeEventsOnUnityMainThread = true;
                 MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
                 MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
-                MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
                 MaxSdk.SetSdkKey(MaxSdkKey);
                 MaxSdk.InitializeSdk();
                 StartCoroutine(WaitForMaxSdkInitCallback());
@@ -890,6 +906,7 @@ namespace Assets.Scripts.Core
             isInitialized = true;
             isInitializing = false;
             sdkInitRetryCount = 0;
+            StopSafeguardSdkInitWatchdog();
             LogMaxSdkInitialized();
 
             TryStartLiftEngine();
