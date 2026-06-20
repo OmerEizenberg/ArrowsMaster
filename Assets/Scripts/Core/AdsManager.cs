@@ -281,6 +281,7 @@ namespace Assets.Scripts.Core
             IAPManager.Instance != null && IAPManager.Instance.HasNoAds;
 
         private bool AreBannerAdsSupported => AndroidWebViewSupport.AreBannerAdsSupported;
+        private bool IsBannerEnvironmentReady() => AndroidWebViewSupport.EnsureWebViewReady();
 
         private void SubscribeToNoAdsStatus()
         {
@@ -1433,6 +1434,12 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
+            if (!IsBannerEnvironmentReady())
+            {
+                _bannerCreateInProgress = false;
+                yield break;
+            }
+
             if (_liftEngineEnabled && !_liftEngineInitSettled)
             {
                 float deadline = Time.realtimeSinceStartup + 30f;
@@ -1520,7 +1527,7 @@ namespace Assets.Scripts.Core
 
             if (!AreBannerAdsSupported)
             {
-                Debug.Log("[AdsManager] Skipping Banner Show: system WebView is too old for banner ads.");
+                Debug.Log("[AdsManager] Skipping Banner Show: System WebView is unavailable for banner ads.");
                 return;
             }
 

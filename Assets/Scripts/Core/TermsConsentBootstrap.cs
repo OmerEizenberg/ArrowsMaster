@@ -38,6 +38,8 @@ namespace Assets.Scripts.Core
 
             _instance = this;
 
+            TermsConsentManager.EnsureReturningPlayerGrandfathered();
+
             if (TermsConsentManager.HasUserDecided)
             {
                 Debug.Log($"[TermsConsentBootstrap] Consent already decided ({TermsConsentManager.GetConsentState()}).");

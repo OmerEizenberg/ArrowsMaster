@@ -35,6 +35,11 @@ namespace Assets.Scripts.GAE
             m_TrackedObjects.Add(obj);
         }
 
+        public void EnsureLifetimeUntil(float unscaledEndTime)
+        {
+            m_DestroyAt = Mathf.Max(m_DestroyAt, unscaledEndTime);
+        }
+
         private void Update()
         {
             if (!m_IsCleaningUp && Time.unscaledTime >= m_DestroyAt)

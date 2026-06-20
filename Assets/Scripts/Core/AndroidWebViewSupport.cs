@@ -4,49 +4,110 @@ using UnityEngine;
 namespace Assets.Scripts.Core
 {
     /// <summary>
-    /// Guards banner ads on Android devices with a pre-2019 System WebView (major &lt; 73),
-    /// which can crash when WebResourceResponse receives an empty HTTP/2 reason phrase.
+    /// Guards banner ads on Android devices where System WebView is missing, too old, or fails to
+    /// initialize. AppLovin banner fills create an AppLovinAdView backed by WebView; a broken
+    /// provider can crash inside Chromium AwContents during first init.
     /// </summary>
     public static class AndroidWebViewSupport
     {
         public const int MinimumSupportedWebViewMajorVersion = 73;
 
         private static bool? _bannerAdsSupported;
+        private static bool _webViewPrewarmAttempted;
+        private static bool _webViewPrewarmSucceeded;
 
         public static bool AreBannerAdsSupported
         {
             get
             {
-                if (!_bannerAdsSupported.HasValue)
-                    _bannerAdsSupported = EvaluateBannerSupport();
+                EnsureBannerSupportEvaluated();
                 return _bannerAdsSupported.Value;
             }
+        }
+
+        /// <summary>
+        /// Validates WebView support and performs a one-time create/destroy prewarm before the first
+        /// banner ad touches native WebView code.
+        /// </summary>
+        public static bool EnsureWebViewReady()
+        {
+            EnsureBannerSupportEvaluated();
+            if (!_bannerAdsSupported.Value)
+                return false;
+
+            if (_webViewPrewarmSucceeded)
+                return true;
+
+            if (_webViewPrewarmAttempted)
+                return false;
+
+            _webViewPrewarmAttempted = true;
+            _webViewPrewarmSucceeded = TryPrewarmWebView();
+            if (!_webViewPrewarmSucceeded)
+                _bannerAdsSupported = false;
+
+            return _webViewPrewarmSucceeded;
+        }
+
+        private static void EnsureBannerSupportEvaluated()
+        {
+            if (!_bannerAdsSupported.HasValue)
+                _bannerAdsSupported = EvaluateBannerSupport();
         }
 
         private static bool EvaluateBannerSupport()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            int? majorVersion = TryGetInstalledWebViewMajorVersion();
-            if (!majorVersion.HasValue)
+            try
             {
-                Debug.LogWarning("[AndroidWebViewSupport] Could not determine System WebView version; allowing banner ads.");
-                return true;
+                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                {
+                    if (activity == null)
+                    {
+                        Debug.LogWarning("[AndroidWebViewSupport] Activity unavailable; banner ads disabled.");
+                        return false;
+                    }
+
+                    string versionName = TryGetWebViewVersionViaWebViewCompat(activity);
+                    if (string.IsNullOrEmpty(versionName))
+                    {
+                        Debug.LogWarning(
+                            "[AndroidWebViewSupport] System WebView provider not available; banner ads disabled.");
+                        return false;
+                    }
+
+                    int? majorVersion = ParseMajorVersion(versionName);
+                    if (!majorVersion.HasValue)
+                    {
+                        Debug.LogWarning(
+                            $"[AndroidWebViewSupport] Could not parse WebView version '{versionName}'; banner ads disabled.");
+                        return false;
+                    }
+
+                    if (majorVersion.Value < MinimumSupportedWebViewMajorVersion)
+                    {
+                        Debug.LogWarning(
+                            $"[AndroidWebViewSupport] System WebView {majorVersion.Value} is below " +
+                            $"{MinimumSupportedWebViewMajorVersion}; banner ads disabled on this device.");
+                        return false;
+                    }
+
+                    return true;
+                }
             }
-
-            if (majorVersion.Value >= MinimumSupportedWebViewMajorVersion)
-                return true;
-
-            Debug.LogWarning(
-                $"[AndroidWebViewSupport] System WebView {majorVersion.Value} is below " +
-                $"{MinimumSupportedWebViewMajorVersion}; banner ads disabled on this device.");
-            return false;
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AndroidWebViewSupport] Banner support evaluation failed: {e.Message}");
+                return false;
+            }
 #else
             return true;
 #endif
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        private static int? TryGetInstalledWebViewMajorVersion()
+        private static bool TryPrewarmWebView()
         {
             try
             {
@@ -54,19 +115,22 @@ namespace Assets.Scripts.Core
                 using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
                 {
                     if (activity == null)
-                        return null;
+                        return false;
 
-                    string versionName = TryGetWebViewVersionViaWebViewCompat(activity);
-                    if (string.IsNullOrEmpty(versionName))
-                        versionName = TryGetWebViewVersionViaPackageManager(activity);
+                    // Unity runs on the Android main thread; create/destroy here mirrors AppLovinAdView init.
+                    using (var webView = new AndroidJavaObject("android.webkit.WebView", activity))
+                    {
+                        webView.Call("destroy");
+                    }
 
-                    return ParseMajorVersion(versionName);
+                    Debug.Log("[AndroidWebViewSupport] WebView prewarm succeeded.");
+                    return true;
                 }
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[AndroidWebViewSupport] WebView version lookup failed: {e.Message}");
-                return null;
+                Debug.LogWarning($"[AndroidWebViewSupport] WebView prewarm failed; banner ads disabled: {e.Message}");
+                return false;
             }
         }
 
@@ -82,7 +146,7 @@ namespace Assets.Scripts.Core
             }
             catch (Exception)
             {
-                return null;
+                return TryGetWebViewVersionViaPackageManager(activity);
             }
         }
 

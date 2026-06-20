@@ -7,6 +7,18 @@ namespace Assets.Scripts.GAE
 {
     public static class GAECurrencyFlyAnimation
     {
+        public static float ComputeStaggeredFlyDuration(
+            int iconCount,
+            float staggerDelay,
+            float flyDuration,
+            float bufferSeconds = 0.5f)
+        {
+            iconCount = Mathf.Max(1, iconCount);
+            staggerDelay = Mathf.Max(0.02f, staggerDelay);
+            flyDuration = Mathf.Max(0.1f, flyDuration);
+            return (iconCount - 1) * staggerDelay + flyDuration + bufferSeconds;
+        }
+
         public static IEnumerator Play(
             RectTransform source,
             RectTransform target,
@@ -119,6 +131,9 @@ namespace Assets.Scripts.GAE
             staggerDelay = Mathf.Max(0.02f, staggerDelay);
             flyDuration = Mathf.Max(0.1f, flyDuration);
 
+            effectRunner?.EnsureLifetimeUntil(
+                Time.unscaledTime + ComputeStaggeredFlyDuration(iconCount, staggerDelay, flyDuration));
+
             var flyingIcons = new List<StaggeredFlyIcon>(iconCount);
             int launchedCount = 0;
             float elapsed = 0f;
@@ -126,7 +141,12 @@ namespace Assets.Scripts.GAE
 
             while (launchedCount < iconCount || flyingIcons.Count > 0)
             {
-                elapsed += Time.deltaTime;
+                if (canvasRect == null)
+                {
+                    yield break;
+                }
+
+                elapsed += Time.unscaledDeltaTime;
 
                 while (launchedCount < iconCount && elapsed >= nextLaunchTime)
                 {
@@ -151,15 +171,24 @@ namespace Assets.Scripts.GAE
                 for (int i = flyingIcons.Count - 1; i >= 0; i--)
                 {
                     StaggeredFlyIcon icon = flyingIcons[i];
+                    if (icon.Rect == null)
+                    {
+                        flyingIcons.RemoveAt(i);
+                        continue;
+                    }
+
                     float flyElapsed = elapsed - icon.LaunchElapsed;
                     float t = Mathf.Clamp01(flyElapsed / flyDuration);
                     float eased = 1f - Mathf.Pow(1f - t, 3f);
 
                     icon.Rect.anchoredPosition = Vector2.Lerp(icon.StartPosition, endLocal, eased);
 
-                    Color c = icon.Image.color;
-                    c.a = t > 0.82f ? Mathf.Lerp(1f, 0f, (t - 0.82f) / 0.18f) : 1f;
-                    icon.Image.color = c;
+                    if (icon.Image != null)
+                    {
+                        Color c = icon.Image.color;
+                        c.a = t > 0.82f ? Mathf.Lerp(1f, 0f, (t - 0.82f) / 0.18f) : 1f;
+                        icon.Image.color = c;
+                    }
 
                     if (t >= 1f)
                     {

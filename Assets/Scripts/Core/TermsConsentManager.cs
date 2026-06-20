@@ -21,6 +21,14 @@ namespace Assets.Scripts.Core
         private const string KeyPopupShown = "TermsConsentPopupShown";
         private const string LegacyTermsAgreedKey = "TermsAgreed";
 
+        // PlayerPrefs written by UserDataManager — used to detect veterans who played before the
+        // June 2026 blocking terms gate (ads used to init without TermsConsentState being set).
+        private const string SessionCountKey = "TotalSessionCount";
+        private const string LevelKey = "CurrentLevel";
+        private const string LevelProgressKey = "LevelProgress";
+        private const string ArrowsCurrencyKey = "ArrowsCurrency";
+        private const string BoostersInitializedKey = "BoostersInitialized";
+
         /// <summary>Fired once per session when Singular and ads are allowed to initialize.</summary>
         public static event Action OnSdkInitAllowed;
 
@@ -35,6 +43,23 @@ namespace Assets.Scripts.Core
         static TermsConsentManager()
         {
             MigrateLegacyTermsAgreed();
+            EnsureReturningPlayerGrandfathered();
+        }
+
+        /// <summary>
+        /// Re-run at bootstrap Awake (BeforeSceneLoad) so prefs are read after any early writers.
+        /// Safe to call multiple times.
+        /// </summary>
+        public static void EnsureReturningPlayerGrandfathered()
+        {
+            if (HasUserDecided)
+                return;
+
+            if (!HasExistingPlayerProgress())
+                return;
+
+            AcceptGrandfatheredPlayer(
+                "existing save progress detected (pre-June non-blocking terms flow)");
         }
 
         public static ConsentState GetConsentState()
@@ -55,6 +80,8 @@ namespace Assets.Scripts.Core
         public static void RecordAccepted()
         {
             SetConsentState(ConsentState.Accepted);
+            PlayerPrefs.SetInt(LegacyTermsAgreedKey, 1);
+            PlayerPrefs.Save();
         }
 
         public static void RecordDeclined()
@@ -91,16 +118,46 @@ namespace Assets.Scripts.Core
 
         private static void MigrateLegacyTermsAgreed()
         {
-            if (PlayerPrefs.HasKey(KeyConsentState))
+            if (HasUserDecided)
                 return;
 
             if (PlayerPrefs.GetInt(LegacyTermsAgreedKey, 0) != 1)
                 return;
 
+            AcceptGrandfatheredPlayer("legacy TermsAgreed preference");
+        }
+
+        private static bool HasExistingPlayerProgress()
+        {
+            if (PlayerPrefs.GetInt(LegacyTermsAgreedKey, 0) == 1)
+                return true;
+
+            // TotalSessionCount is persisted at end of each session; >= 1 means this is not a first install.
+            if (PlayerPrefs.GetInt(SessionCountKey, 0) >= 1)
+                return true;
+
+            if (PlayerPrefs.GetInt(LevelKey, 1) > 1)
+                return true;
+
+            if (PlayerPrefs.GetInt(ArrowsCurrencyKey, 0) > 0)
+                return true;
+
+            if (PlayerPrefs.GetInt(BoostersInitializedKey, 0) == 1)
+                return true;
+
+            if (!string.IsNullOrEmpty(PlayerPrefs.GetString(LevelProgressKey, string.Empty)))
+                return true;
+
+            return false;
+        }
+
+        private static void AcceptGrandfatheredPlayer(string reason)
+        {
             PlayerPrefs.SetInt(KeyConsentState, (int)ConsentState.Accepted);
             PlayerPrefs.SetInt(KeyPopupShown, 1);
+            PlayerPrefs.SetInt(LegacyTermsAgreedKey, 1);
             PlayerPrefs.Save();
-            Debug.Log("[TermsConsentManager] Migrated legacy TermsAgreed preference.");
+            Debug.Log($"[TermsConsentManager] Grandfathered returning player — consent auto-accepted ({reason}).");
         }
     }
 }

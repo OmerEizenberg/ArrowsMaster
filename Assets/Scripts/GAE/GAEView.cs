@@ -227,7 +227,12 @@ namespace Assets.Scripts.GAE
                 yield break;
             }
 
-            GAEFlyEffectRunner runner = GAEFlyEffectRunner.Create(canvas.transform, m_FlyEffectMaxLifetime);
+            GAEFlyEffectRunner runner = GAEFlyEffectRunner.Create(
+                canvas.transform,
+                GAECurrencyFlyAnimation.ComputeStaggeredFlyDuration(
+                    m_CoinRewardFlyCount,
+                    m_CoinRewardFlyStaggerDelay,
+                    m_CoinRewardFlyDuration));
 
             if (rewardType == GAERewardType.Coin)
             {

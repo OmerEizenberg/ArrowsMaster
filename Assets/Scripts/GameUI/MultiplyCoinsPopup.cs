@@ -522,7 +522,12 @@ namespace Assets.Scripts.GameUI
                 yield break;
             }
 
-            GAEFlyEffectRunner runner = GAEFlyEffectRunner.Create(m_Canvas.transform, 3f);
+            GAEFlyEffectRunner runner = GAEFlyEffectRunner.Create(
+                m_Canvas.transform,
+                GAECurrencyFlyAnimation.ComputeStaggeredFlyDuration(
+                    m_GaeFlyIconCount,
+                    m_GaeFlyStaggerDelay,
+                    m_GaeFlyDuration));
 
             yield return GAECurrencyFlyAnimation.PlayStaggered(
                 source,
