@@ -128,10 +128,13 @@ namespace LiftEngine.Ads
                 if (prediction.prediction <= 0f)
                     prediction.prediction = _settings.defaultPredictionFallback;
 
-                _context.SetAuctionContext(format, prediction.keyword, prediction.auction_id, prediction.param);
+                _context.SetAuctionContext(format, prediction.keyword, prediction.auction_id, prediction.param,
+                    prediction.message);
                 LiftEngineLogger.LogBackend(
                     $"{format} predict OK — auction_id={prediction.auction_id}, keyword={prediction.keyword}, " +
-                    $"prediction={prediction.prediction}, multipliers={prediction.multipliers?.Length ?? 0}");
+                    $"param={prediction.param}, message={prediction.message}, " +
+                    $"prediction={prediction.prediction}, multipliers={prediction.multipliers?.Length ?? 0}, " +
+                    $"maxPlacement={_context.GetMaxPlacement(format)}");
                 LiftEngineSdkCallbacks.RaisePredictSuccess(prediction);
             }
             else
@@ -153,7 +156,8 @@ namespace LiftEngine.Ads
 
             var loadDone = false;
             var loadSuccess = false;
-            _orchestrator.TryLoadWithPrediction(format, prediction, success =>
+            var maxPlacement = _context.GetMaxPlacement(format);
+            _orchestrator.TryLoadWithPrediction(format, prediction, maxPlacement, success =>
             {
                 loadSuccess = success;
                 loadDone = true;

@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using LiftEngine;
+using LiftEngine.Mediation;
 using UnityEngine;
 
 namespace LiftEngine.Context
@@ -195,19 +197,43 @@ namespace LiftEngine.Context
         public string GetPayloadKey(LiftEngineAdFormat format) =>
             _payloadKeys.TryGetValue(format, out var payloadKey) ? payloadKey : null;
 
-        private readonly System.Collections.Generic.Dictionary<LiftEngineAdFormat, string> _payloadKeys = new();
+        public string GetMaxPlacement(LiftEngineAdFormat format) =>
+            _maxPlacements.TryGetValue(format, out var placement) ? placement : null;
 
-        public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId, string payloadKey)
+        private readonly Dictionary<LiftEngineAdFormat, string> _payloadKeys = new();
+        private readonly Dictionary<LiftEngineAdFormat, string> _maxPlacements = new();
+
+        /// <summary>
+        /// Stores predict auction context independently per ad format.
+        /// Rewarded, interstitial, and banner each have their own payload key and MAX placement.
+        /// </summary>
+        public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId,
+            string payloadKey, string message = null)
         {
             _store.SaveAuctionContext(format, keyword, auctionId);
             if (!string.IsNullOrEmpty(payloadKey))
                 _payloadKeys[format] = payloadKey;
+            else
+                _payloadKeys.Remove(format);
+
+            if (LiftEngineMaxPlacement.ShouldUse(payloadKey, message))
+            {
+                _maxPlacements[format] = LiftEngineMaxPlacement.GetPlacement(format);
+                LiftEngineLogger.LogClient(
+                    $"{format} — CPM payload detected for this ad type; MAX placement={_maxPlacements[format]}");
+            }
+            else
+            {
+                _maxPlacements.Remove(format);
+                LiftEngineLogger.LogClient($"{format} — no CPM payload for this ad type; MAX placement omitted.");
+            }
         }
 
         public void ClearAuctionContext(LiftEngineAdFormat format)
         {
             _store.ClearAuctionContext(format);
             _payloadKeys.Remove(format);
+            _maxPlacements.Remove(format);
         }
 
         public void ClearContextData() => _store.ClearAll();

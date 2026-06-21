@@ -36,10 +36,10 @@ namespace LiftEngine.Mediation
 
         public void AddPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey, string payloadValue) { }
         public void ClearPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey) { }
-        public void RequestLoad(LiftEngineAdFormat format, string adUnitId) { }
+        public void RequestLoad(LiftEngineAdFormat format, string adUnitId, string maxPlacement = null) { }
         public bool IsReady(LiftEngineAdFormat format, string adUnitId) => false;
         public bool HasLoadedWithRevenue(LiftEngineAdFormat format, string adUnitId) => false;
-        public void Show(LiftEngineAdFormat format, string adUnitId) { }
+        public void Show(LiftEngineAdFormat format, string adUnitId, string maxPlacement = null) { }
         public void HideBanner(string adUnitId) { }
         public void ResetLoadState(LiftEngineAdFormat format, string adUnitId) { }
         public void DestroyAd(LiftEngineAdFormat format, string adUnitId) { }

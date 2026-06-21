@@ -15,6 +15,7 @@ namespace LiftEngine.Mediation
             public bool Loaded;
             public double LastRevenue;
             public string NetworkName;
+            public string MaxPlacement;
         }
 
         public LiftEngineMediationPlatform Platform => LiftEngineMediationPlatform.AppLovinMax;
@@ -128,9 +129,11 @@ namespace LiftEngine.Mediation
             AddPayload(format, adUnitId, payloadKey, "0");
         }
 
-        public void RequestLoad(LiftEngineAdFormat format, string adUnitId)
+        public void RequestLoad(LiftEngineAdFormat format, string adUnitId, string maxPlacement = null)
         {
             ResetLoadState(format, adUnitId);
+            SetMaxPlacement(format, maxPlacement);
+
             switch (format)
             {
                 case LiftEngineAdFormat.Interstitial:
@@ -140,7 +143,7 @@ namespace LiftEngine.Mediation
                     MaxSdk.LoadRewardedAd(adUnitId);
                     break;
                 case LiftEngineAdFormat.Banner:
-                    EnsureBannerCreated(adUnitId);
+                    EnsureBannerCreated(adUnitId, ResolveMaxPlacement(format, maxPlacement));
                     break;
             }
         }
@@ -167,18 +170,26 @@ namespace LiftEngine.Mediation
             return state.LastRevenue > 0d;
         }
 
-        public void Show(LiftEngineAdFormat format, string adUnitId)
+        public void Show(LiftEngineAdFormat format, string adUnitId, string maxPlacement = null)
         {
+            var placement = ResolveMaxPlacement(format, maxPlacement);
+
             switch (format)
             {
                 case LiftEngineAdFormat.Interstitial:
-                    MaxSdk.ShowInterstitial(adUnitId);
+                    if (!string.IsNullOrEmpty(placement))
+                        MaxSdk.ShowInterstitial(adUnitId, placement);
+                    else
+                        MaxSdk.ShowInterstitial(adUnitId);
                     break;
                 case LiftEngineAdFormat.Rewarded:
-                    MaxSdk.ShowRewardedAd(adUnitId);
+                    if (!string.IsNullOrEmpty(placement))
+                        MaxSdk.ShowRewardedAd(adUnitId, placement);
+                    else
+                        MaxSdk.ShowRewardedAd(adUnitId);
                     break;
                 case LiftEngineAdFormat.Banner:
-                    EnsureBannerCreated(adUnitId);
+                    EnsureBannerCreated(adUnitId, placement);
                     MaxSdk.ShowBanner(adUnitId);
                     AdDisplayed?.Invoke(new MediationAdInfo
                     {
@@ -197,7 +208,11 @@ namespace LiftEngine.Mediation
 
         public void ResetLoadState(LiftEngineAdFormat format, string adUnitId)
         {
-            _states[format] = new FormatState();
+            var previousPlacement = GetState(format).MaxPlacement;
+            _states[format] = new FormatState
+            {
+                MaxPlacement = previousPlacement
+            };
         }
 
         public void DestroyAd(LiftEngineAdFormat format, string adUnitId)
@@ -217,12 +232,14 @@ namespace LiftEngine.Mediation
             ResetLoadState(format, adUnitId);
         }
 
-        private void EnsureBannerCreated(string adUnitId)
+        private void EnsureBannerCreated(string adUnitId, string maxPlacement = null)
         {
             if (_bannerCreated)
                 return;
 
             MaxSdk.CreateBanner(adUnitId, MaxSdkBase.BannerPosition.BottomCenter);
+            if (!string.IsNullOrEmpty(maxPlacement))
+                MaxSdk.SetBannerPlacement(adUnitId, maxPlacement);
             MaxSdk.SetBannerBackgroundColor(adUnitId, Color.clear);
             _bannerCreated = true;
         }
@@ -253,6 +270,19 @@ namespace LiftEngine.Mediation
             var state = GetState(format);
             state.LastRevenue = info?.Revenue ?? state.LastRevenue;
             AdRevenuePaid?.Invoke(ToInfo(format, adUnitId, info));
+        }
+
+        private void SetMaxPlacement(LiftEngineAdFormat format, string maxPlacement)
+        {
+            GetState(format).MaxPlacement = string.IsNullOrEmpty(maxPlacement) ? null : maxPlacement;
+        }
+
+        private string ResolveMaxPlacement(LiftEngineAdFormat format, string maxPlacement)
+        {
+            if (!string.IsNullOrEmpty(maxPlacement))
+                return maxPlacement;
+
+            return GetState(format).MaxPlacement;
         }
 
         private FormatState GetState(LiftEngineAdFormat format)

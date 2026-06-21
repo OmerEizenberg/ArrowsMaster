@@ -27,10 +27,10 @@ namespace LiftEngine.Mediation
         void Initialize(LiftEngineSettings settings, Action<bool> onComplete);
         void AddPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey, string payloadValue);
         void ClearPayload(LiftEngineAdFormat format, string adUnitId, string payloadKey);
-        void RequestLoad(LiftEngineAdFormat format, string adUnitId);
+        void RequestLoad(LiftEngineAdFormat format, string adUnitId, string maxPlacement = null);
         bool IsReady(LiftEngineAdFormat format, string adUnitId);
         bool HasLoadedWithRevenue(LiftEngineAdFormat format, string adUnitId);
-        void Show(LiftEngineAdFormat format, string adUnitId);
+        void Show(LiftEngineAdFormat format, string adUnitId, string maxPlacement = null);
         void HideBanner(string adUnitId);
         void ResetLoadState(LiftEngineAdFormat format, string adUnitId);
         void DestroyAd(LiftEngineAdFormat format, string adUnitId);

@@ -181,7 +181,7 @@ namespace LiftEngine
 
             if (IsAdReady(format))
             {
-                _mediation.Show(format, _settings.GetAdUnitId(format));
+                _mediation.Show(format, _settings.GetAdUnitId(format), _context.GetMaxPlacement(format));
                 return;
             }
 
@@ -209,7 +209,7 @@ namespace LiftEngine
                 yield break;
             }
 
-            _mediation.Show(format, _settings.GetAdUnitId(format));
+            _mediation.Show(format, _settings.GetAdUnitId(format), _context.GetMaxPlacement(format));
         }
 
         public void HideBanner()

@@ -10,6 +10,7 @@ namespace LiftEngine.Api
         public string keyword;
         public string auction_id;
         public string param;
+        public string message;
         public float prediction;
         public float[] multipliers;
 
