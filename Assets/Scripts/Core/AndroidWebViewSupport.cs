@@ -42,11 +42,16 @@ namespace Assets.Scripts.Core
                 return false;
 
             _webViewPrewarmAttempted = true;
+#if UNITY_ANDROID && !UNITY_EDITOR
             _webViewPrewarmSucceeded = TryPrewarmWebView();
             if (!_webViewPrewarmSucceeded)
                 _bannerAdsSupported = false;
 
             return _webViewPrewarmSucceeded;
+#else
+            _webViewPrewarmSucceeded = true;
+            return true;
+#endif
         }
 
         private static void EnsureBannerSupportEvaluated()
