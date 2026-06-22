@@ -1,5 +1,5 @@
 # ninja log v5
-1	71	1781869477058017297	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	d744ab69d6e22f79
-71	154	1781869477130548237	/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5x3f135h/obj/armeabi-v7a/libswappywrapper.so	5a109c6cc963a8cd
-0	60	1781900207826882409	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	d744ab69d6e22f79
-60	125	1781900207881961520	/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5x3f135h/obj/armeabi-v7a/libswappywrapper.so	5a109c6cc963a8cd
+1	46	1782068389889608749	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	d744ab69d6e22f79
+46	115	1782068389944825421	/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5x3f135h/obj/armeabi-v7a/libswappywrapper.so	5a109c6cc963a8cd
+0	42	1782101683635218737	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	d744ab69d6e22f79
+43	96	1782101683681274925	/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5x3f135h/obj/armeabi-v7a/libswappywrapper.so	5a109c6cc963a8cd

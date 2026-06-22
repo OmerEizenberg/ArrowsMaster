@@ -39,4 +39,4 @@ MonoBehaviour:
   autoInitialize: 0
   runHealthCheckOnInit: 1
   verboseLogging: 0
-  debugMode: 0
+  debugMode: 1

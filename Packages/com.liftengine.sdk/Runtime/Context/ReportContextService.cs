@@ -206,9 +206,11 @@ namespace LiftEngine.Context
         /// <summary>
         /// Stores predict auction context independently per ad format.
         /// Rewarded, interstitial, and banner each have their own payload key and MAX placement.
+        /// MAX placement is applied only when the decoded predict JSON contained a "cpm" key
+        /// for that ad type.
         /// </summary>
         public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId,
-            string payloadKey, string message = null)
+            string payloadKey, bool hasCpmKey = false)
         {
             _store.SaveAuctionContext(format, keyword, auctionId);
             if (!string.IsNullOrEmpty(payloadKey))
@@ -216,16 +218,16 @@ namespace LiftEngine.Context
             else
                 _payloadKeys.Remove(format);
 
-            if (LiftEngineMaxPlacement.ShouldUse(payloadKey, message))
+            if (hasCpmKey)
             {
                 _maxPlacements[format] = LiftEngineMaxPlacement.GetPlacement(format);
                 LiftEngineLogger.LogClient(
-                    $"{format} — CPM payload detected for this ad type; MAX placement={_maxPlacements[format]}");
+                    $"{format} — 'cpm' key present for this ad type; MAX placement={_maxPlacements[format]}");
             }
             else
             {
                 _maxPlacements.Remove(format);
-                LiftEngineLogger.LogClient($"{format} — no CPM payload for this ad type; MAX placement omitted.");
+                LiftEngineLogger.LogClient($"{format} — no 'cpm' key for this ad type; MAX placement omitted.");
             }
         }
 

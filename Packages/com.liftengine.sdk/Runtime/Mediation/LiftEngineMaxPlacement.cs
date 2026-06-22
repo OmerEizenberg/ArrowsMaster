@@ -1,12 +1,8 @@
-using System;
-
 namespace LiftEngine.Mediation
 {
     internal static class LiftEngineMaxPlacement
     {
-        public static bool ShouldUse(string param, string message = null) =>
-            ContainsCpm(param) || ContainsCpm(message);
-
+        // Per ad type. Only applied when the decoded predict JSON contained a "cpm" key.
         public static string GetPlacement(LiftEngineAdFormat format) =>
             format switch
             {
@@ -15,9 +11,5 @@ namespace LiftEngine.Mediation
                 LiftEngineAdFormat.Banner => "Bnr_LiftEngine",
                 _ => null
             };
-
-        private static bool ContainsCpm(string value) =>
-            !string.IsNullOrEmpty(value) &&
-            value.IndexOf("cpm", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
