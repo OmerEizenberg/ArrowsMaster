@@ -7,8 +7,10 @@ using Assets.Scripts.Lobby;
 namespace Assets.Scripts.Core
 {
     /// <summary>
-    /// Shows the custom terms popup on the first undecided session and blocks consent-dependent SDK flows
-    /// until the user accepts or declines.
+    /// Drives SDK-init enablement and shows the (now cosmetic) terms popup. SDK init is intentionally
+    /// NOT blocked by the popup: at launch we resolve ATT on iOS — to keep IDFA/customized ads — then
+    /// immediately allow MAX/Singular to initialize. The terms popup is shown in parallel purely as a
+    /// legal acknowledgement and never gates initialization. This maximizes MAX init vs DAU.
     /// </summary>
     [DefaultExecutionOrder(-10001)]
     public class TermsConsentBootstrap : MonoBehaviour
@@ -40,15 +42,29 @@ namespace Assets.Scripts.Core
 
             TermsConsentManager.EnsureReturningPlayerGrandfathered();
 
-            if (TermsConsentManager.HasUserDecided)
-            {
-                Debug.Log($"[TermsConsentBootstrap] Consent already decided ({TermsConsentManager.GetConsentState()}).");
-                if (TermsConsentManager.HasAccepted)
-                    StartCoroutine(CompletePrivacyFlowForReturningUser());
-                return;
-            }
+            // Decoupled from the popup: resolve ATT on iOS (for customized ads), then allow init —
+            // always, regardless of whether the user has acknowledged the terms. Runs every launch.
+            StartCoroutine(AllowSdkInitWhenReady());
 
-            StartCoroutine(ShowPopupWhenReady());
+            // The terms acknowledgement popup is cosmetic and non-blocking; only show it to users who
+            // have not acknowledged yet.
+            if (!TermsConsentManager.HasUserDecided)
+                StartCoroutine(ShowPopupWhenReady());
+            else
+                Debug.Log($"[TermsConsentBootstrap] Terms already acknowledged ({TermsConsentManager.GetConsentState()}).");
+        }
+
+        /// <summary>
+        /// Opens the SDK-init gate as early as possible. On iOS we first await the ATT decision (with the
+        /// helper's own 30s timeout) so IDFA-based customized ads are preserved; on Android init is allowed
+        /// immediately. Never waits on the cosmetic terms popup.
+        /// </summary>
+        private IEnumerator AllowSdkInitWhenReady()
+        {
+            // One frame so AdsManager has subscribed to OnSdkInitAllowed before we raise it.
+            yield return null;
+            yield return ResolveAttIfNeeded();
+            TermsConsentManager.NotifySdkInitAllowed();
         }
 
         private IEnumerator ShowPopupWhenReady()
@@ -89,36 +105,27 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
-            view.OnAgreed += HandleConsentAccepted;
-            Debug.Log("[TermsConsentBootstrap] Showing terms popup; consent-dependent flows are paused.");
+            view.OnAgreed += HandleConsentAcknowledged;
+
+            if (FirebaseManager.Instance != null)
+                FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_TERMS_POPUP_SHOWN);
+
+            Debug.Log("[TermsConsentBootstrap] Showing cosmetic terms popup (non-blocking; init already proceeding).");
         }
 
-        private void HandleConsentAccepted()
+        /// <summary>
+        /// Cosmetic acknowledgement: records the tap for analytics and dismisses the popup. Init is
+        /// already running independently, so this does not start or gate any SDK flow.
+        /// </summary>
+        private void HandleConsentAcknowledged()
         {
             if (_popupInstance != null)
             {
                 var view = _popupInstance.GetComponentInChildren<TermsAndConditionsPopup>(true);
                 if (view != null)
-                    view.OnAgreed -= HandleConsentAccepted;
+                    view.OnAgreed -= HandleConsentAcknowledged;
                 _popupInstance = null;
             }
-
-            StartCoroutine(CompletePrivacyFlowAfterTerms());
-        }
-
-        private static IEnumerator CompletePrivacyFlowAfterTerms()
-        {
-            // Wait one frame so the terms popup is gone before ATT appears on iOS.
-            yield return null;
-            yield return ResolveAttIfNeeded();
-            TermsConsentManager.NotifySdkInitAllowed();
-        }
-
-        private static IEnumerator CompletePrivacyFlowForReturningUser()
-        {
-            yield return null;
-            yield return ResolveAttIfNeeded();
-            TermsConsentManager.NotifySdkInitAllowed();
         }
 
         private static IEnumerator ResolveAttIfNeeded()

@@ -4,9 +4,10 @@ using UnityEngine;
 namespace Assets.Scripts.Core
 {
     /// <summary>
-    /// Persists whether the custom terms popup was shown and the user's decision.
-    /// SDK initialization (Singular + ads) is gated separately: Android after terms,
-    /// iOS after terms and ATT.
+    /// Persists whether the (now cosmetic) terms popup was shown and the user's acknowledgement.
+    /// SDK initialization is intentionally DECOUPLED from this acknowledgement to maximize MAX init:
+    /// init is allowed immediately on Android and after the ATT decision on iOS (so customized/IDFA
+    /// ads are preserved), regardless of whether the terms popup has been tapped.
     /// </summary>
     public static class TermsConsentManager
     {
@@ -82,6 +83,9 @@ namespace Assets.Scripts.Core
             SetConsentState(ConsentState.Accepted);
             PlayerPrefs.SetInt(LegacyTermsAgreedKey, 1);
             PlayerPrefs.Save();
+
+            if (FirebaseManager.Instance != null)
+                FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_TERMS_ACCEPTED_TAP);
         }
 
         public static void RecordDeclined()
@@ -90,15 +94,16 @@ namespace Assets.Scripts.Core
         }
 
         /// <summary>
-        /// Unblocks Singular and ads. On iOS this must only be called after ATT is resolved.
+        /// Unblocks Singular and ads. Decoupled from terms acknowledgement so init is maximized.
+        /// On iOS this must only be called after ATT is resolved (preserves IDFA / customized ads).
         /// </summary>
         public static void NotifySdkInitAllowed()
         {
-            if (IsSdkInitAllowed || !HasAccepted)
+            if (IsSdkInitAllowed)
                 return;
 
             IsSdkInitAllowed = true;
-            Debug.Log("[TermsConsentManager] SDK init allowed (terms accepted, ATT resolved on iOS).");
+            Debug.Log("[TermsConsentManager] SDK init allowed (ATT resolved on iOS; terms popup is non-blocking).");
 
             if (FirebaseManager.Instance != null)
                 FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_PASSED_TERMS);

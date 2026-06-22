@@ -55,6 +55,8 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string EVENT_PASSED_TERMS = "passed_terms";
     public const string EVENT_PASSED_CONSENT_APPROVE = "passed_consent_approve";
     public const string EVENT_PASSED_CONSENT_DENY = "passed_consent_deny";
+    public const string EVENT_TERMS_POPUP_SHOWN = "terms_popup_shown";
+    public const string EVENT_TERMS_ACCEPTED_TAP = "terms_accepted_tap";
     public const string EVENT_MAX_SDK_INITIALIZED = "max_sdk_initialized";
     public const string EVENT_MAX_SDK_INIT_FAILED = "max_sdk_init_failed";
     public const string EVENT_LIFTENGINE_SAFEGUARD = "liftengine_safeguard";

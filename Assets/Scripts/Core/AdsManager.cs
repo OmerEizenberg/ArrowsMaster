@@ -188,10 +188,10 @@ namespace Assets.Scripts.Core
             _coinsExplosionPrefab = Resources.Load<GameObject>("CoinsSmallExplosion");
 
             TermsConsentManager.OnSdkInitAllowed += HandleSdkInitAllowed;
-            if (TermsConsentManager.IsSdkInitAllowed && TermsConsentManager.HasAccepted)
+            if (TermsConsentManager.IsSdkInitAllowed)
                 _ = InitializeSDK();
             else
-                Debug.Log("[AdsManager] Waiting for terms (+ ATT on iOS) before ads initialization.");
+                Debug.Log("[AdsManager] Waiting for ATT decision on iOS before ads initialization (terms popup is non-blocking).");
 
             StartCoroutine(AdHealthCheckRoutine());
             StartSafeguardSdkInitWatchdog();
@@ -199,12 +199,6 @@ namespace Assets.Scripts.Core
 
         private void HandleSdkInitAllowed()
         {
-            if (!TermsConsentManager.HasAccepted)
-            {
-                Debug.Log("[AdsManager] Terms not accepted; skipping ads SDK initialization.");
-                return;
-            }
-
             if (!isInitialized && !isInitializing)
                 _ = InitializeSDK();
         }
@@ -680,7 +674,9 @@ namespace Assets.Scripts.Core
 
         private async Task InitializeSDK()
         {
-            if (!TermsConsentManager.HasAccepted || !TermsConsentManager.IsSdkInitAllowed)
+            // Decoupled from terms acknowledgement. IsSdkInitAllowed opens immediately on Android and
+            // after the ATT decision on iOS (so customized/IDFA ads are preserved).
+            if (!TermsConsentManager.IsSdkInitAllowed)
                 return;
 
             if (isInitialized || isInitializing) return;
@@ -693,10 +689,10 @@ namespace Assets.Scripts.Core
                 // A hanging/slow UGS init previously stalled the whole ads chain (major Android init blocker).
                 _ = WarmUpUnityServicesInBackground();
 
-                // GDPR/CMP consent + ATT are handled by AppLovin's built-in Terms & Privacy Policy Flow
-                // (enabled via AppLovinInternalSettings). That flow runs during InitializeSdk() and writes
-                // the IAB TCF consent string every mediated network reads — including for users who decline,
-                // which is what lets non-approving tier-1 users keep receiving (non-personalized) ads.
+                // ATT is already resolved before this point by TermsConsentBootstrap (iOS only), so MAX
+                // initializes with IDFA available where the user authorized it (customized ads preserved).
+                // GDPR/CMP is handled by AppLovin's built-in Terms & Privacy Policy Flow during InitializeSdk().
+                // Init is intentionally NOT gated on the cosmetic terms popup, to maximize MAX init vs DAU.
                 bool maxInitDispatched = false;
                 EnqueueAction(() =>
                 {
@@ -818,11 +814,12 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            // Do NOT consume the backstop here. If terms aren't accepted yet, simply wait and let the
-            // next safeguard cycle try again once the user has decided — the backstop stays armed.
-            if (!TermsConsentManager.HasAccepted)
+            // Do NOT consume the backstop here. If the init gate isn't open yet (iOS ATT still pending),
+            // wait and let the next safeguard cycle try again — the backstop stays armed. We never force
+            // init before ATT resolves so customized/IDFA ads are preserved.
+            if (!TermsConsentManager.IsSdkInitAllowed)
             {
-                Debug.LogWarning("[AdsManager] Safeguard: terms not accepted yet — will retry next cycle.");
+                Debug.LogWarning("[AdsManager] Safeguard: init gate not open yet (ATT pending on iOS) — will retry next cycle.");
                 return;
             }
 

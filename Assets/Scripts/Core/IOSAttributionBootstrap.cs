@@ -6,8 +6,9 @@ using Singular;
 namespace Assets.Scripts.Core
 {
     /// <summary>
-    /// Initializes Singular after the privacy gate passes (terms on all platforms;
-    /// terms + ATT on iOS). SingularSDKObject must have InitializeOnAwake disabled.
+    /// Initializes Singular once the SDK-init gate opens (immediately on Android; after the ATT decision
+    /// on iOS). Decoupled from the cosmetic terms popup so attribution coverage tracks SDK init.
+    /// SingularSDKObject must have InitializeOnAwake disabled.
     /// </summary>
     [DefaultExecutionOrder(-10000)]
     public class IOSAttributionBootstrap : MonoBehaviour
@@ -47,7 +48,7 @@ namespace Assets.Scripts.Core
 #endif
             TermsConsentManager.OnSdkInitAllowed += HandleSdkInitAllowed;
 
-            if (TermsConsentManager.IsSdkInitAllowed && TermsConsentManager.HasAccepted)
+            if (TermsConsentManager.IsSdkInitAllowed)
                 StartCoroutine(InitializeSingularWhenReady());
         }
 
@@ -58,7 +59,7 @@ namespace Assets.Scripts.Core
 
         private void HandleSdkInitAllowed()
         {
-            if (!TermsConsentManager.HasAccepted || _singularInitStarted)
+            if (_singularInitStarted)
                 return;
 
             StartCoroutine(InitializeSingularWhenReady());
