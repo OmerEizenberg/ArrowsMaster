@@ -15,6 +15,11 @@ namespace Assets.Scripts.Core
     [DefaultExecutionOrder(-10001)]
     public class TermsConsentBootstrap : MonoBehaviour
     {
+        // Safety net: if AllowSdkInitWhenReady never completes (coroutine stopped, unexpected hang),
+        // force-open the gate so AdsManager/Singular are never permanently blocked this session.
+        // Must exceed IOSAdsHelper.AttResolutionTimeoutSeconds (30s) so iOS ATT always resolves first.
+        private const float SdkInitGateFallbackSeconds = 35f;
+
         private static TermsConsentBootstrap _instance;
         private static Transform _overlayRoot;
         private GameObject _popupInstance;
@@ -41,10 +46,12 @@ namespace Assets.Scripts.Core
             _instance = this;
 
             TermsConsentManager.EnsureReturningPlayerGrandfathered();
+            TermsConsentManager.EnsureBugPeriodUpgradeRecovery();
 
             // Decoupled from the popup: resolve ATT on iOS (for customized ads), then allow init —
             // always, regardless of whether the user has acknowledged the terms. Runs every launch.
             StartCoroutine(AllowSdkInitWhenReady());
+            StartCoroutine(EnsureSdkInitGateFallback());
 
             // The terms acknowledgement popup is cosmetic and non-blocking; only show it to users who
             // have not acknowledged yet.
@@ -64,6 +71,20 @@ namespace Assets.Scripts.Core
             // One frame so AdsManager has subscribed to OnSdkInitAllowed before we raise it.
             yield return null;
             yield return ResolveAttIfNeeded();
+            TermsConsentManager.NotifySdkInitAllowed();
+        }
+
+        private static IEnumerator EnsureSdkInitGateFallback()
+        {
+            float deadline = Time.realtimeSinceStartup + SdkInitGateFallbackSeconds;
+            while (!TermsConsentManager.IsSdkInitAllowed && Time.realtimeSinceStartup < deadline)
+                yield return null;
+
+            if (TermsConsentManager.IsSdkInitAllowed)
+                yield break;
+
+            Debug.LogWarning(
+                $"[TermsConsentBootstrap] SDK init gate still closed after {SdkInitGateFallbackSeconds}s; force-opening.");
             TermsConsentManager.NotifySdkInitAllowed();
         }
 

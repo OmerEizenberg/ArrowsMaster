@@ -41,10 +41,18 @@ namespace Assets.Scripts.Core
 
         public static bool IsSdkInitAllowed { get; private set; }
 
+        /// <summary>
+        /// Session-only runtime gate — intentionally NOT persisted to PlayerPrefs. Each cold start
+        /// resets to false; TermsConsentBootstrap re-opens it after ATT (iOS) or immediately (Android).
+        /// Persisting would incorrectly skip ATT on a fresh install/reinstall.
+        /// </summary>
+        public static bool WasSdkInitAllowedThisSession => IsSdkInitAllowed;
+
         static TermsConsentManager()
         {
             MigrateLegacyTermsAgreed();
             EnsureReturningPlayerGrandfathered();
+            EnsureBugPeriodUpgradeRecovery();
         }
 
         /// <summary>
@@ -61,6 +69,23 @@ namespace Assets.Scripts.Core
 
             AcceptGrandfatheredPlayer(
                 "existing save progress detected (pre-June non-blocking terms flow)");
+        }
+
+        /// <summary>
+        /// Users who installed during the June 3–22 blocking-terms bug often have PopupShown=1 but
+        /// TermsConsentState=Undecided (they closed before tapping Continue). Init is no longer gated,
+        /// but this clears the stale Undecided state so they are not stuck re-showing the popup forever.
+        /// </summary>
+        public static void EnsureBugPeriodUpgradeRecovery()
+        {
+            if (HasUserDecided)
+                return;
+
+            if (!WasPopupShown)
+                return;
+
+            AcceptGrandfatheredPlayer(
+                "terms popup was shown in a prior session (bug-period upgrade recovery)");
         }
 
         public static ConsentState GetConsentState()
@@ -108,7 +133,16 @@ namespace Assets.Scripts.Core
             if (FirebaseManager.Instance != null)
                 FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_PASSED_TERMS);
 
-            OnSdkInitAllowed?.Invoke();
+            var handlers = OnSdkInitAllowed;
+            if (handlers == null)
+            {
+                Debug.LogWarning(
+                    "[TermsConsentManager] SDK init gate opened but no subscribers yet; " +
+                    "consumers must check IsSdkInitAllowed on subscribe.");
+                return;
+            }
+
+            handlers.Invoke();
         }
 
         private static void SetConsentState(ConsentState state)

@@ -96,6 +96,10 @@ namespace Assets.Scripts.Core
         private const float HealthCheckIntervalSeconds = 20f;
         private const float MaxSdkInitCallbackTimeoutSeconds = 30f;
         private const float SafeguardSdkInitDelaySeconds = 60f;
+        private const float LiftEngineInitSafeguardTimeoutSeconds = 90f;
+        // June-2 behavior: gather UMP/GDPR consent before MAX init, but never block init longer than this
+        // — on timeout we proceed and initialize anyway so init% is not sacrificed.
+        private const float ConsentGatherTimeoutSeconds = 60f;
         private const float RewardedPlacementWaitSeconds = 12f;
         private const float BannerCreateSettleDelaySeconds = 0.25f;
         private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
@@ -691,15 +695,27 @@ namespace Assets.Scripts.Core
 
                 // ATT is already resolved before this point by TermsConsentBootstrap (iOS only), so MAX
                 // initializes with IDFA available where the user authorized it (customized ads preserved).
-                // GDPR/CMP is handled by AppLovin's built-in Terms & Privacy Policy Flow during InitializeSdk().
-                // Init is intentionally NOT gated on the cosmetic terms popup, to maximize MAX init vs DAU.
+                // The cosmetic terms popup never gates init.
+
+                // June-2 GDPR/CMP: gather Google UMP consent BEFORE MAX init so the IAB TCF string is set
+                // for mediated networks, but bound it with a timer — if consent doesn't finish within
+                // ConsentGatherTimeoutSeconds we proceed and initialize anyway (init% is never sacrificed).
+                bool consentFinished = false;
+                EnqueueAction(() => ConsentManager.RequestConsent(() => consentFinished = true));
+
+                float consentWaitStart = Time.time;
+                while (!consentFinished && Time.time - consentWaitStart < ConsentGatherTimeoutSeconds)
+                    await Task.Yield();
+                if (!consentFinished)
+                    Debug.LogWarning("[AdsManager] Consent flow timed out; proceeding with MAX init anyway.");
+
                 bool maxInitDispatched = false;
                 EnqueueAction(() =>
                 {
                     // CCPA: false = user has NOT opted out of sale of personal info.
                     MaxSdk.SetDoNotSell(false);
 
-                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (AppLovin consent flow handles GDPR/ATT)...");
+                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (UMP consent gathered, ATT resolved)...");
 
                     // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
                     MaxSdkBase.InvokeEventsOnUnityMainThread = true;
@@ -786,7 +802,7 @@ namespace Assets.Scripts.Core
         private IEnumerator SafeguardSdkInitRoutine()
         {
             // Re-arming backstop: keeps retrying until MAX is up. Previously this fired exactly once and
-            // was consumed even when it skipped (e.g. terms not yet accepted at 60s, or iOS ATT still
+            // was consumed even when it skipped (e.g. init gate not open at 60s, or iOS ATT still
             // pending), which could leave a user with no path to ever initialize MAX. Now it retries
             // every cycle and only stops once initialization succeeds.
             var wait = new WaitForSeconds(SafeguardSdkInitDelaySeconds);
@@ -800,7 +816,42 @@ namespace Assets.Scripts.Core
                 TriggerSafeguardSdkInit();
             }
 
+            // MAX is up — ensure LiftEngine settles or fall back to direct MAX so ads always work.
+            yield return EnsureLiftEngineSafeguard(wait);
+
             _safeguardSdkInitCoroutine = null;
+        }
+
+        private IEnumerator EnsureLiftEngineSafeguard(WaitForSeconds wait)
+        {
+            if (!_liftEngineEnabled)
+                yield break;
+
+            float deadline = Time.realtimeSinceStartup + LiftEngineInitSafeguardTimeoutSeconds;
+            while (!_liftEngineInitSettled && Time.realtimeSinceStartup < deadline)
+            {
+                if (LiftEngineSdk.IsInitialized)
+                {
+                    EnqueueAction(() => OnLiftEngineSdkInitialized(LiftEngineInitializationStatus.Success));
+                    yield break;
+                }
+
+                yield return wait;
+
+                if (_liftEngineInitSettled || !isInitialized)
+                    yield break;
+
+                Debug.LogWarning("[AdsManager] Safeguard: LiftEngine init not settled; retrying.");
+                TryStartLiftEngine();
+            }
+
+            if (_liftEngineInitSettled)
+                yield break;
+
+            Debug.LogWarning(
+                $"[AdsManager] Safeguard: LiftEngine init not settled after {LiftEngineInitSafeguardTimeoutSeconds}s; " +
+                "falling back to direct MAX.");
+            EnqueueAction(() => OnLiftEngineSdkInitialized(LiftEngineInitializationStatus.Failed));
         }
 
         private void TriggerSafeguardSdkInit()
