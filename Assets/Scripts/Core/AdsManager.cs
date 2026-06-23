@@ -61,6 +61,7 @@ namespace Assets.Scripts.Core
         private bool _liftEngineReady;
         private bool _liftEngineInitSettled;
         private bool _liftEngineCallbacksSubscribed;
+        private bool _liftEngineStartRequested;
         private bool _fullscreenMaxCallbacksSubscribed;
         private bool _maxSdkInitSuccessLogged;
         private bool _maxSdkInitFailedLogged;
@@ -715,13 +716,20 @@ namespace Assets.Scripts.Core
                     // CCPA: false = user has NOT opted out of sale of personal info.
                     MaxSdk.SetDoNotSell(false);
 
-                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (UMP consent gathered, ATT resolved)...");
-
-                    // OnAdRevenuePaidEvent (ILRD) fires on a background thread by default; Singular requires main thread.
                     MaxSdkBase.InvokeEventsOnUnityMainThread = true;
 
                     MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
                     MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+
+                    if (MaxSdk.IsInitialized())
+                    {
+                        Debug.Log("[AdsManager] MAX SDK already initialized natively; replaying init handler.");
+                        OnMaxSdkInitialized(null);
+                        maxInitDispatched = true;
+                        return;
+                    }
+
+                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (UMP consent gathered, ATT resolved)...");
 
                     MaxSdk.SetSdkKey(MaxSdkKey);
                     MaxSdk.InitializeSdk();
@@ -840,9 +848,6 @@ namespace Assets.Scripts.Core
 
                 if (_liftEngineInitSettled || !isInitialized)
                     yield break;
-
-                Debug.LogWarning("[AdsManager] Safeguard: LiftEngine init not settled; retrying.");
-                TryStartLiftEngine();
             }
 
             if (_liftEngineInitSettled)
@@ -896,11 +901,19 @@ namespace Assets.Scripts.Core
                 // handled by AppLovin's built-in flow during InitializeSdk().
                 MaxSdk.SetDoNotSell(false);
 
-                Debug.Log("[AdsManager] Safeguard: initializing AppLovin MAX SDK...");
-
                 MaxSdkBase.InvokeEventsOnUnityMainThread = true;
                 MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
                 MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+
+                if (MaxSdk.IsInitialized())
+                {
+                    Debug.Log("[AdsManager] Safeguard: MAX already initialized natively; replaying init handler.");
+                    OnMaxSdkInitialized(null);
+                    return;
+                }
+
+                Debug.Log("[AdsManager] Safeguard: initializing AppLovin MAX SDK...");
+
                 MaxSdk.SetSdkKey(MaxSdkKey);
                 MaxSdk.InitializeSdk();
                 StartCoroutine(WaitForMaxSdkInitCallback());
@@ -951,6 +964,12 @@ namespace Assets.Scripts.Core
 
         private void OnMaxSdkInitialized(MaxSdkBase.SdkConfiguration sdkConfiguration)
         {
+            if (isInitialized)
+            {
+                Debug.Log("[AdsManager] MAX SDK init callback ignored (already handled).");
+                return;
+            }
+
             Debug.Log("[AdsManager] AppLovin MAX SDK Initialized Successfully.");
             isInitialized = true;
             isInitializing = false;
@@ -968,17 +987,8 @@ namespace Assets.Scripts.Core
 
             SubscribeToNoAdsStatus();
             RefreshAllReadiness();
-            StartCoroutine(PrewarmSettingsBannerAfterSdkInit());
-        }
-
-        private IEnumerator PrewarmSettingsBannerAfterSdkInit()
-        {
-            // Mirrors old OnMaxSdkInitialized → InitializeBannerAds, but deferred off the init frame.
-            yield return null;
-            yield return new WaitForEndOfFrame();
-            PrewarmSettingsBanner();
-            if (_bannerShowRequested)
-                SyncBannerNativeState();
+            // Banner prewarm is handled by HomeController after the lobby settles (~2s).
+            // Early prewarm here raced with scene load and could native-crash on Android WebView.
         }
 
         // ════════════════════════════════════════════
@@ -1727,6 +1737,9 @@ namespace Assets.Scripts.Core
 
         private void TryStartLiftEngine()
         {
+            if (_liftEngineStartRequested)
+                return;
+
             var settings = Resources.Load<LiftEngineSettings>(LiftEngineSettings.DefaultResourcePath);
             if (settings == null || string.IsNullOrWhiteSpace(settings.apiKey))
             {
@@ -1735,6 +1748,7 @@ namespace Assets.Scripts.Core
                 return;
             }
 
+            _liftEngineStartRequested = true;
             _liftEngineEnabled = true;
             SubscribeLiftEngineCallbacks();
             LiftEngineSdk.Initialize(settings);
@@ -1825,14 +1839,18 @@ namespace Assets.Scripts.Core
 
         private void OnLiftEngineSdkInitialized(LiftEngineInitializationStatus status)
         {
+            if (_liftEngineInitSettled)
+            {
+                Debug.Log("[AdsManager] LiftEngine init callback ignored (already handled).");
+                return;
+            }
+
             _liftEngineInitSettled = true;
             _liftEngineReady = status == LiftEngineInitializationStatus.Success;
             if (_liftEngineReady)
             {
                 Debug.Log("[AdsManager] LiftEngine SDK initialized — all ad formats routed through predict/track flow.");
-                PrewarmSettingsBanner();
-                if (_bannerShowRequested)
-                    SyncBannerNativeState();
+                // Banner prewarm deferred to HomeController.PrewarmBannerAfterLobbySettled (~2s).
             }
             else
             {

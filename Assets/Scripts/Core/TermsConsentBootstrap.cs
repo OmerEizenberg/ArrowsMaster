@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using Assets.Scripts.Lobby;
 
 namespace Assets.Scripts.Core
@@ -70,6 +71,20 @@ namespace Assets.Scripts.Core
         {
             // One frame so AdsManager has subscribed to OnSdkInitAllowed before we raise it.
             yield return null;
+
+            // Defer native SDK init until the first scene has finished loading. Starting MAX/Singular
+            // during BeforeSceneLoad/scene activation was causing native crashes right as the lobby appeared.
+            Scene activeScene = SceneManager.GetActiveScene();
+            if (!activeScene.isLoaded)
+            {
+                bool sceneReady = false;
+                void OnSceneLoaded(Scene scene, LoadSceneMode mode) => sceneReady = true;
+                SceneManager.sceneLoaded += OnSceneLoaded;
+                while (!sceneReady && !activeScene.isLoaded)
+                    yield return null;
+                SceneManager.sceneLoaded -= OnSceneLoaded;
+            }
+
             yield return ResolveAttIfNeeded();
             TermsConsentManager.NotifySdkInitAllowed();
         }
