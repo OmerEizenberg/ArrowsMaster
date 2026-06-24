@@ -134,6 +134,21 @@ namespace LiftEngine.Api
             _host.StartCoroutine(Get("GET", "/v1/track/activeview" + query, true, null));
         }
 
+        public void TrackError(string bundleId, string deviceId, string auctionId, string errorCode,
+            string errorMessage)
+        {
+            var query = BuildTrackQuery(new Dictionary<string, string>
+            {
+                ["bundle_id"] = bundleId,
+                ["device_id"] = deviceId,
+                ["auction_id"] = auctionId ?? string.Empty,
+                ["error_code"] = errorCode,
+                ["error_message"] = errorMessage
+            }, null);
+
+            _host.StartCoroutine(Get("GET", "/v1/track/error" + query, true, null));
+        }
+
         private static string BuildTrackQuery(Dictionary<string, string> fields, float? rev)
         {
             var sb = new StringBuilder("?");
@@ -164,6 +179,7 @@ namespace LiftEngine.Api
             LiftEngineLogger.LogClient($"{method} {path}");
 
             using var request = UnityWebRequest.Get(url);
+            ApplyUserAgent(request);
             if (auth)
                 request.SetRequestHeader("Authorization", "Bearer " + _settings.apiKey);
 
@@ -184,6 +200,7 @@ namespace LiftEngine.Api
             using var request = new UnityWebRequest(url, "POST");
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
             request.downloadHandler = new DownloadHandlerBuffer();
+            ApplyUserAgent(request);
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", "Bearer " + _settings.apiKey);
             request.timeout = Mathf.CeilToInt(_settings.predictTimeoutSeconds);
@@ -223,6 +240,7 @@ namespace LiftEngine.Api
             using var request = new UnityWebRequest(url, "POST");
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
             request.downloadHandler = new DownloadHandlerBuffer();
+            ApplyUserAgent(request);
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", "Bearer " + _settings.apiKey);
             request.timeout = Mathf.CeilToInt(_settings.predictTimeoutSeconds);
@@ -234,6 +252,9 @@ namespace LiftEngine.Api
             LogBackendResponse("POST", path, code, body);
             callback?.Invoke(code, body);
         }
+
+        private static void ApplyUserAgent(UnityWebRequest request) =>
+            request.SetRequestHeader("User-Agent", ClassicUserAgentProvider.Build());
 
         private static void LogBackendResponse(string method, string path, int code, string body)
         {

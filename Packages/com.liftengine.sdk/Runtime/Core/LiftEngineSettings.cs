@@ -90,9 +90,6 @@ namespace LiftEngine
         [Tooltip("If enabled, LiftEngineSdk.Initialize() runs automatically at app start. Usually leave off and call Initialize from AdsManager after consent.")]
         public bool autoInitialize = false;
 
-        [Tooltip("Call GET /health/live once during LiftEngine initialization.")]
-        public bool runHealthCheckOnInit = true;
-
         [Tooltip("Log detailed [LiftEngine] messages to the Unity console.")]
         public bool verboseLogging = false;
 

@@ -37,6 +37,5 @@ MonoBehaviour:
   maxBidZeroRounds: 5
   showWaitMaxSeconds: 30
   autoInitialize: 0
-  runHealthCheckOnInit: 1
   verboseLogging: 0
   debugMode: 0

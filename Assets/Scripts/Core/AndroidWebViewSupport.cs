@@ -122,14 +122,18 @@ namespace Assets.Scripts.Core
                     if (activity == null)
                         return false;
 
-                    // Unity runs on the Android main thread; create/destroy here mirrors AppLovinAdView init.
-                    using (var webView = new AndroidJavaObject("android.webkit.WebView", activity))
+                    // JNI from Unity can run on the render thread (nativeRender). WebView must be
+                    // created on the Android UI thread — delegate to a Java helper that uses runOnUiThread.
+                    using (var helper = new AndroidJavaClass("com.everybodygames.arrowsmaster.WebViewPrewarmHelper"))
                     {
-                        webView.Call("destroy");
-                    }
+                        bool prewarmed = helper.CallStatic<bool>("prewarm", activity);
+                        if (prewarmed)
+                            Debug.Log("[AndroidWebViewSupport] WebView prewarm succeeded.");
+                        else
+                            Debug.LogWarning("[AndroidWebViewSupport] WebView prewarm failed; banner ads disabled.");
 
-                    Debug.Log("[AndroidWebViewSupport] WebView prewarm succeeded.");
-                    return true;
+                        return prewarmed;
+                    }
                 }
             }
             catch (Exception e)

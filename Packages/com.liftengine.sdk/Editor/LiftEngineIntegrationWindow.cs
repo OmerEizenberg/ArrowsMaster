@@ -265,7 +265,6 @@ namespace LiftEngine.Editor
             DrawProperty(so, "prewarmOnInit");
             DrawProperty(so, "prewarmAfterShow");
             DrawProperty(so, "autoInitialize");
-            DrawProperty(so, "runHealthCheckOnInit");
             DrawProperty(so, "verboseLogging");
             DrawProperty(so, "debugMode");
 
@@ -354,7 +353,7 @@ namespace LiftEngine.Editor
                     if (LiftEngineSdk.IsInitialized)
                         Log("Initialize LiftEngine SDK — completed immediately (already initialized).");
                     else
-                        Log("Initialize LiftEngine SDK — waiting for mediation / health check…");
+                        Log("Initialize LiftEngine SDK — waiting for mediation…");
                 }
             }
 
