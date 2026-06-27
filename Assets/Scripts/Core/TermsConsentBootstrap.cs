@@ -110,6 +110,26 @@ namespace Assets.Scripts.Core
             if (TermsConsentManager.HasUserDecided || _popupInstance != null)
                 yield break;
 
+            // Never compete with Google UMP on first launch — wait for the init gate, then for MAX
+            // to finish (or time out) before overlaying the cosmetic terms acknowledgement.
+            while (!TermsConsentManager.IsSdkInitAllowed)
+                yield return null;
+
+            const float maxSdkWaitSeconds = 20f;
+            float waited = 0f;
+            while (AdsManager.Instance != null &&
+                   !AdsManager.Instance.IsInitialized &&
+                   waited < maxSdkWaitSeconds)
+            {
+                yield return new WaitForSeconds(0.5f);
+                waited += 0.5f;
+            }
+
+            yield return new WaitForSeconds(0.5f);
+
+            if (TermsConsentManager.HasUserDecided || _popupInstance != null)
+                yield break;
+
             EnsureOverlayCanvas();
             EnsureEventSystem();
             var prefab = Resources.Load<GameObject>("TermsAndConditionsPopup");

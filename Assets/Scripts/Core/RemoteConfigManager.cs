@@ -11,6 +11,8 @@ public class RemoteConfigManager : MonoBehaviour
 
     private const string PREF_KEY_HAS_CACHE = "RC_HasCache";
     private const string PREF_PREFIX = "RC_";
+    private const string PREF_IND_PREFIX = "RC_IND_";
+    private const string LEGACY_UPDATE_VERSION_DEFAULT = "1.0.0";
 
     // Remote Config Keys
     public const string KEY_FORCE_UPDATE_VERSION_ANDROID = "ForceUpdateVersionAndroid";
@@ -46,6 +48,7 @@ public class RemoteConfigManager : MonoBehaviour
     public bool IsFirebaseNativeReady => isFirebaseNativeReady;
 
     public event Action OnConfigInitialized;
+    public event Action OnUpdateVersionsChanged;
 
     private void Awake()
     {
@@ -58,6 +61,7 @@ public class RemoteConfigManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         BuildDefaultValues();
         InitializeActiveValuesFromDefaults();
+        MigrateLegacyUpdateVersionIndications();
         TryLoadCachedValuesFromPlayerPrefs();
 
         if (HasCachedConfig())
@@ -82,10 +86,10 @@ public class RemoteConfigManager : MonoBehaviour
     private void BuildDefaultValues()
     {
         defaults.Clear();
-        defaults[KEY_FORCE_UPDATE_VERSION_ANDROID] = "1.0.0";
-        defaults[KEY_FORCE_UPDATE_VERSION_IOS] = "1.0.0";
-        defaults[KEY_SOFT_UPDATE_VERSION_ANDROID] = "1.0.0";
-        defaults[KEY_SOFT_UPDATE_VERSION_IOS] = "1.0.0";
+        defaults[KEY_FORCE_UPDATE_VERSION_ANDROID] = string.Empty;
+        defaults[KEY_FORCE_UPDATE_VERSION_IOS] = string.Empty;
+        defaults[KEY_SOFT_UPDATE_VERSION_ANDROID] = string.Empty;
+        defaults[KEY_SOFT_UPDATE_VERSION_IOS] = string.Empty;
         defaults[KEY_FIRST_PLAY_ON] = 1600L;
         defaults[KEY_SEC_PLAY_ON] = 3200L;
         defaults[KEY_THIRD_PLAY_ON] = 4200L;
@@ -116,12 +120,66 @@ public class RemoteConfigManager : MonoBehaviour
 
     private static string GetPrefKey(string key) => PREF_PREFIX + key;
 
+    private static string GetIndicationPrefKey(string key) => PREF_IND_PREFIX + key;
+
+    private static bool IsUpdateVersionKey(string key) =>
+        key == KEY_FORCE_UPDATE_VERSION_ANDROID ||
+        key == KEY_FORCE_UPDATE_VERSION_IOS ||
+        key == KEY_SOFT_UPDATE_VERSION_ANDROID ||
+        key == KEY_SOFT_UPDATE_VERSION_IOS;
+
+    private bool HasUpdateVersionIndication(string key) =>
+        PlayerPrefs.GetInt(GetIndicationPrefKey(key), 0) == 1;
+
+    private void SetUpdateVersionIndication(string key, bool hasIndication)
+    {
+        PlayerPrefs.SetInt(GetIndicationPrefKey(key), hasIndication ? 1 : 0);
+    }
+
+    private void MigrateLegacyUpdateVersionIndications()
+    {
+        foreach (string key in GetUpdateVersionKeys())
+        {
+            if (HasUpdateVersionIndication(key))
+            {
+                continue;
+            }
+
+            string prefKey = GetPrefKey(key);
+            if (!PlayerPrefs.HasKey(prefKey))
+            {
+                continue;
+            }
+
+            string cachedVersion = PlayerPrefs.GetString(prefKey, string.Empty);
+            if (string.IsNullOrEmpty(cachedVersion) || cachedVersion == LEGACY_UPDATE_VERSION_DEFAULT)
+            {
+                continue;
+            }
+
+            SetUpdateVersionIndication(key, true);
+        }
+    }
+
+    private static IEnumerable<string> GetUpdateVersionKeys()
+    {
+        yield return KEY_FORCE_UPDATE_VERSION_ANDROID;
+        yield return KEY_FORCE_UPDATE_VERSION_IOS;
+        yield return KEY_SOFT_UPDATE_VERSION_ANDROID;
+        yield return KEY_SOFT_UPDATE_VERSION_IOS;
+    }
+
     private bool HasCachedConfig() => PlayerPrefs.GetInt(PREF_KEY_HAS_CACHE, 0) == 1;
 
     private void TryLoadCachedValuesFromPlayerPrefs()
     {
         foreach (KeyValuePair<string, object> kvp in defaults)
         {
+            if (IsUpdateVersionKey(kvp.Key) && !HasUpdateVersionIndication(kvp.Key))
+            {
+                continue;
+            }
+
             string prefKey = GetPrefKey(kvp.Key);
             if (!PlayerPrefs.HasKey(prefKey))
             {
@@ -244,6 +302,7 @@ public class RemoteConfigManager : MonoBehaviour
         }
 
         int changedCount = 0;
+        bool updateVersionsChanged = false;
 
         foreach (string key in defaults.Keys)
         {
@@ -253,10 +312,26 @@ public class RemoteConfigManager : MonoBehaviour
                 continue;
             }
 
+            if (IsUpdateVersionKey(key))
+            {
+                string remoteVersion = Convert.ToString(remoteValue);
+                if (string.IsNullOrEmpty(remoteVersion))
+                {
+                    continue;
+                }
+            }
+
             if (!activeValues.TryGetValue(key, out object currentValue) || !ValuesEqual(currentValue, remoteValue))
             {
                 activeValues[key] = remoteValue;
                 SaveValueToPlayerPrefs(key, remoteValue);
+
+                if (IsUpdateVersionKey(key))
+                {
+                    SetUpdateVersionIndication(key, true);
+                    updateVersionsChanged = true;
+                }
+
                 changedCount++;
                 Debug.Log($"[RemoteConfigManager] Remote config updated: {key}");
             }
@@ -275,6 +350,11 @@ public class RemoteConfigManager : MonoBehaviour
         else
         {
             Debug.Log("[RemoteConfigManager] Remote config sync complete. No PlayerPrefs changes needed.");
+        }
+
+        if (updateVersionsChanged)
+        {
+            OnUpdateVersionsChanged?.Invoke();
         }
     }
 
@@ -476,10 +556,61 @@ public class RemoteConfigManager : MonoBehaviour
         return value != null ? Convert.ToDouble(value) : 0.0;
     }
 
-    public string ForceUpdateVersionAndroid => GetString(KEY_FORCE_UPDATE_VERSION_ANDROID);
-    public string ForceUpdateVersionIOS => GetString(KEY_FORCE_UPDATE_VERSION_IOS);
-    public string SoftUpdateVersionAndroid => GetString(KEY_SOFT_UPDATE_VERSION_ANDROID);
-    public string SoftUpdateVersionIOS => GetString(KEY_SOFT_UPDATE_VERSION_IOS);
+    public bool HasForceUpdateVersionIndication =>
+        HasUpdateVersionIndication(KEY_FORCE_UPDATE_VERSION_ANDROID) ||
+        HasUpdateVersionIndication(KEY_FORCE_UPDATE_VERSION_IOS);
+
+    public bool HasSoftUpdateVersionIndication =>
+        HasUpdateVersionIndication(KEY_SOFT_UPDATE_VERSION_ANDROID) ||
+        HasUpdateVersionIndication(KEY_SOFT_UPDATE_VERSION_IOS);
+
+    public bool HasCurrentPlatformForceUpdateIndication
+    {
+        get
+        {
+#if UNITY_ANDROID
+            return HasUpdateVersionIndication(KEY_FORCE_UPDATE_VERSION_ANDROID);
+#elif UNITY_IOS
+            return HasUpdateVersionIndication(KEY_FORCE_UPDATE_VERSION_IOS);
+#else
+            return false;
+#endif
+        }
+    }
+
+    public bool HasCurrentPlatformSoftUpdateIndication
+    {
+        get
+        {
+#if UNITY_ANDROID
+            return HasUpdateVersionIndication(KEY_SOFT_UPDATE_VERSION_ANDROID);
+#elif UNITY_IOS
+            return HasUpdateVersionIndication(KEY_SOFT_UPDATE_VERSION_IOS);
+#else
+            return false;
+#endif
+        }
+    }
+
+    public string ForceUpdateVersionAndroid =>
+        HasUpdateVersionIndication(KEY_FORCE_UPDATE_VERSION_ANDROID)
+            ? GetString(KEY_FORCE_UPDATE_VERSION_ANDROID)
+            : string.Empty;
+
+    public string ForceUpdateVersionIOS =>
+        HasUpdateVersionIndication(KEY_FORCE_UPDATE_VERSION_IOS)
+            ? GetString(KEY_FORCE_UPDATE_VERSION_IOS)
+            : string.Empty;
+
+    public string SoftUpdateVersionAndroid =>
+        HasUpdateVersionIndication(KEY_SOFT_UPDATE_VERSION_ANDROID)
+            ? GetString(KEY_SOFT_UPDATE_VERSION_ANDROID)
+            : string.Empty;
+
+    public string SoftUpdateVersionIOS =>
+        HasUpdateVersionIndication(KEY_SOFT_UPDATE_VERSION_IOS)
+            ? GetString(KEY_SOFT_UPDATE_VERSION_IOS)
+            : string.Empty;
     public string ShareText => GetString(KEY_SHARE_TEXT);
     public string ShareUrl => GetString(KEY_SHARE_URL);
     public bool IsInterstitialActive => GetBool(KEY_IS_INTERSTITIAL_ACTIVE);
@@ -512,7 +643,7 @@ public class RemoteConfigManager : MonoBehaviour
 #elif UNITY_IOS
             return ForceUpdateVersionIOS;
 #else
-            return "1.0.0";
+            return string.Empty;
 #endif
         }
     }
@@ -526,7 +657,7 @@ public class RemoteConfigManager : MonoBehaviour
 #elif UNITY_IOS
             return SoftUpdateVersionIOS;
 #else
-            return "1.0.0";
+            return string.Empty;
 #endif
         }
     }

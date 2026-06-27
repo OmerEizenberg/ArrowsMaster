@@ -251,6 +251,8 @@ namespace Assets.Scripts.Lobby
                     RemoteConfigManager.Instance.OnConfigInitialized += CheckForUpdates;
                     RemoteConfigManager.Instance.OnConfigInitialized += UpdateRewardedAdAmount;
                 }
+
+                RemoteConfigManager.Instance.OnUpdateVersionsChanged += CheckForUpdates;
             }
 
             CheckForRateUsPopup();
@@ -293,6 +295,7 @@ namespace Assets.Scripts.Lobby
             {
                 RemoteConfigManager.Instance.OnConfigInitialized -= CheckForUpdates;
                 RemoteConfigManager.Instance.OnConfigInitialized -= UpdateRewardedAdAmount;
+                RemoteConfigManager.Instance.OnUpdateVersionsChanged -= CheckForUpdates;
             }
 
             // Stop any running animation coroutines
@@ -1215,37 +1218,54 @@ namespace Assets.Scripts.Lobby
                 RemoteConfigManager.Instance.OnConfigInitialized -= CheckForUpdates;
             }
 
+            if (RemoteConfigManager.Instance == null)
+            {
+                return;
+            }
+
             string currentVersion = Application.version;
             bool isForce = false;
             bool isSoft = false;
 
             #if UNITY_ANDROID
-            string forceVersion = RemoteConfigManager.Instance.ForceUpdateVersionAndroid;
-            string softVersion = RemoteConfigManager.Instance.SoftUpdateVersionAndroid;
-
-            if (CompareVersions(forceVersion, currentVersion) > 0)
+            if (RemoteConfigManager.Instance.HasCurrentPlatformForceUpdateIndication)
             {
-                Debug.Log("[CheckForUpdates] Android Force detected");
-                isForce = true;
+                string forceVersion = RemoteConfigManager.Instance.ForceUpdateVersionAndroid;
+                if (CompareVersions(forceVersion, currentVersion) > 0)
+                {
+                    Debug.Log("[CheckForUpdates] Android Force detected");
+                    isForce = true;
+                }
             }
-            else if (CompareVersions(softVersion, currentVersion) > 0)
+
+            if (!isForce && RemoteConfigManager.Instance.HasCurrentPlatformSoftUpdateIndication)
             {
-                Debug.Log("[CheckForUpdates] Android Soft detected");
-                isSoft = true;
+                string softVersion = RemoteConfigManager.Instance.SoftUpdateVersionAndroid;
+                if (CompareVersions(softVersion, currentVersion) > 0)
+                {
+                    Debug.Log("[CheckForUpdates] Android Soft detected");
+                    isSoft = true;
+                }
             }
             #elif UNITY_IOS
-            string forceVersion = RemoteConfigManager.Instance.ForceUpdateVersionIOS;
-            string softVersion = RemoteConfigManager.Instance.SoftUpdateVersionIOS;
-
-            if (CompareVersions(forceVersion, currentVersion) > 0)
+            if (RemoteConfigManager.Instance.HasCurrentPlatformForceUpdateIndication)
             {
-                Debug.Log("[CheckForUpdates] iOS Force detected");
-                isForce = true;
+                string forceVersion = RemoteConfigManager.Instance.ForceUpdateVersionIOS;
+                if (CompareVersions(forceVersion, currentVersion) > 0)
+                {
+                    Debug.Log("[CheckForUpdates] iOS Force detected");
+                    isForce = true;
+                }
             }
-            else if (CompareVersions(softVersion, currentVersion) > 0)
+
+            if (!isForce && RemoteConfigManager.Instance.HasCurrentPlatformSoftUpdateIndication)
             {
-                Debug.Log("[CheckForUpdates] iOS Soft detected");
-                isSoft = true;
+                string softVersion = RemoteConfigManager.Instance.SoftUpdateVersionIOS;
+                if (CompareVersions(softVersion, currentVersion) > 0)
+                {
+                    Debug.Log("[CheckForUpdates] iOS Soft detected");
+                    isSoft = true;
+                }
             }
             #endif
 

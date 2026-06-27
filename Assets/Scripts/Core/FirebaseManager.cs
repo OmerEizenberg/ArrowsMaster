@@ -79,6 +79,7 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string PARAM_MAGICWAND = "magicwand";
     public const string PARAM_REFILL = "refill";
     public const string PARAM_REASON = "reason";
+    public const string PARAM_APP_VERSION = "app_version";
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoInitialize()

@@ -101,6 +101,12 @@ namespace Assets.Scripts.Core
         // June-2 behavior: gather UMP/GDPR consent before MAX init, but never block init longer than this
         // — on timeout we proceed and initialize anyway so init% is not sacrificed.
         private const float ConsentGatherTimeoutSeconds = 60f;
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Android lobby load can block the main thread longer than iOS; 10s caused main_thread_dispatch_timeout.
+        private const float MaxSdkMainThreadDispatchTimeoutSeconds = 30f;
+#else
+        private const float MaxSdkMainThreadDispatchTimeoutSeconds = 10f;
+#endif
         private const float RewardedPlacementWaitSeconds = 12f;
         private const float BannerCreateSettleDelaySeconds = 0.25f;
         private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
@@ -118,6 +124,10 @@ namespace Assets.Scripts.Core
         // or find it at: https://dash.applovin.com/o/account#keys
         // ──────────────────────────────────────────────────────────────────
         private const string MaxSdkKey = "ghH9pVPTzdwgPfawqgCRPHWUMcR85KmpzpPlRCJwUDO8Uv4Xgn4oi52lcNTPuCb3ysqbfIUBUfNkrVdmvmuqTI";
+
+        private const string BaseBannerPlacement = "Base_bnr";
+        private const string BaseInterstitialPlacement = "Base_int";
+        private const string BaseRewardedPlacement = "Base_rv";
 
         #region Ad Unit IDs
 
@@ -698,53 +708,35 @@ namespace Assets.Scripts.Core
                 // initializes with IDFA available where the user authorized it (customized ads preserved).
                 // The cosmetic terms popup never gates init.
 
-                // June-2 GDPR/CMP: gather Google UMP consent BEFORE MAX init so the IAB TCF string is set
-                // for mediated networks, but bound it with a timer — if consent doesn't finish within
-                // ConsentGatherTimeoutSeconds we proceed and initialize anyway (init% is never sacrificed).
+                // UMP runs once per install (or until safeguard fallback). Persisted consent skips the
+                // network/form on every subsequent cold start so MAX init is immediate.
                 bool consentFinished = false;
                 EnqueueAction(() => ConsentManager.RequestConsent(() => consentFinished = true));
 
                 float consentWaitStart = Time.time;
                 while (!consentFinished && Time.time - consentWaitStart < ConsentGatherTimeoutSeconds)
                     await Task.Yield();
+
                 if (!consentFinished)
-                    Debug.LogWarning("[AdsManager] Consent flow timed out; proceeding with MAX init anyway.");
+                {
+                    Debug.LogWarning("[AdsManager] Consent flow timed out; applying MAX consent fallback.");
+                    EnqueueAction(() => ConsentManager.ApplyFallbackConsentForMaxInit("init_timeout"));
+                }
 
                 bool maxInitDispatched = false;
-                EnqueueAction(() =>
-                {
-                    // CCPA: false = user has NOT opted out of sale of personal info.
-                    MaxSdk.SetDoNotSell(false);
-
-                    MaxSdkBase.InvokeEventsOnUnityMainThread = true;
-
-                    MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
-                    MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
-
-                    if (MaxSdk.IsInitialized())
-                    {
-                        Debug.Log("[AdsManager] MAX SDK already initialized natively; replaying init handler.");
-                        OnMaxSdkInitialized(null);
-                        maxInitDispatched = true;
-                        return;
-                    }
-
-                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (UMP consent gathered, ATT resolved)...");
-
-                    MaxSdk.SetSdkKey(MaxSdkKey);
-                    MaxSdk.InitializeSdk();
-                    maxInitDispatched = true;
-                    StartCoroutine(WaitForMaxSdkInitCallback());
-                });
+                EnqueueInitializeMaxSdk(dispatched => maxInitDispatched = dispatched);
 
                 float maxInitWaitStart = Time.time;
-                while (!maxInitDispatched && Time.time - maxInitWaitStart < 10f)
+                while (!maxInitDispatched && Time.time - maxInitWaitStart < MaxSdkMainThreadDispatchTimeoutSeconds)
                     await Task.Yield();
                 if (!maxInitDispatched)
                 {
-                    Debug.LogWarning("[AdsManager] Timed out waiting to dispatch MAX SDK initialization on main thread.");
+                    Debug.LogWarning(
+                        $"[AdsManager] Timed out waiting to dispatch MAX SDK initialization on main thread " +
+                        $"({MaxSdkMainThreadDispatchTimeoutSeconds}s).");
                     LogMaxSdkInitFailed("main_thread_dispatch_timeout");
                     isInitializing = false;
+                    _ = RetrySDKInitialization(5000);
                 }
             }
             catch (Exception e)
@@ -786,6 +778,47 @@ namespace Assets.Scripts.Core
                 $"[AdsManager] MAX SDK init callback timed out after {MaxSdkInitCallbackTimeoutSeconds}s.");
             LogMaxSdkInitFailed("callback_timeout");
             isInitializing = false;
+            _ = RetrySDKInitialization(5000);
+        }
+
+        /// <summary>
+        /// Applies UMP privacy flags, disables AppLovin duplicate consent, and calls InitializeSdk on the
+        /// Unity main thread. Shared by the normal init path and the safeguard backstop.
+        /// </summary>
+        private void EnqueueInitializeMaxSdk(Action<bool> onDispatched)
+        {
+            EnqueueAction(() =>
+            {
+                try
+                {
+                    ConsentManager.ConfigureMaxPrivacyBeforeInit();
+
+                    MaxSdkBase.InvokeEventsOnUnityMainThread = true;
+
+                    MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
+                    MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+
+                    if (MaxSdk.IsInitialized())
+                    {
+                        Debug.Log("[AdsManager] MAX SDK already initialized natively; replaying init handler.");
+                        OnMaxSdkInitialized(null);
+                        onDispatched?.Invoke(true);
+                        return;
+                    }
+
+                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (UMP consent gathered, ATT resolved)...");
+
+                    MaxSdk.SetSdkKey(MaxSdkKey);
+                    MaxSdk.InitializeSdk();
+                    StartCoroutine(WaitForMaxSdkInitCallback());
+                    onDispatched?.Invoke(true);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[AdsManager] MAX SDK main-thread dispatch failed: {e.Message}");
+                    onDispatched?.Invoke(false);
+                }
+            });
         }
 
         // ════════════════════════════════════════════
@@ -897,27 +930,43 @@ namespace Assets.Scripts.Core
 
             EnqueueAction(() =>
             {
-                // CCPA: false = user has NOT opted out of sale of personal info. GDPR/ATT consent is
-                // handled by AppLovin's built-in flow during InitializeSdk().
-                MaxSdk.SetDoNotSell(false);
-
-                MaxSdkBase.InvokeEventsOnUnityMainThread = true;
-                MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
-                MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
-
-                if (MaxSdk.IsInitialized())
-                {
-                    Debug.Log("[AdsManager] Safeguard: MAX already initialized natively; replaying init handler.");
-                    OnMaxSdkInitialized(null);
-                    return;
-                }
-
-                Debug.Log("[AdsManager] Safeguard: initializing AppLovin MAX SDK...");
-
-                MaxSdk.SetSdkKey(MaxSdkKey);
-                MaxSdk.InitializeSdk();
-                StartCoroutine(WaitForMaxSdkInitCallback());
+                Debug.LogWarning("[AdsManager] Safeguard: forcing MAX SDK initialization.");
+                StartCoroutine(SafeguardInitializeMaxSdkRoutine());
             });
+        }
+
+        private IEnumerator SafeguardInitializeMaxSdkRoutine()
+        {
+            if (!ConsentManager.IsConsentFlowCompleted && !ConsentManager.ShouldSkipUmpGathering)
+            {
+                bool consentFinished = false;
+                EnqueueAction(() => ConsentManager.RequestConsent(() => consentFinished = true));
+
+                float consentWaitStart = Time.time;
+                while (!consentFinished && Time.time - consentWaitStart < ConsentGatherTimeoutSeconds)
+                    yield return null;
+
+                if (!consentFinished)
+                {
+                    Debug.LogWarning("[AdsManager] Safeguard: UMP consent hung; forcing MAX consent fallback.");
+                    EnqueueAction(() =>
+                        ConsentManager.ApplyFallbackConsentForMaxInit("safeguard_ump_timeout"));
+                }
+            }
+            else if (!ConsentManager.HasPersistedConsentForMax)
+            {
+                // Consent flow cannot hang MAX forever — persist a safe default and init.
+                Debug.LogWarning("[AdsManager] Safeguard: MAX consent not persisted; forcing fallback.");
+                EnqueueAction(() =>
+                    ConsentManager.ApplyFallbackConsentForMaxInit("safeguard_missing_persisted_consent"));
+            }
+
+            bool dispatched = false;
+            EnqueueInitializeMaxSdk(success => dispatched = success);
+
+            float dispatchWaitStart = Time.time;
+            while (!dispatched && Time.time - dispatchWaitStart < MaxSdkMainThreadDispatchTimeoutSeconds)
+                yield return null;
         }
 
         private void LogMaxSdkInitialized()
@@ -927,7 +976,11 @@ namespace Assets.Scripts.Core
 
             _maxSdkInitSuccessLogged = true;
             if (FirebaseManager.Instance != null)
-                FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_MAX_SDK_INITIALIZED);
+            {
+                FirebaseManager.Instance.LogFunnelEvent(
+                    FirebaseManager.EVENT_MAX_SDK_INITIALIZED,
+                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_APP_VERSION, Application.version));
+            }
         }
 
         private void LogMaxSdkInitFailed(string reason)
@@ -1097,7 +1150,7 @@ namespace Assets.Scripts.Core
                 if (_liftEngineReady)
                     ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
                 else
-                    MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                    MaxSdk.ShowInterstitial(InterstitialAdUnitId, BaseInterstitialPlacement);
             }
             else
             {
@@ -1323,9 +1376,9 @@ namespace Assets.Scripts.Core
 
             EnsureFullscreenMaxCallbacks();
             if (format == LiftEngineAdFormat.Interstitial)
-                MaxSdk.ShowInterstitial(InterstitialAdUnitId);
+                MaxSdk.ShowInterstitial(InterstitialAdUnitId, BaseInterstitialPlacement);
             else
-                MaxSdk.ShowRewardedAd(RewardedAdUnitId);
+                MaxSdk.ShowRewardedAd(RewardedAdUnitId, BaseRewardedPlacement);
         }
 
         private void EnsureFullscreenAdsLoaded()
@@ -1517,6 +1570,7 @@ namespace Assets.Scripts.Core
                     SubscribeBannerCallbacks();
                     Debug.Log("[AdsManager] Creating Settings Banner Ad (deferred)...");
                     MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
+                    MaxSdk.SetBannerPlacement(BannerAdUnitId, BaseBannerPlacement);
                     MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
                     _bannerCreated = true;
                 }
