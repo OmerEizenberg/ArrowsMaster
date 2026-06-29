@@ -1002,6 +1002,8 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnHintButtonClicked()
     {
+        if (GameManager.Instance == null || !GameManager.Instance.CanInteract) return;
+
         LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_HINT_CLICKED);
         ResetIdleBoosterNudgeTimer();
 
@@ -1149,6 +1151,8 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnMagicButtonClicked()
     {
+        if (GameManager.Instance == null || !GameManager.Instance.CanInteract) return;
+
         LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_MAGIC_CLICKED);
         ResetIdleBoosterNudgeTimer();
 
@@ -1197,6 +1201,8 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnRefillButtonClicked()
     {
+        if (GameManager.Instance == null || !GameManager.Instance.CanInteract) return;
+
         LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_REFILL_CLICKED);
         ResetIdleBoosterNudgeTimer();
 
@@ -1241,7 +1247,8 @@ public class GameUIContoleer : MonoBehaviour
 
     public void OnShuffleButtonClicked()
     {
-        if (GameManager.Instance == null || !GameManager.Instance.IsShuffleOn) return;
+        if (GameManager.Instance == null || !GameManager.Instance.CanInteract) return;
+        if (!GameManager.Instance.IsShuffleOn) return;
 
         LogBoosterClicked(FirebaseManager.EVENT_BOOSTER_SHUFFLE_CLICKED);
         ResetIdleBoosterNudgeTimer();

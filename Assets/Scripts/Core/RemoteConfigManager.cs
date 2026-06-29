@@ -36,6 +36,7 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_IS_SHUFFLE_ON = "isShuffleOn";
     public const string KEY_NETFLIX_EFFECT = "NetflixEffect";
     public const string KEY_IS_GAE = "isGAE";
+    public const string KEY_IS_OFFLINE = "isOffline";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
     private readonly Dictionary<string, object> activeValues = new Dictionary<string, object>();
@@ -48,6 +49,7 @@ public class RemoteConfigManager : MonoBehaviour
     public bool IsFirebaseNativeReady => isFirebaseNativeReady;
 
     public event Action OnConfigInitialized;
+    public event Action OnConfigValuesUpdated;
     public event Action OnUpdateVersionsChanged;
 
     private void Awake()
@@ -107,6 +109,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_IS_SHUFFLE_ON] = true;
         defaults[KEY_NETFLIX_EFFECT] = false;
         defaults[KEY_IS_GAE] = false;
+        defaults[KEY_IS_OFFLINE] = false;
     }
 
     private void InitializeActiveValuesFromDefaults()
@@ -346,6 +349,7 @@ public class RemoteConfigManager : MonoBehaviour
         if (changedCount > 0)
         {
             Debug.Log($"[RemoteConfigManager] Synced {changedCount} remote config value(s) to PlayerPrefs.");
+            OnConfigValuesUpdated?.Invoke();
         }
         else
         {
@@ -628,6 +632,10 @@ public class RemoteConfigManager : MonoBehaviour
     public bool IsShuffleOn => GetBool(KEY_IS_SHUFFLE_ON);
     public bool IsNetflixEffectEnabled => GetBool(KEY_NETFLIX_EFFECT);
     public bool IsGAEEnabled => GetBool(KEY_IS_GAE);
+    /// <summary>
+    /// When true, the app allows offline play. When false, a reconnect popup is shown after sustained loss of connectivity.
+    /// </summary>
+    public bool IsOfflineSupported => GetBool(KEY_IS_OFFLINE);
     public float PtsMul => (float)GetDouble(KEY_PTS_MUL);
 
     #endregion

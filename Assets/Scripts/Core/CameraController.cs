@@ -137,9 +137,19 @@ namespace Assets.Scripts.Core
             m_CurrentMousePos   = Input.mousePosition;
             m_CurrentOrthoSize  = cam.orthographicSize;
 
-            HandleDesktopZoom();
-            HandleMobileZoom(m_CurrentTouchCount);
-            HandlePanning(m_CurrentTouchCount);
+            if (GameManager.Instance == null || GameManager.Instance.CanInteract)
+            {
+                HandleDesktopZoom();
+                HandleMobileZoom(m_CurrentTouchCount);
+                HandlePanning(m_CurrentTouchCount);
+            }
+            else
+            {
+                isTouching = false;
+                isPanningActive = false;
+                isRollingInertia = false;
+                inertiaVelocity = Vector3.zero;
+            }
 
             // Handle smooth return to maxZoom if over-zoomed and not interacting
             bool isInteracting = isZoomingInteraction || isTouching || m_CurrentTouchCount > 0 || Input.GetMouseButton(0);

@@ -1,14 +1,14 @@
 {
   "dependencies": {
     "com.applovin.mediation.adapters.bytedance.android": {
-      "version": "801000300.0.0",
+      "version": "801000400.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.bytedance.ios": {
-      "version": "801000900.0.0",
+      "version": "801010000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -36,7 +36,7 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.google.ios": {
-      "version": "13050000.0.0",
+      "version": "13060000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -50,7 +50,7 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.googleadmanager.ios": {
-      "version": "13050000.0.0",
+      "version": "13060000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -70,15 +70,43 @@
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
+    "com.applovin.mediation.adapters.ironsource.android": {
+      "version": "904040000.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://unity.packages.applovin.com"
+    },
+    "com.applovin.mediation.adapters.ironsource.ios": {
+      "version": "904010000.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://unity.packages.applovin.com"
+    },
+    "com.applovin.mediation.adapters.moloco.android": {
+      "version": "4090000.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://unity.packages.applovin.com"
+    },
+    "com.applovin.mediation.adapters.moloco.ios": {
+      "version": "4080000.0.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://unity.packages.applovin.com"
+    },
     "com.applovin.mediation.adapters.unityads.android": {
-      "version": "4180100.0.0",
+      "version": "4190000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.unityads.ios": {
-      "version": "4180100.0.0",
+      "version": "4190000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},

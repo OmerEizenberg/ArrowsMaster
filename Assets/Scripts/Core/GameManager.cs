@@ -163,6 +163,7 @@ namespace Assets.Scripts.Core
         private Vector2[] m_QuarterCenters = new Vector2[4];
 
         public bool CanInteract => isEntranceFinished && !isWinning && !isTimeUp && !isShuffleInProgress &&
+                                !NetworkReconnectManager.IsPopupVisible &&
                                 (failureScreen == null || !failureScreen.activeInHierarchy) &&
                                 (m_LobbyUI == null || !m_LobbyUI.activeInHierarchy) &&
                                 (m_FunFact == null || !m_FunFact.activeInHierarchy);
@@ -1457,7 +1458,8 @@ namespace Assets.Scripts.Core
             bool isFailureVisible = failureScreen != null && failureScreen.activeInHierarchy;
             bool isLobbyVisible = m_LobbyUI != null && m_LobbyUI.activeInHierarchy;
 
-            if (isEntranceFinished && !isWinning && !isHintVisible && !isFailureVisible && !isLobbyVisible)
+            if (isEntranceFinished && !isWinning && !isHintVisible && !isFailureVisible && !isLobbyVisible &&
+                !NetworkReconnectManager.IsPopupVisible)
             {
                 hintTimer += Time.deltaTime;
                 hintAdPollTimer += Time.deltaTime;
@@ -1476,6 +1478,7 @@ namespace Assets.Scripts.Core
             // FTUE arrow nudge for levels 2-6
             int nudgeLevel = UserDataManager.Instance.CurrentLevel;
             if (isEntranceFinished && !isWinning && !isFailureVisible && !isLobbyVisible
+                && !NetworkReconnectManager.IsPopupVisible
                 && nudgeLevel > 1 && nudgeLevel < 7
                 && m_ArrowNudgePrefab != null && m_currentArrowNudge == null)
             {
@@ -1503,7 +1506,8 @@ namespace Assets.Scripts.Core
             }
 
             // Update countdown timer
-            if (isTimerActive && isEntranceFinished && !isWinning && !isFailureVisible && !isLobbyVisible)
+            if (isTimerActive && isEntranceFinished && !isWinning && !isFailureVisible && !isLobbyVisible &&
+                !NetworkReconnectManager.IsPopupVisible)
             {
                 currentTime -= Time.deltaTime;
                 
