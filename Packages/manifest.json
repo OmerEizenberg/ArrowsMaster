@@ -67,7 +67,7 @@
         "com.applovin.mediation.adapters.inmobi.android": "11030000.0.0",
         "com.applovin.mediation.adapters.moloco.ios": "4080000.0.0",
         "com.applovin.mediation.adapters.moloco.android": "4090000.0.0",
-        "com.applovin.mediation.adapters.ironsource.ios": "904010000.0.0",
+        "com.applovin.mediation.adapters.ironsource.ios": "904020000.0.0",
         "com.applovin.mediation.adapters.ironsource.android": "904040000.0.0"
     },
     "scopedRegistries": [

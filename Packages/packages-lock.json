@@ -78,7 +78,7 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.ironsource.ios": {
-      "version": "904010000.0.0",
+      "version": "904020000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
