@@ -108,8 +108,15 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
         SingularSDK.registeredDDLHandler = this;
         SingularSDK.SetSingularDeviceAttributionCallbackHandler(this);
         SingularSDK.registeredConversionValuesUpdatedHandler = this;
+
+        var singular = FindFirstObjectByType<SingularSDK>();
+        if (singular != null)
+        {
+            singular.InitializeOnAwake = true;
+            singular.waitForTrackingAuthorizationWithTimeoutInterval = 300;
+            Debug.Log("[FirebaseManager] Configured Singular auto-init and ATT timeout (300s) in Awake.");
+        }
         #endif
-        // Singular init + ATT ordering is handled by IOSAttributionBootstrap on iOS.
         // -----------------------------------------------------------------
     }
 

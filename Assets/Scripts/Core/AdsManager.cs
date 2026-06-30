@@ -65,8 +65,6 @@ namespace Assets.Scripts.Core
         private bool _fullscreenMaxCallbacksSubscribed;
         private bool _maxSdkInitSuccessLogged;
         private bool _maxSdkInitFailedLogged;
-        private bool _safeguardSdkInitLogged;
-        private Coroutine _safeguardSdkInitCoroutine;
 
         private static readonly ConcurrentQueue<SingularAdRevenuePayload> _pendingSingularRevenue =
             new ConcurrentQueue<SingularAdRevenuePayload>();
@@ -95,18 +93,8 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
-        private const float MaxSdkInitCallbackTimeoutSeconds = 30f;
-        private const float SafeguardSdkInitDelaySeconds = 60f;
-        private const float LiftEngineInitSafeguardTimeoutSeconds = 90f;
-        // June-2 behavior: gather UMP/GDPR consent before MAX init, but never block init longer than this
-        // — on timeout we proceed and initialize anyway so init% is not sacrificed.
         private const float ConsentGatherTimeoutSeconds = 60f;
-#if UNITY_ANDROID && !UNITY_EDITOR
-        // Android lobby load can block the main thread longer than iOS; 10s caused main_thread_dispatch_timeout.
-        private const float MaxSdkMainThreadDispatchTimeoutSeconds = 30f;
-#else
-        private const float MaxSdkMainThreadDispatchTimeoutSeconds = 10f;
-#endif
+        private const float AttGatherTimeoutSeconds = 30f;
         private const float RewardedPlacementWaitSeconds = 12f;
         private const float BannerCreateSettleDelaySeconds = 0.25f;
         private const float BannerCreateSettleDelayLowEndSeconds = 0.75f;
@@ -202,20 +190,8 @@ namespace Assets.Scripts.Core
 
             _coinsExplosionPrefab = Resources.Load<GameObject>("CoinsSmallExplosion");
 
-            TermsConsentManager.OnSdkInitAllowed += HandleSdkInitAllowed;
-            if (TermsConsentManager.IsSdkInitAllowed)
-                _ = InitializeSDK();
-            else
-                Debug.Log("[AdsManager] Waiting for ATT decision on iOS before ads initialization (terms popup is non-blocking).");
-
+            _ = InitializeSDK();
             StartCoroutine(AdHealthCheckRoutine());
-            StartSafeguardSdkInitWatchdog();
-        }
-
-        private void HandleSdkInitAllowed()
-        {
-            if (!isInitialized && !isInitializing)
-                _ = InitializeSDK();
         }
 
         private void Start()
@@ -238,9 +214,6 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
-            TermsConsentManager.OnSdkInitAllowed -= HandleSdkInitAllowed;
-            StopSafeguardSdkInitWatchdog();
-
             UnsubscribeLiftEngineCallbacks();
 
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
@@ -689,55 +662,58 @@ namespace Assets.Scripts.Core
 
         private async Task InitializeSDK()
         {
-            // Decoupled from terms acknowledgement. IsSdkInitAllowed opens immediately on Android and
-            // after the ATT decision on iOS (so customized/IDFA ads are preserved).
-            if (!TermsConsentManager.IsSdkInitAllowed)
-                return;
-
             if (isInitialized || isInitializing) return;
 
             isInitializing = true;
             try
             {
-                // Unity Gaming Services is only required for IAP, NOT for AppLovin MAX.
-                // It is warmed up independently by IAPManager; never block MAX init on it.
-                // A hanging/slow UGS init previously stalled the whole ads chain (major Android init blocker).
-                _ = WarmUpUnityServicesInBackground();
+                // Unity Gaming Services is only required for IAP — IAPManager.WarmUp() handles it independently.
+                // Do not block MAX init on UGS; a slow/hung UGS init must never stall the ads chain.
 
-                // ATT is already resolved before this point by TermsConsentBootstrap (iOS only), so MAX
-                // initializes with IDFA available where the user authorized it (customized ads preserved).
-                // The cosmetic terms popup never gates init.
+#if UNITY_IOS && !UNITY_EDITOR
+                bool attFinished = false;
+                EnqueueAction(() =>
+                {
+                    IOSAdsHelper.RequestATT();
+                    StartCoroutine(IOSAdsHelper.PollATTStatus(_ => attFinished = true));
+                });
+                float attWaitStart = Time.time;
+                while (!attFinished && Time.time - attWaitStart < AttGatherTimeoutSeconds)
+                    await Task.Yield();
+                if (!attFinished)
+                    Debug.LogWarning("[AdsManager] ATT flow timed out. Proceeding with ads initialization.");
+#endif
 
-                // UMP runs once per install (or until safeguard fallback). Persisted consent skips the
-                // network/form on every subsequent cold start so MAX init is immediate.
                 bool consentFinished = false;
-                EnqueueAction(() => ConsentManager.RequestConsent(() => consentFinished = true));
+                EnqueueAction(() =>
+                {
+                    ConsentManager.RequestConsent(() =>
+                    {
+                        consentFinished = true;
+                        Debug.Log("[AdsManager] Consent gathering finished. Continuing SDK Init.");
+                    });
+                });
 
                 float consentWaitStart = Time.time;
                 while (!consentFinished && Time.time - consentWaitStart < ConsentGatherTimeoutSeconds)
                     await Task.Yield();
-
                 if (!consentFinished)
-                {
-                    Debug.LogWarning("[AdsManager] Consent flow timed out; applying MAX consent fallback.");
-                    EnqueueAction(() => ConsentManager.ApplyFallbackConsentForMaxInit("init_timeout"));
-                }
+                    Debug.LogWarning("[AdsManager] Consent flow timed out. Proceeding with SDK initialization anyway.");
 
-                bool maxInitDispatched = false;
-                EnqueueInitializeMaxSdk(dispatched => maxInitDispatched = dispatched);
-
-                float maxInitWaitStart = Time.time;
-                while (!maxInitDispatched && Time.time - maxInitWaitStart < MaxSdkMainThreadDispatchTimeoutSeconds)
-                    await Task.Yield();
-                if (!maxInitDispatched)
+                EnqueueAction(() =>
                 {
-                    Debug.LogWarning(
-                        $"[AdsManager] Timed out waiting to dispatch MAX SDK initialization on main thread " +
-                        $"({MaxSdkMainThreadDispatchTimeoutSeconds}s).");
-                    LogMaxSdkInitFailed("main_thread_dispatch_timeout");
-                    isInitializing = false;
-                    _ = RetrySDKInitialization(5000);
-                }
+                    // CCPA: false = user has NOT opted out of sale of personal info.
+                    // AppLovin built-in consent flow (AppLovinInternalSettings.json) handles GDPR.
+                    MaxSdk.SetDoNotSell(false);
+
+                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
+
+                    MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
+                    MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+
+                    MaxSdk.SetSdkKey(MaxSdkKey);
+                    MaxSdk.InitializeSdk();
+                });
             }
             catch (Exception e)
             {
@@ -746,227 +722,6 @@ namespace Assets.Scripts.Core
                 isInitializing = false;
                 _ = RetrySDKInitialization(20000);
             }
-        }
-
-        /// <summary>
-        /// Fire-and-forget Unity Gaming Services warmup. Kept off the MAX init path so a slow or
-        /// hanging UGS init can never block AppLovin initialization (it only matters for IAP).
-        /// </summary>
-        private static async Task WarmUpUnityServicesInBackground()
-        {
-            try
-            {
-                await IAPManager.EnsureUnityServicesInitializedAsync();
-                Debug.Log("[AdsManager] Unity Services warmed up (background, non-blocking).");
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[AdsManager] Unity Services background warmup failed (non-fatal): {e.Message}");
-            }
-        }
-
-        private IEnumerator WaitForMaxSdkInitCallback()
-        {
-            float deadline = Time.realtimeSinceStartup + MaxSdkInitCallbackTimeoutSeconds;
-            while (!isInitialized && Time.realtimeSinceStartup < deadline)
-                yield return null;
-
-            if (isInitialized)
-                yield break;
-
-            Debug.LogWarning(
-                $"[AdsManager] MAX SDK init callback timed out after {MaxSdkInitCallbackTimeoutSeconds}s.");
-            LogMaxSdkInitFailed("callback_timeout");
-            isInitializing = false;
-            _ = RetrySDKInitialization(5000);
-        }
-
-        /// <summary>
-        /// Applies UMP privacy flags, disables AppLovin duplicate consent, and calls InitializeSdk on the
-        /// Unity main thread. Shared by the normal init path and the safeguard backstop.
-        /// </summary>
-        private void EnqueueInitializeMaxSdk(Action<bool> onDispatched)
-        {
-            EnqueueAction(() =>
-            {
-                try
-                {
-                    ConsentManager.ConfigureMaxPrivacyBeforeInit();
-
-                    MaxSdkBase.InvokeEventsOnUnityMainThread = true;
-
-                    MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
-                    MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
-
-                    if (MaxSdk.IsInitialized())
-                    {
-                        Debug.Log("[AdsManager] MAX SDK already initialized natively; replaying init handler.");
-                        OnMaxSdkInitialized(null);
-                        onDispatched?.Invoke(true);
-                        return;
-                    }
-
-                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK (UMP consent gathered, ATT resolved)...");
-
-                    MaxSdk.SetSdkKey(MaxSdkKey);
-                    MaxSdk.InitializeSdk();
-                    StartCoroutine(WaitForMaxSdkInitCallback());
-                    onDispatched?.Invoke(true);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[AdsManager] MAX SDK main-thread dispatch failed: {e.Message}");
-                    onDispatched?.Invoke(false);
-                }
-            });
-        }
-
-        // ════════════════════════════════════════════
-        //  SAFEGUARD — force MAX + LiftEngine if still not up after 60s
-        // ════════════════════════════════════════════
-
-        private void StartSafeguardSdkInitWatchdog()
-        {
-            StopSafeguardSdkInitWatchdog();
-            _safeguardSdkInitCoroutine = StartCoroutine(SafeguardSdkInitRoutine());
-        }
-
-        private void StopSafeguardSdkInitWatchdog()
-        {
-            if (_safeguardSdkInitCoroutine == null)
-                return;
-
-            StopCoroutine(_safeguardSdkInitCoroutine);
-            _safeguardSdkInitCoroutine = null;
-        }
-
-        private IEnumerator SafeguardSdkInitRoutine()
-        {
-            // Re-arming backstop: keeps retrying until MAX is up. Previously this fired exactly once and
-            // was consumed even when it skipped (e.g. init gate not open at 60s, or iOS ATT still
-            // pending), which could leave a user with no path to ever initialize MAX. Now it retries
-            // every cycle and only stops once initialization succeeds.
-            var wait = new WaitForSeconds(SafeguardSdkInitDelaySeconds);
-            while (!isInitialized)
-            {
-                yield return wait;
-
-                if (isInitialized)
-                    break;
-
-                TriggerSafeguardSdkInit();
-            }
-
-            // MAX is up — ensure LiftEngine settles or fall back to direct MAX so ads always work.
-            yield return EnsureLiftEngineSafeguard(wait);
-
-            _safeguardSdkInitCoroutine = null;
-        }
-
-        private IEnumerator EnsureLiftEngineSafeguard(WaitForSeconds wait)
-        {
-            if (!_liftEngineEnabled)
-                yield break;
-
-            float deadline = Time.realtimeSinceStartup + LiftEngineInitSafeguardTimeoutSeconds;
-            while (!_liftEngineInitSettled && Time.realtimeSinceStartup < deadline)
-            {
-                if (LiftEngineSdk.IsInitialized)
-                {
-                    EnqueueAction(() => OnLiftEngineSdkInitialized(LiftEngineInitializationStatus.Success));
-                    yield break;
-                }
-
-                yield return wait;
-
-                if (_liftEngineInitSettled || !isInitialized)
-                    yield break;
-            }
-
-            if (_liftEngineInitSettled)
-                yield break;
-
-            Debug.LogWarning(
-                $"[AdsManager] Safeguard: LiftEngine init not settled after {LiftEngineInitSafeguardTimeoutSeconds}s; " +
-                "falling back to direct MAX.");
-            EnqueueAction(() => OnLiftEngineSdkInitialized(LiftEngineInitializationStatus.Failed));
-        }
-
-        private void TriggerSafeguardSdkInit()
-        {
-            if (isInitialized)
-                return;
-
-            if (MaxSdk.IsInitialized())
-            {
-                EnqueueAction(() => OnMaxSdkInitialized(null));
-                return;
-            }
-
-            // Do NOT consume the backstop here. If the init gate isn't open yet (iOS ATT still pending),
-            // wait and let the next safeguard cycle try again — the backstop stays armed. We never force
-            // init before ATT resolves so customized/IDFA ads are preserved.
-            if (!TermsConsentManager.IsSdkInitAllowed)
-            {
-                Debug.LogWarning("[AdsManager] Safeguard: init gate not open yet (ATT pending on iOS) — will retry next cycle.");
-                return;
-            }
-
-            // A normal init attempt is already in flight (it self-resets on its own timeouts). Don't
-            // stomp it; the next safeguard cycle will force init only if it's still down.
-            if (isInitializing)
-                return;
-
-            if (!_safeguardSdkInitLogged)
-            {
-                _safeguardSdkInitLogged = true;
-
-                Debug.LogWarning(
-                    $"[AdsManager] Safeguard: MAX SDK not initialized after {SafeguardSdkInitDelaySeconds}s. Forcing recovery.");
-
-                if (FirebaseManager.Instance != null)
-                    FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_LIFTENGINE_SAFEGUARD);
-            }
-
-            EnqueueAction(() =>
-            {
-                Debug.LogWarning("[AdsManager] Safeguard: forcing MAX SDK initialization.");
-                StartCoroutine(SafeguardInitializeMaxSdkRoutine());
-            });
-        }
-
-        private IEnumerator SafeguardInitializeMaxSdkRoutine()
-        {
-            if (!ConsentManager.IsConsentFlowCompleted && !ConsentManager.ShouldSkipUmpGathering)
-            {
-                bool consentFinished = false;
-                EnqueueAction(() => ConsentManager.RequestConsent(() => consentFinished = true));
-
-                float consentWaitStart = Time.time;
-                while (!consentFinished && Time.time - consentWaitStart < ConsentGatherTimeoutSeconds)
-                    yield return null;
-
-                if (!consentFinished)
-                {
-                    Debug.LogWarning("[AdsManager] Safeguard: UMP consent hung; forcing MAX consent fallback.");
-                    EnqueueAction(() =>
-                        ConsentManager.ApplyFallbackConsentForMaxInit("safeguard_ump_timeout"));
-                }
-            }
-            else if (!ConsentManager.HasPersistedConsentForMax)
-            {
-                // Consent flow cannot hang MAX forever — persist a safe default and init.
-                Debug.LogWarning("[AdsManager] Safeguard: MAX consent not persisted; forcing fallback.");
-                EnqueueAction(() =>
-                    ConsentManager.ApplyFallbackConsentForMaxInit("safeguard_missing_persisted_consent"));
-            }
-
-            bool dispatched = false;
-            EnqueueInitializeMaxSdk(success => dispatched = success);
-
-            float dispatchWaitStart = Time.time;
-            while (!dispatched && Time.time - dispatchWaitStart < MaxSdkMainThreadDispatchTimeoutSeconds)
-                yield return null;
         }
 
         private void LogMaxSdkInitialized()
@@ -1027,7 +782,6 @@ namespace Assets.Scripts.Core
             isInitialized = true;
             isInitializing = false;
             sdkInitRetryCount = 0;
-            StopSafeguardSdkInitWatchdog();
             LogMaxSdkInitialized();
 
             TryStartLiftEngine();
@@ -1816,8 +1570,8 @@ namespace Assets.Scripts.Core
                 return;
 
 #if UNITY_IOS && !UNITY_EDITOR
-            if (IOSAttributionBootstrap.IsAttResolved)
-                LiftEngineSdk.SetIdfaApproved(IOSAttributionBootstrap.IsAttAuthorized);
+            if (IOSAdsHelper.TryGetAttAuthorization(out bool isAuthorized))
+                LiftEngineSdk.SetIdfaApproved(isAuthorized);
 #endif
             ApplyLiftEngineAttributionFromSnapshot();
             LiftEngineSdk.SendReport();
@@ -2158,7 +1912,7 @@ namespace Assets.Scripts.Core
                 $"network={payload.NetworkName}, format={payload.AdFormat}");
         }
 
-        /// <summary>Called by IOSAttributionBootstrap after SingularSDK.InitializeSingularSDK succeeds.</summary>
+        /// <summary>Called when Singular SDK becomes ready (auto-init with ATT wait).</summary>
         public static void NotifySingularSdkInitialized()
         {
             if (Instance == null)

@@ -10,11 +10,6 @@ namespace Assets.Scripts.Core
 {
     public class IOSAdsHelper
     {
-        // Hard cap on how long SDK init waits for the ATT decision. iOS normally resolves this within
-        // seconds; if the prompt is deferred/stuck and never answered, we proceed as unauthorized so the
-        // privacy gate opens and MAX (plus the rest of the ads chain) is never blocked indefinitely.
-        private const float AttResolutionTimeoutSeconds = 30f;
-
         public static void RequestATT(Action<bool> onComplete = null)
         {
 #if UNITY_IOS && !UNITY_EDITOR
@@ -55,44 +50,22 @@ namespace Assets.Scripts.Core
 #endif
         }
 
-        /// <summary>
-        /// Blocks until the user responds to the ATT dialog (or status is already decided).
-        /// Must complete before Singular or ads initialize on iOS.
-        /// </summary>
-        public static IEnumerator ResolveAttBlocking()
+        /// <summary>Returns true when ATT status is no longer NOT_DETERMINED.</summary>
+        public static bool TryGetAttAuthorization(out bool isAuthorized)
         {
 #if UNITY_IOS && !UNITY_EDITOR
-            if (IOSAttributionBootstrap.IsAttResolved)
-                yield break;
-
-            Debug.Log("[IOSAdsHelper] Waiting for ATT decision before SDK init...");
-
             var status = ATTrackingStatusBinding.GetAuthorizationTrackingStatus();
             if (status == ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
-                ATTrackingStatusBinding.RequestAuthorizationTracking();
-
-            float deadline = Time.realtimeSinceStartup + AttResolutionTimeoutSeconds;
-            while (ATTrackingStatusBinding.GetAuthorizationTrackingStatus() ==
-                   ATTrackingStatusBinding.AuthorizationTrackingStatus.NOT_DETERMINED)
             {
-                if (Time.realtimeSinceStartup >= deadline)
-                {
-                    Debug.LogWarning(
-                        $"[IOSAdsHelper] ATT not answered within {AttResolutionTimeoutSeconds}s; proceeding " +
-                        "with SDK init as unauthorized so ads are never blocked.");
-                    IOSAttributionBootstrap.SetAttResolved(false);
-                    yield break;
-                }
-
-                yield return null;
+                isAuthorized = false;
+                return false;
             }
 
-            bool isAuthorized = ATTrackingStatusBinding.GetAuthorizationTrackingStatus() ==
-                                ATTrackingStatusBinding.AuthorizationTrackingStatus.AUTHORIZED;
-            IOSAttributionBootstrap.SetAttResolved(isAuthorized);
-            Debug.Log($"[IOSAdsHelper] ATT decision received: authorized={isAuthorized}");
+            isAuthorized = status == ATTrackingStatusBinding.AuthorizationTrackingStatus.AUTHORIZED;
+            return true;
 #else
-            yield break;
+            isAuthorized = true;
+            return true;
 #endif
         }
     }
