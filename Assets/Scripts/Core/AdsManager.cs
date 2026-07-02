@@ -93,7 +93,12 @@ namespace Assets.Scripts.Core
         }
 
         private const float HealthCheckIntervalSeconds = 20f;
+        // Ultimate cap on waiting for a GDPR user to finish the consent form before init.
         private const float ConsentGatherTimeoutSeconds = 60f;
+        // Cap on the UMP status roundtrip itself — a hung network must not cost the session's init.
+        private const float ConsentStatusRoundtripTimeoutSeconds = 15f;
+        // How long to wait for OnSdkInitializedEvent before assuming the callback was lost.
+        private const float MaxSdkInitCallbackTimeoutSeconds = 30f;
         private const float AttGatherTimeoutSeconds = 30f;
         private const float RewardedPlacementWaitSeconds = 12f;
         private const float BannerCreateSettleDelaySeconds = 0.25f;
@@ -684,27 +689,38 @@ namespace Assets.Scripts.Core
                     Debug.LogWarning("[AdsManager] ATT flow timed out. Proceeding with ads initialization.");
 #endif
 
-                bool consentFinished = false;
+                // Consent gathering runs in parallel and almost never blocks init:
+                // - Returning users with a stored resolution: init immediately.
+                // - Users outside GDPR scope: init the moment the UMP status roundtrip says so.
+                // - UMP failure/offline: init immediately (nothing to wait for; retried next session).
+                // - Only a first-session GDPR user with the consent form on screen delays init,
+                //   because consent there is legally required before serving ads.
                 EnqueueAction(() =>
                 {
                     ConsentManager.RequestConsent(() =>
-                    {
-                        consentFinished = true;
-                        Debug.Log("[AdsManager] Consent gathering finished. Continuing SDK Init.");
-                    });
+                        Debug.Log("[AdsManager] Consent gathering finished."));
                 });
 
                 float consentWaitStart = Time.time;
-                while (!consentFinished && Time.time - consentWaitStart < ConsentGatherTimeoutSeconds)
+                while (ShouldWaitForConsentBeforeInit(consentWaitStart))
                     await Task.Yield();
-                if (!consentFinished)
-                    Debug.LogWarning("[AdsManager] Consent flow timed out. Proceeding with SDK initialization anyway.");
+                Debug.Log(
+                    $"[AdsManager] Proceeding with MAX init (consent state: {ConsentManager.State}, " +
+                    $"waited {Time.time - consentWaitStart:F1}s).");
 
                 EnqueueAction(() =>
                 {
-                    // CCPA: false = user has NOT opted out of sale of personal info.
-                    // AppLovin built-in consent flow (AppLovinInternalSettings.json) handles GDPR.
-                    MaxSdk.SetDoNotSell(false);
+                    // CCPA flag + non-GDPR consent healing. GDPR users are governed by the
+                    // IAB TCF string that Google UMP writes (read automatically by MAX).
+                    ConsentManager.ApplyConsentToMax();
+
+                    // We gather consent via Google UMP ourselves — keep AppLovin's built-in
+                    // consent flow disabled to avoid duplicate dialogs (Jun-19 tier-1 regression).
+                    MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
+
+                    // MAX events (incl. ILRD revenue callbacks) must reach Unity APIs and
+                    // Singular on the main thread.
+                    MaxSdkBase.InvokeEventsOnUnityMainThread = true;
 
                     Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
 
@@ -713,6 +729,7 @@ namespace Assets.Scripts.Core
 
                     MaxSdk.SetSdkKey(MaxSdkKey);
                     MaxSdk.InitializeSdk();
+                    StartCoroutine(WaitForMaxSdkInitCallback());
                 });
             }
             catch (Exception e)
@@ -721,6 +738,68 @@ namespace Assets.Scripts.Core
                 LogMaxSdkInitFailed(e.Message);
                 isInitializing = false;
                 _ = RetrySDKInitialization(20000);
+            }
+        }
+
+        /// <summary>
+        /// Watchdog: without it, a lost init callback leaves isInitializing=true forever and
+        /// the health check never retries — the session silently produces no ads and no MAX DAU.
+        /// </summary>
+        private IEnumerator WaitForMaxSdkInitCallback()
+        {
+            float deadline = Time.realtimeSinceStartup + MaxSdkInitCallbackTimeoutSeconds;
+            while (!isInitialized && Time.realtimeSinceStartup < deadline)
+                yield return null;
+
+            if (isInitialized)
+                yield break;
+
+            bool nativeInitialized = false;
+            try
+            {
+                nativeInitialized = MaxSdk.IsInitialized();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] Could not query native MAX init state: {e.Message}");
+            }
+
+            if (nativeInitialized)
+            {
+                Debug.Log("[AdsManager] MAX initialized natively but the callback was missed; replaying handler.");
+                OnMaxSdkInitialized(null);
+                yield break;
+            }
+
+            Debug.LogWarning(
+                $"[AdsManager] MAX init callback timed out after {MaxSdkInitCallbackTimeoutSeconds}s. Retrying.");
+            LogMaxSdkInitFailed("callback_timeout");
+            isInitializing = false;
+            _ = RetrySDKInitialization(5000);
+        }
+
+        /// <summary>
+        /// Init waits only while consent is genuinely unresolved: the short UMP status
+        /// roundtrip for everyone, and the on-screen GDPR form for first-session EEA users.
+        /// NotRequired / Completed / Failed states release init immediately.
+        /// </summary>
+        private static bool ShouldWaitForConsentBeforeInit(float waitStartTime)
+        {
+            float waited = Time.time - waitStartTime;
+            if (waited >= ConsentGatherTimeoutSeconds)
+            {
+                Debug.LogWarning("[AdsManager] Consent flow timed out. Proceeding with SDK initialization anyway.");
+                return false;
+            }
+
+            switch (ConsentManager.State)
+            {
+                case ConsentManager.ConsentGatherState.Pending:
+                    return waited < ConsentStatusRoundtripTimeoutSeconds;
+                case ConsentManager.ConsentGatherState.FormRequired:
+                    return true;
+                default:
+                    return false;
             }
         }
 
