@@ -212,6 +212,9 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
                 RequestNotificationPermission();
                 #endif
 
+                // Analytics-only device/install signals (no gameplay or ads gating).
+                DeviceIntegritySignals.ReportToFirebase(this);
+
                 // Request token explicitly to ensure registration
                 FirebaseMessaging.GetTokenAsync().ContinueWithOnMainThread(tokenTask => {
                     if (tokenTask.IsCompleted && !tokenTask.IsFaulted) {
