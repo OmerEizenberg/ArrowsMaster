@@ -21,8 +21,8 @@ namespace LiftEngine
     public static class LiftEngineSdkCallbacks
     {
         public static event Action<LiftEngineInitializationStatus> OnSdkInitializedEvent;
-        public static event Action<Api.LiftEnginePredictResult> OnPredictSuccessEvent;
-        public static event Action<Api.LiftEngineError> OnPredictFailedEvent;
+        public static event Action<LiftEnginePredictEventArgs> OnPredictSuccessEvent;
+        public static event Action<LiftEngineOperationError> OnPredictFailedEvent;
         public static event Action<LiftEngineAdInfo> OnAdLoadedEvent;
         public static event Action<LiftEngineAdInfo> OnAdDisplayedEvent;
         public static event Action<LiftEngineAdInfo> OnAdHiddenEvent;
@@ -32,11 +32,23 @@ namespace LiftEngine
         internal static void RaiseInitialized(LiftEngineInitializationStatus status) =>
             OnSdkInitializedEvent?.Invoke(status);
 
-        internal static void RaisePredictSuccess(Api.LiftEnginePredictResult result) =>
-            OnPredictSuccessEvent?.Invoke(result);
+        internal static void RaisePredictSuccess(LiftEngineAdFormat format)
+        {
+            OnPredictSuccessEvent?.Invoke(new LiftEnginePredictEventArgs
+            {
+                Format = format,
+                Succeeded = true
+            });
+        }
 
-        internal static void RaisePredictFailed(Api.LiftEngineError error) =>
-            OnPredictFailedEvent?.Invoke(error);
+        internal static void RaisePredictFailed(LiftEngineAdFormat format, Api.LiftEngineError error)
+        {
+            OnPredictFailedEvent?.Invoke(new LiftEngineOperationError
+            {
+                StatusCode = error?.StatusCode ?? 0,
+                Message = error?.Message ?? "Unknown error"
+            });
+        }
 
         internal static void RaiseAdLoaded(Mediation.MediationAdInfo info) =>
             OnAdLoadedEvent?.Invoke(LiftEngineAdInfo.FromMediation(info));

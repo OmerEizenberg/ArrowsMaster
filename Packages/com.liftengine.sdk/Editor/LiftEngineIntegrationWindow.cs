@@ -121,19 +121,17 @@ namespace LiftEngine.Editor
             Repaint();
         }
 
-        private void OnPredictSuccess(Api.LiftEnginePredictResult result)
+        private void OnPredictSuccess(LiftEnginePredictEventArgs args)
         {
-            _lastPredictResult = $"Predict OK — model={result.model}, prediction={result.prediction}, multipliers={result.multipliers?.Length ?? 0}";
-            Log($"[BE] Predict response received — model={result.model}, prediction={result.prediction}, " +
-                $"param={result.param}, keyword={result.keyword}, auction_id={result.auction_id}, " +
-                $"multipliers=[{FormatMultipliers(result.multipliers)}]");
+            _lastPredictResult = $"Optimization OK — format={args?.Format}, succeeded={args?.Succeeded}";
+            Log($"Optimization response received — format={args?.Format}");
             Repaint();
         }
 
-        private void OnPredictFailed(Api.LiftEngineError error)
+        private void OnPredictFailed(LiftEngineOperationError error)
         {
-            _lastPredictResult = $"Predict failed — {error?.StatusCode}: {error?.Message}";
-            LogWarning($"[BE] Predict request failed — status={error?.StatusCode}, message={error?.Message}");
+            _lastPredictResult = $"Optimization failed — {error?.StatusCode}: {error?.Message}";
+            LogWarning($"Optimization request failed — status={error?.StatusCode}, message={error?.Message}");
             Repaint();
         }
 
@@ -169,7 +167,7 @@ namespace LiftEngine.Editor
 
         private void OnBidFloorPredictionFailed(BidFloorPredictionFailedSignal signal)
         {
-            LogWarning($"[Attempt -1] Bid floor predict unavailable for {signal.Format}. Entering bid-0 fill loop.");
+            LogWarning($"[Attempt -1] Optimization unavailable for {signal.Format}. Entering fallback fill loop.");
             Repaint();
         }
 
@@ -396,32 +394,32 @@ namespace LiftEngine.Editor
             EditorGUILayout.LabelField("Health:", string.IsNullOrEmpty(_lastHealthResult) ? "—" : _lastHealthResult);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Predict & Ads", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Optimization & Ads", EditorStyles.boldLabel);
 
             _debugFormat = (LiftEngineAdFormat)EditorGUILayout.EnumPopup("Ad Format", _debugFormat);
 
-            if (GUILayout.Button("Preview Predict Payload (Edit Mode OK)"))
+            if (GUILayout.Button("Preview Context Payload (Edit Mode OK)"))
             {
-                Log($"Preview Predict Payload — building local preview for {_debugFormat} (no network request).");
+                Log($"Preview Context Payload — building local preview for {_debugFormat} (no network request).");
                 _predictPreviewJson = LiftEngineDebugHelper.BuildPredictPayloadPreview(
                     _debugFormat, _debugInstallType, _debugMediaSource);
-                Log($"Preview Predict Payload — ready ({_predictPreviewJson.Length} chars). See window text area.");
+                Log($"Preview Context Payload — ready ({_predictPreviewJson.Length} chars). See window text area.");
             }
 
             if (!string.IsNullOrEmpty(_predictPreviewJson))
             {
-                EditorGUILayout.LabelField("Predict payload preview:");
+                EditorGUILayout.LabelField("Context payload preview:");
                 EditorGUILayout.TextArea(_predictPreviewJson, GUILayout.MinHeight(120));
             }
 
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
-                if (GUILayout.Button("Run Predict / Prewarm"))
+                if (GUILayout.Button("Run Prewarm"))
                 {
                     if (!RequireSdkInitialized())
                         return;
 
-                    Log($"[CL] Run Predict / Prewarm — {_debugFormat}");
+                    Log($"[CL] Run Prewarm — {_debugFormat}");
                     LiftEngineSdk.LoadAd(_debugFormat);
                     _lastPredictResult = $"Prewarm started for {_debugFormat}…";
                 }
@@ -462,7 +460,7 @@ namespace LiftEngine.Editor
                 EditorGUILayout.LabelField("Ad ready:", LiftEngineSdk.IsAdReady(_debugFormat).ToString());
             }
 
-            EditorGUILayout.LabelField("Predict:", string.IsNullOrEmpty(_lastPredictResult) ? "—" : _lastPredictResult);
+            EditorGUILayout.LabelField("Optimization:", string.IsNullOrEmpty(_lastPredictResult) ? "—" : _lastPredictResult);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Context", EditorStyles.boldLabel);

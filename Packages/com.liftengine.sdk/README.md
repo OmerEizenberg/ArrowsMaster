@@ -1,95 +1,74 @@
-# LiftEngine Unity SDK
+# LiftEngine SDK for Unity
 
-Portable bid-floor optimization SDK for LiftEngine API + AppLovin MAX mediation.
+Ad monetization optimization layer for **AppLovin MAX**. LiftEngine improves ad revenue through cloud intelligence, preloading ads in the background, and reporting context — while your game keeps full control of when and where ads appear.
+
+---
+
+## Requirements
+
+| | Minimum |
+|---|---------|
+| Unity | 2021.3 LTS |
+| AppLovin MAX | 8.0+ |
+| Newtonsoft JSON | 3.2.1 |
+
+LiftEngine runs **on top of** MAX — you must already have MAX initialized in your project.
+
+---
 
 ## Quick Start
 
-1. Open **Window → LiftEngine → Integration Manager**
-2. Click **Create Settings Asset**
-3. Set your **API Key** (staging: `test-api-key` for mock)
-4. Confirm MAX SDK key and ad unit IDs
-5. Enable **Debug Mode** for testing tools
-
-## Runtime Integration
+1. Install the package (`.tgz` or private registry — provided by LiftEngine)
+2. Install **AppLovin MAX** and **Newtonsoft JSON** if not already present
+3. Open **Window → LiftEngine → Integration Manager**
+4. Create `Assets/Resources/LiftEngineSettings.asset` and enter your API key + MAX ad unit IDs
+5. Initialize LiftEngine **after** `MaxSdk.InitializeSdk()` succeeds
+6. Route ad load/show calls through `LiftEngineSdk`
 
 ```csharp
 using LiftEngine;
 
-// After consent / ATT — typically from AdsManager
+// After MAX init:
 LiftEngineSdk.Initialize();
-
-// Once — from AppsFlyer / Singular attribution callback
 LiftEngineSdk.SetAttribution("Organic", "facebook ads");
+LiftEngineSdk.SendReport();
 
-// From IAPManager on purchase
-LiftEngineSdk.NotifyPurchase(4.99f);
-
-// Show ads (your game applies business rules first)
-if (CanShowRewarded())
+// Show rewarded (apply your business rules first):
+LiftEngineSdk.ShowAd(LiftEngineAdFormat.Rewarded, null, new LiftEngineShowAdCallbacks
 {
-    LiftEngineSdk.ShowAd(LiftEngineAdFormat.Rewarded, null, new LiftEngineShowAdCallbacks
-    {
-        OnAdRewarded = () => GrantReward(),
-        OnAdHidden = () => ResumeGame()
-    });
-}
+    OnAdRewarded = () => GrantReward(),
+    OnAdHidden = () => ResumeGame()
+});
 ```
 
-## Testing Guide
+---
 
-### Editor — no device
+## Documentation
 
+| Document | Audience |
+|----------|----------|
+| [Integration Guide](Documentation~/INTEGRATION.md) | Full setup, API reference, QA checklist |
+| [AI Integration Prompt](Documentation~/CURSOR_INTEGRATION_PROMPT.md) | One-shot Cursor prompt for automatic wiring |
+| [Changelog](CHANGELOG.md) | Version history |
 
-| Test           | How                                                |
-| -------------- | -------------------------------------------------- |
-| Settings asset | Integration Manager → Create Settings Asset        |
-| Payload shape  | Debug tab → Preview Predict Payload (edit mode OK) |
-| Checklist      | Integration tab                                    |
+---
 
+## Init Order (critical)
 
-### Play Mode — staging API
-
-1. Set `environment = Staging`, `apiKey = test-api-key`
-2. Enable **Debug Mode** + **Verbose Logging**
-3. Enter Play Mode
-4. Call `LiftEngineSdk.Initialize()` from test script or enable `autoInitialize`
-
-
-| Test              | Steps                      | Expected                                             |
-| ----------------- | -------------------------- | ---------------------------------------------------- |
-| Health            | Debug → Ping Health        | `OK`, console `{"status":"ok"}`                      |
-| Predict + prewarm | Debug → Run Predict        | Console logs multiplier attempts, state → Ready      |
-| Show rewarded     | Debug → Show Ad (Rewarded) | MAX ad displays                                      |
-| Attribution       | Set Organic + media source | Next predict payload has `install_type: organic`     |
-| Purchase          | Simulate Purchase 4.99     | Payload shows `ltv_gross_up_to_date`, `payer_ind: 1` |
-| Counters          | Show 2 ads                 | `ad_number_*` / `daily_ad_number` increment (0-based) |
-| Clear state       | Clear Context Prefs        | Counters reset                                       |
-
-
-### Device build (Android / iOS)
-
-1. Build development build with test API key
-2. Watch logcat / Xcode for `[LiftEngine]` tags
-3. Verify sequence: **prewarm→ Load → Show → Track**
-4. After dismiss: auto prewarm starts (next predict from multipliers)
-
-### SignalBus (optional subscribe)
-
-```csharp
-LiftEngineSignalBus.BidFloorPredictionFailed += s => Debug.Log("Predict failed: " + s.Format);
-LiftEngineSignalBus.AdPrewarmCompleted += s => Debug.Log($"Prewarm {s.Format}: {s.Success}");
+```
+Consent / ATT  →  MaxSdk.InitializeSdk()  →  LiftEngineSdk.Initialize()
 ```
 
-## Architecture
+Never initialize LiftEngine before MAX.
 
-- **LiftEngineSdk** — static facade
-- **ReportContextService** — PlayerPrefs counters, LTV, eCPM history
-- **AdPrewarmService** —  waterfall 
-- **MaxMediationAdapter** — MAX wrapper
+---
 
-## Notes
+## Fallback
 
-- Game business rules (cooldowns, level gates, no-ads IAP) stay in client code
-- LevelPlay adapter is stubbed
-- Mock API may omit `prediction` field — SDK uses `defaultPredictionFallback` (settings)
+If settings are missing, the API key is empty, or init fails, your game should continue using direct MAX calls. LiftEngine never blocks ad delivery.
 
+---
+
+## Support
+
+Contact your LiftEngine account manager. For integration issues, include Unity version, MAX version, platform, and `[LiftEngine]` log excerpts from a staging build.

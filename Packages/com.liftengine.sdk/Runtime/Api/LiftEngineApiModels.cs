@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 namespace LiftEngine.Api
 {
     [Serializable]
-    public class LiftEnginePredictResult
+    internal class LiftEnginePredictResult
     {
         public string model;
         public string keyword;
@@ -29,7 +29,7 @@ namespace LiftEngine.Api
         public bool HasCpmKey => cpm != null;
     }
 
-    public class LiftEngineError
+    internal class LiftEngineError
     {
         public int StatusCode { get; }
         public string Message { get; }

@@ -1,0 +1,4 @@
+<linker>
+  <assembly fullname="LiftEngine.Runtime" preserve="all"/>
+  <assembly fullname="LiftEngine.Editor" preserve="all"/>
+</linker>

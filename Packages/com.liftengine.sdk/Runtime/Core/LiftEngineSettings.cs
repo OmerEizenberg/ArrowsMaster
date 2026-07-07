@@ -11,10 +11,10 @@ namespace LiftEngine
         [Tooltip("Target LiftEngine backend. Staging for testing, Production for live traffic.")]
         public LiftEngineEnvironment environment = LiftEngineEnvironment.Staging;
 
-        [Tooltip("Used only when Environment is Custom. Base URL for predict/report/track (e.g. https://api-stg.liftengine.ai/).")]
+        [Tooltip("Used only when Environment is Custom. Base URL for LiftEngine API services (e.g. https://api-stg.liftengine.ai/).")]
         public string customApiBaseUrl = "https://api-stg.liftengine.ai/";
 
-        [Tooltip("Bearer token for LiftEngine API (predict, report, track). NOT the AppLovin MAX SDK key. Staging mock often accepts any non-empty value such as test-api-key.")]
+        [Tooltip("Bearer token for LiftEngine API. NOT the AppLovin MAX SDK key. Staging mock often accepts any non-empty value such as test-api-key.")]
         public string apiKey = "";
 
         [Header("Mediation")]
@@ -51,36 +51,36 @@ namespace LiftEngine
         [Tooltip("LiftEngine track placement ID for rewarded impressions.")]
         public string rewardedPlacementId = "rewarded-default";
 
-        [Header("Predict & Load")]
-        [Tooltip("Max seconds to wait for LiftEngine predict HTTP response before failing over to bid-floor fallback.")]
+        [Header("Optimization & Load")]
+        [Tooltip("Max seconds to wait for LiftEngine optimization response before falling back to standard MAX loading.")]
         public float predictTimeoutSeconds = 8f;
 
-        [Tooltip("Base eCPM prediction used when the API response omits the prediction field (e.g. staging mock). Bid floor = this value × each multiplier.")]
+        [Tooltip("Default eCPM value used when the API response omits the optimization value (e.g. staging mock).")]
         public float defaultPredictionFallback = 1f;
 
         [Tooltip("Unity Editor MAX mock ads load with revenue=-1. Treat IsReady as fill during multiplier phase so [Attempt 0] can succeed.")]
         public bool treatEditorLoadAsFilledForMultiplierPhase = true;
 
-        [Tooltip("Max seconds to wait for MAX to finish a single load attempt during multiplier / bid-0 waterfall.")]
+        [Tooltip("Max seconds to wait for MAX to finish a single load attempt during the optimization load sequence.")]
         public float loadAttemptTimeoutSeconds = 15f;
 
         [Header("Prewarm")]
-        [Tooltip("After LiftEngine init, automatically predict + load all ad types in the background.")]
+        [Tooltip("After LiftEngine init, automatically optimize and load all ad types in the background.")]
         public bool prewarmOnInit = true;
 
-        [Tooltip("After an ad is dismissed, immediately start the next predict + load cycle for that type.")]
+        [Tooltip("After an ad is dismissed, immediately start the next optimize + load cycle for that type.")]
         public bool prewarmAfterShow = true;
 
         [Tooltip("Seconds between readiness checks while waiting for an ad load to complete.")]
         public float readinessCheckIntervalSeconds = 2f;
 
-        [Tooltip("Max seconds for a full predict+load prewarm cycle before marking the format as failed.")]
+        [Tooltip("Max seconds for a full optimize+load prewarm cycle before marking the format as failed.")]
         public float prewarmMaxDurationSeconds = 90f;
 
         [Tooltip("Seconds between automatic retries when a format did not get a fill.")]
         public float prewarmRetryIntervalSeconds = 20f;
 
-        [Tooltip("Max bid-0 load rounds per prewarm before giving up until the next retry.")]
+        [Tooltip("Max fallback load rounds per prewarm before giving up until the next retry.")]
         public int maxBidZeroRounds = 5;
 
         [Tooltip("Max seconds ShowAd waits for a fill before reporting display failed.")]

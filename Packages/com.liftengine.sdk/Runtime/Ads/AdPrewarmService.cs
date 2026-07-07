@@ -135,7 +135,7 @@ namespace LiftEngine.Ads
                     $"param={prediction.param}, cpmKey={prediction.HasCpmKey}, " +
                     $"prediction={prediction.prediction}, multipliers={prediction.multipliers?.Length ?? 0}, " +
                     $"maxPlacement={_context.GetMaxPlacement(format)}");
-                LiftEngineSdkCallbacks.RaisePredictSuccess(prediction);
+                LiftEngineSdkCallbacks.RaisePredictSuccess(format);
             }
             else
             {
@@ -148,7 +148,8 @@ namespace LiftEngine.Ads
                 LiftEngineLogger.LogAttemptWarning(-1,
                     $"{format} — no multipliers available → [Attempt -1] bid-0 only");
 
-                LiftEngineSdkCallbacks.RaisePredictFailed(predictError ?? new LiftEngineError(0, reason));
+                LiftEngineSdkCallbacks.RaisePredictFailed(format,
+                    predictError ?? new LiftEngineError(0, reason));
                 LiftEngineSignalBus.Publish(new BidFloorPredictionFailedSignal(format));
             }
 
