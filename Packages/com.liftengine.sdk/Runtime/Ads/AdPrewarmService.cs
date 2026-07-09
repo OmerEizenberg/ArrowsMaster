@@ -125,15 +125,15 @@ namespace LiftEngine.Ads
 
             if (prediction != null)
             {
-                if (prediction.prediction <= 0f)
-                    prediction.prediction = _settings.defaultPredictionFallback;
+                prediction.ResolvePrediction(_settings.defaultPredictionFallback);
 
                 _context.SetAuctionContext(format, prediction.keyword, prediction.auction_id, prediction.param,
-                    prediction.HasCpmKey);
+                    prediction.treatment, prediction.group_ratios);
                 LiftEngineLogger.LogBackend(
                     $"{format} predict OK — auction_id={prediction.auction_id}, keyword={prediction.keyword}, " +
-                    $"param={prediction.param}, cpmKey={prediction.HasCpmKey}, " +
-                    $"prediction={prediction.prediction}, multipliers={prediction.multipliers?.Length ?? 0}, " +
+                    $"param={prediction.param}, treatment={prediction.treatment}, " +
+                    $"cpm={prediction.cpm}, prediction={prediction.prediction}, " +
+                    $"multipliers={prediction.multipliers?.Length ?? 0}, " +
                     $"maxPlacement={_context.GetMaxPlacement(format)}");
                 LiftEngineSdkCallbacks.RaisePredictSuccess(prediction);
             }

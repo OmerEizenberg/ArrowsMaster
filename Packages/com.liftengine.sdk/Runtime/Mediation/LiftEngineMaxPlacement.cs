@@ -2,23 +2,38 @@ namespace LiftEngine.Mediation
 {
     internal static class LiftEngineMaxPlacement
     {
-        // LiftEngine_* placements apply when predict JSON contained a "cpm" key.
-        // Base_* placements apply otherwise (direct MAX or LiftEngine without cpm).
-        public static string GetPlacement(LiftEngineAdFormat format) =>
-            format switch
-            {
-                LiftEngineAdFormat.Rewarded => "LiftEngine_rv",
-                LiftEngineAdFormat.Interstitial => "LiftEngine_int",
-                LiftEngineAdFormat.Banner => "LiftEngine_bnr",
-                _ => null
-            };
+        public static string GetPlacementByTreatment(LiftEngineAdFormat format, string treatment)
+        {
+            var suffix = GetSuffix(format);
+            if (suffix == null)
+                return null;
 
-        public static string GetBasePlacement(LiftEngineAdFormat format) =>
+            var normalized = treatment?.Trim().ToLowerInvariant();
+            return normalized switch
+            {
+                "algo" or "a" => $"LiftEngine_a_{suffix}",
+                "ml" or "m" => $"LiftEngine_m_{suffix}",
+                "base" or "b" => $"Base_{suffix}",
+                _ => $"Base_{suffix}"
+            };
+        }
+
+        public static string SelectTreatmentByWeight(int mlWeight, int algoWeight, int baseWeight)
+        {
+            var roll = UnityEngine.Random.Range(0, 100);
+            if (roll < mlWeight)
+                return "m";
+            if (roll < mlWeight + algoWeight)
+                return "a";
+            return "b";
+        }
+
+        private static string GetSuffix(LiftEngineAdFormat format) =>
             format switch
             {
-                LiftEngineAdFormat.Rewarded => "Base_rv",
-                LiftEngineAdFormat.Interstitial => "Base_int",
-                LiftEngineAdFormat.Banner => "Base_bnr",
+                LiftEngineAdFormat.Rewarded => "rv",
+                LiftEngineAdFormat.Interstitial => "int",
+                LiftEngineAdFormat.Banner => "bnr",
                 _ => null
             };
     }

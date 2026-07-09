@@ -175,7 +175,8 @@ namespace LiftEngine.Context
                 "daily_banner", "daily_interstitial", "daily_rewarded",
                 "sess_banner", "sess_interstitial", "sess_rewarded",
                 "auction_kw_banner", "auction_kw_interstitial", "auction_kw_rewarded",
-                "auction_id_banner", "auction_id_interstitial", "auction_id_rewarded"
+                "auction_id_banner", "auction_id_interstitial", "auction_id_rewarded",
+                "gr_m", "gr_a", "gr_b"
             })
             {
                 PlayerPrefs.DeleteKey(Prefix + suffix);
@@ -269,5 +270,42 @@ namespace LiftEngine.Context
             PlayerPrefs.DeleteKey(Prefix + "auction_id_" + suffix);
             PlayerPrefs.Save();
         }
+
+        public void SaveGroupRatios(Dictionary<string, int> ratios)
+        {
+            if (ratios == null || ratios.Count == 0)
+                return;
+
+            foreach (var pair in ratios)
+            {
+                var key = NormalizeGroupRatioKey(pair.Key);
+                if (key == null)
+                    continue;
+
+                SetRawCount("gr_" + key, Math.Max(0, pair.Value));
+            }
+        }
+
+        public bool HasGroupRatios() =>
+            PlayerPrefs.HasKey(Prefix + "gr_m") ||
+            PlayerPrefs.HasKey(Prefix + "gr_a") ||
+            PlayerPrefs.HasKey(Prefix + "gr_b");
+
+        public (int ml, int algo, int baseWeight) GetGroupRatios()
+        {
+            var ml = GetRawCount("gr_m", 0);
+            var algo = GetRawCount("gr_a", 0);
+            var baseWeight = GetRawCount("gr_b", 0);
+            return (ml, algo, baseWeight);
+        }
+
+        private static string NormalizeGroupRatioKey(string key) =>
+            key?.Trim().ToLowerInvariant() switch
+            {
+                "m" or "ml" => "m",
+                "a" or "algo" => "a",
+                "b" or "base" => "b",
+                _ => null
+            };
     }
 }

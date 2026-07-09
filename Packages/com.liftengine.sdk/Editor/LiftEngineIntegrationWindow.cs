@@ -123,8 +123,11 @@ namespace LiftEngine.Editor
 
         private void OnPredictSuccess(Api.LiftEnginePredictResult result)
         {
-            _lastPredictResult = $"Predict OK — model={result.model}, prediction={result.prediction}, multipliers={result.multipliers?.Length ?? 0}";
-            Log($"[BE] Predict response received — model={result.model}, prediction={result.prediction}, " +
+            _lastPredictResult =
+                $"Predict OK — model={result.model}, cpm={result.cpm}, treatment={result.treatment}, " +
+                $"multipliers={result.multipliers?.Length ?? 0}";
+            Log($"[BE] Predict response received — model={result.model}, cpm={result.cpm}, " +
+                $"treatment={result.treatment}, prediction={result.prediction}, " +
                 $"param={result.param}, keyword={result.keyword}, auction_id={result.auction_id}, " +
                 $"multipliers=[{FormatMultipliers(result.multipliers)}]");
             Repaint();
