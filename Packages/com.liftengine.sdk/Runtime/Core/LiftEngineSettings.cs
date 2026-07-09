@@ -86,6 +86,13 @@ namespace LiftEngine
         [Tooltip("Max seconds ShowAd waits for a fill before reporting display failed.")]
         public float showWaitMaxSeconds = 30f;
 
+        [Header("Init")]
+        [Tooltip("Max LiftEngineSdk.Initialize attempts (first try + retries) before falling back to direct MAX.")]
+        public int maxInitRetryAttempts = 3;
+
+        [Tooltip("Base delay in seconds between LiftEngine init retries (doubled each attempt, capped at 4 steps).")]
+        public float initRetryBaseDelaySeconds = 5f;
+
         [Header("Runtime")]
         [Tooltip("If enabled, LiftEngineSdk.Initialize() runs automatically at app start. Usually leave off and call Initialize from AdsManager after consent.")]
         public bool autoInitialize = false;

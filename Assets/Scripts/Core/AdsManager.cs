@@ -60,8 +60,17 @@ namespace Assets.Scripts.Core
         private bool _liftEngineEnabled;
         private bool _liftEngineReady;
         private bool _liftEngineInitSettled;
+        private bool _liftEnginePermanentlyFailed;
+        private int _liftEngineInitRetryAttempt;
+        private LiftEngineSettings _liftEngineSettings;
+        private Coroutine _liftEngineInitRetryCoroutine;
         private bool _liftEngineCallbacksSubscribed;
         private bool _liftEngineStartRequested;
+
+        private bool UseLiftEngineAdPath => _liftEngineEnabled && _liftEngineReady;
+        private bool UseDirectMaxAdPath => !_liftEngineEnabled || _liftEnginePermanentlyFailed;
+        private bool IsLiftEngineInitPending =>
+            _liftEngineEnabled && !_liftEngineReady && !_liftEnginePermanentlyFailed;
         private bool _fullscreenMaxCallbacksSubscribed;
         private bool _maxSdkInitSuccessLogged;
         private bool _maxSdkInitFailedLogged;
@@ -219,6 +228,7 @@ namespace Assets.Scripts.Core
 
         private void OnDestroy()
         {
+            CancelLiftEngineInitRetry();
             UnsubscribeLiftEngineCallbacks();
 
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
@@ -422,7 +432,8 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            SyncLegacyBannerState();
+            if (UseDirectMaxAdPath)
+                SyncLegacyBannerState();
         }
 
         private void SyncLiftEngineBannerState()
@@ -615,6 +626,9 @@ namespace Assets.Scripts.Core
                 LoadSettingsBanner();
                 return;
             }
+
+            if (!UseDirectMaxAdPath)
+                return;
 
             if (!_bannerCreated)
             {
@@ -925,9 +939,15 @@ namespace Assets.Scripts.Core
             }
             // Loaded even for No Ads buyers so interstitials remain available as a rewarded fallback.
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
-            if (_liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 LiftEngineSdk.LoadAd(LiftEngineAdFormat.Interstitial);
+                return;
+            }
+
+            if (!UseDirectMaxAdPath)
+            {
+                Debug.Log("[AdsManager] Skipping Interstitial Load: LiftEngine init still in progress.");
                 return;
             }
 
@@ -980,9 +1000,9 @@ namespace Assets.Scripts.Core
             {
                 Debug.Log("[AdsManager] Showing Interstitial Ad.");
                 OnAdOpened?.Invoke();
-                if (_liftEngineReady)
+                if (UseLiftEngineAdPath)
                     ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
-                else
+                else if (UseDirectMaxAdPath)
                     MaxSdk.ShowInterstitial(InterstitialAdUnitId, BaseInterstitialPlacement);
             }
             else
@@ -1084,9 +1104,15 @@ namespace Assets.Scripts.Core
                 return;
             }
             Debug.Log("[AdsManager] Loading Rewarded Ad...");
-            if (_liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 LiftEngineSdk.LoadAd(LiftEngineAdFormat.Rewarded);
+                return;
+            }
+
+            if (!UseDirectMaxAdPath)
+            {
+                Debug.Log("[AdsManager] Skipping Rewarded Load: LiftEngine init still in progress.");
                 return;
             }
 
@@ -1201,9 +1227,15 @@ namespace Assets.Scripts.Core
 
         private void ShowFullscreenAd(LiftEngineAdFormat format)
         {
-            if (_liftEngineEnabled && _liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 ShowLiftEngineAd(format);
+                return;
+            }
+
+            if (!UseDirectMaxAdPath)
+            {
+                Debug.LogWarning($"[AdsManager] Skipping {format} show: LiftEngine init still in progress.");
                 return;
             }
 
@@ -1384,28 +1416,28 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
-            if (_liftEngineEnabled && !_liftEngineInitSettled)
-            {
-                float deadline = Time.realtimeSinceStartup + 30f;
-                while (!_liftEngineInitSettled && Time.realtimeSinceStartup < deadline)
-                    yield return new WaitForSeconds(0.1f);
-            }
+            if (_liftEngineEnabled && IsLiftEngineInitPending)
+                yield return WaitForLiftEngineInitOrPermanentFailure(60f);
 
             try
             {
-                if (_liftEngineReady)
+                if (UseLiftEngineAdPath)
                 {
                     Debug.Log("[AdsManager] Loading Settings Banner via LiftEngine (predict + multipliers)...");
                     LiftEngineSdk.LoadAd(LiftEngineAdFormat.Banner);
                 }
-                else
+                else if (UseDirectMaxAdPath)
                 {
                     SubscribeBannerCallbacks();
-                    Debug.Log("[AdsManager] Creating Settings Banner Ad (deferred)...");
+                    Debug.Log("[AdsManager] Creating Settings Banner Ad (direct MAX fallback)...");
                     MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
                     MaxSdk.SetBannerPlacement(BannerAdUnitId, BaseBannerPlacement);
                     MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
                     _bannerCreated = true;
+                }
+                else
+                {
+                    Debug.Log("[AdsManager] Deferring banner create: LiftEngine init still in progress.");
                 }
             }
             catch (Exception e)
@@ -1419,8 +1451,17 @@ namespace Assets.Scripts.Core
                 _bannerCreateRequestedForShow = false;
             }
 
-            if (!_liftEngineReady)
-                SyncBannerNativeState();
+            if (!UseDirectMaxAdPath)
+                yield break;
+
+            SyncBannerNativeState();
+        }
+
+        private IEnumerator WaitForLiftEngineInitOrPermanentFailure(float timeoutSeconds)
+        {
+            float deadline = Time.realtimeSinceStartup + timeoutSeconds;
+            while (IsLiftEngineInitPending && Time.realtimeSinceStartup < deadline)
+                yield return new WaitForSeconds(0.2f);
         }
 
         /// <summary>
@@ -1442,13 +1483,19 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            if (_liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 if (LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Banner))
                     return;
 
                 Debug.Log("[AdsManager] Loading Settings Banner via LiftEngine...");
                 LiftEngineSdk.LoadAd(LiftEngineAdFormat.Banner);
+                return;
+            }
+
+            if (IsLiftEngineInitPending)
+            {
+                Debug.Log("[AdsManager] Skipping Settings Banner load: LiftEngine init still in progress.");
                 return;
             }
 
@@ -1637,10 +1684,62 @@ namespace Assets.Scripts.Core
 
             _liftEngineStartRequested = true;
             _liftEngineEnabled = true;
+            _liftEngineSettings = settings;
             SubscribeLiftEngineCallbacks();
             LiftEngineSdk.Initialize(settings);
             ApplyLiftEngineContext();
             Debug.Log("[AdsManager] LiftEngine init requested (report/predict run inside SDK).");
+        }
+
+        private void CancelLiftEngineInitRetry()
+        {
+            if (_liftEngineInitRetryCoroutine == null)
+                return;
+
+            StopCoroutine(_liftEngineInitRetryCoroutine);
+            _liftEngineInitRetryCoroutine = null;
+        }
+
+        private void ScheduleLiftEngineInitRetry()
+        {
+            CancelLiftEngineInitRetry();
+            _liftEngineInitRetryCoroutine = StartCoroutine(RetryLiftEngineInitRoutine());
+        }
+
+        private IEnumerator RetryLiftEngineInitRoutine()
+        {
+            int maxAttempts = _liftEngineSettings != null ? _liftEngineSettings.maxInitRetryAttempts : 3;
+            float baseDelay = _liftEngineSettings != null ? _liftEngineSettings.initRetryBaseDelaySeconds : 5f;
+            double retryDelay = baseDelay * Math.Pow(2, Math.Min(4, _liftEngineInitRetryAttempt - 1));
+
+            Debug.LogWarning(
+                $"[AdsManager] LiftEngine init retry {_liftEngineInitRetryAttempt}/{maxAttempts - 1} in {retryDelay:F0}s.");
+
+            yield return new WaitForSeconds((float)retryDelay);
+
+            _liftEngineInitRetryCoroutine = null;
+
+            if (!isInitialized || _liftEnginePermanentlyFailed || _liftEngineReady || _liftEngineSettings == null)
+                yield break;
+
+            _liftEngineInitSettled = false;
+            LiftEngineSdk.Initialize(_liftEngineSettings);
+            ApplyLiftEngineContext();
+        }
+
+        private void BeginDirectMaxFallback(string reason)
+        {
+            if (_liftEnginePermanentlyFailed)
+                return;
+
+            _liftEnginePermanentlyFailed = true;
+            CancelLiftEngineInitRetry();
+            Debug.LogWarning($"[AdsManager] {reason} — falling back to direct MAX for all ad formats.");
+            EnsureFullscreenMaxCallbacks();
+            LoadInterstitial();
+            LoadRewarded();
+            LoadSettingsBanner();
+            RefreshAllReadiness();
         }
 
         private void ApplyLiftEngineContext()
@@ -1733,18 +1832,30 @@ namespace Assets.Scripts.Core
             }
 
             _liftEngineInitSettled = true;
-            _liftEngineReady = status == LiftEngineInitializationStatus.Success;
-            if (_liftEngineReady)
+            CancelLiftEngineInitRetry();
+
+            if (status == LiftEngineInitializationStatus.Success)
             {
+                _liftEngineReady = true;
+                _liftEngineInitRetryAttempt = 0;
                 Debug.Log("[AdsManager] LiftEngine SDK initialized — all ad formats routed through predict/track flow.");
-                // Banner prewarm deferred to HomeController.PrewarmBannerAfterLobbySettled (~2s).
+                EnqueueAction(LoadSettingsBanner);
             }
             else
             {
-                Debug.LogWarning("[AdsManager] LiftEngine init failed — falling back to direct MAX for fullscreen ads.");
-                EnsureFullscreenMaxCallbacks();
-                LoadInterstitial();
-                LoadRewarded();
+                _liftEngineReady = false;
+                _liftEngineInitRetryAttempt++;
+                int maxAttempts = _liftEngineSettings != null ? _liftEngineSettings.maxInitRetryAttempts : 3;
+                if (_liftEngineInitRetryAttempt < maxAttempts)
+                {
+                    ScheduleLiftEngineInitRetry();
+                    RefreshAllReadiness();
+                    return;
+                }
+
+                BeginDirectMaxFallback(
+                    $"LiftEngine init failed after {_liftEngineInitRetryAttempt} attempt(s)");
+                return;
             }
 
             RefreshAllReadiness();
