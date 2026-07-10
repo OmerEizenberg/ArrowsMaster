@@ -59,6 +59,26 @@ namespace Assets.Scripts.Core
         private static bool PersistedConsentNotRequired =>
             PlayerPrefs.GetInt(KeyUmpConsentNotRequired, 0) == 1;
 
+        /// <summary>
+        /// Re-runs UMP when the prior attempt failed this session (offline, DNS, etc.).
+        /// Safe to call from resume/health-check; does nothing if consent is already resolved.
+        /// </summary>
+        public static void RetryIfFailed(Action onComplete = null)
+        {
+#if GMA_PRESENT
+            if (State != ConsentGatherState.Failed)
+                return;
+
+            Debug.Log("[ConsentManager] Retrying UMP consent gather after transient failure.");
+            _consentAnalyticsLogged = false;
+            _umpFlowStartedThisSession = false;
+            State = ConsentGatherState.Pending;
+            RunUmpFlow(onComplete);
+#else
+            onComplete?.Invoke();
+#endif
+        }
+
         public static void RequestConsent(Action onComplete)
         {
             DiscardLegacyPoisonedConsent();

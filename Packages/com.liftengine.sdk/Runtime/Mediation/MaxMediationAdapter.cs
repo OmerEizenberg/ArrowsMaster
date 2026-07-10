@@ -48,28 +48,57 @@ namespace LiftEngine.Mediation
                 _callbacksSubscribed = true;
             }
 
-            void Complete()
+            var completed = false;
+
+            void CompleteSuccess()
             {
+                if (completed)
+                    return;
+
+                completed = true;
                 IsInitialized = true;
                 onComplete?.Invoke(true);
             }
 
-            if (MaxSdk.IsInitialized())
+            void CompleteFailure()
             {
-                Complete();
-                return;
+                if (completed)
+                    return;
+
+                completed = true;
+                onComplete?.Invoke(false);
             }
 
-            MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+            if (MaxSdk.IsInitialized())
+            {
+                CompleteSuccess();
+                return;
+            }
 
             void OnMaxSdkInitialized(MaxSdkBase.SdkConfiguration config)
             {
                 MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
-                Complete();
+                CompleteSuccess();
             }
 
-            LiftEngineLogger.Log(
-                "Waiting for AppLovin MAX to initialize. Call MaxSdk.InitializeSdk() in your game before LiftEngineSdk.Initialize().");
+            MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+            LiftEngineHost.Instance.StartCoroutine(WaitForMaxInitOrTimeout(CompleteFailure));
+        }
+
+        private static System.Collections.IEnumerator WaitForMaxInitOrTimeout(Action onTimeout)
+        {
+            const float timeoutSeconds = 45f;
+            var deadline = Time.realtimeSinceStartup + timeoutSeconds;
+
+            while (!MaxSdk.IsInitialized() && Time.realtimeSinceStartup < deadline)
+                yield return null;
+
+            if (MaxSdk.IsInitialized())
+                yield break;
+
+            LiftEngineLogger.LogError(
+                $"AppLovin MAX did not initialize within {timeoutSeconds}s; LiftEngine init will retry.");
+            onTimeout?.Invoke();
         }
 
         private void SubscribeCallbacks()
@@ -295,7 +324,7 @@ namespace LiftEngine.Mediation
             return state;
         }
 
-        private static MediationAdInfo ToInfo(LiftEngineAdFormat format, string adUnitId, MaxSdkBase.AdInfo info)
+        private MediationAdInfo ToInfo(LiftEngineAdFormat format, string adUnitId, MaxSdkBase.AdInfo info)
         {
             return new MediationAdInfo
             {
@@ -303,7 +332,9 @@ namespace LiftEngine.Mediation
                 AdUnitId = adUnitId,
                 NetworkName = info?.NetworkName,
                 Revenue = info?.Revenue ?? 0d,
-                AdFormat = info?.AdFormat
+                AdFormat = info?.AdFormat,
+                RevenuePrecision = info?.RevenuePrecision,
+                MaxPlacement = GetState(format).MaxPlacement
             };
         }
     }
