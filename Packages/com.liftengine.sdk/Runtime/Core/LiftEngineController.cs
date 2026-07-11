@@ -269,7 +269,11 @@ namespace LiftEngine
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
-            var placementId = _settings.GetPlacementId(info.Format);
+            // Use the same internally selected placement for MAX display and LiftEngine tracking.
+            // This resolves to Base_*, LiftEngine_a_*, or LiftEngine_m_* for the ad format.
+            var placementId = !string.IsNullOrEmpty(info.MaxPlacement)
+                ? info.MaxPlacement
+                : _context.GetMaxPlacement(info.Format);
             var rev = info.Revenue > 0 ? (float?)info.Revenue : null;
 
             var adType = _settings.GetModelName(info.Format);

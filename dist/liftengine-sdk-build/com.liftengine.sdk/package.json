@@ -1,0 +1,32 @@
+{
+  "name": "com.liftengine.sdk",
+  "version": "1.1.0",
+  "displayName": "LiftEngine SDK",
+  "description": "Ad monetization optimization for AppLovin MAX. Improves ad revenue through LiftEngine cloud intelligence with automatic preloading and graceful MAX fallback.",
+  "unity": "2021.3",
+  "documentationUrl": "Documentation~/INTEGRATION.md",
+  "changelogUrl": "CHANGELOG.md",
+  "licensesUrl": "LICENSE.md",
+  "author": {
+    "name": "LiftEngine",
+    "url": "https://liftengine.ai"
+  },
+  "keywords": [
+    "ads",
+    "monetization",
+    "max",
+    "applovin",
+    "revenue",
+    "mediation"
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Integration",
+      "description": "Minimal sample driver for testing LiftEngine with MAX.",
+      "path": "Samples~/BasicIntegration"
+    }
+  ]
+}

@@ -243,11 +243,6 @@ namespace LiftEngine.Editor
             DrawProperty(so, "androidInterstitialAdUnitId");
             DrawProperty(so, "androidRewardedAdUnitId");
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Placement IDs (LiftEngine track API)", EditorStyles.boldLabel);
-            DrawProperty(so, "bannerPlacementId");
-            DrawProperty(so, "interstitialPlacementId");
-            DrawProperty(so, "rewardedPlacementId");
-            EditorGUILayout.Space();
             DrawProperty(so, "predictTimeoutSeconds");
             DrawProperty(so, "defaultPredictionFallback");
             DrawProperty(so, "loadAttemptTimeoutSeconds");

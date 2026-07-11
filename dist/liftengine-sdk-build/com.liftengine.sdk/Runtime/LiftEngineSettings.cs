@@ -127,6 +127,20 @@ namespace LiftEngine
 #endif
         }
 
+        /// <summary>
+        /// Hardcoded LiftEngine track placement IDs — not configurable by integrators.
+        /// </summary>
+        public string GetPlacementId(LiftEngineAdFormat format)
+        {
+            return format switch
+            {
+                LiftEngineAdFormat.Banner => "banner-default",
+                LiftEngineAdFormat.Interstitial => "interstitial-default",
+                LiftEngineAdFormat.Rewarded => "rewarded-default",
+                _ => string.Empty
+            };
+        }
+
         public string GetModelName(LiftEngineAdFormat format)
         {
             return format switch
