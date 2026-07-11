@@ -38,6 +38,8 @@ cp "$PKG_DIR/README.md" "$DIST_DIR/com.liftengine.sdk/"
 cp "$PKG_DIR/CHANGELOG.md" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
 cp "$PKG_DIR/LICENSE.md" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
 cp -R "$PKG_DIR/Documentation~" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
+# Customer docs only — exclude internal distribution guide
+rm -f "$DIST_DIR/com.liftengine.sdk/Documentation~/DISTRIBUTION.md" 2>/dev/null || true
 cp -R "$PKG_DIR/Samples~" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
 
 # Copy DLLs

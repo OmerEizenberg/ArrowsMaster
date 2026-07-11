@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
 using Firebase.Analytics;
 using LiftEngine;
@@ -60,8 +61,20 @@ namespace Assets.Scripts.Core
         private bool _liftEngineEnabled;
         private bool _liftEngineReady;
         private bool _liftEngineInitSettled;
+        private int _liftEngineInitRetryAttempt;
+        private float _maxInitStartedRealtime = -1f;
+        private float _liftEngineInitStartedRealtime = -1f;
+        private float _lastLiftEngineBackgroundRetryRealtime = -1f;
+        private LiftEngineSettings _liftEngineSettings;
+        private Coroutine _liftEngineInitRetryCoroutine;
         private bool _liftEngineCallbacksSubscribed;
         private bool _liftEngineStartRequested;
+
+        private bool UseLiftEngineAdPath => _liftEngineEnabled && _liftEngineReady;
+        // Serve direct MAX whenever LiftEngine is disabled or not ready yet — never block ads
+        // while waiting for LiftEngine predict/report init.
+        private bool UseDirectMaxAdPath => !_liftEngineEnabled || !_liftEngineReady;
+        private bool IsLiftEngineInitPending => _liftEngineEnabled && !_liftEngineReady;
         private bool _fullscreenMaxCallbacksSubscribed;
         private bool _maxSdkInitSuccessLogged;
         private bool _maxSdkInitFailedLogged;
@@ -92,7 +105,74 @@ namespace Assets.Scripts.Core
             }
         }
 
+        private readonly struct AdAnalyticsPayload
+        {
+            public readonly string NetworkName;
+            public readonly string AdUnitId;
+            public readonly string AdFormat;
+            public readonly string MediationPath;
+            public readonly string MaxPlacement;
+            public readonly string RevenuePrecision;
+            public readonly double RevenueUsd;
+
+            public AdAnalyticsPayload(
+                string networkName,
+                string adUnitId,
+                string adFormat,
+                string mediationPath,
+                string maxPlacement = null,
+                string revenuePrecision = null,
+                double revenueUsd = 0d)
+            {
+                NetworkName = networkName;
+                AdUnitId = adUnitId;
+                AdFormat = adFormat;
+                MediationPath = mediationPath;
+                MaxPlacement = maxPlacement;
+                RevenuePrecision = revenuePrecision;
+                RevenueUsd = revenueUsd;
+            }
+
+            public static AdAnalyticsPayload FromMaxAdInfo(
+                MaxSdkBase.AdInfo adInfo,
+                string adFormat,
+                string mediationPath,
+                string maxPlacement = null)
+            {
+                return new AdAnalyticsPayload(
+                    adInfo?.NetworkName,
+                    adInfo?.AdUnitIdentifier,
+                    string.IsNullOrEmpty(adInfo?.AdFormat) ? adFormat : adInfo.AdFormat,
+                    mediationPath,
+                    maxPlacement,
+                    adInfo?.RevenuePrecision,
+                    adInfo?.Revenue ?? 0d);
+            }
+
+            public static AdAnalyticsPayload FromLiftEngineAdInfo(LiftEngineAdInfo info, string adFormat)
+            {
+                if (info == null)
+                    return default;
+
+                return new AdAnalyticsPayload(
+                    info.NetworkName,
+                    info.AdUnitId,
+                    string.IsNullOrEmpty(info.AdFormat) ? adFormat : info.AdFormat,
+                    "liftengine",
+                    info.MaxPlacement,
+                    info.RevenuePrecision,
+                    info.Revenue);
+            }
+        }
+
+        private const string MediationPathDirectMax = "direct_max";
+        private const string MediationPathLiftEngine = "liftengine";
+
         private const float HealthCheckIntervalSeconds = 20f;
+        private const float MaxInitStuckRecoverySeconds = 40f;
+        private const float LiftEngineInitCallbackTimeoutSeconds = 45f;
+        private const float LiftEngineBackgroundRetryIntervalSeconds = 60f;
+        private const float LiftEngineBannerPreferWaitSeconds = 10f;
         // Ultimate cap on waiting for a GDPR user to finish the consent form before init.
         private const float ConsentGatherTimeoutSeconds = 60f;
         // Cap on the UMP status roundtrip itself — a hung network must not cost the session's init.
@@ -214,11 +294,15 @@ namespace Assets.Scripts.Core
         {
             _applicationPaused = paused;
             if (!paused)
+            {
                 ScheduleBannerResumeSync();
+                EnqueueAction(RecoverAdsStackIfNeeded);
+            }
         }
 
         private void OnDestroy()
         {
+            CancelLiftEngineInitRetry();
             UnsubscribeLiftEngineCallbacks();
 
             MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
@@ -422,7 +506,8 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            SyncLegacyBannerState();
+            if (UseDirectMaxAdPath)
+                SyncLegacyBannerState();
         }
 
         private void SyncLiftEngineBannerState()
@@ -642,23 +727,61 @@ namespace Assets.Scripts.Core
 
                 try
                 {
-                    if (!isInitialized && !isInitializing)
-                    {
-                        Debug.Log("[AdsManager] HealthCheck: SDK not initialized. Attempting to initialize.");
-                        _ = InitializeSDK();
-                        continue;
-                    }
-
-                    if (!isInitialized) continue;
-
-                    EnsureFullscreenAdsLoaded();
-                    if (!_bannerCreated || !_bannerReady) PrepareBannerAd();
+                    RecoverAdsStackIfNeeded();
                 }
                 catch (Exception e)
                 {
                     Debug.LogWarning($"[AdsManager] HealthCheck error: {e.Message}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Recovers users who bounced, lost init callbacks, had consent/network blips, or are
+        /// stuck waiting for LiftEngine — keeps retrying MAX + LiftEngine for the whole session.
+        /// </summary>
+        private void RecoverAdsStackIfNeeded()
+        {
+            ConsentManager.RetryIfFailed(() =>
+            {
+                if (isInitialized)
+                    ConsentManager.ApplyConsentToMax();
+            });
+
+            if (isInitializing && !isInitialized &&
+                _maxInitStartedRealtime > 0f &&
+                Time.realtimeSinceStartup - _maxInitStartedRealtime > MaxInitStuckRecoverySeconds)
+            {
+                Debug.LogWarning("[AdsManager] MAX init appears stuck; forcing recovery retry.");
+                isInitializing = false;
+
+                if (MaxSdk.IsInitialized())
+                    OnMaxSdkInitialized(null);
+                else
+                    _ = RetrySDKInitialization(0);
+
+                return;
+            }
+
+            if (!isInitialized && !isInitializing)
+            {
+                Debug.Log("[AdsManager] HealthCheck: SDK not initialized. Attempting to initialize.");
+                _ = InitializeSDK();
+                return;
+            }
+
+            if (!isInitialized)
+                return;
+
+            EnsureLiftEngineInitialized();
+
+            if (_liftEngineReady)
+                EnsureFullscreenAdsLoaded();
+            else
+                EnsureDirectMaxAdsLoaded();
+
+            if (!_bannerCreated || !_bannerReady)
+                PrepareBannerAd();
         }
 
         // ════════════════════════════════════════════
@@ -670,6 +793,9 @@ namespace Assets.Scripts.Core
             if (isInitialized || isInitializing) return;
 
             isInitializing = true;
+            _maxInitStartedRealtime = Time.realtimeSinceStartup;
+            _maxSdkInitFailedLogged = false;
+
             try
             {
                 // Unity Gaming Services is only required for IAP — IAPManager.WarmUp() handles it independently.
@@ -710,26 +836,43 @@ namespace Assets.Scripts.Core
 
                 EnqueueAction(() =>
                 {
-                    // CCPA flag + non-GDPR consent healing. GDPR users are governed by the
-                    // IAB TCF string that Google UMP writes (read automatically by MAX).
-                    ConsentManager.ApplyConsentToMax();
+                    try
+                    {
+                        if (MaxSdk.IsInitialized())
+                        {
+                            Debug.Log("[AdsManager] MAX already initialized natively; replaying handler.");
+                            OnMaxSdkInitialized(null);
+                            return;
+                        }
 
-                    // We gather consent via Google UMP ourselves — keep AppLovin's built-in
-                    // consent flow disabled to avoid duplicate dialogs (Jun-19 tier-1 regression).
-                    MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
+                        // CCPA flag + non-GDPR consent healing. GDPR users are governed by the
+                        // IAB TCF string that Google UMP writes (read automatically by MAX).
+                        ConsentManager.ApplyConsentToMax();
 
-                    // MAX events (incl. ILRD revenue callbacks) must reach Unity APIs and
-                    // Singular on the main thread.
-                    MaxSdkBase.InvokeEventsOnUnityMainThread = true;
+                        // We gather consent via Google UMP ourselves — keep AppLovin's built-in
+                        // consent flow disabled to avoid duplicate dialogs (Jun-19 tier-1 regression).
+                        MaxSdk.SetExtraParameter("consent_flow_enabled", "false");
 
-                    Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
+                        // MAX events (incl. ILRD revenue callbacks) must reach Unity APIs and
+                        // Singular on the main thread.
+                        MaxSdkBase.InvokeEventsOnUnityMainThread = true;
 
-                    MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
-                    MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+                        Debug.Log("[AdsManager] Initializing AppLovin MAX SDK...");
 
-                    MaxSdk.SetSdkKey(MaxSdkKey);
-                    MaxSdk.InitializeSdk();
-                    StartCoroutine(WaitForMaxSdkInitCallback());
+                        MaxSdkCallbacks.OnSdkInitializedEvent -= OnMaxSdkInitialized;
+                        MaxSdkCallbacks.OnSdkInitializedEvent += OnMaxSdkInitialized;
+
+                        MaxSdk.SetSdkKey(MaxSdkKey);
+                        MaxSdk.InitializeSdk();
+                        StartCoroutine(WaitForMaxSdkInitCallback());
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError($"[AdsManager] MAX init on main thread failed: {e.Message}");
+                        isInitializing = false;
+                        LogMaxSdkInitFailed(e.Message);
+                        _ = RetrySDKInitialization(5000);
+                    }
                 });
             }
             catch (Exception e)
@@ -837,12 +980,23 @@ namespace Assets.Scripts.Core
 
         private async Task RetrySDKInitialization(int delayMs)
         {
-            if (isInitialized || isInitializing) return;
+            if (isInitialized) return;
 
             Debug.Log($"[AdsManager] Retrying SDK Initialization in {delayMs / 1000}s... (Attempt {sdkInitRetryCount + 1})");
             await Task.Delay(delayMs);
 
-            if (this != null && !isInitialized && !isInitializing)
+            if (this == null || isInitialized)
+                return;
+
+            if (isInitializing &&
+                _maxInitStartedRealtime > 0f &&
+                Time.realtimeSinceStartup - _maxInitStartedRealtime > MaxInitStuckRecoverySeconds)
+            {
+                Debug.LogWarning("[AdsManager] Clearing stuck isInitializing flag before MAX retry.");
+                isInitializing = false;
+            }
+
+            if (!isInitializing)
             {
                 sdkInitRetryCount++;
                 EnqueueAction(() => _ = InitializeSDK());
@@ -860,10 +1014,12 @@ namespace Assets.Scripts.Core
             Debug.Log("[AdsManager] AppLovin MAX SDK Initialized Successfully.");
             isInitialized = true;
             isInitializing = false;
+            _maxInitStartedRealtime = -1f;
             sdkInitRetryCount = 0;
             LogMaxSdkInitialized();
 
             TryStartLiftEngine();
+            EnsureDirectMaxAdsLoaded();
             EnsureFullscreenMaxCallbacks();
             if (!_liftEngineEnabled)
             {
@@ -925,7 +1081,7 @@ namespace Assets.Scripts.Core
             }
             // Loaded even for No Ads buyers so interstitials remain available as a rewarded fallback.
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
-            if (_liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 LiftEngineSdk.LoadAd(LiftEngineAdFormat.Interstitial);
                 return;
@@ -980,9 +1136,9 @@ namespace Assets.Scripts.Core
             {
                 Debug.Log("[AdsManager] Showing Interstitial Ad.");
                 OnAdOpened?.Invoke();
-                if (_liftEngineReady)
+                if (UseLiftEngineAdPath)
                     ShowLiftEngineAd(LiftEngineAdFormat.Interstitial);
-                else
+                else if (UseDirectMaxAdPath)
                     MaxSdk.ShowInterstitial(InterstitialAdUnitId, BaseInterstitialPlacement);
             }
             else
@@ -1021,6 +1177,8 @@ namespace Assets.Scripts.Core
         private void OnInterstitialDisplayed(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
             Debug.Log("[AdsManager] Interstitial Ad Displayed.");
+            if (!_liftEngineReady)
+                LogAdViewed(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "interstitial", MediationPathDirectMax));
             SetCachedReady(ref _interstitialReady, false);
             PrepareAllAdsAfterClose();
         }
@@ -1060,8 +1218,11 @@ namespace Assets.Scripts.Core
 
         private void OnInterstitialRevenuePaid(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
+            if (_liftEngineReady)
+                return;
+
             AdMonetizationOptimizer.RecordInterstitialAd(adInfo);
-            TrackAdRevenue(adInfo, "interstitial");
+            LogAdIlrd(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "interstitial", MediationPathDirectMax));
         }
 
         #endregion
@@ -1084,7 +1245,7 @@ namespace Assets.Scripts.Core
                 return;
             }
             Debug.Log("[AdsManager] Loading Rewarded Ad...");
-            if (_liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 LiftEngineSdk.LoadAd(LiftEngineAdFormat.Rewarded);
                 return;
@@ -1201,7 +1362,7 @@ namespace Assets.Scripts.Core
 
         private void ShowFullscreenAd(LiftEngineAdFormat format)
         {
-            if (_liftEngineEnabled && _liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 ShowLiftEngineAd(format);
                 return;
@@ -1267,6 +1428,8 @@ namespace Assets.Scripts.Core
         private void OnRewardedAdDisplayed(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
             Debug.Log("[AdsManager] Rewarded Ad Displayed.");
+            if (!_liftEngineReady)
+                LogAdViewed(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "rewarded", MediationPathDirectMax));
             SetCachedReady(ref _rewardedReady, false);
             PrepareAllAdsAfterClose();
         }
@@ -1302,8 +1465,11 @@ namespace Assets.Scripts.Core
 
         private void OnRewardedAdRevenuePaid(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
+            if (_liftEngineReady)
+                return;
+
             AdMonetizationOptimizer.RecordRewardedAd(adInfo);
-            TrackAdRevenue(adInfo, "rewarded");
+            LogAdIlrd(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "rewarded", MediationPathDirectMax));
         }
 
         #endregion
@@ -1384,16 +1550,12 @@ namespace Assets.Scripts.Core
                 yield break;
             }
 
-            if (_liftEngineEnabled && !_liftEngineInitSettled)
-            {
-                float deadline = Time.realtimeSinceStartup + 30f;
-                while (!_liftEngineInitSettled && Time.realtimeSinceStartup < deadline)
-                    yield return new WaitForSeconds(0.1f);
-            }
+            if (_liftEngineEnabled && IsLiftEngineInitPending)
+                yield return WaitForLiftEngineInitOrTimeout(LiftEngineBannerPreferWaitSeconds);
 
             try
             {
-                if (_liftEngineReady)
+                if (UseLiftEngineAdPath)
                 {
                     Debug.Log("[AdsManager] Loading Settings Banner via LiftEngine (predict + multipliers)...");
                     LiftEngineSdk.LoadAd(LiftEngineAdFormat.Banner);
@@ -1401,7 +1563,7 @@ namespace Assets.Scripts.Core
                 else
                 {
                     SubscribeBannerCallbacks();
-                    Debug.Log("[AdsManager] Creating Settings Banner Ad (deferred)...");
+                    Debug.Log("[AdsManager] Creating Settings Banner Ad (direct MAX)...");
                     MaxSdk.CreateBanner(BannerAdUnitId, MaxSdkBase.BannerPosition.BottomCenter);
                     MaxSdk.SetBannerPlacement(BannerAdUnitId, BaseBannerPlacement);
                     MaxSdk.SetBannerBackgroundColor(BannerAdUnitId, Color.clear);
@@ -1419,8 +1581,14 @@ namespace Assets.Scripts.Core
                 _bannerCreateRequestedForShow = false;
             }
 
-            if (!_liftEngineReady)
-                SyncBannerNativeState();
+            SyncBannerNativeState();
+        }
+
+        private IEnumerator WaitForLiftEngineInitOrTimeout(float timeoutSeconds)
+        {
+            float deadline = Time.realtimeSinceStartup + timeoutSeconds;
+            while (IsLiftEngineInitPending && Time.realtimeSinceStartup < deadline)
+                yield return new WaitForSeconds(0.2f);
         }
 
         /// <summary>
@@ -1442,7 +1610,7 @@ namespace Assets.Scripts.Core
                 return;
             }
 
-            if (_liftEngineReady)
+            if (UseLiftEngineAdPath)
             {
                 if (LiftEngineSdk.IsAdReady(LiftEngineAdFormat.Banner))
                     return;
@@ -1533,7 +1701,13 @@ namespace Assets.Scripts.Core
 
         private void OnBannerAdRevenuePaid(string adUnitId, MaxSdkBase.AdInfo adInfo)
         {
-            TrackAdRevenue(adInfo, "banner");
+            if (_liftEngineReady)
+                return;
+
+            // Banners have no reliable OnAdDisplayed in our MAX wiring — ILRD is the view signal.
+            var payload = AdAnalyticsPayload.FromMaxAdInfo(adInfo, "banner", MediationPathDirectMax);
+            LogAdViewed(payload);
+            LogAdIlrd(payload);
         }
 
         #endregion
@@ -1637,10 +1811,104 @@ namespace Assets.Scripts.Core
 
             _liftEngineStartRequested = true;
             _liftEngineEnabled = true;
+            _liftEngineSettings = settings;
+            _liftEngineInitStartedRealtime = Time.realtimeSinceStartup;
             SubscribeLiftEngineCallbacks();
             LiftEngineSdk.Initialize(settings);
             ApplyLiftEngineContext();
             Debug.Log("[AdsManager] LiftEngine init requested (report/predict run inside SDK).");
+        }
+
+        private void EnsureLiftEngineInitialized()
+        {
+            if (!isInitialized || !_liftEngineEnabled || _liftEngineReady || _liftEngineSettings == null)
+                return;
+
+            if (!_liftEngineStartRequested)
+            {
+                TryStartLiftEngine();
+                return;
+            }
+
+            if (!_liftEngineInitSettled &&
+                _liftEngineInitStartedRealtime > 0f &&
+                Time.realtimeSinceStartup - _liftEngineInitStartedRealtime > LiftEngineInitCallbackTimeoutSeconds)
+            {
+                Debug.LogWarning("[AdsManager] LiftEngine init callback timed out; retrying.");
+                _liftEngineInitRetryAttempt++;
+                ResetAndRetryLiftEngineInit();
+                return;
+            }
+
+            if (_liftEngineInitSettled &&
+                (_lastLiftEngineBackgroundRetryRealtime < 0f ||
+                 Time.realtimeSinceStartup - _lastLiftEngineBackgroundRetryRealtime >
+                 LiftEngineBackgroundRetryIntervalSeconds))
+            {
+                _lastLiftEngineBackgroundRetryRealtime = Time.realtimeSinceStartup;
+                Debug.Log("[AdsManager] Background LiftEngine init retry.");
+                _liftEngineInitRetryAttempt = 0;
+                ResetAndRetryLiftEngineInit();
+            }
+        }
+
+        private void ResetAndRetryLiftEngineInit()
+        {
+            CancelLiftEngineInitRetry();
+            _liftEngineInitSettled = false;
+            _liftEngineInitStartedRealtime = Time.realtimeSinceStartup;
+            LiftEngineSdk.Initialize(_liftEngineSettings);
+            ApplyLiftEngineContext();
+            EnsureDirectMaxAdsLoaded();
+        }
+
+        private void CancelLiftEngineInitRetry()
+        {
+            if (_liftEngineInitRetryCoroutine == null)
+                return;
+
+            StopCoroutine(_liftEngineInitRetryCoroutine);
+            _liftEngineInitRetryCoroutine = null;
+        }
+
+        private void ScheduleLiftEngineInitRetry()
+        {
+            CancelLiftEngineInitRetry();
+            _liftEngineInitRetryCoroutine = StartCoroutine(RetryLiftEngineInitRoutine());
+        }
+
+        private IEnumerator RetryLiftEngineInitRoutine()
+        {
+            int maxAttempts = _liftEngineSettings != null ? _liftEngineSettings.maxInitRetryAttempts : 3;
+            float baseDelay = _liftEngineSettings != null ? _liftEngineSettings.initRetryBaseDelaySeconds : 5f;
+            double retryDelay = baseDelay * Math.Pow(2, Math.Min(4, _liftEngineInitRetryAttempt - 1));
+
+            Debug.LogWarning(
+                $"[AdsManager] LiftEngine init retry {_liftEngineInitRetryAttempt}/{maxAttempts - 1} in {retryDelay:F0}s.");
+
+            yield return new WaitForSeconds((float)retryDelay);
+
+            _liftEngineInitRetryCoroutine = null;
+
+            if (!isInitialized || _liftEngineReady || _liftEngineSettings == null)
+                yield break;
+
+            ResetAndRetryLiftEngineInit();
+        }
+
+        private void EnsureDirectMaxAdsLoaded()
+        {
+            if (!isInitialized)
+                return;
+
+            EnsureFullscreenMaxCallbacks();
+            if (!_interstitialReady)
+                LoadInterstitial();
+            if (!_rewardedReady)
+                LoadRewarded();
+            if (_bannerShowRequested && !_bannerCreated)
+                LoadSettingsBanner();
+            RefreshAllReadiness();
         }
 
         private void ApplyLiftEngineContext()
@@ -1699,6 +1967,7 @@ namespace Assets.Scripts.Core
 
             LiftEngineSdkCallbacks.OnSdkInitializedEvent += OnLiftEngineSdkInitialized;
             LiftEngineSdkCallbacks.OnAdLoadedEvent += OnLiftEngineAdLoaded;
+            LiftEngineSdkCallbacks.OnAdDisplayedEvent += OnLiftEngineAdDisplayed;
             LiftEngineSdkCallbacks.OnAdRevenuePaidEvent += OnLiftEngineAdRevenuePaid;
             LiftEngineSignalBus.AdReadyStateChanged += OnLiftEngineAdReadyStateChanged;
             _liftEngineCallbacksSubscribed = true;
@@ -1711,6 +1980,7 @@ namespace Assets.Scripts.Core
 
             LiftEngineSdkCallbacks.OnSdkInitializedEvent -= OnLiftEngineSdkInitialized;
             LiftEngineSdkCallbacks.OnAdLoadedEvent -= OnLiftEngineAdLoaded;
+            LiftEngineSdkCallbacks.OnAdDisplayedEvent -= OnLiftEngineAdDisplayed;
             LiftEngineSdkCallbacks.OnAdRevenuePaidEvent -= OnLiftEngineAdRevenuePaid;
             LiftEngineSignalBus.AdReadyStateChanged -= OnLiftEngineAdReadyStateChanged;
             _liftEngineCallbacksSubscribed = false;
@@ -1733,18 +2003,32 @@ namespace Assets.Scripts.Core
             }
 
             _liftEngineInitSettled = true;
-            _liftEngineReady = status == LiftEngineInitializationStatus.Success;
-            if (_liftEngineReady)
+            CancelLiftEngineInitRetry();
+
+            if (status == LiftEngineInitializationStatus.Success)
             {
+                _liftEngineReady = true;
+                _liftEngineInitRetryAttempt = 0;
                 Debug.Log("[AdsManager] LiftEngine SDK initialized — all ad formats routed through predict/track flow.");
-                // Banner prewarm deferred to HomeController.PrewarmBannerAfterLobbySettled (~2s).
+                EnqueueAction(LoadSettingsBanner);
             }
             else
             {
-                Debug.LogWarning("[AdsManager] LiftEngine init failed — falling back to direct MAX for fullscreen ads.");
-                EnsureFullscreenMaxCallbacks();
-                LoadInterstitial();
-                LoadRewarded();
+                _liftEngineReady = false;
+                _liftEngineInitRetryAttempt++;
+                EnsureDirectMaxAdsLoaded();
+
+                int maxAttempts = _liftEngineSettings != null ? _liftEngineSettings.maxInitRetryAttempts : 3;
+                if (_liftEngineInitRetryAttempt < maxAttempts)
+                {
+                    ScheduleLiftEngineInitRetry();
+                    RefreshAllReadiness();
+                    return;
+                }
+
+                Debug.LogWarning(
+                    $"[AdsManager] LiftEngine init failed after {_liftEngineInitRetryAttempt} fast attempt(s); " +
+                    "direct MAX active, background retry continues.");
             }
 
             RefreshAllReadiness();
@@ -1777,9 +2061,18 @@ namespace Assets.Scripts.Core
             RefreshAllReadiness();
         }
 
+        private void OnLiftEngineAdDisplayed(LiftEngineAdInfo info)
+        {
+            if (!_liftEngineReady || info == null)
+                return;
+
+            string adFormat = FormatToAnalyticsName(info.Format);
+            LogAdViewed(AdAnalyticsPayload.FromLiftEngineAdInfo(info, adFormat));
+        }
+
         private void OnLiftEngineAdRevenuePaid(LiftEngineAdInfo info)
         {
-            if (info == null)
+            if (!_liftEngineReady || info == null)
                 return;
 
             if (info.Format == LiftEngineAdFormat.Interstitial)
@@ -1787,7 +2080,14 @@ namespace Assets.Scripts.Core
             else if (info.Format == LiftEngineAdFormat.Rewarded)
                 AdMonetizationOptimizer.RecordRewardedRevenue(info.Revenue);
 
-            TrackLiftEngineAdRevenue(info);
+            string adFormat = FormatToAnalyticsName(info.Format);
+            var payload = AdAnalyticsPayload.FromLiftEngineAdInfo(info, adFormat);
+
+            // Banner display is synthetic in the adapter; treat ILRD as the view signal.
+            if (info.Format == LiftEngineAdFormat.Banner)
+                LogAdViewed(payload);
+
+            LogAdIlrd(payload);
         }
 
         private void ShowLiftEngineAd(LiftEngineAdFormat format)
@@ -1875,12 +2175,15 @@ namespace Assets.Scripts.Core
             RefreshAllReadiness();
         }
 
-        private void TrackLiftEngineAdRevenue(LiftEngineAdInfo info)
-        {
-            if (info == null || info.Revenue <= 0)
-                return;
+        // ════════════════════════════════════════════
+        //  REVENUE TRACKING (Firebase + Singular)
+        //  GA4 best practice:
+        //    ad_viewed      — every display (viewer funnel, aligns with MAX DAV)
+        //    ad_impression  — ILRD with revenue > 0 only (GA4 monetization / BI revenue)
+        // ════════════════════════════════════════════
 
-            string adFormat = info.Format switch
+        private static string FormatToAnalyticsName(LiftEngineAdFormat format) =>
+            format switch
             {
                 LiftEngineAdFormat.Interstitial => "interstitial",
                 LiftEngineAdFormat.Rewarded => "rewarded",
@@ -1888,85 +2191,91 @@ namespace Assets.Scripts.Core
                 _ => "unknown"
             };
 
-            var payload = new SingularAdRevenuePayload(
-                info.Revenue,
-                info.NetworkName,
-                info.AdUnitId,
-                adFormat,
-                string.Empty);
+        private void LogAdViewed(AdAnalyticsPayload payload)
+        {
+            if (FirebaseManager.Instance == null)
+                return;
 
-            EnqueueAction(() => ReportAdRevenueOnMainThread(payload));
+            var parameters = BuildAdAnalyticsParameters(payload, includeRevenue: false);
+            FirebaseManager.Instance.LogFunnelEvent(FirebaseManager.EVENT_AD_VIEWED, parameters);
         }
-
-        // ════════════════════════════════════════════
-        //  REVENUE TRACKING (Firebase + Singular)
-        // ════════════════════════════════════════════
 
         /// <summary>
-        /// Sends AppLovin MAX impression-level revenue (ILRD) to Firebase and Singular.
-        /// MAX fires OnAdRevenuePaidEvent off the main thread unless InvokeEventsOnUnityMainThread is set.
+        /// Logs GA4 <c>ad_impression</c> when ILRD has revenue, and forwards to Singular.
         /// </summary>
-        private void TrackAdRevenue(MaxSdkBase.AdInfo adInfo, string adFormat)
+        private void LogAdIlrd(AdAnalyticsPayload payload)
         {
-            if (adInfo == null)
-            {
-                Debug.LogWarning("[AdsManager] TrackAdRevenue: adInfo is null");
-                return;
-            }
-
-            double revenueUsd = adInfo.Revenue;
-            string resolvedFormat = string.IsNullOrEmpty(adInfo.AdFormat) ? adFormat : adInfo.AdFormat;
-
-            if (revenueUsd <= 0)
+            if (payload.RevenueUsd <= 0d)
             {
                 Debug.LogWarning(
-                    $"[AdsManager] TrackAdRevenue: no revenue (network={adInfo.NetworkName}, " +
-                    $"unit={adInfo.AdUnitIdentifier}, format={resolvedFormat}, precision={adInfo.RevenuePrecision}). " +
-                    "ILRD is delivered via OnAdRevenuePaidEvent when MAX has revenue data—common causes: test ads, " +
-                    "revenue=-1 (error), or network not fully configured in MAX Mediation.");
+                    $"[AdsManager] ILRD without revenue — ad_viewed only " +
+                    $"(network={payload.NetworkName}, format={payload.AdFormat}, " +
+                    $"precision={payload.RevenuePrecision ?? "none"}, path={payload.MediationPath}).");
                 return;
             }
 
-            var payload = new SingularAdRevenuePayload(
-                revenueUsd,
-                adInfo.NetworkName,
-                adInfo.AdUnitIdentifier,
-                resolvedFormat,
-                adInfo.RevenuePrecision);
+            var singularPayload = new SingularAdRevenuePayload(
+                payload.RevenueUsd,
+                payload.NetworkName,
+                payload.AdUnitId,
+                payload.AdFormat,
+                payload.RevenuePrecision);
 
-            EnqueueAction(() => ReportAdRevenueOnMainThread(payload));
+            EnqueueAction(() => ReportAdRevenueOnMainThread(singularPayload, payload));
         }
 
-        private void ReportAdRevenueOnMainThread(SingularAdRevenuePayload payload)
+        private static Parameter[] BuildAdAnalyticsParameters(AdAnalyticsPayload payload, bool includeRevenue)
+        {
+            var list = new List<Parameter>(8)
+            {
+                new Parameter(FirebaseManager.PARAM_AD_PLATFORM, "AppLovinMAX"),
+                new Parameter(FirebaseManager.PARAM_AD_SOURCE, payload.NetworkName ?? string.Empty),
+                new Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, payload.AdUnitId ?? string.Empty),
+                new Parameter(FirebaseManager.PARAM_AD_FORMAT, payload.AdFormat ?? string.Empty),
+                new Parameter(FirebaseManager.PARAM_MEDIATION_PATH, payload.MediationPath ?? string.Empty)
+            };
+
+            if (!string.IsNullOrEmpty(payload.MaxPlacement))
+                list.Add(new Parameter(FirebaseManager.PARAM_MAX_PLACEMENT, payload.MaxPlacement));
+
+            if (!string.IsNullOrEmpty(payload.RevenuePrecision))
+                list.Add(new Parameter(FirebaseManager.PARAM_REVENUE_PRECISION, payload.RevenuePrecision));
+
+            if (includeRevenue)
+            {
+                list.Add(new Parameter(FirebaseManager.PARAM_VALUE, payload.RevenueUsd));
+                list.Add(new Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
+            }
+
+            return list.ToArray();
+        }
+
+        private void ReportAdRevenueOnMainThread(SingularAdRevenuePayload singularPayload, AdAnalyticsPayload analyticsPayload)
         {
             if (FirebaseManager.Instance != null)
             {
-                FirebaseManager.Instance.LogEvent(FirebaseManager.EVENT_AD_IMPRESSION,
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_PLATFORM, "AppLovinMAX"),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_SOURCE, payload.NetworkName),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_UNIT_NAME, payload.AdUnitId),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_AD_FORMAT, payload.AdFormat),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_VALUE, payload.RevenueUsd),
-                    new Firebase.Analytics.Parameter(FirebaseManager.PARAM_CURRENCY, "USD"));
+                FirebaseManager.Instance.LogFunnelEvent(
+                    FirebaseManager.EVENT_AD_IMPRESSION,
+                    BuildAdAnalyticsParameters(analyticsPayload, includeRevenue: true));
             }
 
 #if !UNITY_EDITOR
             if (!SingularSDK.Initialized)
             {
-                _pendingSingularRevenue.Enqueue(payload);
+                _pendingSingularRevenue.Enqueue(singularPayload);
                 EnsurePendingSingularRevenueFlushScheduled();
                 Debug.LogWarning(
-                    $"[AdsManager] Singular not initialized yet; queued ad revenue ${payload.RevenueUsd:F6} " +
-                    $"(network={payload.NetworkName}, format={payload.AdFormat}).");
+                    $"[AdsManager] Singular not initialized yet; queued ad revenue ${singularPayload.RevenueUsd:F6} " +
+                    $"(network={singularPayload.NetworkName}, format={singularPayload.AdFormat}).");
                 return;
             }
 
-            SendSingularAdRevenue(payload);
+            SendSingularAdRevenue(singularPayload);
 #endif
 
             Debug.Log(
-                $"[AdsManager] Ad Revenue: ${payload.RevenueUsd:F6} USD, network={payload.NetworkName}, " +
-                $"format={payload.AdFormat}, precision={payload.RevenuePrecision}");
+                $"[AdsManager] Ad Revenue: ${singularPayload.RevenueUsd:F6} USD, network={singularPayload.NetworkName}, " +
+                $"format={singularPayload.AdFormat}, precision={singularPayload.RevenuePrecision}");
         }
 
         private void SendSingularAdRevenue(SingularAdRevenuePayload payload)

@@ -35,7 +35,10 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string EVENT_LEVEL_START = "level_start";
     public const string EVENT_LEVEL_END = "level_end";
     public const string EVENT_PURCHASE = "purchase";
+    /// <summary>GA4 monetization event — only when ILRD revenue &gt; 0 (see AdsManager).</summary>
     public const string EVENT_AD_IMPRESSION = "ad_impression";
+    /// <summary>Custom viewer funnel — one per ad display; aligns with MAX DAV.</summary>
+    public const string EVENT_AD_VIEWED = "ad_viewed";
     public const string EVENT_TUTORIAL_BEGIN = "tutorial_begin";
     public const string EVENT_TUTORIAL_COMPLETE = "tutorial_complete";
     public const string EVENT_SESSION_7 = "session7";
@@ -73,6 +76,9 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     public const string PARAM_AD_SOURCE = "ad_source";
     public const string PARAM_AD_UNIT_NAME = "ad_unit_name";
     public const string PARAM_AD_FORMAT = "ad_format";
+    public const string PARAM_MEDIATION_PATH = "mediation_path";
+    public const string PARAM_MAX_PLACEMENT = "max_placement";
+    public const string PARAM_REVENUE_PRECISION = "revenue_precision";
     public const string PARAM_COINS = "coins";
     public const string PARAM_HINT = "hint";
     public const string PARAM_SHUFFLE = "shuffle";
@@ -413,7 +419,8 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
     {
         // Skip these events for Singular logging via wrapper because they are handled specifically 
         // with Revenue tracking elsewhere (IAPManager/AdsManager)
-        if (eventName == EVENT_PURCHASE || eventName == EVENT_AD_IMPRESSION) return null;
+        if (eventName == EVENT_PURCHASE || eventName == EVENT_AD_IMPRESSION || eventName == EVENT_AD_VIEWED)
+            return null;
 
         return eventName switch
         {

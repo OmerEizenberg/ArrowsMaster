@@ -183,14 +183,6 @@ namespace LiftEngine.Editor
             Repaint();
         }
 
-        private static string FormatMultipliers(float[] multipliers)
-        {
-            if (multipliers == null || multipliers.Length == 0)
-                return string.Empty;
-
-            return string.Join(", ", multipliers);
-        }
-
         private void LoadSettings()
         {
             _settings = Resources.Load<LiftEngineSettings>(LiftEngineSettings.DefaultResourcePath);

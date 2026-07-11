@@ -80,8 +80,7 @@ namespace LiftEngine.Api
                         return;
                     }
 
-                    if (result.prediction <= 0f)
-                        result.prediction = _settings.defaultPredictionFallback;
+                    result.ResolvePrediction(_settings.defaultPredictionFallback);
 
                     onSuccess?.Invoke(result);
                 }

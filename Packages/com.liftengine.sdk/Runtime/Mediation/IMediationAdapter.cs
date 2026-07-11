@@ -9,6 +9,8 @@ namespace LiftEngine.Mediation
         public string NetworkName;
         public double Revenue;
         public string AdFormat;
+        public string RevenuePrecision;
+        public string MaxPlacement;
     }
 
     internal sealed class MediationAdError

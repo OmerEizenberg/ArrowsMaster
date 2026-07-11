@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace LiftEngine.Api
 {
@@ -12,21 +12,22 @@ namespace LiftEngine.Api
         public string auction_id;
         public string param;
         public float prediction;
+        public float cpm;
         public float[] multipliers;
-
-        // Bound to the decoded predict JSON only when it contains a top-level key named
-        // exactly "cpm". Newtonsoft matches the key name exactly, so "ecpm"/"ecpm_history"
-        // never bind here. Stays null when the key is absent.
-        [JsonProperty("cpm")]
-        public JToken cpm;
+        public string treatment;
+        public Dictionary<string, int> group_ratios;
 
         [JsonIgnore]
         public bool HasMultipliers =>
             multipliers != null && multipliers.Length > 0;
 
-        // True only when the decoded predict JSON contained a "cpm" key (this is our placement).
-        [JsonIgnore]
-        public bool HasCpmKey => cpm != null;
+        public void ResolvePrediction(float fallback)
+        {
+            if (cpm > 0f)
+                prediction = cpm;
+            else if (prediction <= 0f)
+                prediction = fallback;
+        }
     }
 
     internal class LiftEngineError

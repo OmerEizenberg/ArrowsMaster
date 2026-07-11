@@ -197,8 +197,15 @@ namespace LiftEngine.Context
         public string GetPayloadKey(LiftEngineAdFormat format) =>
             _payloadKeys.TryGetValue(format, out var payloadKey) ? payloadKey : null;
 
-        public string GetMaxPlacement(LiftEngineAdFormat format) =>
-            _maxPlacements.TryGetValue(format, out var placement) ? placement : null;
+        public string GetMaxPlacement(LiftEngineAdFormat format)
+        {
+            if (_maxPlacements.TryGetValue(format, out var placement))
+                return placement;
+
+            placement = ResolveFallbackPlacement(format);
+            _maxPlacements[format] = placement;
+            return placement;
+        }
 
         private readonly Dictionary<LiftEngineAdFormat, string> _payloadKeys = new();
         private readonly Dictionary<LiftEngineAdFormat, string> _maxPlacements = new();
@@ -206,11 +213,11 @@ namespace LiftEngine.Context
         /// <summary>
         /// Stores predict auction context independently per ad format.
         /// Rewarded, interstitial, and banner each have their own payload key and MAX placement.
-        /// MAX placement: LiftEngine_* when predict JSON contained a "cpm" key for that ad type,
-        /// otherwise Base_*.
+        /// MAX placement is selected from the predict <c>treatment</c> field when present;
+        /// otherwise weighted random from saved <c>group_ratios</c>.
         /// </summary>
         public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId,
-            string payloadKey, bool hasCpmKey = false)
+            string payloadKey, string treatment = null, Dictionary<string, int> groupRatios = null)
         {
             _store.SaveAuctionContext(format, keyword, auctionId);
             if (!string.IsNullOrEmpty(payloadKey))
@@ -218,18 +225,40 @@ namespace LiftEngine.Context
             else
                 _payloadKeys.Remove(format);
 
-            if (hasCpmKey)
+            if (groupRatios != null && groupRatios.Count > 0)
+                _store.SaveGroupRatios(groupRatios);
+
+            if (!string.IsNullOrEmpty(treatment))
             {
-                _maxPlacements[format] = LiftEngineMaxPlacement.GetPlacement(format);
+                _maxPlacements[format] = LiftEngineMaxPlacement.GetPlacementByTreatment(format, treatment);
                 LiftEngineLogger.LogClient(
-                    $"{format} — 'cpm' key present for this ad type; MAX placement={_maxPlacements[format]}");
+                    $"{format} — treatment={treatment}; MAX placement={_maxPlacements[format]}");
             }
             else
             {
-                _maxPlacements[format] = LiftEngineMaxPlacement.GetBasePlacement(format);
+                _maxPlacements.Remove(format);
                 LiftEngineLogger.LogClient(
-                    $"{format} — no 'cpm' key for this ad type; MAX placement={_maxPlacements[format]}");
+                    $"{format} — no treatment in predict response; MAX placement will use group_ratios fallback");
             }
+        }
+
+        private string ResolveFallbackPlacement(LiftEngineAdFormat format)
+        {
+            if (_store.HasGroupRatios())
+            {
+                var (ml, algo, baseWeight) = _store.GetGroupRatios();
+                var treatment = LiftEngineMaxPlacement.SelectTreatmentByWeight(ml, algo, baseWeight);
+                var placement = LiftEngineMaxPlacement.GetPlacementByTreatment(format, treatment);
+                LiftEngineLogger.LogClient(
+                    $"{format} — group_ratios fallback (ml={ml}, algo={algo}, base={baseWeight}) " +
+                    $"→ treatment={treatment}, MAX placement={placement}");
+                return placement;
+            }
+
+            var defaultPlacement = LiftEngineMaxPlacement.GetPlacementByTreatment(format, "base");
+            LiftEngineLogger.LogClient(
+                $"{format} — no group_ratios saved; default MAX placement={defaultPlacement}");
+            return defaultPlacement;
         }
 
         public void ClearAuctionContext(LiftEngineAdFormat format)
