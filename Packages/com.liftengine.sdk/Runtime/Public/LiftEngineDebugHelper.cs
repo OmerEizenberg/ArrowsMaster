@@ -28,7 +28,7 @@ namespace LiftEngine
 #endif
         }
 
-        public static string BuildPredictPayloadPreview(LiftEngineAdFormat format, string installType = "Organic",
+        public static string BuildContextPayloadPreview(LiftEngineAdFormat format, string installType = "Organic",
             string mediaSource = null)
         {
             var service = new Context.ReportContextService();
@@ -46,5 +46,10 @@ namespace LiftEngine
                 data = service.BuildPayload(format)
             }, Formatting.Indented);
         }
+
+        [System.Obsolete("Use BuildContextPayloadPreview")]
+        public static string BuildPredictPayloadPreview(LiftEngineAdFormat format, string installType = "Organic",
+            string mediaSource = null) =>
+            BuildContextPayloadPreview(format, installType, mediaSource);
     }
 }

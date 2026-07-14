@@ -48,6 +48,7 @@ cp "$EDITOR_DLL" "$DIST_DIR/com.liftengine.sdk/Editor/Plugins/"
 
 # Keep only LiftEngineSettings as runtime source
 cp "$PKG_DIR/Runtime/Core/LiftEngineSettings.cs" "$DIST_DIR/com.liftengine.sdk/Runtime/"
+cp "$PKG_DIR/Runtime/link.xml" "$DIST_DIR/com.liftengine.sdk/Runtime/" 2>/dev/null || true
 
 # Customer-facing asmdef (references precompiled DLL)
 cat > "$DIST_DIR/com.liftengine.sdk/Runtime/LiftEngine.Runtime.asmdef" << 'EOF'

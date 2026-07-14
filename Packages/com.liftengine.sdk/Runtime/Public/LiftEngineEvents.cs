@@ -3,7 +3,7 @@ namespace LiftEngine
     /// <summary>
     /// Raised when LiftEngine completes an optimization request for an ad format.
     /// </summary>
-    public sealed class LiftEnginePredictEventArgs
+    public sealed class LiftEngineOptimizationEventArgs
     {
         public LiftEngineAdFormat Format { get; internal set; }
         public bool Succeeded { get; internal set; }

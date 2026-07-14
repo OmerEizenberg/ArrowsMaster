@@ -7,28 +7,28 @@ using UnityEngine;
 
 namespace LiftEngine.Ads
 {
-    internal sealed class BidFloorLoadOrchestrator
+    internal sealed class AdLoadOrchestrator
     {
-        private const int BidZeroAttempt = -1;
+        private const int FallbackAttemptIndex = -1;
 
         private readonly LiftEngineSettings _settings;
         private readonly IMediationAdapter _mediation;
         private readonly MonoBehaviour _host;
 
-        public BidFloorLoadOrchestrator(LiftEngineSettings settings, IMediationAdapter mediation, MonoBehaviour host)
+        public AdLoadOrchestrator(LiftEngineSettings settings, IMediationAdapter mediation, MonoBehaviour host)
         {
             _settings = settings;
             _mediation = mediation;
             _host = host;
         }
 
-        public void TryLoadWithPrediction(LiftEngineAdFormat format, LiftEnginePredictResult prediction,
+        public void TryLoadWithOptimization(LiftEngineAdFormat format, LiftEngineOptimizationResult optimization,
             string maxPlacement, Action<bool> onComplete)
         {
-            _host.StartCoroutine(LoadRoutine(format, prediction, maxPlacement, onComplete));
+            _host.StartCoroutine(LoadRoutine(format, optimization, maxPlacement, onComplete));
         }
 
-        private IEnumerator LoadRoutine(LiftEngineAdFormat format, LiftEnginePredictResult prediction,
+        private IEnumerator LoadRoutine(LiftEngineAdFormat format, LiftEngineOptimizationResult optimization,
             string maxPlacement, Action<bool> onComplete)
         {
             var adUnitId = _settings.GetAdUnitId(format);
@@ -39,26 +39,26 @@ namespace LiftEngine.Ads
                 yield break;
             }
 
-            var payloadKey = prediction?.param;
+            var payloadKey = optimization?.param;
 
-            if (prediction == null || prediction.multipliers == null || prediction.multipliers.Length == 0)
+            if (optimization == null || optimization.multipliers == null || optimization.multipliers.Length == 0)
             {
-                LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
-                    $"{format} — no predict multipliers available → skipping [Attempt 0..N] → [Attempt -1]");
-                LiftEngineSignalBus.Publish(new BidFloorPredictionFailedSignal(format));
-                yield return BidZeroUntilFill(format, adUnitId, payloadKey, maxPlacement, onComplete);
+                LiftEngineLogger.LogAttemptWarning(FallbackAttemptIndex,
+                    $"{format} — no optimization multipliers available → using fallback load");
+                LiftEngineSignalBus.Publish(new OptimizationUnavailableSignal(format));
+                yield return FallbackLoadUntilFill(format, adUnitId, payloadKey, maxPlacement, onComplete);
                 yield break;
             }
 
             var requireRevenue = RequiresRevenueForMultiplierPhase(format);
 
-            for (var i = 0; i < prediction.multipliers.Length; i++)
+            for (var i = 0; i < optimization.multipliers.Length; i++)
             {
-                var scaledValue = prediction.prediction * prediction.multipliers[i];
+                var scaledValue = optimization.prediction * optimization.multipliers[i];
                 var payloadValue = PredictDataNormalizers.FormatPayloadValue(scaledValue);
                 LiftEngineLogger.LogAttempt(i,
-                    $"{format} — loading with multiplier[{i}]={prediction.multipliers[i]}, " +
-                    $"prediction={prediction.prediction}, payload={payloadValue}, requireRevenue={requireRevenue}");
+                    $"{format} — load attempt {i} with multiplier[{i}]={optimization.multipliers[i]}, " +
+                    $"value={payloadValue}, requireRevenue={requireRevenue}");
 
                 _mediation.AddPayload(format, adUnitId, payloadKey, payloadValue);
                 _mediation.RequestLoad(format, adUnitId, maxPlacement);
@@ -68,59 +68,59 @@ namespace LiftEngine.Ads
 
                 if (success)
                 {
-                    LiftEngineLogger.LogAttempt(i, $"{format} — fill success at multiplier[{i}].");
+                    LiftEngineLogger.LogAttempt(i, $"{format} — fill success at attempt {i}.");
                     onComplete?.Invoke(true);
                     yield break;
                 }
 
                 LiftEngineLogger.LogAttemptWarning(i,
-                    $"{format} — no fill at multiplier[{i}], trying next.");
+                    $"{format} — no fill at attempt {i}, trying next.");
                 _mediation.DestroyAd(format, adUnitId);
             }
 
-            LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
-                $"{format} — all multipliers exhausted → [Attempt -1]");
-            yield return BidZeroUntilFill(format, adUnitId, payloadKey, maxPlacement, onComplete);
+            LiftEngineLogger.LogAttemptWarning(FallbackAttemptIndex,
+                $"{format} — optimization attempts exhausted → fallback load");
+            yield return FallbackLoadUntilFill(format, adUnitId, payloadKey, maxPlacement, onComplete);
         }
 
         private bool RequiresRevenueForMultiplierPhase(LiftEngineAdFormat format)
         {
-            // Banners rarely expose ILRD at load time; full-screen formats do on device.
             if (format == LiftEngineAdFormat.Banner)
                 return false;
 
             return true;
         }
 
-        private IEnumerator BidZeroUntilFill(LiftEngineAdFormat format, string adUnitId, string payloadKey,
+        private IEnumerator FallbackLoadUntilFill(LiftEngineAdFormat format, string adUnitId, string payloadKey,
             string maxPlacement, Action<bool> onComplete)
         {
-            var maxRounds = Mathf.Max(1, _settings.maxBidZeroRounds);
-            for (var bidZeroRound = 0; bidZeroRound < maxRounds; bidZeroRound++)
+            var maxRounds = Mathf.Max(1, LiftEngineRuntimeTuning.MaxFallbackLoadRounds);
+            for (var round = 0; round < maxRounds; round++)
             {
-                LiftEngineLogger.LogAttempt(BidZeroAttempt,
-                    $"{format} — fallback load round {bidZeroRound + 1}/{maxRounds}, payload=0");
+                LiftEngineLogger.LogAttempt(FallbackAttemptIndex,
+                    $"{format} — fallback load round {round + 1}/{maxRounds}");
 
                 _mediation.AddPayload(format, adUnitId, payloadKey, "0");
                 _mediation.RequestLoad(format, adUnitId, maxPlacement);
 
                 var success = false;
-                yield return WaitForLoad(format, adUnitId, BidZeroAttempt, requireRevenue: false, result => success = result);
+                yield return WaitForLoad(format, adUnitId, FallbackAttemptIndex, requireRevenue: false,
+                    result => success = result);
 
                 if (success)
                 {
-                    LiftEngineLogger.LogAttempt(BidZeroAttempt, $"{format} — fill success at bid 0.");
+                    LiftEngineLogger.LogAttempt(FallbackAttemptIndex, $"{format} — fill success on fallback load.");
                     onComplete?.Invoke(true);
                     yield break;
                 }
 
-                LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
-                    $"{format} — bid-0 round {bidZeroRound + 1} failed, retrying in {_settings.readinessCheckIntervalSeconds}s.");
-                yield return new WaitForSeconds(_settings.readinessCheckIntervalSeconds);
+                LiftEngineLogger.LogAttemptWarning(FallbackAttemptIndex,
+                    $"{format} — fallback round {round + 1} failed, retrying in {LiftEngineRuntimeTuning.ReadinessCheckIntervalSeconds}s.");
+                yield return new WaitForSeconds(LiftEngineRuntimeTuning.ReadinessCheckIntervalSeconds);
             }
 
-            LiftEngineLogger.LogAttemptWarning(BidZeroAttempt,
-                $"{format} — bid-0 exhausted after {maxRounds} round(s); no fill.");
+            LiftEngineLogger.LogAttemptWarning(FallbackAttemptIndex,
+                $"{format} — fallback load exhausted after {maxRounds} round(s); no fill.");
             onComplete?.Invoke(false);
         }
 
@@ -128,7 +128,7 @@ namespace LiftEngine.Ads
             bool requireRevenue, Action<bool> callback)
         {
             var elapsed = 0f;
-            var timeout = _settings.loadAttemptTimeoutSeconds;
+            var timeout = LiftEngineRuntimeTuning.LoadAttemptTimeoutSeconds;
 
             while (elapsed < timeout)
             {
@@ -138,8 +138,8 @@ namespace LiftEngine.Ads
                     yield break;
                 }
 
-                yield return new WaitForSeconds(_settings.readinessCheckIntervalSeconds);
-                elapsed += _settings.readinessCheckIntervalSeconds;
+                yield return new WaitForSeconds(LiftEngineRuntimeTuning.ReadinessCheckIntervalSeconds);
+                elapsed += LiftEngineRuntimeTuning.ReadinessCheckIntervalSeconds;
             }
 
             LiftEngineLogger.LogAttemptWarning(attempt,
@@ -155,7 +155,7 @@ namespace LiftEngine.Ads
             if (_mediation.HasLoadedWithRevenue(format, adUnitId))
                 return true;
 
-            if (_settings.treatEditorLoadAsFilledForMultiplierPhase &&
+            if (LiftEngineRuntimeTuning.TreatEditorLoadAsFilled &&
                 Application.isEditor &&
                 _mediation.IsReady(format, adUnitId))
             {

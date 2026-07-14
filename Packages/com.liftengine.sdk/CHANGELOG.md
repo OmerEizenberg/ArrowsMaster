@@ -4,6 +4,19 @@ All notable changes to the LiftEngine Unity SDK are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.1] - 2026-07-11
+
+### Security
+- Customer `LiftEngineSettings` stripped to API key, environment, and MAX ad unit IDs only
+- Internal tuning moved to compiled runtime defaults (not customer-editable)
+- Public API renamed: `OnOptimization*` events, `OptimizationUnavailable` signal, `AdPrewarmState.Optimizing`
+- Internal classes renamed and customer-visible logs sanitized
+- IL2CPP `link.xml` included in customer package
+
+### Changed
+- Integration Manager shows customer-facing settings only
+- Analytics and full report-data wiring added to AI integration prompt
+
 ## [1.1.0] - 2026-07-11
 
 ### Added

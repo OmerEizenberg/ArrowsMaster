@@ -6,7 +6,7 @@ namespace LiftEngine
     {
         public string PlacementName { get; set; }
         public string PlacementId { get; set; }
-        public bool SkipPredict { get; set; }
+        public bool SkipOptimization { get; set; }
     }
 
     public sealed class LiftEngineShowAdCallbacks
@@ -21,8 +21,8 @@ namespace LiftEngine
     public static class LiftEngineSdkCallbacks
     {
         public static event Action<LiftEngineInitializationStatus> OnSdkInitializedEvent;
-        public static event Action<LiftEnginePredictEventArgs> OnPredictSuccessEvent;
-        public static event Action<LiftEngineOperationError> OnPredictFailedEvent;
+        public static event Action<LiftEngineOptimizationEventArgs> OnOptimizationSuccessEvent;
+        public static event Action<LiftEngineOperationError> OnOptimizationFailedEvent;
         public static event Action<LiftEngineAdInfo> OnAdLoadedEvent;
         public static event Action<LiftEngineAdInfo> OnAdDisplayedEvent;
         public static event Action<LiftEngineAdInfo> OnAdHiddenEvent;
@@ -32,18 +32,18 @@ namespace LiftEngine
         internal static void RaiseInitialized(LiftEngineInitializationStatus status) =>
             OnSdkInitializedEvent?.Invoke(status);
 
-        internal static void RaisePredictSuccess(LiftEngineAdFormat format)
+        internal static void RaiseOptimizationSuccess(LiftEngineAdFormat format)
         {
-            OnPredictSuccessEvent?.Invoke(new LiftEnginePredictEventArgs
+            OnOptimizationSuccessEvent?.Invoke(new LiftEngineOptimizationEventArgs
             {
                 Format = format,
                 Succeeded = true
             });
         }
 
-        internal static void RaisePredictFailed(LiftEngineAdFormat format, Api.LiftEngineError error)
+        internal static void RaiseOptimizationFailed(LiftEngineAdFormat format, Api.LiftEngineError error)
         {
-            OnPredictFailedEvent?.Invoke(new LiftEngineOperationError
+            OnOptimizationFailedEvent?.Invoke(new LiftEngineOperationError
             {
                 StatusCode = error?.StatusCode ?? 0,
                 Message = error?.Message ?? "Unknown error"

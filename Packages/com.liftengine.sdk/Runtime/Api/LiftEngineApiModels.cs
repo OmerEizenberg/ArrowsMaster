@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 namespace LiftEngine.Api
 {
     [Serializable]
-    internal class LiftEnginePredictResult
+    internal class LiftEngineOptimizationResult
     {
         public string model;
         public string keyword;
@@ -21,7 +21,7 @@ namespace LiftEngine.Api
         public bool HasMultipliers =>
             multipliers != null && multipliers.Length > 0;
 
-        public void ResolvePrediction(float fallback)
+        public void ResolveOptimizationValue(float fallback)
         {
             if (cpm > 0f)
                 prediction = cpm;
@@ -40,6 +40,21 @@ namespace LiftEngine.Api
             StatusCode = statusCode;
             Message = message;
         }
+    }
+
+    internal sealed class LiftEngineTrackErrorParams
+    {
+        public string BundleId;
+        public string DeviceId;
+        public string AppVersion;
+        public string AuctionId;
+        public string ErrorCode;
+        public string ErrorMessage;
+        public string AdType;
+        public string PlacementId;
+        public string Keyword;
+        public string AdUnitId;
+        public long? Timestamp;
     }
 
     internal class PredictRequestBody

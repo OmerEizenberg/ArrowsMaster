@@ -2,11 +2,11 @@ using System;
 
 namespace LiftEngine
 {
-    public sealed class BidFloorPredictionFailedSignal
+    public sealed class OptimizationUnavailableSignal
     {
         public LiftEngineAdFormat Format { get; }
 
-        public BidFloorPredictionFailedSignal(LiftEngineAdFormat format)
+        public OptimizationUnavailableSignal(LiftEngineAdFormat format)
         {
             Format = format;
         }
@@ -38,12 +38,12 @@ namespace LiftEngine
 
     public static class LiftEngineSignalBus
     {
-        public static event Action<BidFloorPredictionFailedSignal> BidFloorPredictionFailed;
+        public static event Action<OptimizationUnavailableSignal> OptimizationUnavailable;
         public static event Action<AdPrewarmCompletedSignal> AdPrewarmCompleted;
         public static event Action<AdReadyStateChangedSignal> AdReadyStateChanged;
 
-        internal static void Publish(BidFloorPredictionFailedSignal signal) =>
-            BidFloorPredictionFailed?.Invoke(signal);
+        internal static void Publish(OptimizationUnavailableSignal signal) =>
+            OptimizationUnavailable?.Invoke(signal);
 
         internal static void Publish(AdPrewarmCompletedSignal signal) =>
             AdPrewarmCompleted?.Invoke(signal);

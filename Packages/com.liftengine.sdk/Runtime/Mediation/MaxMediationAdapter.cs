@@ -9,6 +9,7 @@ namespace LiftEngine.Mediation
         private readonly Dictionary<LiftEngineAdFormat, FormatState> _states = new();
         private LiftEngineSettings _settings;
         private bool _bannerCreated;
+        private bool _bannerVisible;
 
         private sealed class FormatState
         {
@@ -146,8 +147,11 @@ namespace LiftEngine.Mediation
                     break;
                 case LiftEngineAdFormat.Banner:
                     if (_bannerCreated)
+                    {
                         MaxSdk.DestroyBanner(adUnitId);
-                    _bannerCreated = false;
+                        _bannerCreated = false;
+                        _bannerVisible = false;
+                    }
                     MaxSdk.SetBannerExtraParameter(adUnitId, payloadKey, payloadValue);
                     break;
             }
@@ -202,6 +206,7 @@ namespace LiftEngine.Mediation
         public void Show(LiftEngineAdFormat format, string adUnitId, string maxPlacement = null)
         {
             var placement = ResolveMaxPlacement(format, maxPlacement);
+            SetMaxPlacement(format, placement);
 
             switch (format)
             {
@@ -219,11 +224,16 @@ namespace LiftEngine.Mediation
                     break;
                 case LiftEngineAdFormat.Banner:
                     EnsureBannerCreated(adUnitId, placement);
+                    if (_bannerVisible)
+                        break;
+
                     MaxSdk.ShowBanner(adUnitId);
+                    _bannerVisible = true;
                     AdDisplayed?.Invoke(new MediationAdInfo
                     {
                         Format = LiftEngineAdFormat.Banner,
-                        AdUnitId = adUnitId
+                        AdUnitId = adUnitId,
+                        MaxPlacement = placement
                     });
                     break;
             }
@@ -231,8 +241,11 @@ namespace LiftEngine.Mediation
 
         public void HideBanner(string adUnitId)
         {
-            if (_bannerCreated)
-                MaxSdk.HideBanner(adUnitId);
+            if (!_bannerCreated)
+                return;
+
+            MaxSdk.HideBanner(adUnitId);
+            _bannerVisible = false;
         }
 
         public void ResetLoadState(LiftEngineAdFormat format, string adUnitId)
@@ -253,6 +266,7 @@ namespace LiftEngine.Mediation
                     {
                         MaxSdk.DestroyBanner(adUnitId);
                         _bannerCreated = false;
+                        _bannerVisible = false;
                     }
                     break;
                 // Interstitial/rewarded: next Load replaces inventory; reset state only.
@@ -326,6 +340,11 @@ namespace LiftEngine.Mediation
 
         private MediationAdInfo ToInfo(LiftEngineAdFormat format, string adUnitId, MaxSdkBase.AdInfo info)
         {
+            // Prefer MAX AdInfo.Placement (exact value passed to Show*) over cached load placement.
+            var maxPlacement = !string.IsNullOrEmpty(info?.Placement)
+                ? info.Placement
+                : GetState(format).MaxPlacement;
+
             return new MediationAdInfo
             {
                 Format = format,
@@ -334,7 +353,7 @@ namespace LiftEngine.Mediation
                 Revenue = info?.Revenue ?? 0d,
                 AdFormat = info?.AdFormat,
                 RevenuePrecision = info?.RevenuePrecision,
-                MaxPlacement = GetState(format).MaxPlacement
+                MaxPlacement = maxPlacement
             };
         }
     }

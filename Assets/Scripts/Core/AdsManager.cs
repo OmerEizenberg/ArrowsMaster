@@ -171,6 +171,8 @@ namespace Assets.Scripts.Core
         private const float HealthCheckIntervalSeconds = 20f;
         private const float MaxInitStuckRecoverySeconds = 40f;
         private const float LiftEngineInitCallbackTimeoutSeconds = 45f;
+        private const int LiftEngineMaxInitRetryAttempts = 3;
+        private const float LiftEngineInitRetryBaseDelaySeconds = 5f;
         private const float LiftEngineBackgroundRetryIntervalSeconds = 60f;
         private const float LiftEngineBannerPreferWaitSeconds = 10f;
         // Ultimate cap on waiting for a GDPR user to finish the consent form before init.
@@ -1394,7 +1396,7 @@ namespace Assets.Scripts.Core
                 return;
 
             var state = LiftEngineSdk.GetPrewarmState(format);
-            if (state == AdPrewarmState.Predicting || state == AdPrewarmState.Loading)
+            if (state == AdPrewarmState.Optimizing || state == AdPrewarmState.Loading)
                 return;
 
             loadAction?.Invoke();
@@ -1879,8 +1881,8 @@ namespace Assets.Scripts.Core
 
         private IEnumerator RetryLiftEngineInitRoutine()
         {
-            int maxAttempts = _liftEngineSettings != null ? _liftEngineSettings.maxInitRetryAttempts : 3;
-            float baseDelay = _liftEngineSettings != null ? _liftEngineSettings.initRetryBaseDelaySeconds : 5f;
+            int maxAttempts = LiftEngineMaxInitRetryAttempts;
+            float baseDelay = LiftEngineInitRetryBaseDelaySeconds;
             double retryDelay = baseDelay * Math.Pow(2, Math.Min(4, _liftEngineInitRetryAttempt - 1));
 
             Debug.LogWarning(
@@ -2018,7 +2020,7 @@ namespace Assets.Scripts.Core
                 _liftEngineInitRetryAttempt++;
                 EnsureDirectMaxAdsLoaded();
 
-                int maxAttempts = _liftEngineSettings != null ? _liftEngineSettings.maxInitRetryAttempts : 3;
+                int maxAttempts = LiftEngineMaxInitRetryAttempts;
                 if (_liftEngineInitRetryAttempt < maxAttempts)
                 {
                     ScheduleLiftEngineInitRetry();

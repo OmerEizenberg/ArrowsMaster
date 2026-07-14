@@ -26,7 +26,7 @@ namespace LiftEngine
         public static void LogBackendWarning(string message) =>
             UnityEngine.Debug.LogWarning($"[LiftEngine] [BE] {message}");
 
-        /// <summary>Ad fill attempt — always logged. attempt -1 = bid-0 fallback loop.</summary>
+        /// <summary>Ad fill attempt — always logged. attempt -1 = fallback load loop.</summary>
         public static void LogAttempt(int attempt, string message) =>
             UnityEngine.Debug.Log($"[LiftEngine] [Attempt {attempt}] {message}");
 

@@ -3,11 +3,7 @@ using System.Text;
 
 namespace LiftEngine.Api
 {
-    /// <summary>
-    /// Mirrors backend xorEncrypt: UTC daily key (DDMMYYYY) + XOR + base64.
-    /// XOR is symmetric — decrypt uses the same transform as encrypt.
-    /// </summary>
-    internal static class LiftEngineXorCipher
+    internal static class ResponseDecoder
     {
         public static string GetDailyKey()
         {
@@ -15,22 +11,19 @@ namespace LiftEngine.Api
             return $"{now.Day:00}{now.Month:00}{now.Year:0000}";
         }
 
-        public static string XorTransform(string base64CipherText)
+        public static string DecodeTransform(string encodedBody)
         {
-            var xored = Convert.FromBase64String(base64CipherText);
+            var encoded = Convert.FromBase64String(encodedBody);
             var key = GetDailyKey();
-            var jsonBuf = new byte[xored.Length];
+            var jsonBuf = new byte[encoded.Length];
 
-            for (var i = 0; i < xored.Length; i++)
-                jsonBuf[i] = (byte)(xored[i] ^ key[i % key.Length]);
+            for (var i = 0; i < encoded.Length; i++)
+                jsonBuf[i] = (byte)(encoded[i] ^ key[i % key.Length]);
 
             return Encoding.UTF8.GetString(jsonBuf);
         }
 
-        /// <summary>
-        /// Decode predict response body to JSON text. Supports encrypted base64 and legacy plain JSON.
-        /// </summary>
-        public static bool TryDecodePredictResponse(string body, out string json)
+        public static bool TryDecodeResponse(string body, out string json)
         {
             json = null;
             if (string.IsNullOrWhiteSpace(body))
@@ -57,13 +50,13 @@ namespace LiftEngine.Api
                 }
                 catch
                 {
-                    // fall through to base64 decode
+                    // fall through to encoded decode
                 }
             }
 
             try
             {
-                var decrypted = XorTransform(trimmed);
+                var decrypted = DecodeTransform(trimmed);
                 if (!LooksLikeJson(decrypted))
                     return false;
 

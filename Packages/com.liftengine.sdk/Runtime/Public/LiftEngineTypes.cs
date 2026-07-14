@@ -31,7 +31,7 @@ namespace LiftEngine
     public enum AdPrewarmState
     {
         Idle = 0,
-        Predicting = 1,
+        Optimizing = 1,
         Loading = 2,
         Ready = 3,
         Failed = 4

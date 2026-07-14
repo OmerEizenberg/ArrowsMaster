@@ -194,6 +194,23 @@ namespace LiftEngine.Context
             return !string.IsNullOrEmpty(auctionId);
         }
 
+        /// <summary>
+        /// Ensures track/view and track/activeview can always be sent when an ad fills without a predict auction id
+        /// (optimization timeout/failure with fallback load).
+        /// </summary>
+        public void EnsureFallbackAuctionContext(LiftEngineAdFormat format)
+        {
+            if (HasValidAuctionContext(format))
+                return;
+
+            var suffix = format.ToString().ToLowerInvariant();
+            var auctionId =
+                $"fb_{suffix}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{Math.Abs(SystemInfo.deviceUniqueIdentifier.GetHashCode())}";
+            SetAuctionContext(format, "fallback", auctionId, payloadKey: null);
+            LiftEngineLogger.LogBackendWarning(
+                $"{format} — using fallback auction context (auction_id={auctionId})");
+        }
+
         public string GetPayloadKey(LiftEngineAdFormat format) =>
             _payloadKeys.TryGetValue(format, out var payloadKey) ? payloadKey : null;
 
@@ -232,13 +249,13 @@ namespace LiftEngine.Context
             {
                 _maxPlacements[format] = LiftEngineMaxPlacement.GetPlacementByTreatment(format, treatment);
                 LiftEngineLogger.LogClient(
-                    $"{format} — treatment={treatment}; MAX placement={_maxPlacements[format]}");
+                    $"{format} — route selected; MAX placement={_maxPlacements[format]}");
             }
             else
             {
                 _maxPlacements.Remove(format);
                 LiftEngineLogger.LogClient(
-                    $"{format} — no treatment in predict response; MAX placement will use group_ratios fallback");
+                    $"{format} — using weighted route fallback for MAX placement");
             }
         }
 
@@ -250,8 +267,8 @@ namespace LiftEngine.Context
                 var treatment = LiftEngineMaxPlacement.SelectTreatmentByWeight(ml, algo, baseWeight);
                 var placement = LiftEngineMaxPlacement.GetPlacementByTreatment(format, treatment);
                 LiftEngineLogger.LogClient(
-                    $"{format} — group_ratios fallback (ml={ml}, algo={algo}, base={baseWeight}) " +
-                    $"→ treatment={treatment}, MAX placement={placement}");
+                    $"{format} — route fallback (ml={ml}, algo={algo}, base={baseWeight}) " +
+                    $"→ MAX placement={placement}");
                 return placement;
             }
 

@@ -1,4 +1,4 @@
-# LiftEngine SDK v1.1.0
+# LiftEngine SDK v1.1.1
 
 Unity package for AppLovin MAX monetization optimization.
 
@@ -6,7 +6,7 @@ Unity package for AppLovin MAX monetization optimization.
 
 1. Open Unity (**2021.3 LTS** or newer)
 2. **Window → Package Manager → + → Add package from tarball…**
-3. Select `com.liftengine.sdk-1.1.0.tgz`
+3. Select `com.liftengine.sdk-1.1.1.tgz`
 
 ## Docs (inside the package)
 
@@ -20,7 +20,7 @@ After install, open:
 - **API key** (from LiftEngine — staging for QA, production after sign-off)
 - Your existing **MAX ad unit IDs** (iOS + Android)
 
-Nothing else is required from your side for LiftEngine tracking.
+Nothing else is required from your side.
 
 ## Requirements
 

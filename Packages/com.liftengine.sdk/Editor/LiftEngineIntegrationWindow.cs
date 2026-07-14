@@ -13,8 +13,8 @@ namespace LiftEngine.Editor
         private string _debugStatus = "";
         private string _lastHealthResult = "";
         private string _lastIpCountryResult = "";
-        private string _lastPredictResult = "";
-        private string _predictPreviewJson = "";
+        private string _lastOptimizationResult = "";
+        private string _contextPreviewJson = "";
         private LiftEngineAdFormat _debugFormat = LiftEngineAdFormat.Rewarded;
         private string _debugInstallType = "Organic";
         private string _debugMediaSource = "test_source";
@@ -53,7 +53,7 @@ namespace LiftEngine.Editor
             {
                 _debugStatus = "";
                 _lastHealthResult = "";
-                _lastPredictResult = "";
+                _lastOptimizationResult = "";
                 UnsubscribeSdkEvents();
             }
 
@@ -74,14 +74,14 @@ namespace LiftEngine.Editor
                 return;
 
             LiftEngineSdkCallbacks.OnSdkInitializedEvent += OnSdkInitialized;
-            LiftEngineSdkCallbacks.OnPredictSuccessEvent += OnPredictSuccess;
-            LiftEngineSdkCallbacks.OnPredictFailedEvent += OnPredictFailed;
+            LiftEngineSdkCallbacks.OnOptimizationSuccessEvent += OnOptimizationSuccess;
+            LiftEngineSdkCallbacks.OnOptimizationFailedEvent += OnOptimizationFailed;
             LiftEngineSdkCallbacks.OnAdLoadedEvent += OnAdLoaded;
             LiftEngineSdkCallbacks.OnAdDisplayedEvent += OnAdDisplayed;
             LiftEngineSdkCallbacks.OnAdHiddenEvent += OnAdHidden;
             LiftEngineSdkCallbacks.OnAdRewardedEvent += OnAdRewarded;
             LiftEngineSdkCallbacks.OnAdRevenuePaidEvent += OnAdRevenuePaid;
-            LiftEngineSignalBus.BidFloorPredictionFailed += OnBidFloorPredictionFailed;
+            LiftEngineSignalBus.OptimizationUnavailable += OnOptimizationUnavailable;
             LiftEngineSignalBus.AdPrewarmCompleted += OnAdPrewarmCompleted;
             LiftEngineSignalBus.AdReadyStateChanged += OnAdReadyStateChanged;
             _subscribedToSdkEvents = true;
@@ -94,14 +94,14 @@ namespace LiftEngine.Editor
                 return;
 
             LiftEngineSdkCallbacks.OnSdkInitializedEvent -= OnSdkInitialized;
-            LiftEngineSdkCallbacks.OnPredictSuccessEvent -= OnPredictSuccess;
-            LiftEngineSdkCallbacks.OnPredictFailedEvent -= OnPredictFailed;
+            LiftEngineSdkCallbacks.OnOptimizationSuccessEvent -= OnOptimizationSuccess;
+            LiftEngineSdkCallbacks.OnOptimizationFailedEvent -= OnOptimizationFailed;
             LiftEngineSdkCallbacks.OnAdLoadedEvent -= OnAdLoaded;
             LiftEngineSdkCallbacks.OnAdDisplayedEvent -= OnAdDisplayed;
             LiftEngineSdkCallbacks.OnAdHiddenEvent -= OnAdHidden;
             LiftEngineSdkCallbacks.OnAdRewardedEvent -= OnAdRewarded;
             LiftEngineSdkCallbacks.OnAdRevenuePaidEvent -= OnAdRevenuePaid;
-            LiftEngineSignalBus.BidFloorPredictionFailed -= OnBidFloorPredictionFailed;
+            LiftEngineSignalBus.OptimizationUnavailable -= OnOptimizationUnavailable;
             LiftEngineSignalBus.AdPrewarmCompleted -= OnAdPrewarmCompleted;
             LiftEngineSignalBus.AdReadyStateChanged -= OnAdReadyStateChanged;
             _subscribedToSdkEvents = false;
@@ -121,16 +121,16 @@ namespace LiftEngine.Editor
             Repaint();
         }
 
-        private void OnPredictSuccess(LiftEnginePredictEventArgs args)
+        private void OnOptimizationSuccess(LiftEngineOptimizationEventArgs args)
         {
-            _lastPredictResult = $"Optimization OK — format={args?.Format}, succeeded={args?.Succeeded}";
+            _lastOptimizationResult = $"Optimization OK — format={args?.Format}, succeeded={args?.Succeeded}";
             Log($"Optimization response received — format={args?.Format}");
             Repaint();
         }
 
-        private void OnPredictFailed(LiftEngineOperationError error)
+        private void OnOptimizationFailed(LiftEngineOperationError error)
         {
-            _lastPredictResult = $"Optimization failed — {error?.StatusCode}: {error?.Message}";
+            _lastOptimizationResult = $"Optimization failed — {error?.StatusCode}: {error?.Message}";
             LogWarning($"Optimization request failed — status={error?.StatusCode}, message={error?.Message}");
             Repaint();
         }
@@ -165,9 +165,9 @@ namespace LiftEngine.Editor
             Repaint();
         }
 
-        private void OnBidFloorPredictionFailed(BidFloorPredictionFailedSignal signal)
+        private void OnOptimizationUnavailable(OptimizationUnavailableSignal signal)
         {
-            LogWarning($"[Attempt -1] Optimization unavailable for {signal.Format}. Entering fallback fill loop.");
+            LogWarning($"Optimization unavailable for {signal.Format}. Entering fallback fill loop.");
             Repaint();
         }
 
@@ -243,12 +243,6 @@ namespace LiftEngine.Editor
             DrawProperty(so, "androidInterstitialAdUnitId");
             DrawProperty(so, "androidRewardedAdUnitId");
             EditorGUILayout.Space();
-            DrawProperty(so, "predictTimeoutSeconds");
-            DrawProperty(so, "defaultPredictionFallback");
-            DrawProperty(so, "loadAttemptTimeoutSeconds");
-            DrawProperty(so, "readinessCheckIntervalSeconds");
-            DrawProperty(so, "prewarmOnInit");
-            DrawProperty(so, "prewarmAfterShow");
             DrawProperty(so, "autoInitialize");
             DrawProperty(so, "verboseLogging");
             DrawProperty(so, "debugMode");
@@ -388,15 +382,15 @@ namespace LiftEngine.Editor
             if (GUILayout.Button("Preview Context Payload (Edit Mode OK)"))
             {
                 Log($"Preview Context Payload — building local preview for {_debugFormat} (no network request).");
-                _predictPreviewJson = LiftEngineDebugHelper.BuildPredictPayloadPreview(
+                _contextPreviewJson = LiftEngineDebugHelper.BuildContextPayloadPreview(
                     _debugFormat, _debugInstallType, _debugMediaSource);
-                Log($"Preview Context Payload — ready ({_predictPreviewJson.Length} chars). See window text area.");
+                Log($"Preview Context Payload — ready ({_contextPreviewJson.Length} chars). See window text area.");
             }
 
-            if (!string.IsNullOrEmpty(_predictPreviewJson))
+            if (!string.IsNullOrEmpty(_contextPreviewJson))
             {
                 EditorGUILayout.LabelField("Context payload preview:");
-                EditorGUILayout.TextArea(_predictPreviewJson, GUILayout.MinHeight(120));
+                EditorGUILayout.TextArea(_contextPreviewJson, GUILayout.MinHeight(120));
             }
 
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
@@ -408,7 +402,7 @@ namespace LiftEngine.Editor
 
                     Log($"[CL] Run Prewarm — {_debugFormat}");
                     LiftEngineSdk.LoadAd(_debugFormat);
-                    _lastPredictResult = $"Prewarm started for {_debugFormat}…";
+                    _lastOptimizationResult = $"Prewarm started for {_debugFormat}…";
                 }
 
                 if (GUILayout.Button("Show Ad"))
@@ -447,7 +441,7 @@ namespace LiftEngine.Editor
                 EditorGUILayout.LabelField("Ad ready:", LiftEngineSdk.IsAdReady(_debugFormat).ToString());
             }
 
-            EditorGUILayout.LabelField("Optimization:", string.IsNullOrEmpty(_lastPredictResult) ? "—" : _lastPredictResult);
+            EditorGUILayout.LabelField("Optimization:", string.IsNullOrEmpty(_lastOptimizationResult) ? "—" : _lastOptimizationResult);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Context", EditorStyles.boldLabel);
@@ -565,8 +559,6 @@ namespace LiftEngine.Editor
             _settings.androidRewardedAdUnitId = "a9110da25686aa62";
             _settings.iosBannerAdUnitId = "b4b98419050ba611";
             _settings.androidBannerAdUnitId = "b3d625776838cd3e";
-            _settings.prewarmOnInit = true;
-            _settings.prewarmAfterShow = true;
             _settings.autoInitialize = false;
             _settings.debugMode = true;
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using LiftEngine.Ads;
 using LiftEngine.Context;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -28,8 +29,8 @@ namespace LiftEngine.Api
             }));
         }
 
-        public void Predict(string deviceId, LiftEngineAdFormat format, PredictDataPayload data,
-            Action<LiftEnginePredictResult> onSuccess, Action<LiftEngineError> onFailure)
+        public void RequestOptimization(string deviceId, LiftEngineAdFormat format, PredictDataPayload data,
+            Action<LiftEngineOptimizationResult> onSuccess, Action<LiftEngineError> onFailure)
         {
             var body = new PredictRequestBody
             {
@@ -41,11 +42,11 @@ namespace LiftEngine.Api
             var path = $"/api/v1/predict/{deviceId}";
             var modelsLabel = string.Join(",", body.models);
             var targetModel = _settings.GetModelName(format);
-            _host.StartCoroutine(PostPredict(path, modelsLabel, json, (code, response) =>
+            _host.StartCoroutine(PostOptimization(path, modelsLabel, json, (code, response) =>
             {
                 if (code == 204)
                 {
-                    onFailure?.Invoke(new LiftEngineError(204, "Predict deadline exceeded"));
+                    onFailure?.Invoke(new LiftEngineError(204, "Optimization deadline exceeded"));
                     return;
                 }
 
@@ -57,14 +58,14 @@ namespace LiftEngine.Api
 
                 try
                 {
-                    var results = JsonConvert.DeserializeObject<List<LiftEnginePredictResult>>(response);
+                    var results = JsonConvert.DeserializeObject<List<LiftEngineOptimizationResult>>(response);
                     if (results == null || results.Count == 0)
                     {
-                        onFailure?.Invoke(new LiftEngineError(code, "Empty predict response"));
+                        onFailure?.Invoke(new LiftEngineError(code, "Empty optimization response"));
                         return;
                     }
 
-                    LiftEnginePredictResult result = null;
+                    LiftEngineOptimizationResult result = null;
                     foreach (var item in results)
                     {
                         if (item.model == targetModel)
@@ -76,11 +77,11 @@ namespace LiftEngine.Api
 
                     if (result == null)
                     {
-                        onFailure?.Invoke(new LiftEngineError(code, $"No predict result for model '{targetModel}'"));
+                        onFailure?.Invoke(new LiftEngineError(code, $"No optimization result for model '{targetModel}'"));
                         return;
                     }
 
-                    result.ResolvePrediction(_settings.defaultPredictionFallback);
+                    result.ResolveOptimizationValue(LiftEngineRuntimeTuning.DefaultOptimizationFallback);
 
                     onSuccess?.Invoke(result);
                 }
@@ -100,31 +101,48 @@ namespace LiftEngine.Api
             }));
         }
 
-        public void TrackView(string bundleId, string deviceId, string placementId, string keyword, string auctionId,
-            long timestamp, float? rev)
+        public void TrackInit(string deviceId, string appVersion, string platform)
+        {
+            var query = BuildTrackQuery(new Dictionary<string, string>
+            {
+                ["device_id"] = deviceId,
+                ["app_version"] = appVersion,
+                ["platform"] = platform
+            }, null);
+
+            _host.StartCoroutine(Get("GET", "/v1/init" + query, true, null));
+        }
+
+        public void TrackView(string bundleId, string deviceId, string adType, string placementId,
+            string keyword, string auctionId, long timestamp)
         {
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
                 ["bundle_id"] = bundleId,
                 ["device_id"] = deviceId,
-                ["placement_id"] = placementId,
+                ["app_version"] = Application.version,
+                ["ad_type"] = adType ?? string.Empty,
+                ["placement_id"] = placementId ?? string.Empty,
+                ["plc"] = placementId ?? string.Empty,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
                 ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            }, rev);
+            }, null);
 
             _host.StartCoroutine(Get("GET", "/v1/track/view" + query, true, null));
         }
 
         public void TrackActiveView(string bundleId, string deviceId, string adType, string placementId,
-            string keyword, string auctionId, long timestamp, float? rev)
+            string keyword, string auctionId, long timestamp, float rev)
         {
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
                 ["bundle_id"] = bundleId,
                 ["device_id"] = deviceId,
+                ["app_version"] = Application.version,
                 ["ad_type"] = adType,
-                ["placement_id"] = placementId,
+                ["placement_id"] = placementId ?? string.Empty,
+                ["plc"] = placementId ?? string.Empty,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
                 ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
@@ -134,17 +152,43 @@ namespace LiftEngine.Api
         }
 
         public void TrackError(string bundleId, string deviceId, string auctionId, string errorCode,
-            string errorMessage)
-        {
-            var query = BuildTrackQuery(new Dictionary<string, string>
+            string errorMessage) =>
+            TrackError(new LiftEngineTrackErrorParams
             {
-                ["bundle_id"] = bundleId,
-                ["device_id"] = deviceId,
-                ["auction_id"] = auctionId ?? string.Empty,
-                ["error_code"] = errorCode,
-                ["error_message"] = errorMessage
-            }, null);
+                BundleId = bundleId,
+                DeviceId = deviceId,
+                AuctionId = auctionId,
+                ErrorCode = errorCode,
+                ErrorMessage = errorMessage
+            });
 
+        public void TrackError(LiftEngineTrackErrorParams request)
+        {
+            if (request == null)
+                return;
+
+            var fields = new Dictionary<string, string>
+            {
+                ["bundle_id"] = request.BundleId ?? string.Empty,
+                ["device_id"] = request.DeviceId ?? string.Empty,
+                ["app_version"] = request.AppVersion ?? Application.version,
+                ["auction_id"] = request.AuctionId ?? string.Empty,
+                ["error_code"] = request.ErrorCode ?? string.Empty,
+                ["error_message"] = request.ErrorMessage ?? string.Empty
+            };
+
+            if (!string.IsNullOrEmpty(request.AdType))
+                fields["ad_type"] = request.AdType;
+            if (!string.IsNullOrEmpty(request.PlacementId))
+                fields["placement_id"] = request.PlacementId;
+            if (!string.IsNullOrEmpty(request.Keyword))
+                fields["keyword"] = request.Keyword;
+            if (!string.IsNullOrEmpty(request.AdUnitId))
+                fields["ad_unit_id"] = request.AdUnitId;
+            if (request.Timestamp.HasValue)
+                fields["timestamp"] = request.Timestamp.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            var query = BuildTrackQuery(fields, null);
             _host.StartCoroutine(Get("GET", "/v1/track/error" + query, true, null));
         }
 
@@ -174,6 +218,7 @@ namespace LiftEngine.Api
 
         private IEnumerator Get(string method, string path, bool auth, Action<int, string> callback)
         {
+            path = EnsureCommonQueryParams(path);
             var url = _settings.ApiBaseUrl.TrimEnd('/') + path;
             LiftEngineLogger.LogClient($"{method} {path}");
 
@@ -182,7 +227,7 @@ namespace LiftEngine.Api
             if (auth)
                 request.SetRequestHeader("Authorization", "Bearer " + _settings.apiKey);
 
-            request.timeout = Mathf.CeilToInt(_settings.predictTimeoutSeconds);
+            request.timeout = Mathf.CeilToInt(LiftEngineRuntimeTuning.OptimizationTimeoutSeconds);
             yield return request.SendWebRequest();
 
             var body = request.downloadHandler?.text ?? string.Empty;
@@ -191,8 +236,9 @@ namespace LiftEngine.Api
             callback?.Invoke(code, body);
         }
 
-        private IEnumerator PostPredict(string path, string modelsLabel, string json, Action<int, string> callback)
+        private IEnumerator PostOptimization(string path, string modelsLabel, string json, Action<int, string> callback)
         {
+            path = EnsureCommonQueryParams(path);
             var url = _settings.ApiBaseUrl.TrimEnd('/') + path;
             LiftEngineLogger.LogClient($"POST {path} models={modelsLabel} ({json.Length} bytes)");
 
@@ -202,7 +248,7 @@ namespace LiftEngine.Api
             ApplyUserAgent(request);
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", "Bearer " + _settings.apiKey);
-            request.timeout = Mathf.CeilToInt(_settings.predictTimeoutSeconds);
+            request.timeout = Mathf.CeilToInt(LiftEngineRuntimeTuning.OptimizationTimeoutSeconds);
 
             yield return request.SendWebRequest();
 
@@ -211,7 +257,7 @@ namespace LiftEngine.Api
 
             if (code == 200)
             {
-                if (LiftEngineXorCipher.TryDecodePredictResponse(body, out var decrypted))
+                if (ResponseDecoder.TryDecodeResponse(body, out var decrypted))
                 {
                     LogBackendResponse("POST", $"{path} models={modelsLabel}", code, decrypted);
                     callback?.Invoke(code, decrypted);
@@ -220,7 +266,7 @@ namespace LiftEngine.Api
                 {
                     LogBackendResponse("POST", $"{path} models={modelsLabel}", code, body);
                     LiftEngineLogger.LogBackendWarning(
-                        $"POST {path} models={modelsLabel} → failed to decrypt predict response");
+                        $"POST {path} models={modelsLabel} → failed to decode optimization response");
                     callback?.Invoke(code, body);
                 }
             }
@@ -233,6 +279,7 @@ namespace LiftEngine.Api
 
         private IEnumerator Post(string path, string json, Action<int, string> callback)
         {
+            path = EnsureCommonQueryParams(path);
             var url = _settings.ApiBaseUrl.TrimEnd('/') + path;
             LiftEngineLogger.LogClient($"POST {path} ({json.Length} bytes)");
 
@@ -242,7 +289,7 @@ namespace LiftEngine.Api
             ApplyUserAgent(request);
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", "Bearer " + _settings.apiKey);
-            request.timeout = Mathf.CeilToInt(_settings.predictTimeoutSeconds);
+            request.timeout = Mathf.CeilToInt(LiftEngineRuntimeTuning.OptimizationTimeoutSeconds);
 
             yield return request.SendWebRequest();
 
@@ -250,6 +297,39 @@ namespace LiftEngine.Api
             var code = (int)request.responseCode;
             LogBackendResponse("POST", path, code, body);
             callback?.Invoke(code, body);
+        }
+
+        /// <summary>
+        /// Guarantees <c>device_id</c> and <c>app_version</c> on every LiftEngine request URL
+        /// (GET and POST). Skips a param when it is already present in the query string.
+        /// </summary>
+        private static string EnsureCommonQueryParams(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                path = "/";
+
+            var additions = new List<KeyValuePair<string, string>>(2);
+            if (path.IndexOf("device_id=", StringComparison.OrdinalIgnoreCase) < 0)
+                additions.Add(new KeyValuePair<string, string>("device_id", DeviceIdProvider.GetDeviceId()));
+            if (path.IndexOf("app_version=", StringComparison.OrdinalIgnoreCase) < 0)
+                additions.Add(new KeyValuePair<string, string>("app_version", Application.version));
+
+            if (additions.Count == 0)
+                return path;
+
+            var sb = new StringBuilder(path);
+            sb.Append(path.Contains("?") ? '&' : '?');
+            for (var i = 0; i < additions.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append('&');
+
+                sb.Append(Uri.EscapeDataString(additions[i].Key));
+                sb.Append('=');
+                sb.Append(Uri.EscapeDataString(additions[i].Value ?? string.Empty));
+            }
+
+            return sb.ToString();
         }
 
         private static void ApplyUserAgent(UnityWebRequest request) =>
