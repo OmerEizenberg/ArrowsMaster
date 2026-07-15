@@ -14,6 +14,7 @@ namespace LiftEngine
         public const bool PrewarmAfterShow = true;
         public const float PrewarmMaxDurationSeconds = 90f;
         public const float PrewarmRetryIntervalSeconds = 20f;
+        public const float FirstReportRetryIntervalSeconds = 5f;
         public const int MaxFallbackLoadRounds = 5;
         public const float ShowWaitMaxSeconds = 30f;
     }

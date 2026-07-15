@@ -198,9 +198,13 @@ namespace LiftEngine.Context
         /// Ensures track/view and track/activeview can always be sent when an ad fills without a predict auction id
         /// (optimization timeout/failure with fallback load).
         /// </summary>
-        public void EnsureFallbackAuctionContext(LiftEngineAdFormat format)
+        /// <param name="force">
+        /// When true, always mint a new fallback id (e.g. optimize failed and prior predict must not
+        /// be reused for the next load). When false, keep an existing valid auction id.
+        /// </param>
+        public void EnsureFallbackAuctionContext(LiftEngineAdFormat format, bool force = false)
         {
-            if (HasValidAuctionContext(format))
+            if (!force && HasValidAuctionContext(format))
                 return;
 
             var suffix = format.ToString().ToLowerInvariant();

@@ -4,6 +4,11 @@ All notable changes to the LiftEngine Unity SDK are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- Predict / prewarm is deferred until the first successful report (backend requires report-before-predict); failed first reports retry automatically
+
 ## [1.1.1] - 2026-07-11
 
 ### Security

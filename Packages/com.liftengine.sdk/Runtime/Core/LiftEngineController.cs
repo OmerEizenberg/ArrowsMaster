@@ -23,12 +23,18 @@ namespace LiftEngine
         private LiftEngineAdFormat? _activeFormat;
         private LiftEngineAdFormat? _pendingReportFormat;
         private Coroutine _reportDebounceCoroutine;
+        private Coroutine _firstReportRetryCoroutine;
+        private bool _firstReportSucceeded;
+        private int _reportInFlightCount;
+        private bool _prewarmAllRequestedAfterFirstReport;
         private bool _displayRevenueRecordedThisImpression;
         private bool _bannerViewTrackedForCurrentFill;
         private bool _bannerActiveViewTrackedForCurrentFill;
         private bool _viewTrackedForCurrentImpression;
         private bool _activeViewTrackedForCurrentImpression;
         private readonly Dictionary<LiftEngineAdFormat, string> _impressionPlcByFormat = new();
+        // Pinned at first view for this fill so activeview survives a post-hide prewarm override.
+        private readonly Dictionary<LiftEngineAdFormat, (string keyword, string auctionId)> _impressionAuctionByFormat = new();
 
         public bool IsInitialized { get; private set; }
 
@@ -76,12 +82,21 @@ namespace LiftEngine
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
             var payload = _context.BuildPayload(format);
             LiftEngineLogger.LogClient($"Report — sending context ({format})");
+            _reportInFlightCount++;
             _api.Report(deviceId, payload, success =>
             {
+                _reportInFlightCount = Math.Max(0, _reportInFlightCount - 1);
                 if (success)
+                {
                     LiftEngineLogger.LogBackend("Report — OK");
+                    OnFirstReportSucceeded();
+                }
                 else
+                {
                     LiftEngineLogger.LogBackendWarning("Report — failed");
+                    if (!_firstReportSucceeded && IsInitialized && _reportInFlightCount == 0)
+                        ScheduleFirstReportRetry();
+                }
 
                 callback?.Invoke(success);
             });
@@ -103,7 +118,73 @@ namespace LiftEngine
             _prewarm.StartBackgroundRefill();
 
             if (LiftEngineRuntimeTuning.PrewarmOnInit)
-                _prewarm.PrewarmAll();
+                _prewarmAllRequestedAfterFirstReport = true;
+
+            EnsureFirstReportBeforePredict();
+        }
+
+        /// <summary>
+        /// Backend requires report before predict. Blocks all prewarm/predict until first report succeeds.
+        /// </summary>
+        private void EnsureFirstReportBeforePredict()
+        {
+            if (_firstReportSucceeded)
+            {
+                UnlockPredictAndFlushPrewarm();
+                return;
+            }
+
+            if (_reportInFlightCount > 0)
+                return;
+
+            SendReport(LiftEngineAdFormat.Interstitial);
+        }
+
+        private void ScheduleFirstReportRetry()
+        {
+            if (_firstReportSucceeded || _firstReportRetryCoroutine != null)
+                return;
+
+            _firstReportRetryCoroutine = _host.StartCoroutine(RetryFirstReportRoutine());
+        }
+
+        private IEnumerator RetryFirstReportRoutine()
+        {
+            yield return new WaitForSeconds(LiftEngineRuntimeTuning.FirstReportRetryIntervalSeconds);
+            _firstReportRetryCoroutine = null;
+
+            if (_firstReportSucceeded || !IsInitialized)
+                yield break;
+
+            LiftEngineLogger.LogClient("Report — retrying first report before predict");
+            EnsureFirstReportBeforePredict();
+        }
+
+        private void OnFirstReportSucceeded()
+        {
+            if (_firstReportSucceeded)
+                return;
+
+            _firstReportSucceeded = true;
+            if (_firstReportRetryCoroutine != null)
+            {
+                _host.StopCoroutine(_firstReportRetryCoroutine);
+                _firstReportRetryCoroutine = null;
+            }
+
+            if (IsInitialized)
+                UnlockPredictAndFlushPrewarm();
+        }
+
+        private void UnlockPredictAndFlushPrewarm()
+        {
+            _prewarm.AllowPredictAfterFirstReport();
+
+            if (!_prewarmAllRequestedAfterFirstReport)
+                return;
+
+            _prewarmAllRequestedAfterFirstReport = false;
+            _prewarm.PrewarmAll();
         }
 
         private void SubscribeMediationEvents()
@@ -115,6 +196,7 @@ namespace LiftEngine
                     _bannerViewTrackedForCurrentFill = false;
                     _bannerActiveViewTrackedForCurrentFill = false;
                     _impressionPlcByFormat.Remove(LiftEngineAdFormat.Banner);
+                    _impressionAuctionByFormat.Remove(LiftEngineAdFormat.Banner);
                 }
 
                 LiftEngineSdkCallbacks.RaiseAdLoaded(info);
@@ -124,6 +206,10 @@ namespace LiftEngine
                 _displayRevenueRecordedThisImpression = false;
                 _viewTrackedForCurrentImpression = false;
                 _activeViewTrackedForCurrentImpression = false;
+                // New impression: drop prior pin so view/activeview capture this fill's auction + plc.
+                // Do not clear these on AdHidden — MAX often pays revenue after hide.
+                _impressionPlcByFormat.Remove(info.Format);
+                _impressionAuctionByFormat.Remove(info.Format);
 
                 _context.RecordAdImpression(info.Format);
                 TryRecordImpressionRevenue(info.Format, info.Revenue, fromDisplay: true);
@@ -136,8 +222,6 @@ namespace LiftEngine
             _mediation.AdHidden += info =>
             {
                 _displayRevenueRecordedThisImpression = false;
-                if (info != null)
-                    _impressionPlcByFormat.Remove(info.Format);
 
                 LiftEngineSdkCallbacks.RaiseAdHidden(info);
                 _activeCallbacks?.OnAdHidden?.Invoke();
@@ -361,21 +445,42 @@ namespace LiftEngine
             SendTrackActiveView(info, (float)info.Revenue);
         }
 
+        /// <summary>
+        /// Resolves auction context for this impression and pins it so view + activeview stay aligned
+        /// even if a post-hide prewarm overrides the store with a new predict/fallback id.
+        /// </summary>
         private void EnsureAuctionContext(MediationAdInfo info)
         {
-            if (_context.HasValidAuctionContext(info.Format))
+            if (_impressionAuctionByFormat.TryGetValue(info.Format, out var pinned) &&
+                !string.IsNullOrEmpty(pinned.auctionId))
                 return;
 
-            LiftEngineTrackReporter.ReportError(
-                _api, _settings, _context, info.Format, "no_auction_context",
-                "Impression without predict auction_id; applying fallback auction context.",
-                info);
-            _context.EnsureFallbackAuctionContext(info.Format);
+            if (!_context.HasValidAuctionContext(info.Format))
+            {
+                LiftEngineTrackReporter.ReportError(
+                    _api, _settings, _context, info.Format, "no_auction_context",
+                    "Impression without predict auction_id; applying fallback auction context.",
+                    info);
+                _context.EnsureFallbackAuctionContext(info.Format);
+            }
+
+            var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
+            if (!string.IsNullOrEmpty(auctionId))
+                _impressionAuctionByFormat[info.Format] = (keyword, auctionId);
+        }
+
+        private (string keyword, string auctionId) GetImpressionAuction(LiftEngineAdFormat format)
+        {
+            if (_impressionAuctionByFormat.TryGetValue(format, out var pinned) &&
+                !string.IsNullOrEmpty(pinned.auctionId))
+                return pinned;
+
+            return _context.GetAuctionContext(format);
         }
 
         private void SendTrackView(MediationAdInfo info)
         {
-            var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
+            var (keyword, auctionId) = GetImpressionAuction(info.Format);
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
@@ -399,7 +504,7 @@ namespace LiftEngine
 
         private void SendTrackActiveView(MediationAdInfo info, float rev)
         {
-            var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
+            var (keyword, auctionId) = GetImpressionAuction(info.Format);
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
