@@ -14,12 +14,15 @@ namespace LiftEngine.Ads
         private readonly LiftEngineSettings _settings;
         private readonly IMediationAdapter _mediation;
         private readonly MonoBehaviour _host;
+        private readonly ReportContextService _context;
 
-        public AdLoadOrchestrator(LiftEngineSettings settings, IMediationAdapter mediation, MonoBehaviour host)
+        public AdLoadOrchestrator(LiftEngineSettings settings, IMediationAdapter mediation, MonoBehaviour host,
+            ReportContextService context)
         {
             _settings = settings;
             _mediation = mediation;
             _host = host;
+            _context = context;
         }
 
         public void TryLoadWithOptimization(LiftEngineAdFormat format, LiftEngineOptimizationResult optimization,
@@ -69,6 +72,7 @@ namespace LiftEngine.Ads
                 if (success)
                 {
                     LiftEngineLogger.LogAttempt(i, $"{format} — fill success at attempt {i}.");
+                    _context.SetWinningMultiplierIndex(format, i);
                     onComplete?.Invoke(true);
                     yield break;
                 }
@@ -110,6 +114,7 @@ namespace LiftEngine.Ads
                 if (success)
                 {
                     LiftEngineLogger.LogAttempt(FallbackAttemptIndex, $"{format} — fill success on fallback load.");
+                    _context.SetWinningMultiplierIndex(format, FallbackAttemptIndex);
                     onComplete?.Invoke(true);
                     yield break;
                 }

@@ -114,7 +114,7 @@ namespace LiftEngine.Api
         }
 
         public void TrackView(string bundleId, string deviceId, string adType, string placementId,
-            string keyword, string auctionId, long timestamp)
+            string keyword, string auctionId, long timestamp, int mulIndex)
         {
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
@@ -126,6 +126,7 @@ namespace LiftEngine.Api
                 ["plc"] = placementId ?? string.Empty,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
+                ["Mulindex"] = mulIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
             }, null);
 
@@ -133,7 +134,7 @@ namespace LiftEngine.Api
         }
 
         public void TrackActiveView(string bundleId, string deviceId, string adType, string placementId,
-            string keyword, string auctionId, long timestamp, float rev)
+            string keyword, string auctionId, long timestamp, float rev, int mulIndex)
         {
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
@@ -145,6 +146,7 @@ namespace LiftEngine.Api
                 ["plc"] = placementId ?? string.Empty,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
+                ["Mulindex"] = mulIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
             }, rev);
 

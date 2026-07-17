@@ -218,6 +218,15 @@ namespace LiftEngine.Context
         public string GetPayloadKey(LiftEngineAdFormat format) =>
             _payloadKeys.TryGetValue(format, out var payloadKey) ? payloadKey : null;
 
+        /// <summary>
+        /// Index into predict <c>multipliers</c> that produced the current fill (-1 = fallback / none).
+        /// </summary>
+        public int GetWinningMultiplierIndex(LiftEngineAdFormat format) =>
+            _winningMultiplierIndexes.TryGetValue(format, out var index) ? index : -1;
+
+        public void SetWinningMultiplierIndex(LiftEngineAdFormat format, int mulIndex) =>
+            _winningMultiplierIndexes[format] = mulIndex;
+
         public string GetMaxPlacement(LiftEngineAdFormat format)
         {
             if (_maxPlacements.TryGetValue(format, out var placement))
@@ -230,6 +239,7 @@ namespace LiftEngine.Context
 
         private readonly Dictionary<LiftEngineAdFormat, string> _payloadKeys = new();
         private readonly Dictionary<LiftEngineAdFormat, string> _maxPlacements = new();
+        private readonly Dictionary<LiftEngineAdFormat, int> _winningMultiplierIndexes = new();
 
         /// <summary>
         /// Stores predict auction context independently per ad format.
@@ -241,6 +251,9 @@ namespace LiftEngine.Context
             string payloadKey, string treatment = null, Dictionary<string, int> groupRatios = null)
         {
             _store.SaveAuctionContext(format, keyword, auctionId);
+            // New auction: winning multiplier is unknown until a load attempt fills.
+            _winningMultiplierIndexes.Remove(format);
+
             if (!string.IsNullOrEmpty(payloadKey))
                 _payloadKeys[format] = payloadKey;
             else
@@ -287,6 +300,7 @@ namespace LiftEngine.Context
             _store.ClearAuctionContext(format);
             _payloadKeys.Remove(format);
             _maxPlacements.Remove(format);
+            _winningMultiplierIndexes.Remove(format);
         }
 
         public void ClearContextData() => _store.ClearAll();

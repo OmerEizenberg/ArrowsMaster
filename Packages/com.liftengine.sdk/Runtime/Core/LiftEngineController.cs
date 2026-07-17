@@ -34,7 +34,7 @@ namespace LiftEngine
         private bool _activeViewTrackedForCurrentImpression;
         private readonly Dictionary<LiftEngineAdFormat, string> _impressionPlcByFormat = new();
         // Pinned at first view for this fill so activeview survives a post-hide prewarm override.
-        private readonly Dictionary<LiftEngineAdFormat, (string keyword, string auctionId)> _impressionAuctionByFormat = new();
+        private readonly Dictionary<LiftEngineAdFormat, (string keyword, string auctionId, int mulIndex)> _impressionAuctionByFormat = new();
 
         public bool IsInitialized { get; private set; }
 
@@ -53,7 +53,7 @@ namespace LiftEngine
 
             _api = new LiftEngineApiClient(_settings, _host);
             _mediation = MediationAdapterFactory.Create(_settings.mediationPlatform);
-            _orchestrator = new AdLoadOrchestrator(_settings, _mediation, _host);
+            _orchestrator = new AdLoadOrchestrator(_settings, _mediation, _host, _context);
             _prewarm = new AdPrewarmService(_settings, _api, _context, _mediation, _orchestrator, _host);
 
             SubscribeMediationEvents();
@@ -465,22 +465,24 @@ namespace LiftEngine
             }
 
             var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
+            var mulIndex = _context.GetWinningMultiplierIndex(info.Format);
             if (!string.IsNullOrEmpty(auctionId))
-                _impressionAuctionByFormat[info.Format] = (keyword, auctionId);
+                _impressionAuctionByFormat[info.Format] = (keyword, auctionId, mulIndex);
         }
 
-        private (string keyword, string auctionId) GetImpressionAuction(LiftEngineAdFormat format)
+        private (string keyword, string auctionId, int mulIndex) GetImpressionAuction(LiftEngineAdFormat format)
         {
             if (_impressionAuctionByFormat.TryGetValue(format, out var pinned) &&
                 !string.IsNullOrEmpty(pinned.auctionId))
                 return pinned;
 
-            return _context.GetAuctionContext(format);
+            var (keyword, auctionId) = _context.GetAuctionContext(format);
+            return (keyword, auctionId, _context.GetWinningMultiplierIndex(format));
         }
 
         private void SendTrackView(MediationAdInfo info)
         {
-            var (keyword, auctionId) = GetImpressionAuction(info.Format);
+            var (keyword, auctionId, mulIndex) = GetImpressionAuction(info.Format);
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
@@ -498,13 +500,13 @@ namespace LiftEngine
             LiftEngineLogger.LogClient(
                 $"Track view — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
-                $"keyword={keyword}, auction_id={auctionId}, timestamp={timestamp}");
-            _api.TrackView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp);
+                $"keyword={keyword}, auction_id={auctionId}, Mulindex={mulIndex}, timestamp={timestamp}");
+            _api.TrackView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp, mulIndex);
         }
 
         private void SendTrackActiveView(MediationAdInfo info, float rev)
         {
-            var (keyword, auctionId) = GetImpressionAuction(info.Format);
+            var (keyword, auctionId, mulIndex) = GetImpressionAuction(info.Format);
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
@@ -523,8 +525,8 @@ namespace LiftEngine
             LiftEngineLogger.LogClient(
                 $"Track activeview — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
-                $"keyword={keyword}, auction_id={auctionId}, timestamp={timestamp}, rev={rev}");
-            _api.TrackActiveView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp, rev);
+                $"keyword={keyword}, auction_id={auctionId}, Mulindex={mulIndex}, timestamp={timestamp}, rev={rev}");
+            _api.TrackActiveView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp, rev, mulIndex);
         }
 
         /// <summary>
