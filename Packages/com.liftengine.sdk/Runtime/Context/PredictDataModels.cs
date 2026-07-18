@@ -53,12 +53,12 @@ namespace LiftEngine.Context
     }
 
     /// <summary>
-    /// Per-format eCPM history. Each ad type has its own PlayerPrefs key — never a shared blob.
+    /// Per-format eCPM history. Each ad type has its own PlayerPrefs key.
+    /// Legacy shared <c>le_ctx_ecpm</c> is ignored (not migrated, not wiped on upgrade).
     /// </summary>
     internal static class EcpmHistoryBuffer
     {
         private const int MaxEntries = 15;
-        private const string LegacySharedKey = "le_ctx_ecpm";
 
         public static string GetAdTypeName(LiftEngineAdFormat format) => format switch
         {
@@ -76,8 +76,6 @@ namespace LiftEngine.Context
 
         public static void Push(LiftEngineAdFormat format, float ecpm)
         {
-            MigrateLegacySharedBlobIfNeeded();
-
             var key = PrefsKey(format);
             if (key == null)
                 return;
@@ -94,8 +92,6 @@ namespace LiftEngine.Context
         /// <summary>Returns this format's history only. Never falls back to another format.</summary>
         public static float[] GetForFormat(LiftEngineAdFormat format)
         {
-            MigrateLegacySharedBlobIfNeeded();
-
             var key = PrefsKey(format);
             if (key == null)
                 return Array.Empty<float>();
@@ -116,68 +112,6 @@ namespace LiftEngine.Context
                 var key = PrefsKey(format);
                 if (key != null)
                     PlayerPrefs.DeleteKey(key);
-            }
-
-            PlayerPrefs.DeleteKey(LegacySharedKey);
-            PlayerPrefs.Save();
-        }
-
-        /// <summary>
-        /// Old builds stored one JSON dict (or worse, a bare array) under <c>le_ctx_ecpm</c>.
-        /// Migrate dict entries into per-format keys, then delete the shared key.
-        /// Bare arrays are discarded — they were ambiguous shared history.
-        /// </summary>
-        public static void MigrateLegacySharedBlobIfNeeded()
-        {
-            if (!PlayerPrefs.HasKey(LegacySharedKey))
-                return;
-
-            var raw = PlayerPrefs.GetString(LegacySharedKey, string.Empty);
-            PlayerPrefs.DeleteKey(LegacySharedKey);
-
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                PlayerPrefs.Save();
-                return;
-            }
-
-            raw = raw.Trim();
-            try
-            {
-                var token = JToken.Parse(raw);
-                if (token is JObject obj)
-                {
-                    foreach (var prop in obj.Properties())
-                    {
-                        var adType = prop.Name?.Trim().ToLowerInvariant();
-                        if (adType != "banner" && adType != "interstitial" && adType != "rewarded")
-                            continue;
-
-                        var destKey = "le_ctx_ecpm_" + adType;
-                        // Do not overwrite newer per-format data if already present.
-                        if (PlayerPrefs.HasKey(destKey) &&
-                            !string.IsNullOrEmpty(PlayerPrefs.GetString(destKey, string.Empty)))
-                            continue;
-
-                        if (prop.Value is JArray arr)
-                        {
-                            var list = arr.ToObject<List<float>>() ?? new List<float>();
-                            PlayerPrefs.SetString(destKey, SerializeList(list));
-                        }
-                    }
-
-                    LiftEngineLogger.Log("ecpm_history — migrated legacy shared blob to per-format keys");
-                }
-                else if (token is JArray)
-                {
-                    // Legacy bare array was not format-scoped — drop it rather than assign to all formats.
-                    LiftEngineLogger.LogWarning(
-                        "ecpm_history — discarded legacy unscoped array under le_ctx_ecpm");
-                }
-            }
-            catch (Exception ex)
-            {
-                LiftEngineLogger.LogWarning($"ecpm_history — failed legacy migrate ({ex.Message}); dropped blob");
             }
 
             PlayerPrefs.Save();

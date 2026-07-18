@@ -49,7 +49,6 @@ namespace LiftEngine.Context
         public void Initialize()
         {
             _store.Load();
-            EcpmHistoryBuffer.MigrateLegacySharedBlobIfNeeded();
             _session.BeginSession();
 
             if (!_store.InstallUtc.HasValue)
