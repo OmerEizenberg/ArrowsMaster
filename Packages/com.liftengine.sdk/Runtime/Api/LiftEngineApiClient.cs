@@ -35,11 +35,9 @@ namespace LiftEngine.Api
             // Only the format being prewarmed. data (incl. ecpm_history) is format-specific —
             // batching all models with one payload made banner/IV/RV share the wrong history.
             var targetModel = _settings.GetModelName(format);
-            // Defense-in-depth: payload must describe the same format we request.
-            if (string.IsNullOrEmpty(data.ad_type))
-                data.ad_type = targetModel;
-            if (data.ecpm_history == null)
-                data.ecpm_history = Array.Empty<float>();
+            // Force-bind at send time from per-format store — never trust a stale/wrong history on `data`.
+            data.ad_type = targetModel;
+            data.ecpm_history = EcpmHistoryBuffer.GetForFormat(format);
 
             var body = new PredictRequestBody
             {
@@ -50,9 +48,9 @@ namespace LiftEngine.Api
             var json = JsonConvert.SerializeObject(body);
             var path = AppendQueryParam($"/api/v1/predict/{deviceId}", "ad_type", targetModel);
             var modelsLabel = targetModel;
-            var historyLen = data.ecpm_history?.Length ?? 0;
             LiftEngineLogger.LogClient(
-                $"Predict {targetModel} — ad_type={data.ad_type}, ecpm_history_len={historyLen}");
+                $"Predict {targetModel} — ad_type={data.ad_type}, " +
+                $"ecpm_history=[{FormatEcpmHistory(data.ecpm_history)}]");
             _host.StartCoroutine(PostOptimization(path, modelsLabel, json, (code, response) =>
             {
                 if (code == 204)
@@ -107,16 +105,21 @@ namespace LiftEngine.Api
         {
             var path = $"/api/v1/report/{deviceId}";
             if (!string.IsNullOrEmpty(data?.ad_type))
-                path = AppendQueryParam(path, "ad_type", data.ad_type);
+            {
+                // Re-bind history from the ad_type's own store at send time.
+                var format = ParseAdType(data.ad_type);
+                if (format.HasValue)
+                    data.ecpm_history = EcpmHistoryBuffer.GetForFormat(format.Value);
+                else if (data.ecpm_history == null)
+                    data.ecpm_history = Array.Empty<float>();
 
-            // Format-scoped reports always send ecpm_history (possibly empty) — never omit.
-            if (!string.IsNullOrEmpty(data?.ad_type) && data.ecpm_history == null)
-                data.ecpm_history = Array.Empty<float>();
+                path = AppendQueryParam(path, "ad_type", data.ad_type);
+            }
 
             var json = JsonConvert.SerializeObject(data);
             LiftEngineLogger.LogClient(
                 $"Report — ad_type={data?.ad_type ?? "(none)"}, " +
-                $"ecpm_history_len={data?.ecpm_history?.Length ?? 0}");
+                $"ecpm_history=[{FormatEcpmHistory(data?.ecpm_history)}]");
             _host.StartCoroutine(Post(path, json, (code, _) =>
             {
                 callback?.Invoke(code == 200);
@@ -156,8 +159,10 @@ namespace LiftEngine.Api
         }
 
         public void TrackActiveView(string bundleId, string deviceId, string adType, string placementId,
-            string keyword, string auctionId, long timestamp, float rev, int mulIndex)
+            string keyword, string auctionId, long timestamp, float rev, int mulIndex,
+            float[] ecpmHistory = null)
         {
+            var historyJson = JsonConvert.SerializeObject(ecpmHistory ?? Array.Empty<float>());
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
                 ["bundle_id"] = bundleId,
@@ -169,7 +174,9 @@ namespace LiftEngine.Api
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
                 ["Mulindex"] = mulIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                // Self-contained per-format history for this impression — do not join device report.
+                ["ecpm_history"] = historyJson
             }, rev);
 
             _host.StartCoroutine(Get("GET", "/v1/track/activeview" + query, true, null));
@@ -330,6 +337,31 @@ namespace LiftEngine.Api
 
             var sep = path.Contains("?") ? "&" : "?";
             return path + sep + Uri.EscapeDataString(key) + "=" + Uri.EscapeDataString(value ?? string.Empty);
+        }
+
+        private static LiftEngineAdFormat? ParseAdType(string adType)
+        {
+            if (string.IsNullOrEmpty(adType))
+                return null;
+
+            return adType.Trim().ToLowerInvariant() switch
+            {
+                "banner" => LiftEngineAdFormat.Banner,
+                "interstitial" => LiftEngineAdFormat.Interstitial,
+                "rewarded" => LiftEngineAdFormat.Rewarded,
+                _ => null
+            };
+        }
+
+        private static string FormatEcpmHistory(float[] history)
+        {
+            if (history == null || history.Length == 0)
+                return "";
+
+            var parts = new string[history.Length];
+            for (var i = 0; i < history.Length; i++)
+                parts[i] = history[i].ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return string.Join(", ", parts);
         }
 
         /// <summary>

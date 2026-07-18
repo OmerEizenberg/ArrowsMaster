@@ -535,11 +535,15 @@ namespace LiftEngine
                     info);
             }
 
+            // History for THIS format only (revenue already pushed in TryRecordImpressionRevenue).
+            var ecpmHistory = EcpmHistoryBuffer.GetForFormat(info.Format);
             LiftEngineLogger.LogClient(
                 $"Track activeview — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
-                $"keyword={keyword}, auction_id={auctionId}, Mulindex={mulIndex}, timestamp={timestamp}, rev={rev}");
-            _api.TrackActiveView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp, rev, mulIndex);
+                $"keyword={keyword}, auction_id={auctionId}, Mulindex={mulIndex}, timestamp={timestamp}, " +
+                $"rev={rev}, ecpm_history_len={ecpmHistory.Length}");
+            _api.TrackActiveView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp, rev, mulIndex,
+                ecpmHistory);
         }
 
         /// <summary>
