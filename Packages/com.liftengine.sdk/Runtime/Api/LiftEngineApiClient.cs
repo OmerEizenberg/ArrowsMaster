@@ -35,6 +35,12 @@ namespace LiftEngine.Api
             // Only the format being prewarmed. data (incl. ecpm_history) is format-specific —
             // batching all models with one payload made banner/IV/RV share the wrong history.
             var targetModel = _settings.GetModelName(format);
+            // Defense-in-depth: payload must describe the same format we request.
+            if (string.IsNullOrEmpty(data.ad_type))
+                data.ad_type = targetModel;
+            if (data.ecpm_history == null)
+                data.ecpm_history = Array.Empty<float>();
+
             var body = new PredictRequestBody
             {
                 models = new[] { targetModel },
@@ -42,8 +48,11 @@ namespace LiftEngine.Api
             };
 
             var json = JsonConvert.SerializeObject(body);
-            var path = $"/api/v1/predict/{deviceId}";
+            var path = AppendQueryParam($"/api/v1/predict/{deviceId}", "ad_type", targetModel);
             var modelsLabel = targetModel;
+            var historyLen = data.ecpm_history?.Length ?? 0;
+            LiftEngineLogger.LogClient(
+                $"Predict {targetModel} — ad_type={data.ad_type}, ecpm_history_len={historyLen}");
             _host.StartCoroutine(PostOptimization(path, modelsLabel, json, (code, response) =>
             {
                 if (code == 204)
@@ -96,8 +105,19 @@ namespace LiftEngine.Api
 
         public void Report(string deviceId, PredictDataPayload data, Action<bool> callback)
         {
+            var path = $"/api/v1/report/{deviceId}";
+            if (!string.IsNullOrEmpty(data?.ad_type))
+                path = AppendQueryParam(path, "ad_type", data.ad_type);
+
+            // Format-scoped reports always send ecpm_history (possibly empty) — never omit.
+            if (!string.IsNullOrEmpty(data?.ad_type) && data.ecpm_history == null)
+                data.ecpm_history = Array.Empty<float>();
+
             var json = JsonConvert.SerializeObject(data);
-            _host.StartCoroutine(Post($"/api/v1/report/{deviceId}", json, (code, _) =>
+            LiftEngineLogger.LogClient(
+                $"Report — ad_type={data?.ad_type ?? "(none)"}, " +
+                $"ecpm_history_len={data?.ecpm_history?.Length ?? 0}");
+            _host.StartCoroutine(Post(path, json, (code, _) =>
             {
                 callback?.Invoke(code == 200);
             }));
@@ -301,6 +321,15 @@ namespace LiftEngine.Api
             var code = (int)request.responseCode;
             LogBackendResponse("POST", path, code, body);
             callback?.Invoke(code, body);
+        }
+
+        private static string AppendQueryParam(string path, string key, string value)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(key))
+                return path;
+
+            var sep = path.Contains("?") ? "&" : "?";
+            return path + sep + Uri.EscapeDataString(key) + "=" + Uri.EscapeDataString(value ?? string.Empty);
         }
 
         /// <summary>

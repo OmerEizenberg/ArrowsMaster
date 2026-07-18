@@ -49,6 +49,7 @@ namespace LiftEngine.Context
         public void Initialize()
         {
             _store.Load();
+            EcpmHistoryBuffer.MigrateLegacySharedBlobIfNeeded();
             _session.BeginSession();
 
             if (!_store.InstallUtc.HasValue)
@@ -116,13 +117,12 @@ namespace LiftEngine.Context
             }
 
             var ecpm = PredictDataNormalizers.RevenuePerImpressionToEcpm(revenueUsd);
-            var history = _store.EcpmHistory;
-            EcpmHistoryBuffer.Push(history, format, ecpm);
-            _store.EcpmHistory = history;
+            EcpmHistoryBuffer.Push(format, ecpm);
 
-            var snapshot = EcpmHistoryBuffer.GetForFormat(history, format);
+            var snapshot = EcpmHistoryBuffer.GetForFormat(format);
             LiftEngineLogger.Log(
-                $"ecpm_history {format} — rev={revenueUsd.ToString(CultureInfo.InvariantCulture)} → " +
+                $"ecpm_history {format} ({EcpmHistoryBuffer.GetAdTypeName(format)}) — " +
+                $"rev={revenueUsd.ToString(CultureInfo.InvariantCulture)} → " +
                 $"ecpm={ecpm.ToString(CultureInfo.InvariantCulture)}, history=[{FormatHistory(snapshot)}]");
         }
 
@@ -165,11 +165,12 @@ namespace LiftEngine.Context
                 typeRaw = _store.GetLifetimeRaw(format.Value);
                 typeDailyRaw = _store.GetDailyRaw(format.Value);
                 typeSessionRaw = _store.GetSessionRaw(format.Value);
-                // Always attach this format's list (may be empty) — never another format's history.
-                ecpmHistory = EcpmHistoryBuffer.GetForFormat(_store.EcpmHistory, format.Value);
+                // Per-format PlayerPrefs key only. Empty → [] (never null) so backends cannot
+                // substitute another format's history for a missing field.
+                ecpmHistory = EcpmHistoryBuffer.GetForFormat(format.Value) ?? Array.Empty<float>();
             }
 
-            return new PredictDataPayload
+            var payload = new PredictDataPayload
             {
                 os = DeviceOsProvider.GetOs(),
                 country_code = countryCode,
@@ -202,6 +203,15 @@ namespace LiftEngine.Context
                 device_memory = PredictDataNormalizers.DeviceMemoryGb(),
                 app_version = Application.version
             };
+
+            if (format.HasValue)
+            {
+                LiftEngineLogger.Log(
+                    $"BuildPayload {format.Value} — ad_type={adType}, " +
+                    $"ecpm_history=[{FormatHistory(ecpmHistory)}] (len={ecpmHistory?.Length ?? 0})");
+            }
+
+            return payload;
         }
 
         public (string keyword, string auctionId) GetAuctionContext(LiftEngineAdFormat format) =>

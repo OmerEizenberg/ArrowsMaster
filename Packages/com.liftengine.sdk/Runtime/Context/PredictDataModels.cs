@@ -35,13 +35,16 @@ namespace LiftEngine.Context
         public int session_ad_number_ad_type;
         /// <summary>
         /// Model / format this payload was built for (<c>banner</c> / <c>interstitial</c> / <c>rewarded</c>).
-        /// Omitted on context-only reports (no format). Required so backends cannot attach
-        /// another format's <c>ecpm_history</c> to the wrong placement.
+        /// Omitted on context-only reports (no format).
         /// </summary>
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string ad_type;
-        /// <summary>Recent eCPM values (USD per 1,000 impressions), newest first. Not per-impression revenue.
-        /// Omitted when the payload has no ad format (context-only reports).</summary>
+        /// <summary>
+        /// Recent eCPM values (USD per 1,000 impressions), newest first — for <see cref="ad_type"/> only.
+        /// When <see cref="ad_type"/> is set this is never null (empty array if no impressions yet),
+        /// so backends cannot substitute another format's history for a missing field.
+        /// Omitted only on context-only reports (no format).
+        /// </summary>
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public float[] ecpm_history;
         public long sec_from_last_ad;
@@ -49,59 +52,14 @@ namespace LiftEngine.Context
         public string app_version;
     }
 
+    /// <summary>
+    /// Per-format eCPM history. Each ad type has its own PlayerPrefs key — never a shared blob.
+    /// </summary>
     internal static class EcpmHistoryBuffer
     {
         private const int MaxEntries = 15;
+        private const string LegacySharedKey = "le_ctx_ecpm";
 
-        public static void Push(Dictionary<string, List<float>> store, LiftEngineAdFormat format, float ecpm)
-        {
-            string key = FormatKey(format);
-            if (key == null)
-                return;
-
-            if (!store.TryGetValue(key, out var list))
-            {
-                list = new List<float>();
-                store[key] = list;
-            }
-
-            list.Insert(0, ecpm);
-            if (list.Count > MaxEntries)
-                list.RemoveAt(list.Count - 1);
-        }
-
-        public static float[] GetForFormat(Dictionary<string, List<float>> store, LiftEngineAdFormat format)
-        {
-            string key = FormatKey(format);
-            if (key == null || !store.TryGetValue(key, out var list) || list.Count == 0)
-                return Array.Empty<float>();
-
-            return list.ToArray();
-        }
-
-        public static Dictionary<string, List<float>> Deserialize(string json)
-        {
-            if (string.IsNullOrEmpty(json))
-                return new Dictionary<string, List<float>>();
-
-            try
-            {
-                return JsonConvert.DeserializeObject<Dictionary<string, List<float>>>(json)
-                       ?? new Dictionary<string, List<float>>();
-            }
-            catch
-            {
-                return new Dictionary<string, List<float>>();
-            }
-        }
-
-        public static string Serialize(Dictionary<string, List<float>> store) =>
-            JsonConvert.SerializeObject(store);
-
-        /// <summary>
-        /// Wire / storage name for a format. Matches <see cref="LiftEngineSettings.GetModelName"/>.
-        /// Unknown values return null (never fall back to another format).
-        /// </summary>
         public static string GetAdTypeName(LiftEngineAdFormat format) => format switch
         {
             LiftEngineAdFormat.Banner => "banner",
@@ -110,7 +68,139 @@ namespace LiftEngine.Context
             _ => null
         };
 
-        private static string FormatKey(LiftEngineAdFormat format) => GetAdTypeName(format);
+        public static string PrefsKey(LiftEngineAdFormat format)
+        {
+            var name = GetAdTypeName(format);
+            return name == null ? null : "le_ctx_ecpm_" + name;
+        }
+
+        public static void Push(LiftEngineAdFormat format, float ecpm)
+        {
+            MigrateLegacySharedBlobIfNeeded();
+
+            var key = PrefsKey(format);
+            if (key == null)
+                return;
+
+            var list = LoadList(key);
+            list.Insert(0, ecpm);
+            if (list.Count > MaxEntries)
+                list.RemoveAt(list.Count - 1);
+
+            PlayerPrefs.SetString(key, SerializeList(list));
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>Returns this format's history only. Never falls back to another format.</summary>
+        public static float[] GetForFormat(LiftEngineAdFormat format)
+        {
+            MigrateLegacySharedBlobIfNeeded();
+
+            var key = PrefsKey(format);
+            if (key == null)
+                return Array.Empty<float>();
+
+            var list = LoadList(key);
+            return list.Count == 0 ? Array.Empty<float>() : list.ToArray();
+        }
+
+        public static void ClearAllFormats()
+        {
+            foreach (LiftEngineAdFormat format in new[]
+                     {
+                         LiftEngineAdFormat.Banner,
+                         LiftEngineAdFormat.Interstitial,
+                         LiftEngineAdFormat.Rewarded
+                     })
+            {
+                var key = PrefsKey(format);
+                if (key != null)
+                    PlayerPrefs.DeleteKey(key);
+            }
+
+            PlayerPrefs.DeleteKey(LegacySharedKey);
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Old builds stored one JSON dict (or worse, a bare array) under <c>le_ctx_ecpm</c>.
+        /// Migrate dict entries into per-format keys, then delete the shared key.
+        /// Bare arrays are discarded — they were ambiguous shared history.
+        /// </summary>
+        public static void MigrateLegacySharedBlobIfNeeded()
+        {
+            if (!PlayerPrefs.HasKey(LegacySharedKey))
+                return;
+
+            var raw = PlayerPrefs.GetString(LegacySharedKey, string.Empty);
+            PlayerPrefs.DeleteKey(LegacySharedKey);
+
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                PlayerPrefs.Save();
+                return;
+            }
+
+            raw = raw.Trim();
+            try
+            {
+                var token = JToken.Parse(raw);
+                if (token is JObject obj)
+                {
+                    foreach (var prop in obj.Properties())
+                    {
+                        var adType = prop.Name?.Trim().ToLowerInvariant();
+                        if (adType != "banner" && adType != "interstitial" && adType != "rewarded")
+                            continue;
+
+                        var destKey = "le_ctx_ecpm_" + adType;
+                        // Do not overwrite newer per-format data if already present.
+                        if (PlayerPrefs.HasKey(destKey) &&
+                            !string.IsNullOrEmpty(PlayerPrefs.GetString(destKey, string.Empty)))
+                            continue;
+
+                        if (prop.Value is JArray arr)
+                        {
+                            var list = arr.ToObject<List<float>>() ?? new List<float>();
+                            PlayerPrefs.SetString(destKey, SerializeList(list));
+                        }
+                    }
+
+                    LiftEngineLogger.Log("ecpm_history — migrated legacy shared blob to per-format keys");
+                }
+                else if (token is JArray)
+                {
+                    // Legacy bare array was not format-scoped — drop it rather than assign to all formats.
+                    LiftEngineLogger.LogWarning(
+                        "ecpm_history — discarded legacy unscoped array under le_ctx_ecpm");
+                }
+            }
+            catch (Exception ex)
+            {
+                LiftEngineLogger.LogWarning($"ecpm_history — failed legacy migrate ({ex.Message}); dropped blob");
+            }
+
+            PlayerPrefs.Save();
+        }
+
+        private static List<float> LoadList(string prefsKey)
+        {
+            var json = PlayerPrefs.GetString(prefsKey, string.Empty);
+            if (string.IsNullOrEmpty(json))
+                return new List<float>();
+
+            try
+            {
+                return JsonConvert.DeserializeObject<List<float>>(json) ?? new List<float>();
+            }
+            catch
+            {
+                return new List<float>();
+            }
+        }
+
+        private static string SerializeList(List<float> list) =>
+            JsonConvert.SerializeObject(list ?? new List<float>());
     }
 
     internal static class DeviceBrandProvider

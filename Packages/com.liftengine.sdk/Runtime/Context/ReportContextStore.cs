@@ -56,16 +56,6 @@ namespace LiftEngine.Context
             set { PlayerPrefs.SetString(Prefix + "daily_date", value); PlayerPrefs.Save(); }
         }
 
-        public Dictionary<string, List<float>> EcpmHistory
-        {
-            get => EcpmHistoryBuffer.Deserialize(PlayerPrefs.GetString(Prefix + "ecpm", string.Empty));
-            set
-            {
-                PlayerPrefs.SetString(Prefix + "ecpm", EcpmHistoryBuffer.Serialize(value));
-                PlayerPrefs.Save();
-            }
-        }
-
         public int ActiveDayCount
         {
             get => GetRawCount("active_day_count", 0);
@@ -176,11 +166,14 @@ namespace LiftEngine.Context
                 "sess_banner", "sess_interstitial", "sess_rewarded",
                 "auction_kw_banner", "auction_kw_interstitial", "auction_kw_rewarded",
                 "auction_id_banner", "auction_id_interstitial", "auction_id_rewarded",
+                "ecpm_banner", "ecpm_interstitial", "ecpm_rewarded",
                 "gr_m", "gr_a", "gr_b"
             })
             {
                 PlayerPrefs.DeleteKey(Prefix + suffix);
             }
+
+            EcpmHistoryBuffer.ClearAllFormats();
             PlayerPrefs.Save();
             Load();
         }
