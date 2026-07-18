@@ -32,16 +32,18 @@ namespace LiftEngine.Api
         public void RequestOptimization(string deviceId, LiftEngineAdFormat format, PredictDataPayload data,
             Action<LiftEngineOptimizationResult> onSuccess, Action<LiftEngineError> onFailure)
         {
+            // Only the format being prewarmed. data (incl. ecpm_history) is format-specific —
+            // batching all models with one payload made banner/IV/RV share the wrong history.
+            var targetModel = _settings.GetModelName(format);
             var body = new PredictRequestBody
             {
-                models = _settings.GetAllModelNames(),
+                models = new[] { targetModel },
                 data = data
             };
 
             var json = JsonConvert.SerializeObject(body);
             var path = $"/api/v1/predict/{deviceId}";
-            var modelsLabel = string.Join(",", body.models);
-            var targetModel = _settings.GetModelName(format);
+            var modelsLabel = targetModel;
             _host.StartCoroutine(PostOptimization(path, modelsLabel, json, (code, response) =>
             {
                 if (code == 204)

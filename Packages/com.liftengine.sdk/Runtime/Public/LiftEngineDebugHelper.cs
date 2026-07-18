@@ -36,13 +36,20 @@ namespace LiftEngine
             service.SetAttribution(installType, mediaSource);
 
             var settings = UnityEngine.Resources.Load<LiftEngineSettings>(LiftEngineSettings.DefaultResourcePath);
-            var models = settings != null
-                ? settings.GetAllModelNames()
-                : new[] { "banner", "interstitial", "rewarded" };
+            // Mirror production predict: one model + that format's payload (incl. ecpm_history).
+            var model = settings != null
+                ? settings.GetModelName(format)
+                : format switch
+                {
+                    LiftEngineAdFormat.Banner => "banner",
+                    LiftEngineAdFormat.Interstitial => "interstitial",
+                    LiftEngineAdFormat.Rewarded => "rewarded",
+                    _ => "unknown"
+                };
 
             return JsonConvert.SerializeObject(new
             {
-                models,
+                models = new[] { model },
                 data = service.BuildPayload(format)
             }, Formatting.Indented);
         }

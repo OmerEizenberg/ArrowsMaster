@@ -21,17 +21,26 @@ namespace LiftEngine
 
         private LiftEngineShowAdCallbacks _activeCallbacks;
         private LiftEngineAdFormat? _activeFormat;
-        private LiftEngineAdFormat? _pendingReportFormat;
+        private readonly HashSet<LiftEngineAdFormat> _pendingReportFormats = new();
         private Coroutine _reportDebounceCoroutine;
         private Coroutine _firstReportRetryCoroutine;
         private bool _firstReportSucceeded;
         private int _reportInFlightCount;
         private bool _prewarmAllRequestedAfterFirstReport;
-        private bool _displayRevenueRecordedThisImpression;
+        /// <summary>
+        /// Per-format: display already recorded revenue for the current impression.
+        /// Must not be cleared on AdHidden — MAX often pays AdRevenuePaid after hide.
+        /// </summary>
+        private readonly HashSet<LiftEngineAdFormat> _displayRevenueRecordedFormats = new();
         private bool _bannerViewTrackedForCurrentFill;
         private bool _bannerActiveViewTrackedForCurrentFill;
-        private bool _viewTrackedForCurrentImpression;
-        private bool _activeViewTrackedForCurrentImpression;
+        /// <summary>
+        /// Per-format view/activeview dedupe for interstitial/rewarded.
+        /// Must not be a single global flag — a banner AdDisplayed would reset it and
+        /// could suppress or double-fire the wrong format's track events.
+        /// </summary>
+        private readonly HashSet<LiftEngineAdFormat> _viewTrackedFormats = new();
+        private readonly HashSet<LiftEngineAdFormat> _activeViewTrackedFormats = new();
         private readonly Dictionary<LiftEngineAdFormat, string> _impressionPlcByFormat = new();
         // Pinned at first view for this fill so activeview survives a post-hide prewarm override.
         private readonly Dictionary<LiftEngineAdFormat, (string keyword, string auctionId, int mulIndex)> _impressionAuctionByFormat = new();
@@ -74,14 +83,23 @@ namespace LiftEngine
             });
         }
 
+        /// <summary>
+        /// Context-only report (init / attribution). No ad format — omits ecpm_history.
+        /// </summary>
         public void SendReport(Action<bool> callback = null) =>
-            SendReport(LiftEngineAdFormat.Interstitial, callback);
+            SendReportInternal(null, callback);
 
-        public void SendReport(LiftEngineAdFormat format, Action<bool> callback = null)
+        public void SendReport(LiftEngineAdFormat format, Action<bool> callback = null) =>
+            SendReportInternal(format, callback);
+
+        private void SendReportInternal(LiftEngineAdFormat? format, Action<bool> callback)
         {
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
             var payload = _context.BuildPayload(format);
-            LiftEngineLogger.LogClient($"Report — sending context ({format})");
+            LiftEngineLogger.LogClient(
+                format.HasValue
+                    ? $"Report — sending context ({format.Value})"
+                    : "Report — sending context (no format)");
             _reportInFlightCount++;
             _api.Report(deviceId, payload, success =>
             {
@@ -137,7 +155,7 @@ namespace LiftEngine
             if (_reportInFlightCount > 0)
                 return;
 
-            SendReport(LiftEngineAdFormat.Interstitial);
+            SendReport();
         }
 
         private void ScheduleFirstReportRetry()
@@ -203,9 +221,9 @@ namespace LiftEngine
             };
             _mediation.AdDisplayed += info =>
             {
-                _displayRevenueRecordedThisImpression = false;
-                _viewTrackedForCurrentImpression = false;
-                _activeViewTrackedForCurrentImpression = false;
+                _displayRevenueRecordedFormats.Remove(info.Format);
+                _viewTrackedFormats.Remove(info.Format);
+                _activeViewTrackedFormats.Remove(info.Format);
                 // New impression: drop prior pin so view/activeview capture this fill's auction + plc.
                 // Do not clear these on AdHidden — MAX often pays revenue after hide.
                 _impressionPlcByFormat.Remove(info.Format);
@@ -221,7 +239,8 @@ namespace LiftEngine
             };
             _mediation.AdHidden += info =>
             {
-                _displayRevenueRecordedThisImpression = false;
+                // Do NOT clear display-revenue dedupe here: AdRevenuePaid often arrives after hide.
+                // Clearing caused the same eCPM to be pushed twice (paired duplicates in history).
 
                 LiftEngineSdkCallbacks.RaiseAdHidden(info);
                 _activeCallbacks?.OnAdHidden?.Invoke();
@@ -379,12 +398,12 @@ namespace LiftEngine
                 return;
             }
 
-            if (!fromDisplay && _displayRevenueRecordedThisImpression)
+            if (!fromDisplay && _displayRevenueRecordedFormats.Contains(format))
                 return;
 
             _context.RecordAdRevenue(format, revenueUsd);
             if (fromDisplay)
-                _displayRevenueRecordedThisImpression = true;
+                _displayRevenueRecordedFormats.Add(format);
         }
 
         private void TrackViewOnDisplay(MediationAdInfo info)
@@ -396,13 +415,9 @@ namespace LiftEngine
 
                 _bannerViewTrackedForCurrentFill = true;
             }
-            else if (_viewTrackedForCurrentImpression)
+            else if (!_viewTrackedFormats.Add(info.Format))
             {
                 return;
-            }
-            else
-            {
-                _viewTrackedForCurrentImpression = true;
             }
 
             EnsureAuctionContext(info);
@@ -423,13 +438,11 @@ namespace LiftEngine
             }
             else
             {
-                if (!_viewTrackedForCurrentImpression)
+                if (!_viewTrackedFormats.Contains(info.Format))
                     TrackViewOnDisplay(info);
 
-                if (_activeViewTrackedForCurrentImpression)
+                if (!_activeViewTrackedFormats.Add(info.Format))
                     return;
-
-                _activeViewTrackedForCurrentImpression = true;
             }
 
             if (info.Revenue <= 0d)
@@ -571,7 +584,9 @@ namespace LiftEngine
 
         private void QueueReportAfterAdDisplay(LiftEngineAdFormat format)
         {
-            _pendingReportFormat = format;
+            // Accumulate formats — a single pending slot was last-writer-wins and could
+            // replace a banner report with interstitial/rewarded (wrong ecpm_history).
+            _pendingReportFormats.Add(format);
             if (_reportDebounceCoroutine != null)
                 _host.StopCoroutine(_reportDebounceCoroutine);
 
@@ -582,11 +597,12 @@ namespace LiftEngine
         {
             yield return new WaitForSeconds(2f);
 
-            if (_pendingReportFormat.HasValue)
+            if (_pendingReportFormats.Count > 0)
             {
-                var format = _pendingReportFormat.Value;
-                _pendingReportFormat = null;
-                SendReport(format);
+                var formats = new List<LiftEngineAdFormat>(_pendingReportFormats);
+                _pendingReportFormats.Clear();
+                foreach (var format in formats)
+                    SendReport(format);
             }
 
             _reportDebounceCoroutine = null;

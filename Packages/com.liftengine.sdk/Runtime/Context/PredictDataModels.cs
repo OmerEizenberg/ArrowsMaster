@@ -33,7 +33,16 @@ namespace LiftEngine.Context
         public float daily_ad_type_share;
         public int session_ad_number;
         public int session_ad_number_ad_type;
-        /// <summary>Recent eCPM values (USD per 1,000 impressions), newest first. Not per-impression revenue.</summary>
+        /// <summary>
+        /// Model / format this payload was built for (<c>banner</c> / <c>interstitial</c> / <c>rewarded</c>).
+        /// Omitted on context-only reports (no format). Required so backends cannot attach
+        /// another format's <c>ecpm_history</c> to the wrong placement.
+        /// </summary>
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string ad_type;
+        /// <summary>Recent eCPM values (USD per 1,000 impressions), newest first. Not per-impression revenue.
+        /// Omitted when the payload has no ad format (context-only reports).</summary>
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public float[] ecpm_history;
         public long sec_from_last_ad;
         public int device_memory;
@@ -47,6 +56,9 @@ namespace LiftEngine.Context
         public static void Push(Dictionary<string, List<float>> store, LiftEngineAdFormat format, float ecpm)
         {
             string key = FormatKey(format);
+            if (key == null)
+                return;
+
             if (!store.TryGetValue(key, out var list))
             {
                 list = new List<float>();
@@ -60,7 +72,8 @@ namespace LiftEngine.Context
 
         public static float[] GetForFormat(Dictionary<string, List<float>> store, LiftEngineAdFormat format)
         {
-            if (!store.TryGetValue(FormatKey(format), out var list) || list.Count == 0)
+            string key = FormatKey(format);
+            if (key == null || !store.TryGetValue(key, out var list) || list.Count == 0)
                 return Array.Empty<float>();
 
             return list.ToArray();
@@ -85,7 +98,19 @@ namespace LiftEngine.Context
         public static string Serialize(Dictionary<string, List<float>> store) =>
             JsonConvert.SerializeObject(store);
 
-        private static string FormatKey(LiftEngineAdFormat format) => format.ToString().ToLowerInvariant();
+        /// <summary>
+        /// Wire / storage name for a format. Matches <see cref="LiftEngineSettings.GetModelName"/>.
+        /// Unknown values return null (never fall back to another format).
+        /// </summary>
+        public static string GetAdTypeName(LiftEngineAdFormat format) => format switch
+        {
+            LiftEngineAdFormat.Banner => "banner",
+            LiftEngineAdFormat.Interstitial => "interstitial",
+            LiftEngineAdFormat.Rewarded => "rewarded",
+            _ => null
+        };
+
+        private static string FormatKey(LiftEngineAdFormat format) => GetAdTypeName(format);
     }
 
     internal static class DeviceBrandProvider

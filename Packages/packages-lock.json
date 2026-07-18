@@ -1,14 +1,14 @@
 {
   "dependencies": {
     "com.applovin.mediation.adapters.bytedance.android": {
-      "version": "801000400.0.0",
+      "version": "801000500.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.bytedance.ios": {
-      "version": "801010000.0.0",
+      "version": "801010100.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -57,14 +57,14 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.inmobi.android": {
-      "version": "11030000.0.0",
+      "version": "11040000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.inmobi.ios": {
-      "version": "11030000.0.0",
+      "version": "11040000.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -85,14 +85,14 @@
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.moloco.android": {
-      "version": "4090000.0.0",
+      "version": "4100100.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://unity.packages.applovin.com"
     },
     "com.applovin.mediation.adapters.moloco.ios": {
-      "version": "4080000.0.0",
+      "version": "4080100.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},

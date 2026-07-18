@@ -126,7 +126,14 @@ namespace LiftEngine.Context
                 $"ecpm={ecpm.ToString(CultureInfo.InvariantCulture)}, history=[{FormatHistory(snapshot)}]");
         }
 
-        public PredictDataPayload BuildPayload(LiftEngineAdFormat format)
+        public PredictDataPayload BuildPayload(LiftEngineAdFormat format) =>
+            BuildPayload((LiftEngineAdFormat?)format);
+
+        /// <param name="format">
+        /// When null (context-only report), format-specific fields stay at defaults and
+        /// <c>ecpm_history</c> is omitted — no interstitial/auto format fallback.
+        /// </param>
+        public PredictDataPayload BuildPayload(LiftEngineAdFormat? format)
         {
             _session.EnsureDailyRollover(_store);
             _store.RecordActiveDay();
@@ -144,12 +151,23 @@ namespace LiftEngine.Context
                 daysSinceLastPurchase = Math.Max(0, (int)(nowUtc - _store.LastPurchaseUtc.Value).TotalDays);
 
             var ltv = _store.LtvGross;
-            var typeRaw = _store.GetLifetimeRaw(format);
-            var typeDailyRaw = _store.GetDailyRaw(format);
-            var typeSessionRaw = _store.GetSessionRaw(format);
             var dailyAdNumber = _store.GetDailyTotalRaw();
-            var dailyAdNumberByType = typeDailyRaw;
             var countryCode = ResolveCountryCode();
+
+            int typeRaw = 0;
+            int typeDailyRaw = 0;
+            int typeSessionRaw = 0;
+            float[] ecpmHistory = null;
+            string adType = null;
+            if (format.HasValue)
+            {
+                adType = EcpmHistoryBuffer.GetAdTypeName(format.Value);
+                typeRaw = _store.GetLifetimeRaw(format.Value);
+                typeDailyRaw = _store.GetDailyRaw(format.Value);
+                typeSessionRaw = _store.GetSessionRaw(format.Value);
+                // Always attach this format's list (may be empty) — never another format's history.
+                ecpmHistory = EcpmHistoryBuffer.GetForFormat(_store.EcpmHistory, format.Value);
+            }
 
             return new PredictDataPayload
             {
@@ -173,12 +191,13 @@ namespace LiftEngine.Context
                 ad_number_life_time = _store.GetLifetimeTotalRaw(),
                 ad_number_life_time_ad_type = typeRaw,
                 daily_ad_number = dailyAdNumber,
-                daily_ad_number_ad_type = dailyAdNumberByType,
+                daily_ad_number_ad_type = typeDailyRaw,
                 daily_ad_type_share = PredictDataNormalizers.DailyAdTypeShare(
-                    dailyAdNumber, dailyAdNumberByType),
+                    dailyAdNumber, typeDailyRaw),
                 session_ad_number = _store.GetSessionTotalRaw(),
                 session_ad_number_ad_type = typeSessionRaw,
-                ecpm_history = EcpmHistoryBuffer.GetForFormat(_store.EcpmHistory, format),
+                ad_type = adType,
+                ecpm_history = ecpmHistory,
                 sec_from_last_ad = PredictDataNormalizers.SecFromLastAd(_store.LastAdUtc),
                 device_memory = PredictDataNormalizers.DeviceMemoryGb(),
                 app_version = Application.version
