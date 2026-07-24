@@ -32,20 +32,30 @@ namespace LiftEngine
         /// Must not be cleared on AdHidden — MAX often pays AdRevenuePaid after hide.
         /// </summary>
         private readonly HashSet<LiftEngineAdFormat> _displayRevenueRecordedFormats = new();
-        private bool _bannerViewTrackedForCurrentFill;
-        private bool _bannerActiveViewTrackedForCurrentFill;
+
         /// <summary>
-        /// Per-format view/activeview dedupe for interstitial/rewarded.
-        /// Must not be a single global flag — a banner AdDisplayed would reset it and
-        /// could suppress or double-fire the wrong format's track events.
+        /// Per-format FIFO of impressions waiting for MAX AdRevenuePaid → track/activeview.
+        /// Isolated queues so banner/interstitial/rewarded never collide; late ILRD matches
+        /// the oldest waiter for that format even after a refresh/prewarm.
         /// </summary>
-        private readonly HashSet<LiftEngineAdFormat> _viewTrackedFormats = new();
-        private readonly HashSet<LiftEngineAdFormat> _activeViewTrackedFormats = new();
-        private readonly Dictionary<LiftEngineAdFormat, string> _impressionPlcByFormat = new();
-        // Pinned at first view for this fill so activeview survives a post-hide prewarm override.
-        private readonly Dictionary<LiftEngineAdFormat, (string keyword, string auctionId, int mulIndex)> _impressionAuctionByFormat = new();
+        private readonly Queue<ActiveViewWaiter> _bannerActiveViewWaiters = new();
+        private readonly Queue<ActiveViewWaiter> _interstitialActiveViewWaiters = new();
+        private readonly Queue<ActiveViewWaiter> _rewardedActiveViewWaiters = new();
 
         public bool IsInitialized { get; private set; }
+
+        /// <summary>
+        /// One pending impression for a format, with auction/plc pinned at enqueue time.
+        /// </summary>
+        private sealed class ActiveViewWaiter
+        {
+            public LiftEngineAdFormat Format;
+            public string Keyword;
+            public string AuctionId;
+            public int MulIndex;
+            public string Plc;
+            public bool ViewSent;
+        }
 
         public void Initialize(LiftEngineSettings settings, LiftEngineHost host)
         {
@@ -209,29 +219,20 @@ namespace LiftEngine
         {
             _mediation.AdLoaded += info =>
             {
+                // Banner auto-refresh has no AdDisplayed — enqueue a waiter per fill so late
+                // ILRD still matches this impression's pinned auction/plc (do not clear prior waiters).
                 if (info.Format == LiftEngineAdFormat.Banner)
-                {
-                    _bannerViewTrackedForCurrentFill = false;
-                    _bannerActiveViewTrackedForCurrentFill = false;
-                    _impressionPlcByFormat.Remove(LiftEngineAdFormat.Banner);
-                    _impressionAuctionByFormat.Remove(LiftEngineAdFormat.Banner);
-                }
+                    EnqueueBannerActiveViewWaiter(info);
 
                 LiftEngineSdkCallbacks.RaiseAdLoaded(info);
             };
             _mediation.AdDisplayed += info =>
             {
                 _displayRevenueRecordedFormats.Remove(info.Format);
-                _viewTrackedFormats.Remove(info.Format);
-                _activeViewTrackedFormats.Remove(info.Format);
-                // New impression: drop prior pin so view/activeview capture this fill's auction + plc.
-                // Do not clear these on AdHidden — MAX often pays revenue after hide.
-                _impressionPlcByFormat.Remove(info.Format);
-                _impressionAuctionByFormat.Remove(info.Format);
 
                 _context.RecordAdImpression(info.Format);
                 TryRecordImpressionRevenue(info.Format, info.Revenue, fromDisplay: true);
-                TrackViewOnDisplay(info);
+                OnAdDisplayedForActiveView(info);
                 QueueReportAfterAdDisplay(info.Format);
 
                 LiftEngineSdkCallbacks.RaiseAdDisplayed(info);
@@ -239,8 +240,8 @@ namespace LiftEngine
             };
             _mediation.AdHidden += info =>
             {
-                // Do NOT clear display-revenue dedupe here: AdRevenuePaid often arrives after hide.
-                // Clearing caused the same eCPM to be pushed twice (paired duplicates in history).
+                // Do NOT clear activeview waiters or display-revenue dedupe here:
+                // AdRevenuePaid often arrives after hide.
 
                 LiftEngineSdkCallbacks.RaiseAdHidden(info);
                 _activeCallbacks?.OnAdHidden?.Invoke();
@@ -360,22 +361,16 @@ namespace LiftEngine
         {
             var adUnitId = _settings.GetAdUnitId(LiftEngineAdFormat.Banner);
             if (!string.IsNullOrEmpty(adUnitId))
-            {
                 _mediation.HideBanner(adUnitId);
-                _bannerViewTrackedForCurrentFill = false;
-                _bannerActiveViewTrackedForCurrentFill = false;
-            }
+            // Keep banner activeview waiters — MAX may still pay revenue after hide.
         }
 
         public void DestroyBanner()
         {
             var adUnitId = _settings.GetAdUnitId(LiftEngineAdFormat.Banner);
             if (!string.IsNullOrEmpty(adUnitId))
-            {
                 _mediation.DestroyAd(LiftEngineAdFormat.Banner, adUnitId);
-                _bannerViewTrackedForCurrentFill = false;
-                _bannerActiveViewTrackedForCurrentFill = false;
-            }
+            // Keep waiters for late ILRD; they are removed only when activeview is sent.
         }
 
         public void ClearDebugContext() => _context.ClearContextData();
@@ -387,6 +382,7 @@ namespace LiftEngine
         /// <summary>
         /// Records per-impression revenue into ecpm_history. AdRevenuePaid is the primary source;
         /// display revenue is used when MAX includes it on the display callback.
+        /// Still skips revenue &lt;= 0 (unchanged) — activeview itself always sends rev as given.
         /// </summary>
         private void TryRecordImpressionRevenue(LiftEngineAdFormat format, double revenueUsd, bool fromDisplay)
         {
@@ -406,68 +402,73 @@ namespace LiftEngine
                 _displayRevenueRecordedFormats.Add(format);
         }
 
-        private void TrackViewOnDisplay(MediationAdInfo info)
+        private void OnAdDisplayedForActiveView(MediationAdInfo info)
         {
-            if (info.Format == LiftEngineAdFormat.Banner)
+            switch (info.Format)
             {
-                if (_bannerViewTrackedForCurrentFill)
-                    return;
-
-                _bannerViewTrackedForCurrentFill = true;
+                case LiftEngineAdFormat.Banner:
+                    OnBannerDisplayedForActiveView(info);
+                    break;
+                case LiftEngineAdFormat.Interstitial:
+                    OnInterstitialDisplayedForActiveView(info);
+                    break;
+                case LiftEngineAdFormat.Rewarded:
+                    OnRewardedDisplayedForActiveView(info);
+                    break;
             }
-            else if (!_viewTrackedFormats.Add(info.Format))
-            {
-                return;
-            }
-
-            EnsureAuctionContext(info);
-            SendTrackView(info);
-        }
-
-        private void TrackActiveViewOnRevenue(MediationAdInfo info)
-        {
-            if (info.Format == LiftEngineAdFormat.Banner)
-            {
-                if (!_bannerViewTrackedForCurrentFill)
-                    TrackViewOnDisplay(info);
-
-                if (_bannerActiveViewTrackedForCurrentFill)
-                    return;
-
-                _bannerActiveViewTrackedForCurrentFill = true;
-            }
-            else
-            {
-                if (!_viewTrackedFormats.Contains(info.Format))
-                    TrackViewOnDisplay(info);
-
-                if (!_activeViewTrackedFormats.Add(info.Format))
-                    return;
-            }
-
-            if (info.Revenue <= 0d)
-            {
-                LiftEngineTrackReporter.ReportError(
-                    _api, _settings, _context, info.Format, "revenue_missing",
-                    "MAX AdRevenuePaid callback received without revenue; activeview requires rev.",
-                    info);
-                return;
-            }
-
-            EnsureAuctionContext(info);
-            SendTrackActiveView(info, (float)info.Revenue);
         }
 
         /// <summary>
-        /// Resolves auction context for this impression and pins it so view + activeview stay aligned
-        /// even if a post-hide prewarm overrides the store with a new predict/fallback id.
+        /// Banner fill already enqueued on AdLoaded; display only sends track/view for the
+        /// oldest waiter that has not yet reported view (first show). If none, enqueue.
         /// </summary>
-        private void EnsureAuctionContext(MediationAdInfo info)
+        private void OnBannerDisplayedForActiveView(MediationAdInfo info)
         {
-            if (_impressionAuctionByFormat.TryGetValue(info.Format, out var pinned) &&
-                !string.IsNullOrEmpty(pinned.auctionId))
-                return;
+            var queue = _bannerActiveViewWaiters;
+            ActiveViewWaiter waiter = null;
+            foreach (var pending in queue)
+            {
+                if (!pending.ViewSent)
+                {
+                    waiter = pending;
+                    break;
+                }
+            }
 
+            if (waiter == null)
+            {
+                waiter = CreateActiveViewWaiter(info);
+                queue.Enqueue(waiter);
+            }
+
+            SendTrackViewIfNeeded(waiter, info);
+        }
+
+        private void OnInterstitialDisplayedForActiveView(MediationAdInfo info)
+        {
+            var waiter = CreateActiveViewWaiter(info);
+            _interstitialActiveViewWaiters.Enqueue(waiter);
+            SendTrackViewIfNeeded(waiter, info);
+        }
+
+        private void OnRewardedDisplayedForActiveView(MediationAdInfo info)
+        {
+            var waiter = CreateActiveViewWaiter(info);
+            _rewardedActiveViewWaiters.Enqueue(waiter);
+            SendTrackViewIfNeeded(waiter, info);
+        }
+
+        private void EnqueueBannerActiveViewWaiter(MediationAdInfo info)
+        {
+            var waiter = CreateActiveViewWaiter(info);
+            _bannerActiveViewWaiters.Enqueue(waiter);
+            LiftEngineLogger.Log(
+                $"activeview waiter enqueued (banner) — auction_id={waiter.AuctionId}, " +
+                $"plc={waiter.Plc}, queue={_bannerActiveViewWaiters.Count}");
+        }
+
+        private ActiveViewWaiter CreateActiveViewWaiter(MediationAdInfo info)
+        {
             if (!_context.HasValidAuctionContext(info.Format))
             {
                 LiftEngineTrackReporter.ReportError(
@@ -479,95 +480,139 @@ namespace LiftEngine
 
             var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
             var mulIndex = _context.GetWinningMultiplierIndex(info.Format);
-            if (!string.IsNullOrEmpty(auctionId))
-                _impressionAuctionByFormat[info.Format] = (keyword, auctionId, mulIndex);
+            var plc = ResolveImpressionPlc(info);
+
+            return new ActiveViewWaiter
+            {
+                Format = info.Format,
+                Keyword = keyword,
+                AuctionId = auctionId,
+                MulIndex = mulIndex,
+                Plc = plc,
+                ViewSent = false
+            };
         }
 
-        private (string keyword, string auctionId, int mulIndex) GetImpressionAuction(LiftEngineAdFormat format)
+        private void TrackActiveViewOnRevenue(MediationAdInfo info)
         {
-            if (_impressionAuctionByFormat.TryGetValue(format, out var pinned) &&
-                !string.IsNullOrEmpty(pinned.auctionId))
-                return pinned;
-
-            var (keyword, auctionId) = _context.GetAuctionContext(format);
-            return (keyword, auctionId, _context.GetWinningMultiplierIndex(format));
+            switch (info.Format)
+            {
+                case LiftEngineAdFormat.Banner:
+                    TrackBannerActiveViewOnRevenue(info);
+                    break;
+                case LiftEngineAdFormat.Interstitial:
+                    TrackInterstitialActiveViewOnRevenue(info);
+                    break;
+                case LiftEngineAdFormat.Rewarded:
+                    TrackRewardedActiveViewOnRevenue(info);
+                    break;
+            }
         }
 
-        private void SendTrackView(MediationAdInfo info)
+        private void TrackBannerActiveViewOnRevenue(MediationAdInfo info) =>
+            CompleteActiveViewWaiter(_bannerActiveViewWaiters, info);
+
+        private void TrackInterstitialActiveViewOnRevenue(MediationAdInfo info) =>
+            CompleteActiveViewWaiter(_interstitialActiveViewWaiters, info);
+
+        private void TrackRewardedActiveViewOnRevenue(MediationAdInfo info) =>
+            CompleteActiveViewWaiter(_rewardedActiveViewWaiters, info);
+
+        /// <summary>
+        /// Pops the oldest waiter for this format (one activeview per impression), sends
+        /// track/activeview with whatever rev MAX provided (including 0), then removes the waiter.
+        /// If the queue is empty (orphan ILRD), still sends once using freshly pinned context.
+        /// </summary>
+        private void CompleteActiveViewWaiter(Queue<ActiveViewWaiter> queue, MediationAdInfo info)
         {
-            var (keyword, auctionId, mulIndex) = GetImpressionAuction(info.Format);
+            ActiveViewWaiter waiter;
+            if (queue.Count > 0)
+            {
+                waiter = queue.Peek();
+            }
+            else
+            {
+                LiftEngineLogger.LogWarning(
+                    $"activeview revenue with no waiter ({info.Format}) — sending orphan event");
+                waiter = CreateActiveViewWaiter(info);
+            }
+
+            SendTrackViewIfNeeded(waiter, info);
+
+            // Always send, including rev == 0. Only drop the waiter after the send attempt.
+            SendTrackActiveView(waiter, (float)info.Revenue);
+
+            if (queue.Count > 0 && ReferenceEquals(queue.Peek(), waiter))
+                queue.Dequeue();
+        }
+
+        private void SendTrackViewIfNeeded(ActiveViewWaiter waiter, MediationAdInfo info)
+        {
+            if (waiter.ViewSent)
+                return;
+
+            // Prefer MAX placement from this callback when waiter was created without it.
+            if (string.IsNullOrEmpty(waiter.Plc) && !string.IsNullOrEmpty(info?.MaxPlacement))
+                waiter.Plc = info.MaxPlacement;
+
+            SendTrackView(waiter);
+            waiter.ViewSent = true;
+        }
+
+        private void SendTrackView(ActiveViewWaiter waiter)
+        {
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
-            var plc = ResolveAndCacheImpressionPlc(info);
-            var adType = _settings.GetModelName(info.Format);
+            var adType = _settings.GetModelName(waiter.Format);
+            var plc = waiter.Plc ?? string.Empty;
 
             if (string.IsNullOrEmpty(plc))
             {
                 LiftEngineTrackReporter.ReportError(
-                    _api, _settings, _context, info.Format, "missing_plc",
-                    "view event missing MAX placement (plc); cannot attribute impression route.",
-                    info);
+                    _api, _settings, _context, waiter.Format, "missing_plc",
+                    "view event missing MAX placement (plc); cannot attribute impression route.");
             }
 
             LiftEngineLogger.LogClient(
                 $"Track view — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
-                $"keyword={keyword}, auction_id={auctionId}, Mulindex={mulIndex}, timestamp={timestamp}");
-            _api.TrackView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp, mulIndex);
+                $"keyword={waiter.Keyword}, auction_id={waiter.AuctionId}, Mulindex={waiter.MulIndex}, " +
+                $"timestamp={timestamp}");
+            _api.TrackView(bundleId, deviceId, adType, plc, waiter.Keyword, waiter.AuctionId, timestamp,
+                waiter.MulIndex);
         }
 
-        private void SendTrackActiveView(MediationAdInfo info, float rev)
+        private void SendTrackActiveView(ActiveViewWaiter waiter, float rev)
         {
-            var (keyword, auctionId, mulIndex) = GetImpressionAuction(info.Format);
             var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
-            // Prefer placement captured at display so reload after show cannot change plc mid-impression.
-            var plc = GetCachedOrResolveImpressionPlc(info);
-            var adType = _settings.GetModelName(info.Format);
+            var adType = _settings.GetModelName(waiter.Format);
+            var plc = waiter.Plc ?? string.Empty;
 
             if (string.IsNullOrEmpty(plc))
             {
                 LiftEngineTrackReporter.ReportError(
-                    _api, _settings, _context, info.Format, "missing_plc",
-                    "activeview event missing MAX placement (plc); cannot attribute impression route.",
-                    info);
+                    _api, _settings, _context, waiter.Format, "missing_plc",
+                    "activeview event missing MAX placement (plc); cannot attribute impression route.");
             }
 
-            // History for THIS format only (revenue already pushed in TryRecordImpressionRevenue).
-            var ecpmHistory = EcpmHistoryBuffer.GetForFormat(info.Format);
+            // History for THIS format only (revenue already pushed in TryRecordImpressionRevenue when > 0).
+            var ecpmHistory = EcpmHistoryBuffer.GetForFormat(waiter.Format);
             LiftEngineLogger.LogClient(
                 $"Track activeview — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
-                $"keyword={keyword}, auction_id={auctionId}, Mulindex={mulIndex}, timestamp={timestamp}, " +
-                $"rev={rev}, ecpm_history_len={ecpmHistory.Length}");
-            _api.TrackActiveView(bundleId, deviceId, adType, plc, keyword, auctionId, timestamp, rev, mulIndex,
-                ecpmHistory);
+                $"keyword={waiter.Keyword}, auction_id={waiter.AuctionId}, Mulindex={waiter.MulIndex}, " +
+                $"timestamp={timestamp}, rev={rev}, ecpm_history_len={ecpmHistory.Length}");
+            _api.TrackActiveView(bundleId, deviceId, adType, plc, waiter.Keyword, waiter.AuctionId, timestamp,
+                rev, waiter.MulIndex, ecpmHistory);
         }
 
         /// <summary>
-        /// Resolves the MAX placement used for this impression (e.g. LiftEngine_a_rv) and caches it
-        /// so view + activeview report the same plc even if a reload changes route afterwards.
-        /// Priority: MAX AdInfo.Placement → mediation state → context route for format.
+        /// Resolves the MAX placement used for this impression (e.g. LiftEngine_a_rv).
+        /// Priority: MAX AdInfo.Placement → context route for format.
         /// </summary>
-        private string ResolveAndCacheImpressionPlc(MediationAdInfo info)
-        {
-            var plc = ResolveImpressionPlc(info);
-            if (!string.IsNullOrEmpty(plc))
-                _impressionPlcByFormat[info.Format] = plc;
-            return plc;
-        }
-
-        private string GetCachedOrResolveImpressionPlc(MediationAdInfo info)
-        {
-            if (_impressionPlcByFormat.TryGetValue(info.Format, out var cached) &&
-                !string.IsNullOrEmpty(cached))
-                return cached;
-
-            return ResolveAndCacheImpressionPlc(info);
-        }
-
         private string ResolveImpressionPlc(MediationAdInfo info)
         {
             if (!string.IsNullOrEmpty(info?.MaxPlacement))
