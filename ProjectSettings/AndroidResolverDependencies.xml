@@ -13,7 +13,7 @@
     <package>com.applovin.mediation:inmobi-adapter:11.4.0.0</package>
     <package>com.applovin.mediation:ironsource-adapter:9.4.4.0.0</package>
     <package>com.applovin.mediation:moloco-adapter:4.10.1.0</package>
-    <package>com.applovin.mediation:unityads-adapter:4.19.0.0</package>
+    <package>com.applovin.mediation:unityads-adapter:4.19.0.1</package>
     <package>com.applovin.mediation:vungle-adapter:7.7.4.0</package>
     <package>com.applovin:applovin-sdk:13.6.3</package>
     <package>com.google.android.gms:play-services-ads:25.2.0</package>
