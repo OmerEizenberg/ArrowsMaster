@@ -2440,7 +2440,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: -160}
-  m_SizeDelta: {x: 1640, y: 460}
+  m_SizeDelta: {x: 1700, y: 460}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &463006340439848122
 CanvasRenderer:
@@ -6776,7 +6776,7 @@ GameObject:
   - component: {fileID: 6119790620002131825}
   - component: {fileID: 8563673673421067409}
   m_Layer: 5
-  m_Name: MissionsPopup
+  m_Name: TournamentLeaderboardPopup
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11235,7 +11235,7 @@ GameObject:
   - component: {fileID: 5182455406202828352}
   - component: {fileID: 2857550423493115782}
   m_Layer: 5
-  m_Name: MissionsPopup
+  m_Name: TournamentLeaderboardPopup
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11347,19 +11347,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 8734495640765151318}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a3e120549524548cba3b642bcdd3524d, type: 3}
+  m_Script: {fileID: 11500000, guid: 432eb5daba3144c9aadcf58697e5e8be, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Assets.Scripts.LiveOps.Missions.MissionsPopupView
-  m_MissionsHolder: {fileID: 5735248604172772518}
-  m_MissionsHolderView: {fileID: 2361819774544289194}
-  m_MissionSlots:
-  - {fileID: 3378675069076490819}
-  - {fileID: 3177721399461439913}
-  - {fileID: 9178551634364374633}
-  - {fileID: 3954551675885918104}
-  - {fileID: 8548450069096814432}
+  m_EditorClassIdentifier: Assembly-CSharp::Assets.Scripts.LiveOps.Tournament.TournamentLeaderboardPopupView
   m_CloseButton: {fileID: 6091132366059924105}
-  m_AllowRuntimeSlotComponents: 0
+  m_Title: {fileID: 3310534765851262013}
+  m_TimerText: {fileID: 4621612390813113809}
+  m_RowsParent: {fileID: 5735248604172772518}
+  m_NameEditRoot: {fileID: 0}
+  m_NameInput: {fileID: 0}
+  m_NameError: {fileID: 0}
+  m_SaveNameButton: {fileID: 0}
+  m_CancelNameButton: {fileID: 0}
 --- !u!1 &8946464605464109404
 GameObject:
   m_ObjectHideFlags: 0
@@ -11531,7 +11530,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.05, y: 0.818}
   m_AnchorMax: {x: 0.95, y: 0.993}
-  m_AnchoredPosition: {x: 0, y: 16.000122}
+  m_AnchoredPosition: {x: 0, y: 16}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2862030070023923598

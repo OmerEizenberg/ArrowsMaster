@@ -267,13 +267,17 @@ namespace Assets.Scripts.Lobby
                 LiveOpManager.Instance.SyncLobbyIcons();
             }
 
-            StartCoroutine(DeferredGaeCommitAfterLobbyPopups());
+            StartCoroutine(DeferredLobbyLiveOpsAndGae());
         }
 
-        private IEnumerator DeferredGaeCommitAfterLobbyPopups()
+        private IEnumerator DeferredLobbyLiveOpsAndGae()
         {
             yield return null;
             yield return null;
+
+            // Finished tournament results take priority when entering the lobby.
+            Assets.Scripts.LiveOps.Tournament.TournamentResultsPopupView.TryShowPending();
+
             NotifyGaePendingCommit();
         }
 
