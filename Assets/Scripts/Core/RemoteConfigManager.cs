@@ -108,7 +108,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_ONE_LIFE_PLAY_ON] = false;
         defaults[KEY_IS_SHUFFLE_ON] = true;
         defaults[KEY_NETFLIX_EFFECT] = false;
-        defaults[KEY_IS_GAE] = false;
+        defaults[KEY_IS_GAE] = true;
         defaults[KEY_IS_OFFLINE] = false;
     }
 
