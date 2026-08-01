@@ -45,11 +45,28 @@ namespace Assets.Scripts.LiveOps.Tournament
         {
             service = tournamentService;
             ResolveRefs();
+            SanitizeMissionLeftovers();
             ApplyCopy();
             WireButtons();
             WireDimToDismiss();
-            HideMissionSlots();
             RefreshTimer();
+        }
+
+        private void SanitizeMissionLeftovers()
+        {
+            var popup = FindDeep("Popup");
+            if (popup == null) return;
+
+            for (int i = popup.childCount - 1; i >= 0; i--)
+            {
+                Transform child = popup.GetChild(i);
+                if (child == null) continue;
+                string n = child.name;
+                if (n == "Title" || n == "Description" || n == "GreenShadow" || n == "Title (1)")
+                    continue;
+                child.gameObject.SetActive(false);
+                Destroy(child.gameObject);
+            }
         }
 
         private void WireDimToDismiss()
@@ -138,13 +155,6 @@ namespace Assets.Scripts.LiveOps.Tournament
                 m_JoinButton.onClick.RemoveAllListeners();
                 m_JoinButton.onClick.AddListener(OnJoinOrClose);
             }
-        }
-
-        private void HideMissionSlots()
-        {
-            var holder = FindDeep("MissionsHolder");
-            if (holder != null)
-                holder.gameObject.SetActive(false);
         }
 
         private void RefreshTimer()

@@ -11353,7 +11353,7 @@ MonoBehaviour:
   m_CloseButton: {fileID: 6091132366059924105}
   m_Title: {fileID: 3310534765851262013}
   m_TimerText: {fileID: 4621612390813113809}
-  m_RowsParent: {fileID: 5735248604172772518}
+  m_RowsParent: {fileID: 0}
   m_CoinSprite: {fileID: 21300000, guid: 780862a05578141fd9bd3ee1a28f17ee, type: 3}
   m_HintSprite: {fileID: 21300000, guid: da653c99511e0479da64ad11a1b4cc56, type: 3}
   m_WandSprite: {fileID: 21300000, guid: 9aa6aac210b1f44499288385f2a5890b, type: 3}
