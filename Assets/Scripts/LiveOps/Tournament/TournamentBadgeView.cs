@@ -70,9 +70,21 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (service == null || service.SO == null || UserDataManager.Instance == null)
                 return;
 
+            // Keep this component active while the tournament window is eligible so Update
+            // keeps running offline and the badge can reappear when back online.
+            bool eligible = service.IsBadgeEligible();
+            if (!eligible)
+            {
+                if (gameObject.activeSelf)
+                    gameObject.SetActive(false);
+                return;
+            }
+
+            if (!gameObject.activeSelf)
+                gameObject.SetActive(true);
+
             bool show = service.ShouldShowBadge();
-            if (gameObject.activeSelf != show)
-                gameObject.SetActive(show);
+            ApplyOnlineVisibility(show);
             if (!show) return;
 
             isLocked = !service.IsUnlocked();
@@ -87,6 +99,17 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             float alpha = isLocked ? 0.5f : 1f;
             ApplyAlpha(alpha);
+        }
+
+        private void ApplyOnlineVisibility(bool visible)
+        {
+            var cg = GetComponent<CanvasGroup>();
+            if (cg == null)
+                cg = gameObject.AddComponent<CanvasGroup>();
+
+            cg.alpha = visible ? 1f : 0f;
+            cg.interactable = visible;
+            cg.blocksRaycasts = visible;
         }
 
         private void OnClicked()

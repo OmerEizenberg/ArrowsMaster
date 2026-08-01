@@ -42,11 +42,15 @@ namespace Assets.Scripts.LiveOps.Tournament.Editor
             so.FindProperty("m_Background").objectReferenceValue = view.Background;
             so.FindProperty("m_Button").objectReferenceValue = view.Button;
             so.FindProperty("m_PlaceText").objectReferenceValue = view.PlaceText;
+            so.FindProperty("m_PlaceTextBg").objectReferenceValue = view.PlaceTextBg;
             so.FindProperty("m_NameText").objectReferenceValue = view.NameText;
+            so.FindProperty("m_NameTextBg").objectReferenceValue = view.NameTextBg;
             so.FindProperty("m_RewardIcon").objectReferenceValue = view.RewardIcon;
             so.FindProperty("m_RewardAmountText").objectReferenceValue = view.RewardAmountText;
+            so.FindProperty("m_RewardAmountTextBg").objectReferenceValue = view.RewardAmountTextBg;
             so.FindProperty("m_RewardRoot").objectReferenceValue = view.RewardRoot;
             so.FindProperty("m_ScoreText").objectReferenceValue = view.ScoreText;
+            so.FindProperty("m_ScoreTextBg").objectReferenceValue = view.ScoreTextBg;
             so.FindProperty("m_PlaceBg").objectReferenceValue = view.PlaceBg;
             so.FindProperty("m_NameBg").objectReferenceValue = view.NameBg;
             so.FindProperty("m_RewardBg").objectReferenceValue = view.RewardBg;

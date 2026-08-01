@@ -67,6 +67,8 @@ namespace Assets.Scripts.LiveOps
 
         private float checkInterval = 60f; // Check every minute
         private float timer = 0f;
+        private float tournamentUiInterval = 1f;
+        private float tournamentUiTimer = 0f;
 
         private void Start()
         {
@@ -89,6 +91,23 @@ namespace Assets.Scripts.LiveOps
                 timer = 0f;
                 CheckLiveOps();
             }
+
+            tournamentUiTimer += Time.deltaTime;
+            if (tournamentUiTimer >= tournamentUiInterval)
+            {
+                tournamentUiTimer = 0f;
+                TickTournamentUi();
+            }
+        }
+
+        private void TickTournamentUi()
+        {
+            var tournament = GetActiveService(TournamentLiveOpService.EventId) as TournamentLiveOpService;
+            tournament?.TickFinalize();
+
+            // Pending results stay queued offline; show claim popup only once online in lobby.
+            if (TournamentLiveOpService.HasPendingResults() && NetworkReconnectManager.IsOnline)
+                TryShowTournamentResultsIfInLobby();
         }
 
         public void CheckLiveOps()

@@ -186,6 +186,19 @@ namespace Assets.Scripts.LiveOps
             if (SO == null || UserDataManager.Instance == null) return false;
             if (UserDataManager.Instance.CurrentLevel < SO.ShowLevel) return false;
             if (Progress == null) return false;
+            if (!NetworkReconnectManager.IsOnline) return false;
+            return Progress.Status == TournamentStatus.PendingJoin || Progress.Status == TournamentStatus.Joined;
+        }
+
+        /// <summary>
+        /// Level/status eligibility only — used to keep the badge component alive while offline
+        /// so it can reappear when connectivity returns.
+        /// </summary>
+        public bool IsBadgeEligible()
+        {
+            if (SO == null || UserDataManager.Instance == null) return false;
+            if (UserDataManager.Instance.CurrentLevel < SO.ShowLevel) return false;
+            if (Progress == null) return false;
             return Progress.Status == TournamentStatus.PendingJoin || Progress.Status == TournamentStatus.Joined;
         }
 

@@ -12,8 +12,8 @@ namespace Assets.Scripts.LiveOps.Tournament
     {
         public const float DefaultRowHeight = 216f;
         public const float PlaceWidth = 120f;
-        public const float RewardWidth = 160f;
-        public const float ScoreWidth = 160f;
+        public const float RewardWidth = 250f;
+        public const float ScoreWidth = 250f;
 
         private static readonly Color PlaceColColor = new Color(0.95f, 0.75f, 0.2f, 0.45f);
         private static readonly Color NameColColor = new Color(0.2f, 0.55f, 0.75f, 0.35f);

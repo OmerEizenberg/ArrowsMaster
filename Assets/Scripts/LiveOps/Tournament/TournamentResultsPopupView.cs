@@ -20,6 +20,9 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         public static bool TryShowPending()
         {
+            if (!NetworkReconnectManager.IsOnline)
+                return false;
+
             if (!TournamentLiveOpService.HasPendingResults())
                 return false;
 

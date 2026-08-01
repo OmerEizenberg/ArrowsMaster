@@ -31,6 +31,12 @@ namespace Assets.Scripts.Core
         public static bool IsPopupVisible =>
             _instance != null && _instance._popupInstance != null && _instance._popupInstance.activeSelf;
 
+        /// <summary>
+        /// True when Unity reports any network path (Wi‑Fi, cellular, or LAN).
+        /// Not a real internet ping — matches reconnect-popup reachability.
+        /// </summary>
+        public static bool IsOnline => IsNetworkReachable();
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Create()
         {
