@@ -212,13 +212,26 @@ namespace Assets.Scripts.LiveOps
 
         public int GetCurrentPlace()
         {
-            var rows = BuildLeaderboardRows(TrustedTimeService.UtcNow);
-            for (int i = 0; i < rows.Count; i++)
+            if (Progress == null || Progress.Status == TournamentStatus.PendingJoin)
+                return 25;
+
+            // Rank-only path: avoid allocating/sorting a full leaderboard for badge ticks.
+            DateTime now = TrustedTimeService.UtcNow;
+            int playerScore = Progress.PlayerScore;
+            int betterOrEqualBots = 0;
+
+            if (Progress.Bots != null)
             {
-                if (rows[i].IsPlayer)
-                    return i + 1;
+                for (int i = 0; i < Progress.Bots.Count; i++)
+                {
+                    int botScore = TournamentBotSimulator.GetBotScoreAt(Progress.Bots[i], now);
+                    // Player wins ties, so only strictly higher bot scores push the player down.
+                    if (botScore > playerScore)
+                        betterOrEqualBots++;
+                }
             }
-            return 25;
+
+            return betterOrEqualBots + 1;
         }
 
         public bool TryJoin()

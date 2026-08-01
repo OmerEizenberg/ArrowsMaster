@@ -38,8 +38,16 @@ MonoBehaviour:
   - 
   - 
   - 
-  MinArrowsForRewardedPlaces: 71
+  MinArrowsForRewardedPlaces: 0
   LateJoinLookbackMinutes: 30
+  AvgGoldenArrowsPerLevel: 150
+  TopLevelsPerDayMin: 10
+  TopLevelsPerDayMax: 12
+  AvgLevelsPerDay: 5
+  TournamentIntensityVariance: 0.12
+  BotTargetVariance: 0.1
+  MinPaceGapPercent: 0.04
+  ArrowsPerLevelVariance: 0.15
   BotGainRules:
   - Archetype: 0
     IntervalHours: 2.5

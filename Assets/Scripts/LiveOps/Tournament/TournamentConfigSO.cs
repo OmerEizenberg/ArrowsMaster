@@ -32,15 +32,45 @@ namespace Assets.Scripts.LiveOps.Tournament
         [Tooltip("Rewards by final place. Index 0 = 1st place, 24 = last. Format: Type:Amount e.g. Coin:500")]
         public List<string> PlaceRewards = new List<string>(25);
 
-        [Tooltip("At join time, every place that has a reward must already have a bot with at least this many golden arrows.")]
-        public int MinArrowsForRewardedPlaces = 71;
+        [Tooltip("At join time, every place that has a reward must already have a bot with at least this many golden arrows. Unused by the pace-based simulator (kept for compatibility).")]
+        public int MinArrowsForRewardedPlaces = 0;
 
         [Header("Late-join bucket feel")]
-        [Tooltip("Bots are simulated as if they joined within this many minutes before the player.")]
+        [Tooltip("Legacy field. Bot schedules now use the player's remaining tournament window.")]
         public float LateJoinLookbackMinutes = 30f;
 
+        [Header("Score calibration (Golden Arrows)")]
+        [Tooltip("Average golden arrows earned per completed level.")]
+        public int AvgGoldenArrowsPerLevel = 150;
+
+        [Tooltip("Top-player daily level pace used for #1-style bots (design target: 10).")]
+        public float TopLevelsPerDayMin = 10f;
+
+        [Tooltip("Upper end of top-player daily level pace (design: 10-12).")]
+        public float TopLevelsPerDayMax = 12f;
+
+        [Tooltip("Average player daily level pace for the mid pack.")]
+        public float AvgLevelsPerDay = 5f;
+
+        [Header("Per-tournament / bot variance")]
+        [Tooltip("Each tournament's overall intensity drifts by up to this fraction (0.12 = ±12%).")]
+        [Range(0f, 0.35f)]
+        public float TournamentIntensityVariance = 0.12f;
+
+        [Tooltip("Extra random % applied to each bot's final target on top of pace (0.08 = ±8%).")]
+        [Range(0f, 0.35f)]
+        public float BotTargetVariance = 0.10f;
+
+        [Tooltip("Minimum relative pace gap between neighboring competitive bots (0.04 = 4%). Keeps ranks from clustering.")]
+        [Range(0f, 0.2f)]
+        public float MinPaceGapPercent = 0.04f;
+
+        [Tooltip("How much arrows-per-level can drift per bot (0.15 = ±15% around AvgGoldenArrowsPerLevel).")]
+        [Range(0f, 0.4f)]
+        public float ArrowsPerLevelVariance = 0.15f;
+
         [Header("Bot Golden Arrow gain rules")]
-        [Tooltip("Per-archetype cadence and batch sizes. If empty, built-in defaults are used.")]
+        [Tooltip("Legacy per-archetype batch rules. Pace-based simulator uses Score calibration above; archetypes only shape timing.")]
         public List<BotArchetypeGainRule> BotGainRules = new List<BotArchetypeGainRule>();
 
         public BotArchetypeGainRule GetBotGainRule(BotArchetype archetype)
@@ -134,56 +164,90 @@ namespace Assets.Scripts.LiveOps.Tournament
             return count;
         }
 
+        private static readonly Dictionary<string, Reward> s_RewardCache =
+            new Dictionary<string, Reward>(StringComparer.Ordinal);
+
         public static Reward ParseReward(string key)
         {
-            Reward reward = new Reward();
-            if (string.IsNullOrEmpty(key)) return reward;
+            if (string.IsNullOrEmpty(key))
+                return default;
 
-            var match = System.Text.RegularExpressions.Regex.Match(key, @"^([a-zA-Z]+)(\d+)$");
-            if (match.Success)
+            if (s_RewardCache.TryGetValue(key, out Reward cached))
+                return cached;
+
+            Reward reward = ParseRewardUncached(key);
+            s_RewardCache[key] = reward;
+            return reward;
+        }
+
+        private static Reward ParseRewardUncached(string key)
+        {
+            Reward reward = new Reward();
+            int colon = key.IndexOf(':');
+            if (colon > 0 && colon < key.Length - 1)
             {
-                string typeToken = match.Groups[1].Value.ToUpperInvariant();
-                int.TryParse(match.Groups[2].Value, out reward.amount);
-                switch (typeToken)
-                {
-                    case "C": reward.type = RewardType.Coin; return reward;
-                    case "H": reward.type = RewardType.Hint; return reward;
-                    case "MW": reward.type = RewardType.MagicWand; return reward;
-                    case "L": reward.type = RewardType.RefillLife; return reward;
-                }
+                ParseRewardType(key.Substring(0, colon).Trim(), out reward.type);
+                int.TryParse(key.Substring(colon + 1).Trim(), out reward.amount);
+                return reward;
             }
 
-            string[] parts = key.Split(':');
-            if (parts.Length < 2) return reward;
+            // Compact tokens e.g. C500 / H3 / MW1 / L1
+            int split = 0;
+            while (split < key.Length && char.IsLetter(key[split]))
+                split++;
+            if (split > 0 && split < key.Length && int.TryParse(key.Substring(split), out reward.amount))
+            {
+                string typeToken = key.Substring(0, split);
+                if (typeToken.Equals("C", StringComparison.OrdinalIgnoreCase) ||
+                    typeToken.Equals("Coin", StringComparison.OrdinalIgnoreCase) ||
+                    typeToken.Equals("Coins", StringComparison.OrdinalIgnoreCase))
+                    reward.type = RewardType.Coin;
+                else if (typeToken.Equals("H", StringComparison.OrdinalIgnoreCase) ||
+                         typeToken.Equals("Hint", StringComparison.OrdinalIgnoreCase) ||
+                         typeToken.Equals("Hints", StringComparison.OrdinalIgnoreCase))
+                    reward.type = RewardType.Hint;
+                else if (typeToken.Equals("MW", StringComparison.OrdinalIgnoreCase) ||
+                         typeToken.Equals("Wand", StringComparison.OrdinalIgnoreCase) ||
+                         typeToken.Equals("MagicWand", StringComparison.OrdinalIgnoreCase))
+                    reward.type = RewardType.MagicWand;
+                else if (typeToken.Equals("L", StringComparison.OrdinalIgnoreCase) ||
+                         typeToken.Equals("Life", StringComparison.OrdinalIgnoreCase) ||
+                         typeToken.Equals("RefillLife", StringComparison.OrdinalIgnoreCase))
+                    reward.type = RewardType.RefillLife;
+            }
 
-            string typeStr = parts[0].Trim().ToLowerInvariant();
-            int.TryParse(parts[1].Trim(), out reward.amount);
+            return reward;
+        }
 
-            switch (typeStr)
+        private static void ParseRewardType(string typeStr, out RewardType type)
+        {
+            type = default;
+            if (string.IsNullOrEmpty(typeStr))
+                return;
+
+            switch (typeStr.ToLowerInvariant())
             {
                 case "coin":
                 case "coins":
                 case "c":
-                    reward.type = RewardType.Coin;
+                    type = RewardType.Coin;
                     break;
                 case "hint":
                 case "hints":
                 case "h":
-                    reward.type = RewardType.Hint;
+                    type = RewardType.Hint;
                     break;
                 case "magicwand":
                 case "wand":
                 case "mw":
-                    reward.type = RewardType.MagicWand;
+                    type = RewardType.MagicWand;
                     break;
                 case "refilllife":
                 case "life":
                 case "l":
-                    reward.type = RewardType.RefillLife;
+                    type = RewardType.RefillLife;
                     break;
             }
-
-            return reward;
         }
 
 #if UNITY_EDITOR

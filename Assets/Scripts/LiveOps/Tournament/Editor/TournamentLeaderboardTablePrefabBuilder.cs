@@ -91,7 +91,7 @@ namespace Assets.Scripts.LiveOps.Tournament.Editor
                 var description = FindDeep(popup, "Description");
                 TextMeshProUGUI timer = description != null ? description.GetComponent<TextMeshProUGUI>() : null;
                 if (timer != null)
-                    timer.text = "Don't give up, — left!";
+                    timer.text = "Don't give up\n— left";
 
                 var close = FindDeep(popup, "GreenShadow");
                 Button closeButton = close != null ? close.GetComponent<Button>() : null;

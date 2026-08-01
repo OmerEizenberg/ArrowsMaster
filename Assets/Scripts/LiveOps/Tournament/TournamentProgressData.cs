@@ -19,6 +19,11 @@ namespace Assets.Scripts.LiveOps.Tournament
         /// <summary>UTC ticks when this bot "joined" the simulated field.</summary>
         public long JoinUtcTicks;
         public List<TournamentScoreEvent> Events = new List<TournamentScoreEvent>();
+
+        // Runtime-only cursor for GetBotScoreAt as time advances (not persisted).
+        [NonSerialized] public long ScoreCacheTicks;
+        [NonSerialized] public int ScoreCacheValue;
+        [NonSerialized] public int ScoreCacheIndex;
     }
 
     [Serializable]

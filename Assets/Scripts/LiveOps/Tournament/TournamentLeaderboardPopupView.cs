@@ -61,16 +61,16 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private static readonly string[] TimerTaglines =
         {
-            "Don't give up, {0} left!",
-            "Hurry up, {0} left!",
-            "Keep climbing, {0} left!",
-            "Push harder, {0} remaining!",
-            "The race is on — {0} left!",
-            "Stay sharp, {0} left!",
-            "Every arrow counts — {0} left!",
-            "No time to rest, {0} left!",
-            "Chase the lead, {0} remaining!",
-            "Finish strong, {0} left!"
+            "Don't give up",
+            "Hurry up",
+            "Keep climbing",
+            "Push harder",
+            "The race is on",
+            "Stay sharp",
+            "Every arrow counts",
+            "No time to rest",
+            "Chase the lead",
+            "Finish strong"
         };
 
         private TournamentLiveOpService service;
@@ -80,7 +80,8 @@ namespace Assets.Scripts.LiveOps.Tournament
         private bool m_DidFocusPlayer;
         private RectTransform m_PopupRect;
         private Coroutine m_FocusCoroutine;
-        private string m_SelectedTaglineFormat;
+        private string m_SelectedTagline;
+        private string m_LastTimerText;
 
         public static void Show(TournamentLiveOpService service)
         {
@@ -360,7 +361,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private void PickTagline()
         {
-            m_SelectedTaglineFormat = TimerTaglines[Random.Range(0, TimerTaglines.Length)];
+            m_SelectedTagline = TimerTaglines[Random.Range(0, TimerTaglines.Length)];
         }
 
         private void RefreshTimer()
@@ -368,17 +369,24 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (service == null || m_TimerText == null) return;
 
             var rem = service.GetRemainingTime();
+            string text;
             if (rem.TotalSeconds <= 0)
             {
-                SetPairedText(m_TimerText, m_TimerTextBg, "Finished");
-                return;
+                text = "Finished";
+            }
+            else
+            {
+                string timeLeft = FormatTimeLeft(rem);
+                if (string.IsNullOrEmpty(m_SelectedTagline))
+                    PickTagline();
+                text = $"{m_SelectedTagline}\n{timeLeft} left";
             }
 
-            string timeLeft = FormatTimeLeft(rem);
-            if (string.IsNullOrEmpty(m_SelectedTaglineFormat))
-                PickTagline();
+            if (string.Equals(m_LastTimerText, text, System.StringComparison.Ordinal))
+                return;
 
-            SetPairedText(m_TimerText, m_TimerTextBg, string.Format(m_SelectedTaglineFormat, timeLeft));
+            m_LastTimerText = text;
+            SetPairedText(m_TimerText, m_TimerTextBg, text);
         }
 
         private static void SetPairedText(TextMeshProUGUI main, TextMeshProUGUI bg, string value)
@@ -422,6 +430,11 @@ namespace Assets.Scripts.LiveOps.Tournament
             {
                 var view = Instantiate(m_RowPrefab, m_RowsParent);
                 view.gameObject.name = $"Row_{i}";
+                if (view.Button != null)
+                {
+                    view.Button.onClick.RemoveAllListeners();
+                    view.Button.onClick.AddListener(OpenNameEditor);
+                }
                 m_Rows.Add(view);
             }
         }
@@ -445,21 +458,16 @@ namespace Assets.Scripts.LiveOps.Tournament
                     if (!view.gameObject.activeSelf)
                         view.gameObject.SetActive(true);
 
-                    string rewardKey = service.GetRewardKeyForPlace(data[i].Place - 1);
-                    Reward reward = TournamentConfigSO.ParseReward(rewardKey);
+                    Reward reward = default;
+                    if (service.Config != null)
+                        service.Config.TryGetReward(data[i].Place - 1, out reward);
+
                     view.SetData(
                         data[i],
                         reward,
                         GetRewardSprite(reward.type, reward.amount),
                         PlayerRowColor,
                         BotRowColor);
-
-                    if (view.Button != null)
-                    {
-                        view.Button.onClick.RemoveAllListeners();
-                        if (data[i].IsPlayer)
-                            view.Button.onClick.AddListener(OpenNameEditor);
-                    }
 
                     if (data[i].IsPlayer)
                         playerIndex = i;
@@ -482,9 +490,22 @@ namespace Assets.Scripts.LiveOps.Tournament
             yield return null;
             yield return null;
             Canvas.ForceUpdateCanvases();
-            if (m_ScrollRect != null)
+            if (m_ScrollRect != null && m_ScrollRect.content != null)
                 LayoutRebuilder.ForceRebuildLayoutImmediate(m_ScrollRect.content);
-            RefreshRows();
+
+            // Rows already populated in Initialize; only scroll to the player.
+            if (!m_DidFocusPlayer)
+            {
+                for (int i = 0; i < m_Rows.Count; i++)
+                {
+                    if (m_Rows[i] != null && m_Rows[i].IsPlayerRow)
+                    {
+                        m_DidFocusPlayer = true;
+                        FocusRow(i);
+                        break;
+                    }
+                }
+            }
         }
 
         private void FocusRow(int index)

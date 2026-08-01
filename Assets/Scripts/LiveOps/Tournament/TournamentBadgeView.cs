@@ -30,6 +30,8 @@ namespace Assets.Scripts.LiveOps.Tournament
         private float nextRefresh;
         private Coroutine tooltipCoroutine;
         private bool resolved;
+        private string m_LastPlaceText;
+        private string m_LastTimerText;
 
         public void Initialize(TournamentLiveOpService tournamentService)
         {
@@ -92,10 +94,18 @@ namespace Assets.Scripts.LiveOps.Tournament
                 m_LockIcon.SetActive(isLocked);
 
             string place = $"#{service.GetDisplayPlace()}";
-            SetPlaceTexts(place);
+            if (!string.Equals(m_LastPlaceText, place, StringComparison.Ordinal))
+            {
+                m_LastPlaceText = place;
+                SetPlaceTexts(place);
+            }
 
             string timeStr = FormatRemaining(service.GetRemainingTime());
-            SetTimerTexts(timeStr);
+            if (!string.Equals(m_LastTimerText, timeStr, StringComparison.Ordinal))
+            {
+                m_LastTimerText = timeStr;
+                SetTimerTexts(timeStr);
+            }
 
             float alpha = isLocked ? 0.5f : 1f;
             ApplyAlpha(alpha);

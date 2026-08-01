@@ -63,8 +63,18 @@ namespace Assets.Scripts.LiveOps.Tournament
         public LayoutElement RewardLayout { get => m_RewardLayout; set => m_RewardLayout = value; }
 
         private bool isPlayerRow;
-        private const float NameFlexibleWithReward = 1f;
-        private const float NameFlexibleWithoutReward = 1f;
+        private bool m_LayoutsReady;
+        private bool m_HasAppliedRewardState;
+        private bool m_LastHasReward;
+        private int m_LastPlace = int.MinValue;
+        private int m_LastScore = int.MinValue;
+        private int m_LastRewardAmount = int.MinValue;
+        private string m_LastName;
+        private Sprite m_LastRewardSprite;
+        private bool m_LastIsPlayer;
+        private Color m_LastBgColor;
+
+        private const float NameFlexibleWidth = 1f;
         private const float RewardPreferredWidth = 250f;
         private const float NameMinWidth = 100f;
 
@@ -88,23 +98,46 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             Color playerColor = playerRowColor.a > 0f ? playerRowColor : m_PlayerRowColor;
             Color botColor = botRowColor.a > 0f ? botRowColor : m_BotRowColor;
+            Color bgColor = row.IsPlayer ? playerColor : botColor;
 
-            if (m_Background != null)
-                m_Background.color = row.IsPlayer ? playerColor : botColor;
+            if (m_Background != null && (m_LastIsPlayer != row.IsPlayer || m_LastBgColor != bgColor))
+            {
+                m_Background.color = bgColor;
+                m_LastBgColor = bgColor;
+            }
+            m_LastIsPlayer = row.IsPlayer;
 
-            SetPairedText(m_PlaceText, m_PlaceTextBg, $"#{row.Place}");
-            SetPairedText(m_NameText, m_NameTextBg, row.Name ?? string.Empty);
+            if (m_LastPlace != row.Place)
+            {
+                SetPairedText(m_PlaceText, m_PlaceTextBg, $"#{row.Place}");
+                m_LastPlace = row.Place;
+            }
+
+            string name = row.Name ?? string.Empty;
+            if (!string.Equals(m_LastName, name, System.StringComparison.Ordinal))
+            {
+                SetPairedText(m_NameText, m_NameTextBg, name);
+                m_LastName = name;
+            }
 
             bool hasReward = reward.amount > 0;
+            bool rewardVisibilityChanged = !m_HasAppliedRewardState || m_LastHasReward != hasReward;
 
-            if (m_RewardBg != null)
-                m_RewardBg.gameObject.SetActive(hasReward);
-            if (m_RewardRoot != null)
-                m_RewardRoot.SetActive(hasReward);
+            if (rewardVisibilityChanged)
+            {
+                if (m_RewardBg != null && m_RewardBg.gameObject.activeSelf != hasReward)
+                    m_RewardBg.gameObject.SetActive(hasReward);
+                if (m_RewardRoot != null && m_RewardRoot.activeSelf != hasReward)
+                    m_RewardRoot.SetActive(hasReward);
+
+                ApplyRewardColumnLayout(hasReward);
+                m_LastHasReward = hasReward;
+                m_HasAppliedRewardState = true;
+            }
 
             if (hasReward)
             {
-                if (m_RewardIcon != null)
+                if (m_RewardIcon != null && !ReferenceEquals(m_LastRewardSprite, rewardSprite))
                 {
                     if (rewardSprite != null)
                     {
@@ -117,20 +150,38 @@ namespace Assets.Scripts.LiveOps.Tournament
                     {
                         m_RewardIcon.enabled = false;
                     }
+                    m_LastRewardSprite = rewardSprite;
                 }
-                SetPairedText(m_RewardAmountText, m_RewardAmountTextBg, reward.amount.ToString());
+
+                if (m_LastRewardAmount != reward.amount)
+                {
+                    SetPairedText(m_RewardAmountText, m_RewardAmountTextBg, reward.amount.ToString());
+                    m_LastRewardAmount = reward.amount;
+                }
+            }
+            else
+            {
+                m_LastRewardAmount = int.MinValue;
+                m_LastRewardSprite = null;
             }
 
-            ApplyRewardColumnLayout(hasReward);
-
-            SetPairedText(m_ScoreText, m_ScoreTextBg, Mathf.Max(0, row.Score).ToString());
+            int score = Mathf.Max(0, row.Score);
+            if (m_LastScore != score)
+            {
+                SetPairedText(m_ScoreText, m_ScoreTextBg, score.ToString());
+                m_LastScore = score;
+            }
 
             if (m_Button != null)
                 m_Button.interactable = row.IsPlayer;
 
-            var rowRect = transform as RectTransform;
-            if (rowRect != null)
-                LayoutRebuilder.ForceRebuildLayoutImmediate(rowRect);
+            // Layout rebuild only when reward column visibility changes (expensive).
+            if (rewardVisibilityChanged)
+            {
+                var rowRect = transform as RectTransform;
+                if (rowRect != null)
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(rowRect);
+            }
         }
 
         private void ApplyRewardColumnLayout(bool hasReward)
@@ -139,7 +190,7 @@ namespace Assets.Scripts.LiveOps.Tournament
             {
                 m_NameLayout.minWidth = NameMinWidth;
                 m_NameLayout.preferredWidth = -1f;
-                m_NameLayout.flexibleWidth = hasReward ? NameFlexibleWithReward : NameFlexibleWithoutReward;
+                m_NameLayout.flexibleWidth = NameFlexibleWidth;
             }
 
             if (m_RewardLayout == null)
@@ -154,7 +205,6 @@ namespace Assets.Scripts.LiveOps.Tournament
             }
             else
             {
-                // Keep column collapsed if it stays active for any reason.
                 m_RewardLayout.ignoreLayout = true;
                 m_RewardLayout.preferredWidth = 0f;
                 m_RewardLayout.minWidth = 0f;
@@ -163,6 +213,9 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private void EnsureColumnLayouts()
         {
+            if (m_LayoutsReady)
+                return;
+
             var hlg = GetComponent<HorizontalLayoutGroup>();
             if (hlg != null)
             {
@@ -180,7 +233,7 @@ namespace Assets.Scripts.LiveOps.Tournament
             {
                 m_NameLayout.minWidth = NameMinWidth;
                 if (m_NameLayout.flexibleWidth < 0f)
-                    m_NameLayout.flexibleWidth = NameFlexibleWithReward;
+                    m_NameLayout.flexibleWidth = NameFlexibleWidth;
             }
 
             if (m_RewardLayout != null && m_RewardLayout.preferredWidth <= 0f)
@@ -188,6 +241,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             EnsureFixedColumnLayout(m_PlaceBg, TournamentLeaderboardRowFactory.PlaceWidth);
             EnsureFixedColumnLayout(m_ScoreBg, 250f);
+            m_LayoutsReady = true;
         }
 
         private static void EnsureFixedColumnLayout(Image columnBg, float fallbackPreferredWidth)
@@ -218,6 +272,21 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private void TryAutoWireTextBgs()
         {
+            // Prefab should already wire these; only scan hierarchy for missing refs.
+            bool needsScan =
+                m_NameTextBg == null ||
+                m_ScoreTextBg == null ||
+                m_RewardAmountTextBg == null ||
+                m_PlaceText == null ||
+                m_PlaceTextBg == null ||
+                (m_PlaceText != null && m_PlaceText.gameObject.name.EndsWith("BG", System.StringComparison.Ordinal)) ||
+                (m_ScoreText != null && m_ScoreText.gameObject.name == "ScoreBG") ||
+                (m_RewardAmountText != null && m_RewardAmountText.gameObject.name == "AmountBG") ||
+                (m_NameText != null && m_NameText.gameObject.name == "NameBG");
+
+            if (!needsScan)
+                return;
+
             if (m_NameTextBg == null)
                 m_NameTextBg = FindChildTmp("NameBG");
             if (m_ScoreTextBg == null)
@@ -226,20 +295,24 @@ namespace Assets.Scripts.LiveOps.Tournament
                 m_RewardAmountTextBg = FindChildTmp("AmountBG");
             if (m_PlaceTextBg == null)
             {
-                m_PlaceTextBg = FindChildTmp("PlaceBG") ?? FindChildTmp("TextBG");
-                // Sibling under PlaceCol (common when duplicating place text as BG).
+                m_PlaceTextBg = FindChildTmp("PositionBG")
+                                ?? FindChildTmp("PlaceBG")
+                                ?? FindChildTmp("TextBG");
                 if (m_PlaceTextBg == null && m_PlaceText != null && m_PlaceText.transform.parent != null)
                 {
-                    m_PlaceTextBg = FindDirectChildTmp(m_PlaceText.transform.parent, "PlaceBG")
+                    m_PlaceTextBg = FindDirectChildTmp(m_PlaceText.transform.parent, "PositionBG")
+                                    ?? FindDirectChildTmp(m_PlaceText.transform.parent, "PlaceBG")
                                     ?? FindDirectChildTmp(m_PlaceText.transform.parent, "TextBG")
                                     ?? FindDirectChildTmp(m_PlaceText.transform.parent, "Text (1)");
                 }
             }
 
-            // Prefab may have had Score/Amount/Place wired to the BG by mistake — prefer the non-BG sibling.
-            if (m_PlaceText != null && (m_PlaceText.gameObject.name == "PlaceBG" || m_PlaceText.gameObject.name == "TextBG"))
+            if (m_PlaceText != null &&
+                (m_PlaceText.gameObject.name == "PositionBG"
+                 || m_PlaceText.gameObject.name == "PlaceBG"
+                 || m_PlaceText.gameObject.name == "TextBG"))
             {
-                var place = FindChildTmp("Place") ?? FindChildTmp("Text");
+                var place = FindChildTmp("Position") ?? FindChildTmp("Place") ?? FindChildTmp("Text");
                 if (place != null && place != m_PlaceText)
                 {
                     if (m_PlaceTextBg == null)
@@ -247,6 +320,11 @@ namespace Assets.Scripts.LiveOps.Tournament
                     m_PlaceText = place;
                 }
             }
+
+            if (m_PlaceText == null)
+                m_PlaceText = FindChildTmp("Position") ?? FindChildTmp("Place");
+            if (m_PlaceTextBg == null)
+                m_PlaceTextBg = FindChildTmp("PositionBG") ?? FindChildTmp("PlaceBG");
 
             if (m_ScoreText != null && m_ScoreText.gameObject.name == "ScoreBG")
             {

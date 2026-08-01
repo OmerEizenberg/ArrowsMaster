@@ -16,9 +16,17 @@ namespace Assets.Scripts.LiveOps.Tournament
         Spiky = 7
     }
 
+    /// <summary>
+    /// Builds bot score schedules calibrated to real play:
+    /// ~150 golden arrows per level, avg ~5 levels/day, top players ~10-12 levels/day.
+    /// Final #1 target ≈ AvgArrowsPerLevel × TopLevelsPerDay × remainingDaysAtJoin
+    /// (e.g. 150 × 10 × 3.5 = 5250 when joining at tournament start).
+    /// Each tournament also gets intensity / gap / personality variance so rounds feel different.
+    /// </summary>
     public static class TournamentBotSimulator
     {
         private const int BotCount = 24;
+        private const int TopCompetitiveCount = 5;
 
         public static List<TournamentBotData> CreateBotsOnJoin(
             TournamentConfigSO config,
@@ -29,220 +37,336 @@ namespace Assets.Scripts.LiveOps.Tournament
         {
             int seed = unchecked(uniqueId.GetHashCode() ^ joinUtc.Ticks.GetHashCode());
             var rng = new System.Random(seed);
-            float lookbackMinutes = config != null ? Mathf.Max(5f, config.LateJoinLookbackMinutes) : 30f;
-            int minRewardScore = config != null ? Mathf.Max(1, config.MinArrowsForRewardedPlaces) : 71;
-            int rewardedPlaces = config != null ? Mathf.Max(1, config.CountRewardedPlaces()) : 5;
+
+            float arrowsPerLevel = config != null ? Mathf.Max(1f, config.AvgGoldenArrowsPerLevel) : 150f;
+            float topMin = config != null ? Mathf.Max(1f, config.TopLevelsPerDayMin) : 10f;
+            float topMax = config != null ? Mathf.Max(topMin, config.TopLevelsPerDayMax) : 12f;
+            float avgLevels = config != null ? Mathf.Max(0.5f, config.AvgLevelsPerDay) : 5f;
+
+            float intensityVar = config != null ? Mathf.Clamp01(config.TournamentIntensityVariance) : 0.12f;
+            float botTargetVar = config != null ? Mathf.Clamp01(config.BotTargetVariance) : 0.10f;
+            float minGapPct = config != null ? Mathf.Clamp(config.MinPaceGapPercent, 0f, 0.2f) : 0.04f;
+            float arrowsVar = config != null ? Mathf.Clamp01(config.ArrowsPerLevelVariance) : 0.15f;
+
+            // Per-tournament mood: hotter/cooler field so consecutive rounds don't feel identical.
+            float tournamentIntensity = 1f + SignedUnit(rng) * intensityVar;
+
+            // Competitive window = time left when the player joins (not full tournament length if late).
+            DateTime scheduleStart = joinUtc < tournamentStartUtc ? tournamentStartUtc : joinUtc;
+            if (scheduleStart >= tournamentEndUtc)
+                scheduleStart = tournamentEndUtc.AddMinutes(-1);
+
+            double remainingDays = Math.Max(1d / 24d, (tournamentEndUtc - scheduleStart).TotalDays);
+
+            float[] paces = BuildDailyLevelPaces(BotCount, topMin, topMax, avgLevels, tournamentIntensity, rng);
+            EnforceMinimumGaps(paces, minGapPct);
+            Shuffle(paces, rng);
+
+            // Shuffle archetypes separately so behavior mix changes every tournament.
+            var archetypes = BuildShuffledArchetypes(BotCount, rng);
 
             var names = TournamentBotNames.PickUnique(BotCount, seed ^ 9176);
             var bots = new List<TournamentBotData>(BotCount);
 
             for (int i = 0; i < BotCount; i++)
             {
-                var archetype = (BotArchetype)(i % 8);
-                double joinOffsetMin = rng.NextDouble() * lookbackMinutes;
-                DateTime botJoin = joinUtc.AddMinutes(-joinOffsetMin);
-                if (botJoin < tournamentStartUtc)
-                    botJoin = tournamentStartUtc;
+                var archetype = archetypes[i];
+                float pace = paces[i];
+
+                // Per-bot arrows efficiency + target jitter (independent of pace band).
+                float botArrows = arrowsPerLevel * (1f + SignedUnit(rng) * arrowsVar);
+                botArrows = Mathf.Max(1f, botArrows);
+
+                float targetMul = 1f + SignedUnit(rng) * botTargetVar;
+                int targetEnd = Mathf.Max(0, Mathf.RoundToInt(pace * botArrows * (float)remainingDays * targetMul));
 
                 var bot = new TournamentBotData
                 {
                     Name = names[i],
                     Archetype = (int)archetype,
                     Seed = rng.Next(),
-                    JoinUtcTicks = botJoin.Ticks
+                    JoinUtcTicks = scheduleStart.Ticks
                 };
 
-                BuildSchedule(bot, archetype, config, tournamentStartUtc, tournamentEndUtc, botJoin, joinUtc, rng);
+                float timingSkew = SignedUnit(rng) * 0.2f; // ±20% timing aggression
+                float batchSizeSkew = SignedUnit(rng) * 0.25f; // ±25% batch size spread
+                BuildScheduleToTarget(
+                    bot,
+                    archetype,
+                    scheduleStart,
+                    tournamentEndUtc,
+                    targetEnd,
+                    botArrows,
+                    timingSkew,
+                    batchSizeSkew,
+                    rng);
                 bots.Add(bot);
             }
 
-            EnsureRewardedFloor(bots, joinUtc, rewardedPlaces, minRewardScore, rng);
             return bots;
         }
 
         public static int GetBotScoreAt(TournamentBotData bot, DateTime utcNow)
         {
-            if (bot?.Events == null) return 0;
+            if (bot?.Events == null || bot.Events.Count == 0)
+                return 0;
+
             long ticks = utcNow.Ticks;
+            var events = bot.Events;
+
+            // Time usually only moves forward — continue from the last cursor.
+            int startIndex = 0;
             int sum = 0;
-            for (int i = 0; i < bot.Events.Count; i++)
+            if (ticks < bot.ScoreCacheTicks)
             {
-                if (bot.Events[i].UtcTicks <= ticks)
-                    sum += bot.Events[i].Amount;
+                // Rare (debug rewind): recompute from scratch.
+                startIndex = 0;
+                sum = 0;
             }
+            else if (bot.ScoreCacheIndex >= 0 && bot.ScoreCacheIndex <= events.Count)
+            {
+                startIndex = bot.ScoreCacheIndex;
+                sum = bot.ScoreCacheValue;
+            }
+
+            int i = startIndex;
+            while (i < events.Count && events[i].UtcTicks <= ticks)
+            {
+                sum += events[i].Amount;
+                i++;
+            }
+
+            bot.ScoreCacheTicks = ticks;
+            bot.ScoreCacheValue = sum;
+            bot.ScoreCacheIndex = i;
             return sum;
         }
 
-        private static void EnsureRewardedFloor(
-            List<TournamentBotData> bots,
-            DateTime joinUtc,
-            int rewardedPlaces,
-            int minScore,
+        /// <summary>
+        /// Index 0..4 ≈ top-player band (10-12 levels/day). Mid pack ≈ avg. Tail is low.
+        /// Array is shuffled by caller so which named bot is #1 varies per tournament.
+        /// </summary>
+        private static float[] BuildDailyLevelPaces(
+            int count,
+            float topMin,
+            float topMax,
+            float avgLevels,
+            float tournamentIntensity,
             System.Random rng)
         {
-            var indices = new List<int>(bots.Count);
-            for (int i = 0; i < bots.Count; i++)
-                indices.Add(i);
-            for (int i = 0; i < rewardedPlaces && i < indices.Count; i++)
+            var paces = new float[count];
+            float topSpan = Mathf.Max(0.01f, topMax - topMin);
+
+            // Top 5: all in / near the top-player band (10-12 levels/day).
+            // #1 design target ≈ TopLevelsPerDayMin (e.g. 150 × 10 × remainingDays).
+            paces[0] = topMin + topSpan * (0.35f + (float)rng.NextDouble() * 0.65f); // ~10.7-12
+            paces[1] = topMin + topSpan * (0.20f + (float)rng.NextDouble() * 0.45f); // ~10.4-11.3
+            paces[2] = topMin + topSpan * (0.05f + (float)rng.NextDouble() * 0.35f); // ~10.1-10.7
+            paces[3] = topMin + topSpan * (0.00f + (float)rng.NextDouble() * 0.25f); // ~10.0-10.5
+            paces[4] = topMin * (0.90f + (float)rng.NextDouble() * 0.12f);           // ~9.0-10.2
+
+            // Mid pack (~avg 5 levels/day).
+            for (int i = TopCompetitiveCount; i < 15 && i < count; i++)
             {
-                int j = rng.Next(i, indices.Count);
-                (indices[i], indices[j]) = (indices[j], indices[i]);
+                float variance = 0.55f + (float)rng.NextDouble() * 0.90f; // 0.55x-1.45x avg
+                paces[i] = Mathf.Max(1.5f, avgLevels * variance);
             }
 
-            for (int i = 0; i < rewardedPlaces && i < bots.Count; i++)
+            // Lower pack / casuals / ghosts.
+            for (int i = 15; i < count; i++)
             {
-                var bot = bots[indices[i]];
-                int current = GetBotScoreAt(bot, joinUtc);
-                if (current >= minScore)
-                    continue;
+                paces[i] = 0.3f + (float)rng.NextDouble() * (avgLevels * 0.55f); // ~0.3-2.75
+            }
 
-                int needed = minScore + rng.Next(0, 25) - current;
-                bot.Events.Add(new TournamentScoreEvent
-                {
-                    UtcTicks = joinUtc.AddMinutes(-rng.Next(1, 12)).Ticks,
-                    Amount = Mathf.Max(1, needed)
-                });
-                bot.Events.Sort((a, b) => a.UtcTicks.CompareTo(b.UtcTicks));
+            // Apply tournament intensity, then keep top band roughly on design targets.
+            for (int i = 0; i < count; i++)
+                paces[i] *= tournamentIntensity;
+
+            return paces;
+        }
+
+        /// <summary>
+        /// After sorting high→low, push neighbors apart by at least <paramref name="minGapPercent"/>
+        /// so places don't clump into near-ties every round.
+        /// </summary>
+        private static void EnforceMinimumGaps(float[] paces, float minGapPercent)
+        {
+            if (paces == null || paces.Length < 2 || minGapPercent <= 0f)
+                return;
+
+            Array.Sort(paces, (a, b) => b.CompareTo(a));
+
+            for (int i = 1; i < paces.Length; i++)
+            {
+                float maxAllowed = paces[i - 1] * (1f - minGapPercent);
+                if (paces[i] > maxAllowed)
+                    paces[i] = Mathf.Max(0.05f, maxAllowed);
             }
         }
 
-        private static void BuildSchedule(
+        private static BotArchetype[] BuildShuffledArchetypes(int count, System.Random rng)
+        {
+            var archetypes = new BotArchetype[count];
+            var values = (BotArchetype[])Enum.GetValues(typeof(BotArchetype));
+            for (int i = 0; i < count; i++)
+                archetypes[i] = values[i % values.Length];
+
+            for (int i = archetypes.Length - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (archetypes[i], archetypes[j]) = (archetypes[j], archetypes[i]);
+            }
+
+            return archetypes;
+        }
+
+        private static void BuildScheduleToTarget(
             TournamentBotData bot,
             BotArchetype archetype,
-            TournamentConfigSO config,
-            DateTime tournamentStart,
-            DateTime tournamentEnd,
-            DateTime botJoin,
-            DateTime playerJoin,
+            DateTime from,
+            DateTime end,
+            int targetScore,
+            float arrowsPerLevel,
+            float timingSkew,
+            float batchSizeSkew,
             System.Random rng)
         {
-            AddPastBatches(bot, archetype, botJoin, playerJoin, rng);
-            AddFutureBatches(bot, archetype, config, playerJoin, tournamentEnd, rng);
+            bot.Events = new List<TournamentScoreEvent>();
+            if (targetScore <= 0 || end <= from)
+                return;
+
+            int perLevel = Mathf.Max(1, Mathf.RoundToInt(arrowsPerLevel));
+            int batchCount = Mathf.Max(1, Mathf.RoundToInt(targetScore / (float)perLevel));
+
+            // Session density varies: some bots fewer bigger sessions, others many small ones.
+            float density = 1f + SignedUnit(rng) * 0.35f;
+            batchCount = Mathf.RoundToInt(batchCount * density);
+            batchCount = Mathf.Clamp(batchCount, 1, 180);
+
+            int[] amounts = SplitScoreIntoBatches(targetScore, batchCount, perLevel, batchSizeSkew, rng);
+            double[] fracs = SampleTimeFractions(batchCount, archetype, timingSkew, rng);
+            Array.Sort(fracs);
+
+            double totalHours = Math.Max(0.1, (end - from).TotalHours);
+            for (int i = 0; i < batchCount; i++)
+            {
+                if (amounts[i] <= 0)
+                    continue;
+
+                // Keep events inside (from, end), slightly off the endpoints.
+                double frac = Mathf.Clamp01((float)fracs[i]);
+                double hours = frac * totalHours;
+                hours = Math.Max(0.02, Math.Min(totalHours - 0.02, hours));
+
+                bot.Events.Add(new TournamentScoreEvent
+                {
+                    UtcTicks = from.AddHours(hours).Ticks,
+                    Amount = amounts[i]
+                });
+            }
+
             bot.Events.Sort((a, b) => a.UtcTicks.CompareTo(b.UtcTicks));
         }
 
-        private static void AddPastBatches(
-            TournamentBotData bot,
-            BotArchetype archetype,
-            DateTime botJoin,
-            DateTime playerJoin,
+        private static int[] SplitScoreIntoBatches(
+            int targetScore,
+            int batchCount,
+            int perLevel,
+            float batchSizeSkew,
             System.Random rng)
         {
-            double minutes = Math.Max(1, (playerJoin - botJoin).TotalMinutes);
-            int bursts = archetype == BotArchetype.Ghost ? rng.Next(0, 2) : rng.Next(1, 4);
-            for (int i = 0; i < bursts; i++)
+            var amounts = new int[batchCount];
+            int remaining = targetScore;
+            float spread = Mathf.Clamp(0.2f + Mathf.Abs(batchSizeSkew), 0.1f, 0.45f);
+
+            for (int i = 0; i < batchCount; i++)
             {
-                double t = rng.NextDouble() * minutes;
-                int amount = PastAmount(archetype, rng);
-                if (amount <= 0) continue;
-                bot.Events.Add(new TournamentScoreEvent
+                int batchesLeft = batchCount - i;
+                if (batchesLeft == 1)
                 {
-                    UtcTicks = botJoin.AddMinutes(t).Ticks,
-                    Amount = amount
-                });
+                    amounts[i] = Mathf.Max(0, remaining);
+                    break;
+                }
+
+                int baseAmt = Mathf.Max(1, perLevel);
+                int minAmt = Mathf.Max(1, Mathf.RoundToInt(baseAmt * (1f - spread)));
+                int maxAmt = Mathf.Max(minAmt, Mathf.RoundToInt(baseAmt * (1f + spread)));
+                int ideal = remaining / batchesLeft;
+                int amount = Mathf.Clamp(ideal + rng.Next(-perLevel / 4, perLevel / 4 + 1), minAmt, maxAmt);
+                amount = Mathf.Min(amount, remaining - (batchesLeft - 1));
+                amount = Mathf.Max(1, amount);
+                amounts[i] = amount;
+                remaining -= amount;
             }
+
+            return amounts;
         }
 
-        private static void AddFutureBatches(
-            TournamentBotData bot,
+        private static double[] SampleTimeFractions(
+            int count,
             BotArchetype archetype,
-            TournamentConfigSO config,
-            DateTime from,
-            DateTime end,
+            float timingSkew,
             System.Random rng)
         {
-            double totalHours = Math.Max(0.25, (end - from).TotalHours);
-            BotArchetypeGainRule rule = config != null
-                ? config.GetBotGainRule(archetype)
-                : TournamentConfigSO.CreateDefaultRule(archetype);
+            var fracs = new double[count];
+            // Skew softens/hardens archetype bias per bot (−: steadier, +: more extreme).
+            float bias = Mathf.Clamp(1.7f + timingSkew, 1.15f, 2.4f);
+            float skipStart = Mathf.Clamp(0.35f + timingSkew * 0.15f, 0.15f, 0.55f);
 
-            switch (archetype)
+            for (int i = 0; i < count; i++)
             {
-                case BotArchetype.SteadyGrinder:
-                case BotArchetype.Casual:
-                case BotArchetype.Ghost:
-                    ScheduleUniform(bot, from, end,
-                        rule.IntervalHours + rng.NextDouble(),
-                        rule.AmountMin, rule.AmountMax, rng);
-                    break;
-
-                case BotArchetype.SleeperBurst:
-                case BotArchetype.FrontRunner:
-                case BotArchetype.ComebackKid:
+                double u = rng.NextDouble();
+                switch (archetype)
                 {
-                    float split = Mathf.Clamp01(rule.PhaseSplit);
-                    DateTime mid = from.AddHours(totalHours * split);
-                    ScheduleUniform(bot, from, mid, rule.IntervalHours, rule.AmountMin, rule.AmountMax, rng);
-                    ScheduleUniform(bot, mid, end, rule.Phase2IntervalHours, rule.Phase2AmountMin, rule.Phase2AmountMax, rng);
-                    break;
-                }
-
-                case BotArchetype.DaySkipper:
-                {
-                    double skip = Math.Min(24, totalHours * Mathf.Clamp01(rule.PhaseSplit > 0 ? rule.PhaseSplit : 0.4f));
-                    DateTime resume = from.AddHours(skip);
-                    if (resume < end)
-                        ScheduleUniform(bot, resume, end, rule.IntervalHours, rule.AmountMin, rule.AmountMax, rng);
-                    break;
-                }
-
-                case BotArchetype.Spiky:
-                {
-                    int spikes = 3 + rng.Next(5);
-                    for (int i = 0; i < spikes; i++)
+                    case BotArchetype.FrontRunner:
+                        fracs[i] = Math.Pow(u, bias);
+                        break;
+                    case BotArchetype.ComebackKid:
+                        fracs[i] = 1.0 - Math.Pow(1.0 - u, bias);
+                        break;
+                    case BotArchetype.SleeperBurst:
                     {
-                        double h = rng.NextDouble() * totalHours;
-                        int amount = rule.AmountMax <= rule.AmountMin
-                            ? rule.AmountMin
-                            : rng.Next(rule.AmountMin, rule.AmountMax + 1);
-                        if (amount <= 0) continue;
-                        bot.Events.Add(new TournamentScoreEvent
-                        {
-                            UtcTicks = from.AddHours(h).Ticks,
-                            Amount = amount
-                        });
+                        float quietShare = Mathf.Clamp(0.25f + timingSkew * 0.1f, 0.1f, 0.4f);
+                        fracs[i] = u < quietShare
+                            ? u * 0.45
+                            : 0.45 + (u - quietShare) / (1.0 - quietShare) * 0.55;
+                        break;
                     }
-                    break;
-                }
-            }
-        }
-
-        private static void ScheduleUniform(
-            TournamentBotData bot,
-            DateTime from,
-            DateTime end,
-            double intervalHours,
-            int amountMin,
-            int amountMax,
-            System.Random rng)
-        {
-            if (end <= from || intervalHours <= 0.05)
-                return;
-
-            DateTime t = from.AddHours(rng.NextDouble() * Math.Min(intervalHours, 2));
-            while (t < end)
-            {
-                int amount = amountMax <= amountMin ? amountMin : rng.Next(amountMin, amountMax + 1);
-                if (amount > 0)
-                {
-                    bot.Events.Add(new TournamentScoreEvent
+                    case BotArchetype.DaySkipper:
+                        fracs[i] = skipStart + u * (1.0 - skipStart);
+                        break;
+                    case BotArchetype.Spiky:
                     {
-                        UtcTicks = t.Ticks,
-                        Amount = amount
-                    });
+                        int clusters = 3 + rng.Next(0, 3); // 3-5 burst windows, varies per bot/round
+                        int cluster = rng.Next(0, clusters);
+                        fracs[i] = (cluster + rng.NextDouble()) / clusters;
+                        break;
+                    }
+                    case BotArchetype.Ghost:
+                    case BotArchetype.Casual:
+                        fracs[i] = Math.Pow(u, 0.85 + timingSkew * 0.2);
+                        break;
+                    default:
+                        // Steady grinders: mild drift so they aren't perfectly even.
+                        fracs[i] = Mathf.Clamp01((float)(u + SignedUnit(rng) * 0.08f * (1f + Mathf.Abs(timingSkew))));
+                        break;
                 }
-                t = t.AddHours(intervalHours * (0.75 + rng.NextDouble() * 0.5));
             }
+
+            return fracs;
         }
 
-        private static int PastAmount(BotArchetype archetype, System.Random rng)
+        private static float SignedUnit(System.Random rng)
         {
-            switch (archetype)
+            return (float)(rng.NextDouble() * 2.0 - 1.0);
+        }
+
+        private static void Shuffle(float[] values, System.Random rng)
+        {
+            for (int i = values.Length - 1; i > 0; i--)
             {
-                case BotArchetype.Ghost: return rng.Next(0, 4);
-                case BotArchetype.Casual: return rng.Next(2, 12);
-                case BotArchetype.FrontRunner: return rng.Next(10, 28);
-                default: return rng.Next(3, 18);
+                int j = rng.Next(i + 1);
+                (values[i], values[j]) = (values[j], values[i]);
             }
         }
     }
