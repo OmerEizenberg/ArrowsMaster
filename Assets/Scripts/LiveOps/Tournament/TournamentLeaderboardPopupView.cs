@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -76,13 +77,23 @@ namespace Assets.Scripts.LiveOps.Tournament
         private TournamentLiveOpService service;
         private float nextRefresh;
         private readonly List<TournamentLeaderboardRowView> m_Rows = new List<TournamentLeaderboardRowView>(ExpectedRows);
+        private readonly List<TournamentLeaderboardRow> m_LeaderboardData = new List<TournamentLeaderboardRow>(ExpectedRows);
+        private readonly List<TournamentLeaderboardRowView> m_OrderedRows = new List<TournamentLeaderboardRowView>(ExpectedRows);
+        private readonly Dictionary<TournamentLeaderboardRowView, Vector2> m_StartPositions =
+            new Dictionary<TournamentLeaderboardRowView, Vector2>(ExpectedRows);
+        private readonly Dictionary<TournamentLeaderboardRowView, Vector2> m_EndPositions =
+            new Dictionary<TournamentLeaderboardRowView, Vector2>(ExpectedRows);
         private bool m_RowsBuilt;
         private bool m_DidFocusPlayer;
         private RectTransform m_PopupRect;
         private Coroutine m_IntroCoroutine;
         private bool m_IntroPlaying;
+        private bool m_RowsDirty = true;
         private string m_SelectedTagline;
         private string m_LastTimerText;
+        private int m_LastBoardPlayerScore = int.MinValue;
+        private long m_LastBoardSecond = -1;
+        private float m_LastFollowContentY = float.NaN;
 
         private const float MaxRowsPerSecond = 8f;
         private const float MinIntroDuration = 0.4f;
@@ -128,8 +139,8 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             if (service != null)
             {
-                service.OnStateChanged -= RefreshRows;
-                service.OnStateChanged += RefreshRows;
+                service.OnStateChanged -= OnServiceStateChanged;
+                service.OnStateChanged += OnServiceStateChanged;
             }
 
             EnsureRowsBuilt();
@@ -137,16 +148,24 @@ namespace Assets.Scripts.LiveOps.Tournament
             RefreshTimer();
 
             m_DidFocusPlayer = false;
+            m_RowsDirty = true;
             if (m_IntroCoroutine != null)
                 StopCoroutine(m_IntroCoroutine);
 
             m_IntroCoroutine = StartCoroutine(PlayIntroThenFocus());
         }
 
+        private void OnServiceStateChanged()
+        {
+            m_RowsDirty = true;
+            if (!m_IntroPlaying)
+                RefreshRows();
+        }
+
         private void OnDestroy()
         {
             if (service != null)
-                service.OnStateChanged -= RefreshRows;
+                service.OnStateChanged -= OnServiceStateChanged;
 
             if (m_NameEdit != null)
             {
@@ -163,7 +182,7 @@ namespace Assets.Scripts.LiveOps.Tournament
         {
             if (service == null || Time.time < nextRefresh) return;
             nextRefresh = Time.time + 2f;
-            service.TickFinalize();
+            // Finalize is owned by LiveOpManager.
             if (service.Status == TournamentStatus.Finished || service.Status == TournamentStatus.PendingJoin)
             {
                 Close();
@@ -371,7 +390,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private void PickTagline()
         {
-            m_SelectedTagline = TimerTaglines[Random.Range(0, TimerTaglines.Length)];
+            m_SelectedTagline = TimerTaglines[UnityEngine.Random.Range(0, TimerTaglines.Length)];
         }
 
         private void RefreshTimer()
@@ -450,8 +469,22 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (service == null || m_RowsParent == null || m_IntroPlaying) return;
             EnsureRowsBuilt();
 
-            List<TournamentLeaderboardRow> data = service.BuildLeaderboardRows(TrustedTimeService.UtcNow);
-            ApplyRowData(data);
+            DateTime now = TrustedTimeService.UtcNow;
+            long second = now.Ticks / TimeSpan.TicksPerSecond;
+            int playerScore = service.Progress != null ? service.Progress.PlayerScore : 0;
+            if (!m_RowsDirty &&
+                second == m_LastBoardSecond &&
+                playerScore == m_LastBoardPlayerScore)
+            {
+                return;
+            }
+
+            m_RowsDirty = false;
+            m_LastBoardSecond = second;
+            m_LastBoardPlayerScore = playerScore;
+
+            service.FillLeaderboardRows(now, m_LeaderboardData);
+            ApplyRowData(m_LeaderboardData);
 
             if (!m_DidFocusPlayer)
             {
@@ -473,9 +506,9 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (m_ScrollRect != null && m_ScrollRect.content != null)
                 LayoutRebuilder.ForceRebuildLayoutImmediate(m_ScrollRect.content);
 
-            List<TournamentLeaderboardRow> data = service != null
-                ? service.BuildLeaderboardRows(TrustedTimeService.UtcNow)
-                : null;
+            List<TournamentLeaderboardRow> data = m_LeaderboardData;
+            if (service != null)
+                service.FillLeaderboardRows(TrustedTimeService.UtcNow, data);
 
             if (data == null || data.Count == 0 || service == null)
             {
@@ -585,17 +618,17 @@ namespace Assets.Scripts.LiveOps.Tournament
             // Capture final (current) positions while layout is on.
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(m_RowsParent as RectTransform);
-            var endPositions = CaptureRowPositions();
+            CaptureRowPositions(m_EndPositions);
 
             // Build start sibling order: player appears at last shown place.
-            var ordered = new List<TournamentLeaderboardRowView>(m_Rows.Count);
+            m_OrderedRows.Clear();
             for (int i = 0; i < m_Rows.Count; i++)
             {
                 if (m_Rows[i] != null && m_Rows[i].gameObject.activeSelf)
-                    ordered.Add(m_Rows[i]);
+                    m_OrderedRows.Add(m_Rows[i]);
             }
 
-            if (toIndex < 0 || toIndex >= ordered.Count)
+            if (toIndex < 0 || toIndex >= m_OrderedRows.Count)
             {
                 if (animateScore)
                     yield return AnimateScore(playerRow, fromScore, toScore, ScoreOnlyDuration);
@@ -603,24 +636,24 @@ namespace Assets.Scripts.LiveOps.Tournament
                 yield break;
             }
 
-            fromIndex = Mathf.Clamp(fromIndex, 0, ordered.Count - 1);
+            fromIndex = Mathf.Clamp(fromIndex, 0, m_OrderedRows.Count - 1);
             int rowsMoved = Mathf.Abs(toIndex - fromIndex);
             float duration = Mathf.Max(MinIntroDuration, rowsMoved / MaxRowsPerSecond);
 
-            var moving = ordered[toIndex];
-            ordered.RemoveAt(toIndex);
-            ordered.Insert(fromIndex, moving);
+            var moving = m_OrderedRows[toIndex];
+            m_OrderedRows.RemoveAt(toIndex);
+            m_OrderedRows.Insert(fromIndex, moving);
 
-            for (int i = 0; i < ordered.Count; i++)
-                ordered[i].transform.SetSiblingIndex(i);
+            for (int i = 0; i < m_OrderedRows.Count; i++)
+                m_OrderedRows[i].transform.SetSiblingIndex(i);
 
-            for (int i = 0; i < ordered.Count; i++)
-                ordered[i].SetPlaceDisplay(i + 1);
+            for (int i = 0; i < m_OrderedRows.Count; i++)
+                m_OrderedRows[i].SetPlaceDisplay(i + 1);
             playerRow.SetScoreDisplay(fromScore);
 
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(m_RowsParent as RectTransform);
-            var startPositions = CaptureRowPositions();
+            CaptureRowPositions(m_StartPositions);
 
             // Restore final sibling order, then free-move from start → end.
             for (int i = 0; i < m_Rows.Count; i++)
@@ -632,8 +665,8 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (layout != null)
                 layout.enabled = false;
 
-            ApplyCapturedPositions(startPositions);
-            // Draw player above every other row for the whole travel.
+            ApplyCapturedPositions(m_StartPositions);
+            // Draw player above every other row for the whole travel (once — not per frame).
             if (playerRow != null)
                 playerRow.transform.SetAsLastSibling();
 
@@ -642,6 +675,7 @@ namespace Assets.Scripts.LiveOps.Tournament
             float contentHeight = contentRt != null ? contentRt.rect.height : 0f;
             float viewportHeight = viewportRt != null ? viewportRt.rect.height : 0f;
             float maxScrollY = Mathf.Max(0f, contentHeight - viewportHeight);
+            m_LastFollowContentY = float.NaN;
 
             bool scrollWasEnabled = m_ScrollRect != null && m_ScrollRect.enabled;
             if (m_ScrollRect != null)
@@ -663,16 +697,12 @@ namespace Assets.Scripts.LiveOps.Tournament
                 {
                     var row = m_Rows[i];
                     if (row == null || !row.gameObject.activeSelf) continue;
-                    if (!startPositions.TryGetValue(row, out var start)) continue;
-                    if (!endPositions.TryGetValue(row, out var end)) continue;
+                    if (!m_StartPositions.TryGetValue(row, out var start)) continue;
+                    if (!m_EndPositions.TryGetValue(row, out var end)) continue;
                     var rt = row.transform as RectTransform;
                     if (rt != null)
                         rt.anchoredPosition = Vector2.LerpUnclamped(start, end, eased);
                 }
-
-                // Keep player on top of the draw stack if anything reorders mid-frame.
-                if (playerRow != null)
-                    playerRow.transform.SetAsLastSibling();
 
                 if (playerRow != null)
                 {
@@ -691,12 +721,11 @@ namespace Assets.Scripts.LiveOps.Tournament
                     playerRow.SetPlaceDisplay(place);
                 }
 
-                // Sticky middle: Content.y follows only while the player can stay centered.
                 ScrollContentToFollowPlayer(playerRow, contentRt, maxScrollY, viewportHeight);
                 yield return null;
             }
 
-            ApplyCapturedPositions(endPositions);
+            ApplyCapturedPositions(m_EndPositions);
             ScrollContentToFollowPlayer(playerRow, contentRt, maxScrollY, viewportHeight);
 
             // Restore place order before layout turns back on.
@@ -711,16 +740,15 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             if (m_ScrollRect != null)
             {
-                // Sync ScrollRect's internal normalized value to the Content.y we drove,
-                // then re-enable so it doesn't snap back.
                 SyncScrollRectFromContentY(contentRt, maxScrollY);
                 m_ScrollRect.enabled = scrollWasEnabled;
             }
 
-            // Snap all row copy back to authoritative final leaderboard data.
-            // Do not refocus/scroll here — that caused a visible jump after the anim.
             if (service != null)
-                ApplyRowData(service.BuildLeaderboardRows(TrustedTimeService.UtcNow));
+            {
+                service.FillLeaderboardRows(TrustedTimeService.UtcNow, m_LeaderboardData);
+                ApplyRowData(m_LeaderboardData);
+            }
         }
 
         private IEnumerator AnimateScore(
@@ -749,9 +777,9 @@ namespace Assets.Scripts.LiveOps.Tournament
             playerRow.SetScoreDisplay(toScore);
         }
 
-        private Dictionary<TournamentLeaderboardRowView, Vector2> CaptureRowPositions()
+        private void CaptureRowPositions(Dictionary<TournamentLeaderboardRowView, Vector2> map)
         {
-            var map = new Dictionary<TournamentLeaderboardRowView, Vector2>(m_Rows.Count);
+            map.Clear();
             for (int i = 0; i < m_Rows.Count; i++)
             {
                 var row = m_Rows[i];
@@ -760,7 +788,6 @@ namespace Assets.Scripts.LiveOps.Tournament
                 if (rt != null)
                     map[row] = rt.anchoredPosition;
             }
-            return map;
         }
 
         private static void ApplyCapturedPositions(Dictionary<TournamentLeaderboardRowView, Vector2> positions)
@@ -855,7 +882,7 @@ namespace Assets.Scripts.LiveOps.Tournament
         /// middle of the viewport when possible. Near the top/bottom of the list the content
         /// clamps and the row continues alone (sticky middle follow).
         /// </summary>
-        private static void ScrollContentToFollowPlayer(
+        private void ScrollContentToFollowPlayer(
             TournamentLeaderboardRowView rowView,
             RectTransform content,
             float maxScrollY,
@@ -876,10 +903,13 @@ namespace Assets.Scripts.LiveOps.Tournament
             // Clamp: stay at top until the row reaches mid, then follow, then pin at bottom.
             float desiredY = rowCenterFromTop - viewportHeight * 0.5f;
             float targetY = Mathf.Clamp(desiredY, 0f, maxScrollY);
+            if (!float.IsNaN(m_LastFollowContentY) && Mathf.Abs(m_LastFollowContentY - targetY) < 0.05f)
+                return;
 
             Vector2 pos = content.anchoredPosition;
             pos.y = targetY;
             content.anchoredPosition = pos;
+            m_LastFollowContentY = targetY;
         }
 
         private void SyncScrollRectFromContentY(RectTransform content, float maxScrollY)

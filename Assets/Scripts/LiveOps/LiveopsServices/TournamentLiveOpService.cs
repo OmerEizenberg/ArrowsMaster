@@ -19,6 +19,15 @@ namespace Assets.Scripts.LiveOps
         public TournamentProgressData Progress { get; private set; }
         public TournamentSchedule.Window CurrentWindow { get; private set; }
 
+        private readonly List<TournamentLeaderboardRow> m_RowBuffer = new List<TournamentLeaderboardRow>(25);
+        private bool m_ProgressDirty;
+        private int m_CachedPlace = -1;
+        private long m_CachedPlaceSecond = -1;
+        private int m_CachedPlacePlayerScore = int.MinValue;
+
+        private static string LastShownPlacePrefsKey(string uniqueId) => $"Tournament_LastShownPlace_{uniqueId}";
+        private static string LastShownScorePrefsKey(string uniqueId) => $"Tournament_LastShownScore_{uniqueId}";
+
         public override void OnActivate()
         {
             Config = Resources.Load<TournamentConfigSO>(ConfigResourcePath);
@@ -34,12 +43,34 @@ namespace Assets.Scripts.LiveOps
                 SaveState();
                 Debug.Log($"[TournamentLiveOpService] New tournament instance {UniqueID}");
             }
-            else if (Progress.Status == TournamentStatus.Joined && TrustedTimeService.UtcNow >= CurrentWindow.EndUtc)
+            else
             {
-                FinalizeIfNeeded();
+                OverlayLastShownFromPrefs();
+                if (Progress.Status == TournamentStatus.Joined && TrustedTimeService.UtcNow >= CurrentWindow.EndUtc)
+                    FinalizeIfNeeded();
+
+                TryRecoverClaimedFinishToPendingJoin();
             }
 
             NotifyStateChanged();
+        }
+
+        /// <summary>
+        /// Force-finish + claim (same UniqueId) used to stamp Finished onto a fresh PendingJoin,
+        /// which hid the lobby badge until the next window. Reopen join when safe.
+        /// </summary>
+        private bool TryRecoverClaimedFinishToPendingJoin()
+        {
+            if (Progress == null) return false;
+            if (Progress.Status != TournamentStatus.Finished) return false;
+            // Still have an unclaimed results popup — keep Finished until they claim.
+            if (HasPendingResults()) return false;
+            if (TrustedTimeService.UtcNow >= CurrentWindow.EndUtc) return false;
+
+            Progress = CreateFreshProgress();
+            SaveState();
+            Debug.Log($"[TournamentLiveOpService] Reopened PendingJoin after finished window state for {UniqueID}");
+            return true;
         }
 
         public override void OnDeactivate()
@@ -225,23 +256,31 @@ namespace Assets.Scripts.LiveOps
             if (Progress == null || Progress.Status == TournamentStatus.PendingJoin)
                 return 25;
 
-            // Rank-only path: avoid allocating/sorting a full leaderboard for badge ticks.
             DateTime now = TrustedTimeService.UtcNow;
+            long second = now.Ticks / TimeSpan.TicksPerSecond;
             int playerScore = Progress.PlayerScore;
-            int betterOrEqualBots = 0;
+            if (m_CachedPlace > 0 &&
+                second == m_CachedPlaceSecond &&
+                playerScore == m_CachedPlacePlayerScore)
+            {
+                return m_CachedPlace;
+            }
 
+            int betterBots = 0;
             if (Progress.Bots != null)
             {
                 for (int i = 0; i < Progress.Bots.Count; i++)
                 {
                     int botScore = TournamentBotSimulator.GetBotScoreAt(Progress.Bots[i], now);
-                    // Player wins ties, so only strictly higher bot scores push the player down.
                     if (botScore > playerScore)
-                        betterOrEqualBots++;
+                        betterBots++;
                 }
             }
 
-            return betterOrEqualBots + 1;
+            m_CachedPlace = betterBots + 1;
+            m_CachedPlaceSecond = second;
+            m_CachedPlacePlayerScore = playerScore;
+            return m_CachedPlace;
         }
 
         public bool TryJoin()
@@ -260,6 +299,8 @@ namespace Assets.Scripts.LiveOps
             Progress.PlayerScore = 0;
             Progress.LastShownPlace = -1;
             Progress.LastShownScore = -1;
+            PlayerPrefs.DeleteKey(LastShownPlacePrefsKey(UniqueID));
+            PlayerPrefs.DeleteKey(LastShownScorePrefsKey(UniqueID));
             Progress.PlayerName = GetOrCreatePlayerDisplayName();
             Progress.Bots = TournamentBotSimulator.CreateBotsOnJoin(
                 Config,
@@ -288,7 +329,7 @@ namespace Assets.Scripts.LiveOps
             }
 
             Progress.PlayerScore += amount;
-            SaveState();
+            MarkProgressDirty();
             NotifyStateChanged();
         }
 
@@ -309,14 +350,23 @@ namespace Assets.Scripts.LiveOps
             if (place < 1) return;
             Progress.LastShownPlace = place;
             Progress.LastShownScore = Mathf.Max(0, score);
-            SaveState();
+            // Cheap prefs write instead of serializing the full bot schedule JSON.
+            PlayerPrefs.SetInt(LastShownPlacePrefsKey(UniqueID), place);
+            PlayerPrefs.SetInt(LastShownScorePrefsKey(UniqueID), Progress.LastShownScore);
+            PlayerPrefs.Save();
+            MarkProgressDirty();
         }
 
-        public List<TournamentLeaderboardRow> BuildLeaderboardRows(DateTime utcNow)
+        /// <summary>
+        /// Fills <paramref name="rows"/> without allocating a new list.
+        /// Caller owns the list; do not retain the service internal buffer across frames.
+        /// </summary>
+        public void FillLeaderboardRows(DateTime utcNow, List<TournamentLeaderboardRow> rows)
         {
-            var rows = new List<TournamentLeaderboardRow>(25);
+            if (rows == null) return;
+            rows.Clear();
             if (Progress == null)
-                return rows;
+                return;
 
             if (Progress.Status == TournamentStatus.PendingJoin)
             {
@@ -327,7 +377,7 @@ namespace Assets.Scripts.LiveOps
                     IsPlayer = true,
                     Place = 25
                 });
-                return rows;
+                return;
             }
 
             rows.Add(new TournamentLeaderboardRow
@@ -351,20 +401,29 @@ namespace Assets.Scripts.LiveOps
                 }
             }
 
-            rows.Sort((a, b) =>
-            {
-                int cmp = b.Score.CompareTo(a.Score);
-                if (cmp != 0) return cmp;
-                // Player wins ties for friendlier ranking.
-                if (a.IsPlayer != b.IsPlayer)
-                    return a.IsPlayer ? -1 : 1;
-                return string.CompareOrdinal(a.Name, b.Name);
-            });
+            rows.Sort(CompareLeaderboardRows);
 
             for (int i = 0; i < rows.Count; i++)
-                rows[i].Place = i + 1;
+            {
+                var row = rows[i];
+                row.Place = i + 1;
+                rows[i] = row;
+            }
+        }
 
-            return rows;
+        public List<TournamentLeaderboardRow> BuildLeaderboardRows(DateTime utcNow)
+        {
+            FillLeaderboardRows(utcNow, m_RowBuffer);
+            return m_RowBuffer;
+        }
+
+        private static int CompareLeaderboardRows(TournamentLeaderboardRow a, TournamentLeaderboardRow b)
+        {
+            int cmp = b.Score.CompareTo(a.Score);
+            if (cmp != 0) return cmp;
+            if (a.IsPlayer != b.IsPlayer)
+                return a.IsPlayer ? -1 : 1;
+            return string.CompareOrdinal(a.Name, b.Name);
         }
 
         public string GetRewardKeyForPlace(int zeroBasedPlace)
@@ -386,22 +445,42 @@ namespace Assets.Scripts.LiveOps
 
             ClearPendingResults();
 
-            // Mark claimed on live progress if it still matches.
+            // Mark claimed on live progress if it still matches this tournament instance.
+            // Do NOT overwrite a fresh PendingJoin (e.g. force-finish reopened same UniqueId,
+            // or the next window already activated) — that permanently hides the lobby badge.
             if (Progress != null && Progress.UniqueId == pending.UniqueId)
             {
-                Progress.ResultsClaimed = true;
-                Progress.Status = TournamentStatus.Finished;
-                SaveState();
+                if (Progress.Status == TournamentStatus.Joined ||
+                    Progress.Status == TournamentStatus.Finished)
+                {
+                    Progress.ResultsClaimed = true;
+                    Progress.Status = TournamentStatus.Finished;
+                    SaveState();
+                }
             }
 
             NotifyStateChanged();
             return true;
         }
 
+        /// <summary>QA: reset current window to PendingJoin and refresh the lobby badge.</summary>
+        public void DebugResetToPendingJoin()
+        {
+            CurrentWindow = TournamentSchedule.GetCurrentWindow(TrustedTimeService.UtcNow);
+            Progress = CreateFreshProgress();
+            SaveState();
+            NotifyStateChanged();
+            LiveOpManager.Instance?.SyncLobbyIcons();
+            Debug.Log($"[TournamentLiveOpService] Reset to PendingJoin for {UniqueID}");
+        }
+
         public void TickFinalize()
         {
             var before = Progress?.Status;
             FinalizeIfNeeded();
+            if (TryRecoverClaimedFinishToPendingJoin())
+                NotifyStateChanged();
+            FlushProgressIfDirty();
             if (before == TournamentStatus.Joined &&
                 Progress != null &&
                 Progress.Status == TournamentStatus.Finished &&
@@ -464,7 +543,7 @@ namespace Assets.Scripts.LiveOps
                 return progress;
 
             DateTime endUtc = new DateTime(progress.EndUtcTicks, DateTimeKind.Utc);
-            var serviceRows = new List<TournamentLeaderboardRow>();
+            var serviceRows = new List<TournamentLeaderboardRow>(25);
             serviceRows.Add(new TournamentLeaderboardRow
             {
                 Name = progress.PlayerName,
@@ -484,14 +563,7 @@ namespace Assets.Scripts.LiveOps
                 }
             }
 
-            serviceRows.Sort((a, b) =>
-            {
-                int cmp = b.Score.CompareTo(a.Score);
-                if (cmp != 0) return cmp;
-                if (a.IsPlayer != b.IsPlayer)
-                    return a.IsPlayer ? -1 : 1;
-                return string.CompareOrdinal(a.Name, b.Name);
-            });
+            serviceRows.Sort(CompareLeaderboardRows);
 
             int place = 25;
             for (int i = 0; i < serviceRows.Count; i++)
@@ -585,9 +657,45 @@ namespace Assets.Scripts.LiveOps
         {
             if (Progress == null) return;
             SaveProgress(JsonUtility.ToJson(Progress));
+            m_ProgressDirty = false;
         }
 
-        private void NotifyStateChanged() => OnStateChanged?.Invoke();
+        private void MarkProgressDirty() => m_ProgressDirty = true;
+
+        private void FlushProgressIfDirty()
+        {
+            if (m_ProgressDirty)
+                SaveState();
+        }
+
+        private void InvalidatePlaceCache()
+        {
+            m_CachedPlace = -1;
+            m_CachedPlaceSecond = -1;
+            m_CachedPlacePlayerScore = int.MinValue;
+        }
+
+        private void OverlayLastShownFromPrefs()
+        {
+            if (Progress == null || string.IsNullOrEmpty(UniqueID)) return;
+            string placeKey = LastShownPlacePrefsKey(UniqueID);
+            if (!PlayerPrefs.HasKey(placeKey)) return;
+            int place = PlayerPrefs.GetInt(placeKey, -1);
+            int score = PlayerPrefs.GetInt(LastShownScorePrefsKey(UniqueID), -1);
+            if (place < 1) return;
+            // Prefs are authoritative for UI-shown state if newer than disk progress defaults.
+            if (place != Progress.LastShownPlace || score != Progress.LastShownScore)
+            {
+                Progress.LastShownPlace = place;
+                Progress.LastShownScore = Mathf.Max(0, score);
+            }
+        }
+
+        private void NotifyStateChanged()
+        {
+            InvalidatePlaceCache();
+            OnStateChanged?.Invoke();
+        }
 
         private static TournamentProgressData Deserialize(string json)
         {
@@ -618,7 +726,7 @@ namespace Assets.Scripts.LiveOps
     }
 
     [Serializable]
-    public class TournamentLeaderboardRow
+    public struct TournamentLeaderboardRow
     {
         public string Name;
         public int Score;

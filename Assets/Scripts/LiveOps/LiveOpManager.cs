@@ -142,7 +142,8 @@ namespace Assets.Scripts.LiveOps
                     }
                     else if (isTournament)
                     {
-                        (activeServices[so.EventID] as TournamentLiveOpService)?.TickFinalize();
+                        var tournament = activeServices[so.EventID] as TournamentLiveOpService;
+                        tournament?.TickFinalize();
                     }
                 }
                 else
@@ -256,7 +257,18 @@ namespace Assets.Scripts.LiveOps
         public void InstantiateIcon(ALiveOpService service)
         {
             if (service == null || service.SO == null) return;
-            if (service.IconInstance != null) return;
+
+            // Unity fake-null: destroyed lobby icons must be cleared so we can recreate.
+            if (service.IconInstance == null)
+                service.IconInstance = null;
+            else
+            {
+                // Lobby already has this icon — re-bind so badge state refreshes on home enter.
+                if (!service.IconInstance.activeSelf)
+                    service.IconInstance.SetActive(true);
+                BindIconView(service, service.IconInstance);
+                return;
+            }
 
             HomeContoller lobby = FindFirstObjectByType<HomeContoller>();
             if (lobby == null || !lobby.gameObject.activeInHierarchy) return;
@@ -303,6 +315,8 @@ namespace Assets.Scripts.LiveOps
                 if (IsIconBoundToAnotherService(child.gameObject, service)) continue;
 
                 service.IconInstance = child.gameObject;
+                if (!child.gameObject.activeSelf)
+                    child.gameObject.SetActive(true);
                 BindIconView(service, child.gameObject);
                 return true;
             }

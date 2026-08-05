@@ -338,6 +338,31 @@ namespace Assets.Scripts.Core
             Debug.Log("[CHEAT] Cleared trusted-time debug offset.");
         }
 
+        [ContextMenu("Cheat: Tournament Reset To Pending Join")]
+        public void CheatTournamentResetToPendingJoin()
+        {
+            var service = LiveOpManager.Instance?
+                .GetActiveService(TournamentLiveOpService.EventId)
+                as TournamentLiveOpService;
+            if (service == null)
+            {
+                LiveOpManager.Instance?.CheckLiveOps();
+                service = LiveOpManager.Instance?
+                    .GetActiveService(TournamentLiveOpService.EventId)
+                    as TournamentLiveOpService;
+            }
+
+            if (service == null)
+            {
+                Debug.LogWarning("[CHEAT] Tournament service not active.");
+                return;
+            }
+
+            service.DebugResetToPendingJoin();
+            LiveOpManager.Instance?.SyncLobbyIcons();
+            Debug.Log("[CHEAT] Tournament reset to PendingJoin — badge should show in lobby.");
+        }
+
         private void CheatTournamentAdvance(TimeSpan delta)
         {
             var service = LiveOpManager.Instance?

@@ -32,11 +32,21 @@ namespace Assets.Scripts.LiveOps.Tournament
         private bool resolved;
         private string m_LastPlaceText;
         private string m_LastTimerText;
+        private int m_LastPlace = int.MinValue;
+        private float m_LastAlpha = -1f;
+        private int m_LastOnlineVisible = -1;
+        private CanvasGroup m_CanvasGroup;
 
         public void Initialize(TournamentLiveOpService tournamentService)
         {
             service = tournamentService;
             ResolveRefs();
+            // Reset UI caches so re-bind after lobby sync can't leave the badge stuck invisible.
+            m_LastPlace = int.MinValue;
+            m_LastPlaceText = null;
+            m_LastTimerText = null;
+            m_LastAlpha = -1f;
+            m_LastOnlineVisible = -1;
 
             if (m_Button != null)
             {
@@ -71,7 +81,6 @@ namespace Assets.Scripts.LiveOps.Tournament
         {
             if (service == null || Time.time < nextRefresh) return;
             nextRefresh = Time.time + 1f;
-            service.TickFinalize();
             Refresh();
         }
 
@@ -85,6 +94,7 @@ namespace Assets.Scripts.LiveOps.Tournament
             bool eligible = service.IsBadgeEligible();
             if (!eligible)
             {
+                ApplyOnlineVisibility(false);
                 if (gameObject.activeSelf)
                     gameObject.SetActive(false);
                 return;
@@ -97,15 +107,21 @@ namespace Assets.Scripts.LiveOps.Tournament
             ApplyOnlineVisibility(show);
             if (!show) return;
 
-            isLocked = !service.IsUnlocked();
-            if (m_LockIcon != null)
-                m_LockIcon.SetActive(isLocked);
-
-            string place = $"#{service.GetDisplayPlace()}";
-            if (!string.Equals(m_LastPlaceText, place, StringComparison.Ordinal))
+            bool locked = !service.IsUnlocked();
+            if (locked != isLocked)
             {
-                m_LastPlaceText = place;
-                SetPlaceTexts(place);
+                isLocked = locked;
+                if (m_LockIcon != null)
+                    m_LockIcon.SetActive(isLocked);
+            }
+
+            int place = service.GetDisplayPlace();
+            if (place != m_LastPlace)
+            {
+                m_LastPlace = place;
+                string placeText = "#" + place.ToString();
+                m_LastPlaceText = placeText;
+                SetPlaceTexts(placeText);
             }
 
             string timeStr = FormatRemaining(service.GetRemainingTime());
@@ -116,18 +132,31 @@ namespace Assets.Scripts.LiveOps.Tournament
             }
 
             float alpha = isLocked ? 0.5f : 1f;
-            ApplyAlpha(alpha);
+            if (!Mathf.Approximately(alpha, m_LastAlpha))
+            {
+                m_LastAlpha = alpha;
+                ApplyAlpha(alpha);
+            }
         }
 
         private void ApplyOnlineVisibility(bool visible)
         {
-            var cg = GetComponent<CanvasGroup>();
-            if (cg == null)
-                cg = gameObject.AddComponent<CanvasGroup>();
+            int flag = visible ? 1 : 0;
+            if (m_CanvasGroup == null)
+            {
+                m_CanvasGroup = GetComponent<CanvasGroup>();
+                if (m_CanvasGroup == null)
+                    m_CanvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
 
-            cg.alpha = visible ? 1f : 0f;
-            cg.interactable = visible;
-            cg.blocksRaycasts = visible;
+            // Always force alpha when becoming visible so a stale CanvasGroup(0) can't stick.
+            if (flag == m_LastOnlineVisible && !(visible && m_CanvasGroup.alpha < 0.99f))
+                return;
+            m_LastOnlineVisible = flag;
+
+            m_CanvasGroup.alpha = visible ? 1f : 0f;
+            m_CanvasGroup.interactable = visible;
+            m_CanvasGroup.blocksRaycasts = visible;
         }
 
         private void OnClicked()

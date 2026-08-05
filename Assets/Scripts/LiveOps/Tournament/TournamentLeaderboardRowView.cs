@@ -109,7 +109,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             if (m_LastPlace != row.Place)
             {
-                SetPairedText(m_PlaceText, m_PlaceTextBg, $"#{row.Place}");
+                SetPairedText(m_PlaceText, m_PlaceTextBg, "#" + row.Place.ToString());
                 m_LastPlace = row.Place;
             }
 
@@ -186,14 +186,15 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         public void SetPlaceDisplay(int place)
         {
-            if (place < 1) return;
-            SetPairedText(m_PlaceText, m_PlaceTextBg, $"#{place}");
+            if (place < 1 || place == m_LastPlace) return;
+            SetPairedText(m_PlaceText, m_PlaceTextBg, "#" + place.ToString());
             m_LastPlace = place;
         }
 
         public void SetScoreDisplay(int score)
         {
             score = Mathf.Max(0, score);
+            if (score == m_LastScore) return;
             SetPairedText(m_ScoreText, m_ScoreTextBg, score.ToString());
             m_LastScore = score;
         }
