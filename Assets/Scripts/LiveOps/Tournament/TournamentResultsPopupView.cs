@@ -35,6 +35,8 @@ namespace Assets.Scripts.LiveOps.Tournament
         [Header("Action label")]
         [SerializeField] private TextMeshProUGUI m_ActionLabel;
         [SerializeField] private TextMeshProUGUI m_ActionLabelBg;
+        [SerializeField] private TextMeshProUGUI m_ClaimAmountLabel;
+        [SerializeField] private TextMeshProUGUI m_ClaimAmountLabelBg;
 
         [Header("Win flair (optional)")]
         [SerializeField] private Image m_RewardIcon;
@@ -129,6 +131,12 @@ namespace Assets.Scripts.LiveOps.Tournament
                 if (m_ActionLabelBg == null)
                     m_ActionLabelBg = FindDirectChildTmp(m_ActionButton.transform, "TextBG")
                                       ?? FindDirectChildTmp(m_ActionButton.transform, "Text (TMP) (1)");
+                if (m_ClaimAmountLabel == null)
+                    m_ClaimAmountLabel = FindDirectChildTmp(m_ActionButton.transform, "ClaimAmount")
+                                         ?? FindTmp("ClaimAmount");
+                if (m_ClaimAmountLabelBg == null)
+                    m_ClaimAmountLabelBg = FindDirectChildTmp(m_ActionButton.transform, "ClaimAmountBG")
+                                           ?? FindTmp("ClaimAmountBG");
                 if (m_ClaimRewardIcon == null)
                 {
                     var iconTf = m_ActionButton.transform.Find("ClaimRewardIcon");
@@ -235,8 +243,15 @@ namespace Assets.Scripts.LiveOps.Tournament
                 }
             }
 
-            // Prefab places ClaimRewardIcon between CLAIM and the amount.
-            SetPairedText(m_ActionLabel, m_ActionLabelBg, $"CLAIM  {reward.amount}");
+            ApplyClaimLabelStyle(m_ActionLabel, rightAlign: true);
+            ApplyClaimLabelStyle(m_ActionLabelBg, rightAlign: true);
+            ApplyClaimLabelStyle(m_ClaimAmountLabel, rightAlign: false);
+            ApplyClaimLabelStyle(m_ClaimAmountLabelBg, rightAlign: false);
+            ApplyActionLabelRects(rewardMode: true);
+
+            SetPairedText(m_ActionLabel, m_ActionLabelBg, "CLAIM");
+            SetPairedText(m_ClaimAmountLabel, m_ClaimAmountLabelBg, reward.amount.ToString());
+            SetClaimAmountVisible(true);
         }
 
         private void SetupClaimButtonOk()
@@ -244,7 +259,90 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (m_ClaimRewardIcon != null)
                 m_ClaimRewardIcon.gameObject.SetActive(false);
 
+            SetClaimAmountVisible(false);
+            ApplyClaimLabelStyle(m_ActionLabel, rightAlign: false, center: true);
+            ApplyClaimLabelStyle(m_ActionLabelBg, rightAlign: false, center: true);
+            ApplyActionLabelRects(rewardMode: false);
             SetPairedText(m_ActionLabel, m_ActionLabelBg, "OK");
+        }
+
+        private void SetClaimAmountVisible(bool visible)
+        {
+            if (m_ClaimAmountLabel != null)
+                m_ClaimAmountLabel.gameObject.SetActive(visible);
+            if (m_ClaimAmountLabelBg != null)
+                m_ClaimAmountLabelBg.gameObject.SetActive(visible);
+        }
+
+        private void ApplyActionLabelRects(bool rewardMode)
+        {
+            const float sidePad = 20f;
+            const float iconSize = 72f;
+            const float gap = 10f; // space between text and icon — reads as one phrase
+            float halfIcon = iconSize * 0.5f;
+
+            if (m_ClaimRewardIcon != null)
+            {
+                var iconRt = m_ClaimRewardIcon.rectTransform;
+                iconRt.anchorMin = iconRt.anchorMax = new Vector2(0.5f, 0.5f);
+                iconRt.pivot = new Vector2(0.5f, 0.5f);
+                iconRt.anchoredPosition = new Vector2(0f, 16f);
+                iconRt.sizeDelta = new Vector2(iconSize, iconSize);
+            }
+
+            if (rewardMode)
+            {
+                // Pack CLAIM | icon | amount tightly around the button center.
+                SetPackedLabel(m_ActionLabel, pivotX: 1f, x: -(halfIcon + gap), width: 200f, y: 16f);
+                SetPackedLabel(m_ActionLabelBg, pivotX: 1f, x: -(halfIcon + gap), width: 200f, y: 2f);
+                SetPackedLabel(m_ClaimAmountLabel, pivotX: 0f, x: halfIcon + gap, width: 200f, y: 16f);
+                SetPackedLabel(m_ClaimAmountLabelBg, pivotX: 0f, x: halfIcon + gap, width: 200f, y: 2f);
+            }
+            else
+            {
+                SetPaddedFullLabel(m_ActionLabel, sidePad, 16f);
+                SetPaddedFullLabel(m_ActionLabelBg, sidePad, 2f);
+            }
+        }
+
+        private static void SetPackedLabel(TextMeshProUGUI tmp, float pivotX, float x, float width, float y)
+        {
+            if (tmp == null) return;
+            var rt = tmp.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(pivotX, 0.5f);
+            rt.anchoredPosition = new Vector2(x, y);
+            rt.sizeDelta = new Vector2(width, 120f);
+        }
+
+        private static void SetPaddedFullLabel(TextMeshProUGUI tmp, float sidePad, float y)
+        {
+            if (tmp == null) return;
+            var rt = tmp.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.offsetMin = new Vector2(sidePad, 10f);
+            rt.offsetMax = new Vector2(-sidePad, -10f);
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
+        }
+
+        private static void ApplyClaimLabelStyle(TextMeshProUGUI tmp, bool rightAlign, bool center = false)
+        {
+            if (tmp == null) return;
+            tmp.enableAutoSizing = true;
+            tmp.fontSizeMin = 36f;
+            tmp.fontSizeMax = 72f;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.margin = Vector4.zero;
+            if (center)
+                tmp.alignment = TextAlignmentOptions.Center;
+            else if (rightAlign)
+                tmp.alignment = TextAlignmentOptions.MidlineRight;
+            else
+                tmp.alignment = TextAlignmentOptions.MidlineLeft;
         }
 
         private void HideRewardVisual()

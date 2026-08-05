@@ -27,6 +27,8 @@ namespace Assets.Scripts.LiveOps.Tournament
     {
         private const int BotCount = 24;
         private const int TopCompetitiveCount = 5;
+        /// <summary>Every bot score step must award at least this many golden arrows.</summary>
+        private const int MinScoreStep = 45;
 
         public static List<TournamentBotData> CreateBotsOnJoin(
             TournamentConfigSO config,
@@ -148,9 +150,11 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             for (int i = 0; i < preCount; i++)
             {
-                int amount = rng.Next(0, scoreMax + 1); // 0..scoreMax inclusive
-                if (amount <= 0)
-                    continue;
+                if (scoreMax < MinScoreStep)
+                    break;
+
+                // Random pre-progress at/above the minimum step (never a tiny drip).
+                int amount = rng.Next(MinScoreStep, scoreMax + 1);
 
                 var bot = bots[indices[i]];
                 if (bot.Events == null)
@@ -305,13 +309,15 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (targetScore <= 0 || end <= from)
                 return;
 
-            int perLevel = Mathf.Max(1, Mathf.RoundToInt(arrowsPerLevel));
+            int perLevel = Mathf.Max(MinScoreStep, Mathf.RoundToInt(arrowsPerLevel));
             int batchCount = Mathf.Max(1, Mathf.RoundToInt(targetScore / (float)perLevel));
 
             // Session density varies: some bots fewer bigger sessions, others many small ones.
             float density = 1f + SignedUnit(rng) * 0.35f;
             batchCount = Mathf.RoundToInt(batchCount * density);
-            batchCount = Mathf.Clamp(batchCount, 1, 180);
+            // Never more batches than can each hold MinScoreStep arrows.
+            int maxBatchesByMinStep = Mathf.Max(1, targetScore / MinScoreStep);
+            batchCount = Mathf.Clamp(batchCount, 1, Mathf.Min(180, maxBatchesByMinStep));
 
             int[] amounts = SplitScoreIntoBatches(targetScore, batchCount, perLevel, batchSizeSkew, rng);
             double[] fracs = SampleTimeFractions(batchCount, archetype, timingSkew, rng);
@@ -320,7 +326,7 @@ namespace Assets.Scripts.LiveOps.Tournament
             double totalHours = Math.Max(0.1, (end - from).TotalHours);
             for (int i = 0; i < batchCount; i++)
             {
-                if (amounts[i] <= 0)
+                if (amounts[i] < MinScoreStep)
                     continue;
 
                 // Keep events inside (from, end), slightly off the endpoints.
@@ -348,23 +354,39 @@ namespace Assets.Scripts.LiveOps.Tournament
             var amounts = new int[batchCount];
             int remaining = targetScore;
             float spread = Mathf.Clamp(0.2f + Mathf.Abs(batchSizeSkew), 0.1f, 0.45f);
+            int baseAmt = Mathf.Max(MinScoreStep, perLevel);
 
             for (int i = 0; i < batchCount; i++)
             {
                 int batchesLeft = batchCount - i;
                 if (batchesLeft == 1)
                 {
-                    amounts[i] = Mathf.Max(0, remaining);
+                    // Fold tiny leftovers into the previous step so no event is under MinScoreStep.
+                    if (remaining > 0 && remaining < MinScoreStep && i > 0)
+                    {
+                        amounts[i - 1] += remaining;
+                        amounts[i] = 0;
+                    }
+                    else
+                    {
+                        amounts[i] = Mathf.Max(0, remaining);
+                    }
                     break;
                 }
 
-                int baseAmt = Mathf.Max(1, perLevel);
-                int minAmt = Mathf.Max(1, Mathf.RoundToInt(baseAmt * (1f - spread)));
-                int maxAmt = Mathf.Max(minAmt, Mathf.RoundToInt(baseAmt * (1f + spread)));
+                int reserved = (batchesLeft - 1) * MinScoreStep;
+                int maxForThis = Mathf.Max(MinScoreStep, remaining - reserved);
+
+                // Random at/above the minimum — spread around arrows-per-level, never below MinScoreStep.
+                int minAmt = MinScoreStep;
+                int maxAmt = Mathf.Max(minAmt + 1, Mathf.RoundToInt(baseAmt * (1f + spread)));
+                maxAmt = Mathf.Min(maxAmt, maxForThis);
+
                 int ideal = remaining / batchesLeft;
-                int amount = Mathf.Clamp(ideal + rng.Next(-perLevel / 4, perLevel / 4 + 1), minAmt, maxAmt);
-                amount = Mathf.Min(amount, remaining - (batchesLeft - 1));
-                amount = Mathf.Max(1, amount);
+                int amount = ideal + rng.Next(-baseAmt / 5, baseAmt / 5 + 1);
+                amount = Mathf.Clamp(amount, minAmt, maxAmt);
+                amount = Mathf.Max(MinScoreStep, amount);
+
                 amounts[i] = amount;
                 remaining -= amount;
             }

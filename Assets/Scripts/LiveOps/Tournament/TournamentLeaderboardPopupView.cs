@@ -84,7 +84,7 @@ namespace Assets.Scripts.LiveOps.Tournament
         private string m_SelectedTagline;
         private string m_LastTimerText;
 
-        private const float MaxRowsPerSecond = 4f;
+        private const float MaxRowsPerSecond = 8f;
         private const float MinIntroDuration = 0.4f;
         private const float ScoreOnlyDuration = 1.0f;
 
@@ -632,6 +632,11 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (layout != null)
                 layout.enabled = false;
 
+            ApplyCapturedPositions(startPositions);
+            // Draw player above every other row for the whole travel.
+            if (playerRow != null)
+                playerRow.transform.SetAsLastSibling();
+
             RectTransform contentRt = ResolveScrollContent();
             RectTransform viewportRt = m_ScrollRect != null ? m_ScrollRect.viewport : null;
             float contentHeight = contentRt != null ? contentRt.rect.height : 0f;
@@ -645,7 +650,6 @@ namespace Assets.Scripts.LiveOps.Tournament
                 m_ScrollRect.enabled = false; // prevent ScrollRect LateUpdate from fighting Content.y
             }
 
-            ApplyCapturedPositions(startPositions);
             ScrollContentToFollowPlayer(playerRow, contentRt, maxScrollY, viewportHeight);
 
             float t = 0f;
@@ -665,6 +669,10 @@ namespace Assets.Scripts.LiveOps.Tournament
                     if (rt != null)
                         rt.anchoredPosition = Vector2.LerpUnclamped(start, end, eased);
                 }
+
+                // Keep player on top of the draw stack if anything reorders mid-frame.
+                if (playerRow != null)
+                    playerRow.transform.SetAsLastSibling();
 
                 if (playerRow != null)
                 {
@@ -690,6 +698,13 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             ApplyCapturedPositions(endPositions);
             ScrollContentToFollowPlayer(playerRow, contentRt, maxScrollY, viewportHeight);
+
+            // Restore place order before layout turns back on.
+            for (int i = 0; i < m_Rows.Count; i++)
+            {
+                if (m_Rows[i] != null && m_Rows[i].gameObject.activeSelf)
+                    m_Rows[i].transform.SetSiblingIndex(i);
+            }
 
             if (layout != null)
                 layout.enabled = layoutWasEnabled;
