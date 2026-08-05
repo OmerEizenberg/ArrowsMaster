@@ -124,7 +124,7 @@ namespace Assets.Scripts.LiveOps.Tournament
             SetPairedText(
                 m_Description,
                 m_DescriptionBg,
-                "Compete with 24 players!\nCollect Golden Arrows from combos.\n<size=140%>JOIN TO START</size>");
+                "Compete with 24 players!\nCollect Golden Arrows from combos.\n<size=140%>JOIN TO START!</size>");
             SetPairedText(m_JoinLabel, m_JoinLabelBg, "JOIN");
         }
 

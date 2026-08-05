@@ -103,7 +103,77 @@ namespace Assets.Scripts.LiveOps.Tournament
                 bots.Add(bot);
             }
 
+            SeedExistingFieldProgress(bots, config, tournamentStartUtc, scheduleStart, rng);
             return bots;
+        }
+
+        /// <summary>
+        /// Gives a random subset of bots a small head-start score so joining feels like
+        /// entering an in-progress room (sometimes 1-2 bots, sometimes ~half the table).
+        /// </summary>
+        private static void SeedExistingFieldProgress(
+            List<TournamentBotData> bots,
+            TournamentConfigSO config,
+            DateTime tournamentStartUtc,
+            DateTime joinUtc,
+            System.Random rng)
+        {
+            if (bots == null || bots.Count == 0)
+                return;
+
+            float fracMin = config != null ? Mathf.Clamp01(config.PreProgressBotFractionMin) : 0.04f;
+            float fracMax = config != null ? Mathf.Clamp01(config.PreProgressBotFractionMax) : 0.50f;
+            if (fracMax < fracMin)
+                (fracMin, fracMax) = (fracMax, fracMin);
+
+            int scoreMax = config != null ? Mathf.Max(0, config.PreProgressScoreMax) : 140;
+            if (scoreMax <= 0)
+                return;
+
+            float fraction = fracMin + (float)rng.NextDouble() * (fracMax - fracMin);
+            int preCount = Mathf.Clamp(Mathf.RoundToInt(bots.Count * fraction), 0, bots.Count);
+            // Always allow a quiet lobby (0) if fraction rolls near the floor on a tiny table,
+            // but with 4%+ of 24 we usually get at least 1.
+            if (preCount <= 0)
+                return;
+
+            var indices = new List<int>(bots.Count);
+            for (int i = 0; i < bots.Count; i++)
+                indices.Add(i);
+            for (int i = 0; i < preCount; i++)
+            {
+                int j = rng.Next(i, indices.Count);
+                (indices[i], indices[j]) = (indices[j], indices[i]);
+            }
+
+            for (int i = 0; i < preCount; i++)
+            {
+                int amount = rng.Next(0, scoreMax + 1); // 0..scoreMax inclusive
+                if (amount <= 0)
+                    continue;
+
+                var bot = bots[indices[i]];
+                if (bot.Events == null)
+                    bot.Events = new List<TournamentScoreEvent>();
+
+                // Stamp slightly before join so it's already visible when the board opens.
+                int minutesBefore = rng.Next(1, 50);
+                DateTime stamp = joinUtc.AddMinutes(-minutesBefore);
+                if (stamp < tournamentStartUtc)
+                    stamp = tournamentStartUtc;
+
+                bot.Events.Add(new TournamentScoreEvent
+                {
+                    UtcTicks = stamp.Ticks,
+                    Amount = amount
+                });
+                bot.Events.Sort((a, b) => a.UtcTicks.CompareTo(b.UtcTicks));
+
+                // Invalidate any runtime score cursor.
+                bot.ScoreCacheTicks = 0;
+                bot.ScoreCacheValue = 0;
+                bot.ScoreCacheIndex = 0;
+            }
         }
 
         public static int GetBotScoreAt(TournamentBotData bot, DateTime utcNow)
@@ -315,7 +385,12 @@ namespace Assets.Scripts.LiveOps.Tournament
 
             for (int i = 0; i < count; i++)
             {
-                double u = rng.NextDouble();
+                // Even spacing + light jitter so scores accrue steadily over time
+                // (including while the app is closed — events are absolute UTC timestamps).
+                double baseFrac = (i + 0.5) / count;
+                double jitter = (rng.NextDouble() - 0.5) * (0.7 / Math.Max(1, count));
+                double u = Math.Max(0.0, Math.Min(1.0, baseFrac + jitter));
+
                 switch (archetype)
                 {
                     case BotArchetype.FrontRunner:
@@ -337,9 +412,9 @@ namespace Assets.Scripts.LiveOps.Tournament
                         break;
                     case BotArchetype.Spiky:
                     {
-                        int clusters = 3 + rng.Next(0, 3); // 3-5 burst windows, varies per bot/round
-                        int cluster = rng.Next(0, clusters);
-                        fracs[i] = (cluster + rng.NextDouble()) / clusters;
+                        int clusters = 3 + rng.Next(0, 3);
+                        int cluster = Mathf.Clamp((int)(u * clusters), 0, clusters - 1);
+                        fracs[i] = (cluster + 0.25 + rng.NextDouble() * 0.5) / clusters;
                         break;
                     }
                     case BotArchetype.Ghost:
@@ -347,8 +422,7 @@ namespace Assets.Scripts.LiveOps.Tournament
                         fracs[i] = Math.Pow(u, 0.85 + timingSkew * 0.2);
                         break;
                     default:
-                        // Steady grinders: mild drift so they aren't perfectly even.
-                        fracs[i] = Mathf.Clamp01((float)(u + SignedUnit(rng) * 0.08f * (1f + Mathf.Abs(timingSkew))));
+                        fracs[i] = u;
                         break;
                 }
             }

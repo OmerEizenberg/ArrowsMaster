@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: TournamentConfig
   m_EditorClassIdentifier: 
   PlaceRewards:
+  - Coin:5000
+  - Shuffle:3
+  - Hint:2
   - Coin:500
-  - Coin:300
-  - Coin:200
-  - Hint:3
-  - Hint:1
+  - Coin:250
   - 
   - 
   - 
@@ -40,7 +40,7 @@ MonoBehaviour:
   - 
   MinArrowsForRewardedPlaces: 0
   LateJoinLookbackMinutes: 30
-  AvgGoldenArrowsPerLevel: 150
+  AvgGoldenArrowsPerLevel: 225
   TopLevelsPerDayMin: 10
   TopLevelsPerDayMax: 12
   AvgLevelsPerDay: 5
@@ -48,6 +48,9 @@ MonoBehaviour:
   BotTargetVariance: 0.1
   MinPaceGapPercent: 0.04
   ArrowsPerLevelVariance: 0.15
+  PreProgressBotFractionMin: 0.04
+  PreProgressBotFractionMax: 0.5
+  PreProgressScoreMax: 140
   BotGainRules:
   - Archetype: 0
     IntervalHours: 2.5

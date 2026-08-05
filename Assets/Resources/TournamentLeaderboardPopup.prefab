@@ -310,7 +310,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: 0, y: 29}
-  m_SizeDelta: {x: 512, y: 144}
+  m_SizeDelta: {x: 640, y: 180}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &797573742264196289
 CanvasRenderer:
@@ -534,7 +534,7 @@ MonoBehaviour:
   m_HintSprite: {fileID: 21300000, guid: da653c99511e0479da64ad11a1b4cc56, type: 3}
   m_WandSprite: {fileID: 21300000, guid: 9aa6aac210b1f44499288385f2a5890b, type: 3}
   m_LifeSprite: {fileID: 21300000, guid: 08d3bf6c5323a4938ade7b9fbd1734d3, type: 3}
-  m_GoldenArrowSprite: {fileID: 21300000, guid: 89ac2ba3cf3dc48279f2ff697bc80ce2, type: 3}
+  m_GoldenArrowSprite: {fileID: 6680456413420582483, guid: 89ac2ba3cf3dc48279f2ff697bc80ce2, type: 3}
   m_NameEditPrefab: {fileID: 1665012042764252170, guid: c780e2b3b18a3432bbdec3f5db27765b, type: 3}
 --- !u!1 &9100000000000000007
 GameObject:
@@ -2592,7 +2592,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: 0, y: 48}
-  m_SizeDelta: {x: 512, y: 144}
+  m_SizeDelta: {x: 640, y: 180}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &9100000000000000086
 CanvasRenderer:
@@ -2741,7 +2741,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Let's Go!
+  m_text: LET'S GO!
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
@@ -2878,7 +2878,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Let's Go!
+  m_text: LET'S GO!
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}
   m_sharedMaterial: {fileID: -3190065974913724221, guid: 4cc6ea74168234ff48314c110ff67504, type: 2}

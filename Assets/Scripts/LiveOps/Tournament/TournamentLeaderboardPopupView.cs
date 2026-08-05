@@ -53,7 +53,7 @@ namespace Assets.Scripts.LiveOps.Tournament
         private TournamentNameEditPopupView m_NameEdit;
 
         private static readonly Color PlayerRowColor = new Color(0.49f, 0.37f, 1f, 1f);
-        private static readonly Color BotRowColor = new Color(0.35f, 0.35f, 0.4f, 0.9f);
+        private static readonly Color BotRowColor = Color.white;
 
         private const int ExpectedRows = 25;
         private const string RowPrefabResourcePath = "TournamentLeaderboardRow";
@@ -61,16 +61,16 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private static readonly string[] TimerTaglines =
         {
-            "Don't give up",
-            "Hurry up",
-            "Keep climbing",
-            "Push harder",
-            "The race is on",
-            "Stay sharp",
-            "Every arrow counts",
-            "No time to rest",
-            "Chase the lead",
-            "Finish strong"
+            "DON'T GIVE UP",
+            "HURRY UP",
+            "KEEP CLIMBING",
+            "PUSH HARDER",
+            "THE RACE IS ON",
+            "STAY SHARP",
+            "EVERY ARROW COUNTS",
+            "NO TIME TO REST",
+            "CHASE THE LEAD",
+            "FINISH STRONG"
         };
 
         private TournamentLiveOpService service;
@@ -323,7 +323,7 @@ namespace Assets.Scripts.LiveOps.Tournament
         private void ApplyStaticCopy()
         {
             SetPairedText(m_Title, m_TitleBg, "Golden Tournament");
-            SetPairedText(m_CloseLabel, m_CloseLabelBg, "Let's Go!");
+            SetPairedText(m_CloseLabel, m_CloseLabelBg, "LET'S GO!");
 
             // Keep header TextBG shadows matching whatever is authored on the main header labels.
             SyncPairedFromMain(m_PlaceHeaderText, m_PlaceHeaderTextBg);
@@ -379,7 +379,7 @@ namespace Assets.Scripts.LiveOps.Tournament
                 string timeLeft = FormatTimeLeft(rem);
                 if (string.IsNullOrEmpty(m_SelectedTagline))
                     PickTagline();
-                text = $"{m_SelectedTagline}\n{timeLeft} left";
+                text = $"<size=125%>{m_SelectedTagline}</size>\n<size=90%>{timeLeft} left</size>";
             }
 
             if (string.Equals(m_LastTimerText, text, System.StringComparison.Ordinal))

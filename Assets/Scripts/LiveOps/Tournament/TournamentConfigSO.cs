@@ -69,6 +69,18 @@ namespace Assets.Scripts.LiveOps.Tournament
         [Range(0f, 0.4f)]
         public float ArrowsPerLevelVariance = 0.15f;
 
+        [Header("Existing-field feel (pre-progress at join)")]
+        [Tooltip("Min fraction of bots that already have some score when the player joins (0.04 = 4%).")]
+        [Range(0f, 0.5f)]
+        public float PreProgressBotFractionMin = 0.04f;
+
+        [Tooltip("Max fraction of bots that already have some score when the player joins (0.50 = 50%).")]
+        [Range(0f, 1f)]
+        public float PreProgressBotFractionMax = 0.50f;
+
+        [Tooltip("Max golden arrows a pre-progress bot can already have at join (inclusive).")]
+        public int PreProgressScoreMax = 140;
+
         [Header("Bot Golden Arrow gain rules")]
         [Tooltip("Legacy per-archetype batch rules. Pace-based simulator uses Score calibration above; archetypes only shape timing.")]
         public List<BotArchetypeGainRule> BotGainRules = new List<BotArchetypeGainRule>();
