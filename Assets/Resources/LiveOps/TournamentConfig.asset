@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: TournamentConfig
   m_EditorClassIdentifier: 
   PlaceRewards:
+  - Hint:3,Life:1
   - Coin:5000
-  - Hint:3
   - Wand:2
   - Life:1
   - Coin:500
