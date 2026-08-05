@@ -50,6 +50,12 @@ namespace Assets.Scripts.LiveOps.Tournament
                 service.OnStateChanged += Refresh;
             }
 
+            if (RemoteConfigManager.Instance != null)
+            {
+                RemoteConfigManager.Instance.OnConfigValuesUpdated -= Refresh;
+                RemoteConfigManager.Instance.OnConfigValuesUpdated += Refresh;
+            }
+
             Refresh();
         }
 
@@ -57,6 +63,8 @@ namespace Assets.Scripts.LiveOps.Tournament
         {
             if (service != null)
                 service.OnStateChanged -= Refresh;
+            if (RemoteConfigManager.Instance != null)
+                RemoteConfigManager.Instance.OnConfigValuesUpdated -= Refresh;
         }
 
         private void Update()
@@ -273,12 +281,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private static string FormatRemaining(TimeSpan remaining)
         {
-            if (remaining.TotalSeconds <= 0) return "0m";
-            if (remaining.TotalDays >= 1)
-                return $"{(int)remaining.TotalDays}d {remaining.Hours}h";
-            if (remaining.TotalHours >= 1)
-                return $"{(int)remaining.TotalHours}h {remaining.Minutes}m";
-            return $"{Math.Max(1, remaining.Minutes)}m";
+            return TournamentUiFormat.FormatTimeLeft(remaining);
         }
     }
 }

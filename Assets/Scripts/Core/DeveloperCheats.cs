@@ -266,11 +266,49 @@ namespace Assets.Scripts.Core
             Assets.Scripts.LiveOps.Tournament.TournamentResultsPopupView.TryShowPending();
         }
 
-        [ContextMenu("Cheat: Add 50 Tournament Golden Arrows")]
+        [ContextMenu("Cheat: Add 500 Tournament Golden Arrows")]
         public void CheatTournamentAddScore()
         {
-            Assets.Scripts.LiveOps.TournamentLiveOpService.NotifyGoldenArrowsEarned(50);
-            Debug.Log("[CHEAT] Added 50 tournament golden arrows.");
+            Assets.Scripts.LiveOps.TournamentLiveOpService.NotifyGoldenArrowsEarned(500);
+            Debug.Log("[CHEAT] Added 500 tournament golden arrows.");
+        }
+
+        [ContextMenu("Cheat: Add 1000 Tournament Golden Arrows")]
+        public void CheatTournamentAddScore1000()
+        {
+            Assets.Scripts.LiveOps.TournamentLiveOpService.NotifyGoldenArrowsEarned(1000);
+            Debug.Log("[CHEAT] Added 1000 tournament golden arrows.");
+        }
+
+        [ContextMenu("Cheat: Tournament Jump To Last 2 Minutes")]
+        public void CheatTournamentLast2Minutes()
+        {
+            var service = LiveOpManager.Instance?
+                .GetActiveService(TournamentLiveOpService.EventId)
+                as TournamentLiveOpService;
+            if (service == null)
+            {
+                Debug.LogWarning("[CHEAT] Tournament service not active. Join a tournament first.");
+                return;
+            }
+
+            if (service.Status != TournamentStatus.Joined)
+            {
+                Debug.LogWarning("[CHEAT] Join the tournament first (Cheat: Tournament Join).");
+                return;
+            }
+
+            var rem = service.GetRemainingTime();
+            var target = TimeSpan.FromMinutes(2);
+            if (rem <= target)
+            {
+                Debug.Log($"[CHEAT] Already within last 2 minutes (remaining {rem}).");
+                return;
+            }
+
+            var delta = rem - target;
+            CheatTournamentAdvance(delta);
+            Debug.Log($"[CHEAT] Jumped to last 2 minutes. Remaining≈{service.GetRemainingTime()}.");
         }
 
         [ContextMenu("Cheat: Tournament +1 Hour")]

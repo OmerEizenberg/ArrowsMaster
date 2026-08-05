@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -7,16 +8,46 @@ using Assets.Scripts.LiveOps;
 namespace Assets.Scripts.LiveOps.Tournament
 {
     /// <summary>
-    /// Prefab-driven results popup (MissionsPopup shell).
+    /// Prefab-driven results popup (Resources/TournamentResultsPopup), styled like the join popup.
+    /// Win cases add reward flair + light celebration FX.
     /// </summary>
     public class TournamentResultsPopupView : MonoBehaviour
     {
+        private static readonly Color PlaceYellow = new Color(1f, 0.88f, 0.35f, 1f);
+        private static readonly Color PlaceOutline = new Color(0.45f, 0.25f, 0.05f, 0.85f);
+        private static readonly Color RewardGold = new Color(1f, 0.85f, 0.25f, 1f);
+
+        [Header("Buttons")]
         [SerializeField] private Button m_ActionButton;
+
+        [Header("Title")]
         [SerializeField] private TextMeshProUGUI m_Title;
+        [SerializeField] private TextMeshProUGUI m_TitleBg;
+
+        [Header("Subtitle (place)")]
+        [SerializeField] private TextMeshProUGUI m_Subtitle;
+        [SerializeField] private TextMeshProUGUI m_SubtitleBg;
+
+        [Header("Body")]
         [SerializeField] private TextMeshProUGUI m_Body;
+        [SerializeField] private TextMeshProUGUI m_BodyBg;
+
+        [Header("Action label")]
         [SerializeField] private TextMeshProUGUI m_ActionLabel;
+        [SerializeField] private TextMeshProUGUI m_ActionLabelBg;
+
+        [Header("Win flair (optional)")]
+        [SerializeField] private Image m_RewardIcon;
+        [SerializeField] private RectTransform m_RewardRoot;
+        [SerializeField] private Image m_ClaimRewardIcon;
+        [SerializeField] private Sprite m_CoinSprite;
+        [SerializeField] private Sprite m_HintSprite;
+        [SerializeField] private Sprite m_WandSprite;
+        [SerializeField] private Sprite m_LifeSprite;
 
         private TournamentPendingResultsData pending;
+        private Coroutine m_FxRoutine;
+        private ParticleSystem m_Confetti;
 
         public static bool TryShowPending()
         {
@@ -26,11 +57,10 @@ namespace Assets.Scripts.LiveOps.Tournament
             if (!TournamentLiveOpService.HasPendingResults())
                 return false;
 
-            var pending = TournamentLiveOpService.GetPendingResults();
-            if (pending == null)
+            var pendingData = TournamentLiveOpService.GetPendingResults();
+            if (pendingData == null)
                 return false;
 
-            // Avoid stacking duplicates.
             if (Object.FindFirstObjectByType<TournamentResultsPopupView>() != null)
                 return true;
 
@@ -47,85 +77,358 @@ namespace Assets.Scripts.LiveOps.Tournament
             var view = instance.GetComponent<TournamentResultsPopupView>();
             if (view == null)
                 view = instance.AddComponent<TournamentResultsPopupView>();
-            view.Initialize(pending);
+            view.Initialize(pendingData);
             return true;
         }
 
         public void Initialize(TournamentPendingResultsData data)
         {
             pending = data;
-            ResolveRefs();
-            SanitizeMissionLeftovers();
+            ResolveRefsIfNeeded();
             ApplyCopy();
             WireButton();
+            PlayIntroFx();
         }
 
-        private void SanitizeMissionLeftovers()
+        private void OnDestroy()
         {
-            var popup = FindDeep("Popup");
-            if (popup == null) return;
-
-            for (int i = popup.childCount - 1; i >= 0; i--)
-            {
-                Transform child = popup.GetChild(i);
-                if (child == null) continue;
-                string n = child.name;
-                if (n == "Title" || n == "Description" || n == "GreenShadow")
-                    continue;
-                child.gameObject.SetActive(false);
-                Destroy(child.gameObject);
-            }
+            if (m_FxRoutine != null)
+                StopCoroutine(m_FxRoutine);
         }
 
-        private void ResolveRefs()
+        private void ResolveRefsIfNeeded()
         {
             if (m_ActionButton == null)
             {
-                var t = FindDeep("GreenShadow");
-                if (t != null) m_ActionButton = t.GetComponent<Button>();
+                var green = FindDeep("GreenShadow");
+                if (green != null)
+                    m_ActionButton = green.GetComponent<Button>();
             }
+
             if (m_Title == null)
-            {
-                var t = FindDeep("Title");
-                if (t != null) m_Title = t.GetComponent<TextMeshProUGUI>();
-            }
+                m_Title = FindTmp("Title");
+            if (m_TitleBg == null)
+                m_TitleBg = FindTmp("TitleBG");
+
+            if (m_Subtitle == null)
+                m_Subtitle = FindTmp("Subtitle") ?? FindTmp("Title (1)");
+            if (m_SubtitleBg == null)
+                m_SubtitleBg = FindTmp("SubtitleBG") ?? FindTmp("TitleBG (1)");
+
             if (m_Body == null)
+                m_Body = FindTmp("Description") ?? FindTmp("Body");
+            if (m_BodyBg == null)
+                m_BodyBg = FindTmp("DescriptionBG") ?? FindTmp("BodyBG") ?? FindTmp("Description (1)");
+
+            if (m_ActionButton != null)
             {
-                var t = FindDeep("Description");
-                if (t != null) m_Body = t.GetComponent<TextMeshProUGUI>();
+                if (m_ActionLabel == null)
+                    m_ActionLabel = FindDirectChildTmp(m_ActionButton.transform, "Text (TMP)")
+                                    ?? FindDirectChildTmp(m_ActionButton.transform, "Text")
+                                    ?? m_ActionButton.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (m_ActionLabelBg == null)
+                    m_ActionLabelBg = FindDirectChildTmp(m_ActionButton.transform, "TextBG")
+                                      ?? FindDirectChildTmp(m_ActionButton.transform, "Text (TMP) (1)");
+                if (m_ClaimRewardIcon == null)
+                {
+                    var iconTf = m_ActionButton.transform.Find("ClaimRewardIcon");
+                    if (iconTf != null)
+                        m_ClaimRewardIcon = iconTf.GetComponent<Image>();
+                }
             }
-            if (m_ActionLabel == null && m_ActionButton != null)
-                m_ActionLabel = m_ActionButton.GetComponentInChildren<TextMeshProUGUI>(true);
+
+            // Legacy center reward slot (ReelBG) — always hide; reward lives on the claim button.
+            if (m_RewardRoot == null)
+            {
+                var reel = FindDeep("ReelBG");
+                if (reel != null)
+                {
+                    m_RewardRoot = reel as RectTransform;
+                    m_RewardIcon = reel.GetComponent<Image>();
+                }
+            }
+            HideRewardVisual();
         }
 
         private void ApplyCopy()
         {
             if (pending == null) return;
 
-            if (m_Title != null)
-                m_Title.text = "Tournament Finished";
+            SetPairedText(m_Title, m_TitleBg, "GOLDEN TOURNAMENT");
+            ApplyPlaceStyle();
 
-            if (m_Body != null)
+            string placeLine = pending.FinalPlace > 0 ? $"#{pending.FinalPlace}" : "#—";
+            SetPairedText(m_Subtitle, m_SubtitleBg, placeLine);
+
+            bool topFive = pending.FinalPlace > 0 && pending.FinalPlace <= 5;
+            string body;
+            if (pending.HasReward)
             {
-                if (pending.HasReward)
+                var reward = TournamentConfigSO.ParseReward(pending.RewardKey);
+                SetupClaimButtonReward(reward);
+                body =
+                    "<color=#2B3640>You finished in position " +
+                    $"<color=#FFE159><b>#{pending.FinalPlace}</b></color></color>\n" +
+                    $"<color=#FFE159><size=145%><b>YOU WON!</b></size></color>\n" +
+                    $"<color=#2B3640><b>Golden Arrows: {Mathf.Max(0, pending.PlayerScore)}</b></color>";
+            }
+            else
+            {
+                SetupClaimButtonOk();
+                if (topFive)
                 {
-                    var reward = TournamentConfigSO.ParseReward(pending.RewardKey);
-                    m_Body.text =
-                        $"You finished in position #{pending.FinalPlace}\n" +
-                        $"Reward: {FormatReward(reward)}\n" +
-                        $"Golden Arrows: {pending.PlayerScore}";
+                    body =
+                        $"You finished in position <color=#FFE159><b>#{pending.FinalPlace}</b></color>\n" +
+                        "<size=120%>Great run!</size>\n" +
+                        $"<b>Golden Arrows: {Mathf.Max(0, pending.PlayerScore)}</b>";
                 }
                 else
                 {
-                    m_Body.text =
-                        $"You finished in position #{pending.FinalPlace}\n" +
+                    body =
+                        $"You finished in position <color=#FFE159><b>#{pending.FinalPlace}</b></color>\n" +
                         "Better luck next time!\n" +
-                        $"Golden Arrows: {pending.PlayerScore}";
+                        $"<b>Golden Arrows: {Mathf.Max(0, pending.PlayerScore)}</b>";
                 }
             }
 
-            if (m_ActionLabel != null)
-                m_ActionLabel.text = pending.HasReward ? "CLAIM" : "OK";
+            SetPairedText(m_Body, m_BodyBg, body);
+        }
+
+        private void ApplyPlaceStyle()
+        {
+            ApplyYellowPlace(m_Subtitle);
+            ApplyYellowPlace(m_SubtitleBg);
+            if (m_SubtitleBg != null)
+            {
+                var c = PlaceYellow;
+                c.a = 0.55f;
+                m_SubtitleBg.color = c;
+            }
+        }
+
+        private static void ApplyYellowPlace(TextMeshProUGUI tmp)
+        {
+            if (tmp == null) return;
+            tmp.color = PlaceYellow;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.enableAutoSizing = true;
+            tmp.fontSizeMin = 72f;
+            tmp.fontSizeMax = 180f;
+            tmp.outlineWidth = 0.22f;
+            tmp.outlineColor = PlaceOutline;
+        }
+
+        private void SetupClaimButtonReward(Reward reward)
+        {
+            Sprite sprite = GetRewardSprite(reward.type);
+
+            if (m_ClaimRewardIcon != null)
+            {
+                m_ClaimRewardIcon.gameObject.SetActive(true);
+                m_ClaimRewardIcon.enabled = sprite != null;
+                if (sprite != null)
+                {
+                    m_ClaimRewardIcon.sprite = sprite;
+                    m_ClaimRewardIcon.color = Color.white;
+                    m_ClaimRewardIcon.preserveAspect = true;
+                    m_ClaimRewardIcon.type = Image.Type.Simple;
+                }
+            }
+
+            // Prefab places ClaimRewardIcon between CLAIM and the amount.
+            SetPairedText(m_ActionLabel, m_ActionLabelBg, $"CLAIM  {reward.amount}");
+        }
+
+        private void SetupClaimButtonOk()
+        {
+            if (m_ClaimRewardIcon != null)
+                m_ClaimRewardIcon.gameObject.SetActive(false);
+
+            SetPairedText(m_ActionLabel, m_ActionLabelBg, "OK");
+        }
+
+        private void HideRewardVisual()
+        {
+            if (m_RewardRoot != null)
+                m_RewardRoot.gameObject.SetActive(false);
+        }
+
+        private void PlayIntroFx()
+        {
+            if (m_FxRoutine != null)
+                StopCoroutine(m_FxRoutine);
+            m_FxRoutine = StartCoroutine(IntroFxRoutine());
+        }
+
+        private IEnumerator IntroFxRoutine()
+        {
+            // Punch the place number.
+            if (m_Subtitle != null)
+                yield return PunchScale(m_Subtitle.rectTransform, 1.35f, 0.12f, 0.1f);
+
+            if (pending != null && pending.HasReward)
+            {
+                if (SoundManager.Instance != null)
+                {
+                    SoundManager.Instance.PlayWin();
+                    SoundManager.Instance.PlaySmallCheer();
+                }
+
+                // Reuse the game's existing coin celebration FX when possible.
+                if (AdsManager.Instance != null)
+                    AdsManager.Instance.SpawnCoinsSmallExplosion();
+                else
+                    SpawnConfettiBurst();
+
+                RectTransform claimFxTarget = m_ClaimRewardIcon != null
+                    ? m_ClaimRewardIcon.rectTransform
+                    : (m_ActionButton != null ? m_ActionButton.transform as RectTransform : null);
+
+                if (claimFxTarget != null && claimFxTarget.gameObject.activeInHierarchy)
+                {
+                    claimFxTarget.localScale = Vector3.zero;
+                    yield return PunchScale(claimFxTarget, 1.25f, 0.18f, 0.12f);
+                    m_FxRoutine = StartCoroutine(IdlePulse(claimFxTarget));
+                    yield break;
+                }
+            }
+
+            m_FxRoutine = null;
+        }
+
+        private IEnumerator IdlePulse(RectTransform target)
+        {
+            if (target == null) yield break;
+            Vector3 baseScale = Vector3.one;
+            float t = 0f;
+            while (target != null)
+            {
+                t += Time.unscaledDeltaTime;
+                float s = 1f + Mathf.Sin(t * 3.2f) * 0.06f;
+                target.localScale = baseScale * s;
+                if (m_ClaimRewardIcon != null && target == m_ClaimRewardIcon.rectTransform)
+                {
+                    float glow = 0.85f + Mathf.Sin(t * 4f) * 0.15f;
+                    m_ClaimRewardIcon.color = Color.Lerp(Color.white, RewardGold, (glow - 0.85f) / 0.15f * 0.35f);
+                }
+                yield return null;
+            }
+        }
+
+        private static IEnumerator PunchScale(RectTransform target, float punch, float up, float down)
+        {
+            if (target == null) yield break;
+            Vector3 start = Vector3.one * 0.01f;
+            Vector3 peak = Vector3.one * punch;
+            Vector3 end = Vector3.one;
+            target.localScale = start;
+
+            float t = 0f;
+            while (t < up)
+            {
+                t += Time.unscaledDeltaTime;
+                target.localScale = Vector3.LerpUnclamped(start, peak, Mathf.SmoothStep(0f, 1f, t / up));
+                yield return null;
+            }
+
+            t = 0f;
+            while (t < down)
+            {
+                t += Time.unscaledDeltaTime;
+                target.localScale = Vector3.LerpUnclamped(peak, end, Mathf.SmoothStep(0f, 1f, t / down));
+                yield return null;
+            }
+
+            target.localScale = end;
+        }
+
+        private void SpawnConfettiBurst()
+        {
+            if (m_Confetti != null)
+            {
+                m_Confetti.Play(true);
+                return;
+            }
+
+            var host = m_Subtitle != null ? m_Subtitle.transform.parent : transform;
+            var go = new GameObject("TournamentConfetti", typeof(RectTransform));
+            go.transform.SetParent(host, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.75f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = Vector2.zero;
+
+            m_Confetti = go.AddComponent<ParticleSystem>();
+            var main = m_Confetti.main;
+            main.playOnAwake = false;
+            main.loop = false;
+            main.duration = 1.2f;
+            main.startLifetime = 1.4f;
+            main.startSpeed = new ParticleSystem.MinMaxCurve(180f, 420f);
+            main.startSize = new ParticleSystem.MinMaxCurve(10f, 22f);
+            main.startColor = new ParticleSystem.MinMaxGradient(PlaceYellow, RewardGold);
+            main.gravityModifier = 0.8f;
+            main.maxParticles = 80;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+
+            var emission = m_Confetti.emission;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 48) });
+
+            var shape = m_Confetti.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 35f;
+            shape.radius = 10f;
+
+            var colorOverLifetime = m_Confetti.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var grad = new Gradient();
+            grad.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(PlaceYellow, 0f),
+                    new GradientColorKey(Color.white, 0.4f),
+                    new GradientColorKey(RewardGold, 1f)
+                },
+                new[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(0.9f, 0.6f),
+                    new GradientAlphaKey(0f, 1f)
+                });
+            colorOverLifetime.color = grad;
+
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            // UI-friendly sorting so confetti draws above the popup sheet.
+            renderer.sortingOrder = 250;
+
+            // Make ParticleSystem work under a Screen Space Overlay canvas.
+            var canvas = GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                // Overlay canvases don't always show world particles well; keep burst subtle via UI punch only.
+                // Still play — many projects use Overlay with default particle shader successfully.
+            }
+
+            m_Confetti.Play(true);
+        }
+
+        private Sprite GetRewardSprite(RewardType type)
+        {
+            switch (type)
+            {
+                case RewardType.Coin:
+                    return m_CoinSprite != null ? m_CoinSprite : Resources.Load<Sprite>("Tournament/ArrowsCoin");
+                case RewardType.Hint:
+                    return m_HintSprite != null ? m_HintSprite : Resources.Load<Sprite>("Tournament/Hint");
+                case RewardType.MagicWand:
+                    return m_WandSprite != null ? m_WandSprite : Resources.Load<Sprite>("Tournament/Wand");
+                case RewardType.RefillLife:
+                    return m_LifeSprite != null ? m_LifeSprite : Resources.Load<Sprite>("Tournament/Life");
+                default:
+                    return null;
+            }
         }
 
         private void WireButton()
@@ -172,26 +475,41 @@ namespace Assets.Scripts.LiveOps.Tournament
             }
         }
 
-        private Transform FindDeep(string objectName)
+        private static void SetPairedText(TextMeshProUGUI main, TextMeshProUGUI bg, string value)
         {
-            foreach (var t in GetComponentsInChildren<Transform>(true))
+            if (main != null)
+                main.text = value;
+            if (bg != null)
+                bg.text = value;
+        }
+
+        private static TextMeshProUGUI FindDirectChildTmp(Transform parent, string objectName)
+        {
+            if (parent == null) return null;
+            for (int i = 0; i < parent.childCount; i++)
             {
-                if (t.name == objectName)
-                    return t;
+                var child = parent.GetChild(i);
+                if (child != null && child.name == objectName)
+                    return child.GetComponent<TextMeshProUGUI>();
             }
             return null;
         }
 
-        private static string FormatReward(Reward reward)
+        private TextMeshProUGUI FindTmp(string objectName)
         {
-            switch (reward.type)
+            var t = FindDeep(objectName);
+            return t != null ? t.GetComponent<TextMeshProUGUI>() : null;
+        }
+
+        private Transform FindDeep(string objectName)
+        {
+            var transforms = GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < transforms.Length; i++)
             {
-                case RewardType.Coin: return $"{reward.amount} Coins";
-                case RewardType.Hint: return $"{reward.amount} Hint(s)";
-                case RewardType.MagicWand: return $"{reward.amount} Magic Wand(s)";
-                case RewardType.RefillLife: return $"{reward.amount} Life Refill(s)";
-                default: return $"{reward.amount}";
+                if (transforms[i] != null && transforms[i].name == objectName)
+                    return transforms[i];
             }
+            return null;
         }
     }
 }

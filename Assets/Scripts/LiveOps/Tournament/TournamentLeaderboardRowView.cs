@@ -184,6 +184,20 @@ namespace Assets.Scripts.LiveOps.Tournament
             }
         }
 
+        public void SetPlaceDisplay(int place)
+        {
+            if (place < 1) return;
+            SetPairedText(m_PlaceText, m_PlaceTextBg, $"#{place}");
+            m_LastPlace = place;
+        }
+
+        public void SetScoreDisplay(int score)
+        {
+            score = Mathf.Max(0, score);
+            SetPairedText(m_ScoreText, m_ScoreTextBg, score.ToString());
+            m_LastScore = score;
+        }
+
         private void ApplyRewardColumnLayout(bool hasReward)
         {
             if (m_NameLayout != null)

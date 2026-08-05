@@ -183,6 +183,7 @@ namespace Assets.Scripts.LiveOps
 
         public bool ShouldShowBadge()
         {
+            if (!IsTournamentFeatureEnabled()) return false;
             if (SO == null || UserDataManager.Instance == null) return false;
             if (UserDataManager.Instance.CurrentLevel < SO.ShowLevel) return false;
             if (Progress == null) return false;
@@ -196,10 +197,19 @@ namespace Assets.Scripts.LiveOps
         /// </summary>
         public bool IsBadgeEligible()
         {
+            if (!IsTournamentFeatureEnabled()) return false;
             if (SO == null || UserDataManager.Instance == null) return false;
             if (UserDataManager.Instance.CurrentLevel < SO.ShowLevel) return false;
             if (Progress == null) return false;
             return Progress.Status == TournamentStatus.PendingJoin || Progress.Status == TournamentStatus.Joined;
+        }
+
+        public static bool IsTournamentFeatureEnabled()
+        {
+            // Default true when RemoteConfig is not ready yet (matches Firebase default).
+            if (RemoteConfigManager.Instance == null)
+                return true;
+            return RemoteConfigManager.Instance.IsTournamentOn;
         }
 
         public int GetDisplayPlace()
@@ -239,6 +249,7 @@ namespace Assets.Scripts.LiveOps
             if (Progress == null || Config == null) return false;
             if (Progress.Status != TournamentStatus.PendingJoin) return false;
             if (!IsUnlocked()) return false;
+            if (!IsTournamentFeatureEnabled()) return false;
 
             DateTime now = TrustedTimeService.UtcNow;
             DateTime end = new DateTime(Progress.EndUtcTicks, DateTimeKind.Utc);
@@ -247,6 +258,8 @@ namespace Assets.Scripts.LiveOps
             Progress.Status = TournamentStatus.Joined;
             Progress.JoinedUtcTicks = now.Ticks;
             Progress.PlayerScore = 0;
+            Progress.LastShownPlace = -1;
+            Progress.LastShownScore = -1;
             Progress.PlayerName = GetOrCreatePlayerDisplayName();
             Progress.Bots = TournamentBotSimulator.CreateBotsOnJoin(
                 Config,
@@ -277,6 +290,26 @@ namespace Assets.Scripts.LiveOps
             Progress.PlayerScore += amount;
             SaveState();
             NotifyStateChanged();
+        }
+
+        public bool TryGetLastShownPlayerState(out int place, out int score)
+        {
+            place = -1;
+            score = -1;
+            if (Progress == null) return false;
+            if (Progress.LastShownPlace < 1) return false;
+            place = Progress.LastShownPlace;
+            score = Mathf.Max(0, Progress.LastShownScore);
+            return true;
+        }
+
+        public void MarkPlayerStateShown(int place, int score)
+        {
+            if (Progress == null) return;
+            if (place < 1) return;
+            Progress.LastShownPlace = place;
+            Progress.LastShownScore = Mathf.Max(0, score);
+            SaveState();
         }
 
         public List<TournamentLeaderboardRow> BuildLeaderboardRows(DateTime utcNow)

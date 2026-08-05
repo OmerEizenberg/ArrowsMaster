@@ -161,11 +161,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private static string FormatTimeLeft(System.TimeSpan rem)
         {
-            if (rem.TotalDays >= 1)
-                return $"{(int)rem.TotalDays}d {rem.Hours}h";
-            if (rem.TotalHours >= 1)
-                return $"{(int)rem.TotalHours}h {rem.Minutes}m";
-            return $"{Mathf.Max(1, rem.Minutes)}m";
+            return TournamentUiFormat.FormatTimeLeft(rem);
         }
 
         private void OnJoinClicked()

@@ -47,6 +47,11 @@ namespace Assets.Scripts.LiveOps.Tournament
         public List<TournamentBotData> Bots = new List<TournamentBotData>();
         public int FinalPlace = -1;
         public bool ResultsClaimed;
+
+        /// <summary>Last place shown to the player in the leaderboard UI (-1 = never shown).</summary>
+        public int LastShownPlace = -1;
+        /// <summary>Last player score shown in the leaderboard UI (-1 = never shown).</summary>
+        public int LastShownScore = -1;
     }
 
     [Serializable]

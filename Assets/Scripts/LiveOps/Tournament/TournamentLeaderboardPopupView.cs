@@ -79,9 +79,14 @@ namespace Assets.Scripts.LiveOps.Tournament
         private bool m_RowsBuilt;
         private bool m_DidFocusPlayer;
         private RectTransform m_PopupRect;
-        private Coroutine m_FocusCoroutine;
+        private Coroutine m_IntroCoroutine;
+        private bool m_IntroPlaying;
         private string m_SelectedTagline;
         private string m_LastTimerText;
+
+        private const float MaxRowsPerSecond = 4f;
+        private const float MinIntroDuration = 0.4f;
+        private const float ScoreOnlyDuration = 1.0f;
 
         public static void Show(TournamentLiveOpService service)
         {
@@ -128,14 +133,14 @@ namespace Assets.Scripts.LiveOps.Tournament
             }
 
             EnsureRowsBuilt();
-            RefreshRows();
             PickTagline();
             RefreshTimer();
 
             m_DidFocusPlayer = false;
-            if (m_FocusCoroutine != null)
-                StopCoroutine(m_FocusCoroutine);
-            m_FocusCoroutine = StartCoroutine(FocusPlayerAfterLayout());
+            if (m_IntroCoroutine != null)
+                StopCoroutine(m_IntroCoroutine);
+
+            m_IntroCoroutine = StartCoroutine(PlayIntroThenFocus());
         }
 
         private void OnDestroy()
@@ -148,6 +153,10 @@ namespace Assets.Scripts.LiveOps.Tournament
                 m_NameEdit.OnSaveClicked -= SaveName;
                 m_NameEdit.OnCancelClicked -= OnNameEditCancelled;
             }
+
+            if (m_IntroCoroutine != null)
+                StopCoroutine(m_IntroCoroutine);
+            m_IntroPlaying = false;
         }
 
         private void Update()
@@ -160,7 +169,8 @@ namespace Assets.Scripts.LiveOps.Tournament
                 Close();
                 return;
             }
-            RefreshRows();
+            if (!m_IntroPlaying)
+                RefreshRows();
             RefreshTimer();
         }
 
@@ -399,11 +409,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private static string FormatTimeLeft(System.TimeSpan rem)
         {
-            if (rem.TotalDays >= 1)
-                return $"{(int)rem.TotalDays}d {rem.Hours}h";
-            if (rem.TotalHours >= 1)
-                return $"{(int)rem.TotalHours}h {rem.Minutes}m";
-            return $"{Mathf.Max(1, rem.Minutes)}m";
+            return TournamentUiFormat.FormatTimeLeft(rem);
         }
 
         private void EnsureRowsBuilt()
@@ -441,12 +447,329 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         private void RefreshRows()
         {
-            if (service == null || m_RowsParent == null) return;
+            if (service == null || m_RowsParent == null || m_IntroPlaying) return;
             EnsureRowsBuilt();
 
             List<TournamentLeaderboardRow> data = service.BuildLeaderboardRows(TrustedTimeService.UtcNow);
+            ApplyRowData(data);
+
+            if (!m_DidFocusPlayer)
+            {
+                int playerIndex = FindPlayerRowIndex();
+                if (playerIndex >= 0)
+                {
+                    m_DidFocusPlayer = true;
+                    FocusRow(playerIndex);
+                }
+            }
+        }
+
+        private IEnumerator PlayIntroThenFocus()
+        {
+            m_IntroPlaying = true;
+            yield return null;
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            if (m_ScrollRect != null && m_ScrollRect.content != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(m_ScrollRect.content);
+
+            List<TournamentLeaderboardRow> data = service != null
+                ? service.BuildLeaderboardRows(TrustedTimeService.UtcNow)
+                : null;
+
+            if (data == null || data.Count == 0 || service == null)
+            {
+                m_IntroPlaying = false;
+                yield break;
+            }
+
+            int currentPlace = 1;
+            int currentScore = 0;
+            for (int i = 0; i < data.Count; i++)
+            {
+                if (!data[i].IsPlayer) continue;
+                currentPlace = data[i].Place;
+                currentScore = Mathf.Max(0, data[i].Score);
+                break;
+            }
+
+            bool hasLast = service.TryGetLastShownPlayerState(out int lastPlace, out int lastScore);
+            bool placeChanged = hasLast && lastPlace != currentPlace;
+            bool scoreChanged = hasLast && lastScore != currentScore;
+
+            ApplyRowData(data);
+            int playerIndex = FindPlayerRowIndex();
+
+            if (!hasLast || (!placeChanged && !scoreChanged))
+            {
+                service.MarkPlayerStateShown(currentPlace, currentScore);
+                m_IntroPlaying = false;
+                if (playerIndex >= 0)
+                {
+                    m_DidFocusPlayer = true;
+                    FocusRow(playerIndex);
+                }
+                yield break;
+            }
+
+            TournamentLeaderboardRowView playerRow = playerIndex >= 0 ? m_Rows[playerIndex] : null;
+            if (playerRow != null)
+            {
+                playerRow.SetPlaceDisplay(lastPlace);
+                playerRow.SetScoreDisplay(lastScore);
+            }
+
+            if (placeChanged && playerIndex >= 0)
+            {
+                int fromIndex = Mathf.Clamp(lastPlace - 1, 0, m_Rows.Count - 1);
+                int toIndex = playerIndex;
+                yield return AnimatePlayerMoveAndScore(
+                    playerRow,
+                    fromIndex,
+                    toIndex,
+                    lastPlace,
+                    currentPlace,
+                    lastScore,
+                    currentScore,
+                    scoreChanged);
+                m_DidFocusPlayer = true;
+            }
+            else if (scoreChanged && playerRow != null)
+            {
+                yield return AnimateScore(playerRow, lastScore, currentScore, ScoreOnlyDuration);
+                playerRow.SetPlaceDisplay(currentPlace);
+                if (playerIndex >= 0)
+                {
+                    m_DidFocusPlayer = true;
+                    FocusRow(playerIndex);
+                }
+            }
+
+            service.MarkPlayerStateShown(currentPlace, currentScore);
+            m_IntroPlaying = false;
+
+            if (!m_DidFocusPlayer)
+            {
+                playerIndex = FindPlayerRowIndex();
+                if (playerIndex >= 0)
+                {
+                    m_DidFocusPlayer = true;
+                    FocusRow(playerIndex);
+                }
+            }
+            m_IntroCoroutine = null;
+        }
+
+        private IEnumerator AnimatePlayerMoveAndScore(
+            TournamentLeaderboardRowView playerRow,
+            int fromIndex,
+            int toIndex,
+            int fromPlace,
+            int toPlace,
+            int fromScore,
+            int toScore,
+            bool animateScore)
+        {
+            if (playerRow == null || m_RowsParent == null || fromIndex == toIndex)
+            {
+                if (animateScore && playerRow != null)
+                    yield return AnimateScore(playerRow, fromScore, toScore, ScoreOnlyDuration);
+                if (playerRow != null)
+                    playerRow.SetPlaceDisplay(toPlace);
+                yield break;
+            }
+
+            var layout = m_RowsParent.GetComponent<VerticalLayoutGroup>();
+            bool layoutWasEnabled = layout != null && layout.enabled;
+
+            // Capture final (current) positions while layout is on.
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(m_RowsParent as RectTransform);
+            var endPositions = CaptureRowPositions();
+
+            // Build start sibling order: player appears at last shown place.
+            var ordered = new List<TournamentLeaderboardRowView>(m_Rows.Count);
+            for (int i = 0; i < m_Rows.Count; i++)
+            {
+                if (m_Rows[i] != null && m_Rows[i].gameObject.activeSelf)
+                    ordered.Add(m_Rows[i]);
+            }
+
+            if (toIndex < 0 || toIndex >= ordered.Count)
+            {
+                if (animateScore)
+                    yield return AnimateScore(playerRow, fromScore, toScore, ScoreOnlyDuration);
+                playerRow.SetPlaceDisplay(toPlace);
+                yield break;
+            }
+
+            fromIndex = Mathf.Clamp(fromIndex, 0, ordered.Count - 1);
+            int rowsMoved = Mathf.Abs(toIndex - fromIndex);
+            float duration = Mathf.Max(MinIntroDuration, rowsMoved / MaxRowsPerSecond);
+
+            var moving = ordered[toIndex];
+            ordered.RemoveAt(toIndex);
+            ordered.Insert(fromIndex, moving);
+
+            for (int i = 0; i < ordered.Count; i++)
+                ordered[i].transform.SetSiblingIndex(i);
+
+            for (int i = 0; i < ordered.Count; i++)
+                ordered[i].SetPlaceDisplay(i + 1);
+            playerRow.SetScoreDisplay(fromScore);
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(m_RowsParent as RectTransform);
+            var startPositions = CaptureRowPositions();
+
+            // Restore final sibling order, then free-move from start → end.
+            for (int i = 0; i < m_Rows.Count; i++)
+            {
+                if (m_Rows[i] != null && m_Rows[i].gameObject.activeSelf)
+                    m_Rows[i].transform.SetSiblingIndex(i);
+            }
+
+            if (layout != null)
+                layout.enabled = false;
+
+            RectTransform contentRt = ResolveScrollContent();
+            RectTransform viewportRt = m_ScrollRect != null ? m_ScrollRect.viewport : null;
+            float contentHeight = contentRt != null ? contentRt.rect.height : 0f;
+            float viewportHeight = viewportRt != null ? viewportRt.rect.height : 0f;
+            float maxScrollY = Mathf.Max(0f, contentHeight - viewportHeight);
+
+            bool scrollWasEnabled = m_ScrollRect != null && m_ScrollRect.enabled;
+            if (m_ScrollRect != null)
+            {
+                m_ScrollRect.StopMovement();
+                m_ScrollRect.enabled = false; // prevent ScrollRect LateUpdate from fighting Content.y
+            }
+
+            ApplyCapturedPositions(startPositions);
+            ScrollContentToFollowPlayer(playerRow, contentRt, maxScrollY, viewportHeight);
+
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.unscaledDeltaTime;
+                float u = Mathf.Clamp01(t / duration);
+                float eased = EaseInOutCubic(u);
+
+                for (int i = 0; i < m_Rows.Count; i++)
+                {
+                    var row = m_Rows[i];
+                    if (row == null || !row.gameObject.activeSelf) continue;
+                    if (!startPositions.TryGetValue(row, out var start)) continue;
+                    if (!endPositions.TryGetValue(row, out var end)) continue;
+                    var rt = row.transform as RectTransform;
+                    if (rt != null)
+                        rt.anchoredPosition = Vector2.LerpUnclamped(start, end, eased);
+                }
+
+                if (playerRow != null)
+                {
+                    if (animateScore)
+                    {
+                        int score = Mathf.RoundToInt(Mathf.Lerp(fromScore, toScore, eased));
+                        playerRow.SetScoreDisplay(score);
+                    }
+
+                    int place = fromPlace;
+                    if (u >= 0.35f)
+                    {
+                        float placeU = Mathf.Clamp01((u - 0.35f) / 0.65f);
+                        place = Mathf.RoundToInt(Mathf.Lerp(fromPlace, toPlace, EaseInOutCubic(placeU)));
+                    }
+                    playerRow.SetPlaceDisplay(place);
+                }
+
+                // Sticky middle: Content.y follows only while the player can stay centered.
+                ScrollContentToFollowPlayer(playerRow, contentRt, maxScrollY, viewportHeight);
+                yield return null;
+            }
+
+            ApplyCapturedPositions(endPositions);
+            ScrollContentToFollowPlayer(playerRow, contentRt, maxScrollY, viewportHeight);
+
+            if (layout != null)
+                layout.enabled = layoutWasEnabled;
+
+            if (m_ScrollRect != null)
+            {
+                // Sync ScrollRect's internal normalized value to the Content.y we drove,
+                // then re-enable so it doesn't snap back.
+                SyncScrollRectFromContentY(contentRt, maxScrollY);
+                m_ScrollRect.enabled = scrollWasEnabled;
+            }
+
+            // Snap all row copy back to authoritative final leaderboard data.
+            // Do not refocus/scroll here — that caused a visible jump after the anim.
+            if (service != null)
+                ApplyRowData(service.BuildLeaderboardRows(TrustedTimeService.UtcNow));
+        }
+
+        private IEnumerator AnimateScore(
+            TournamentLeaderboardRowView playerRow,
+            int fromScore,
+            int toScore,
+            float duration)
+        {
+            if (playerRow == null || fromScore == toScore)
+            {
+                if (playerRow != null)
+                    playerRow.SetScoreDisplay(toScore);
+                yield break;
+            }
+
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.unscaledDeltaTime;
+                float u = EaseInOutCubic(Mathf.Clamp01(t / duration));
+                int score = Mathf.RoundToInt(Mathf.Lerp(fromScore, toScore, u));
+                playerRow.SetScoreDisplay(score);
+                yield return null;
+            }
+
+            playerRow.SetScoreDisplay(toScore);
+        }
+
+        private Dictionary<TournamentLeaderboardRowView, Vector2> CaptureRowPositions()
+        {
+            var map = new Dictionary<TournamentLeaderboardRowView, Vector2>(m_Rows.Count);
+            for (int i = 0; i < m_Rows.Count; i++)
+            {
+                var row = m_Rows[i];
+                if (row == null || !row.gameObject.activeSelf) continue;
+                var rt = row.transform as RectTransform;
+                if (rt != null)
+                    map[row] = rt.anchoredPosition;
+            }
+            return map;
+        }
+
+        private static void ApplyCapturedPositions(Dictionary<TournamentLeaderboardRowView, Vector2> positions)
+        {
+            if (positions == null) return;
+            foreach (var kv in positions)
+            {
+                if (kv.Key == null) continue;
+                var rt = kv.Key.transform as RectTransform;
+                if (rt != null)
+                    rt.anchoredPosition = kv.Value;
+            }
+        }
+
+        private static float EaseInOutCubic(float t)
+        {
+            return t < 0.5f
+                ? 4f * t * t * t
+                : 1f - Mathf.Pow(-2f * t + 2f, 3f) / 2f;
+        }
+
+        private void ApplyRowData(List<TournamentLeaderboardRow> data)
+        {
             int count = data != null ? data.Count : 0;
-            int playerIndex = -1;
 
             for (int i = 0; i < m_Rows.Count; i++)
             {
@@ -459,7 +782,7 @@ namespace Assets.Scripts.LiveOps.Tournament
                         view.gameObject.SetActive(true);
 
                     Reward reward = default;
-                    if (service.Config != null)
+                    if (service != null && service.Config != null)
                         service.Config.TryGetReward(data[i].Place - 1, out reward);
 
                     view.SetData(
@@ -468,69 +791,94 @@ namespace Assets.Scripts.LiveOps.Tournament
                         GetRewardSprite(reward.type, reward.amount),
                         PlayerRowColor,
                         BotRowColor);
-
-                    if (data[i].IsPlayer)
-                        playerIndex = i;
                 }
                 else if (view.gameObject.activeSelf)
                 {
                     view.gameObject.SetActive(false);
                 }
             }
-
-            if (!m_DidFocusPlayer && playerIndex >= 0)
-            {
-                m_DidFocusPlayer = true;
-                FocusRow(playerIndex);
-            }
         }
 
-        private IEnumerator FocusPlayerAfterLayout()
+        private int FindPlayerRowIndex()
         {
-            yield return null;
-            yield return null;
-            Canvas.ForceUpdateCanvases();
-            if (m_ScrollRect != null && m_ScrollRect.content != null)
-                LayoutRebuilder.ForceRebuildLayoutImmediate(m_ScrollRect.content);
-
-            // Rows already populated in Initialize; only scroll to the player.
-            if (!m_DidFocusPlayer)
+            for (int i = 0; i < m_Rows.Count; i++)
             {
-                for (int i = 0; i < m_Rows.Count; i++)
-                {
-                    if (m_Rows[i] != null && m_Rows[i].IsPlayerRow)
-                    {
-                        m_DidFocusPlayer = true;
-                        FocusRow(i);
-                        break;
-                    }
-                }
+                if (m_Rows[i] != null && m_Rows[i].IsPlayerRow)
+                    return i;
             }
+            return -1;
         }
 
         private void FocusRow(int index)
         {
-            if (m_ScrollRect == null || m_ScrollRect.content == null || m_Rows.Count == 0)
-                return;
             if (index < 0 || index >= m_Rows.Count || m_Rows[index] == null)
                 return;
+            FocusRowView(m_Rows[index]);
+        }
 
-            Canvas.ForceUpdateCanvases();
-            var content = m_ScrollRect.content;
-            var row = m_Rows[index].transform as RectTransform;
+        private void FocusRowView(TournamentLeaderboardRowView rowView)
+        {
+            RectTransform contentRt = ResolveScrollContent();
+            if (contentRt == null) return;
+            float viewportHeight = m_ScrollRect != null && m_ScrollRect.viewport != null
+                ? m_ScrollRect.viewport.rect.height
+                : 0f;
+            float maxScrollY = Mathf.Max(0f, contentRt.rect.height - viewportHeight);
+            ScrollContentToFollowPlayer(rowView, contentRt, maxScrollY, viewportHeight);
+            SyncScrollRectFromContentY(contentRt, maxScrollY);
+        }
+
+        private RectTransform ResolveScrollContent()
+        {
+            if (m_ScrollRect != null && m_ScrollRect.content != null)
+                return m_ScrollRect.content;
+            return m_RowsParent as RectTransform;
+        }
+
+        /// <summary>
+        /// Drives LeaderboardScroll Content.anchoredPosition.y so the player stays in the
+        /// middle of the viewport when possible. Near the top/bottom of the list the content
+        /// clamps and the row continues alone (sticky middle follow).
+        /// </summary>
+        private static void ScrollContentToFollowPlayer(
+            TournamentLeaderboardRowView rowView,
+            RectTransform content,
+            float maxScrollY,
+            float viewportHeight)
+        {
+            if (rowView == null || content == null || viewportHeight <= 0.01f)
+                return;
+
+            var row = rowView.transform as RectTransform;
             if (row == null) return;
 
-            float contentHeight = content.rect.height;
-            float viewportHeight = m_ScrollRect.viewport != null ? m_ScrollRect.viewport.rect.height : 0f;
-            if (contentHeight <= viewportHeight || contentHeight <= 0.01f)
+            // Row center in content-local space (content pivot is top).
+            Vector3 rowCenterWorld = row.TransformPoint(row.rect.center);
+            Vector3 rowCenterInContent = content.InverseTransformPoint(rowCenterWorld);
+            float rowCenterFromTop = -rowCenterInContent.y;
+
+            // Desired content Y that would put the row in the vertical middle.
+            // Clamp: stay at top until the row reaches mid, then follow, then pin at bottom.
+            float desiredY = rowCenterFromTop - viewportHeight * 0.5f;
+            float targetY = Mathf.Clamp(desiredY, 0f, maxScrollY);
+
+            Vector2 pos = content.anchoredPosition;
+            pos.y = targetY;
+            content.anchoredPosition = pos;
+        }
+
+        private void SyncScrollRectFromContentY(RectTransform content, float maxScrollY)
+        {
+            if (m_ScrollRect == null || content == null) return;
+            m_ScrollRect.StopMovement();
+            if (maxScrollY <= 0.01f)
             {
                 m_ScrollRect.verticalNormalizedPosition = 1f;
                 return;
             }
 
-            float rowCenter = Mathf.Abs(row.anchoredPosition.y) + row.rect.height * 0.5f;
-            float normalized = 1f - Mathf.Clamp01((rowCenter - viewportHeight * 0.5f) / (contentHeight - viewportHeight));
-            m_ScrollRect.verticalNormalizedPosition = Mathf.Clamp01(normalized);
+            float y = content.anchoredPosition.y;
+            m_ScrollRect.verticalNormalizedPosition = 1f - Mathf.Clamp01(y / maxScrollY);
         }
 
         private Sprite GetRewardSprite(RewardType type, int amount)
