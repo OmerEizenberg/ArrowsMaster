@@ -48,7 +48,7 @@ namespace Assets.Scripts.LiveOps.Tournament
             var bg = go.GetComponent<Image>();
             bg.sprite = backgroundSprite;
             bg.type = Image.Type.Sliced;
-            bg.color = new Color(0.35f, 0.35f, 0.4f, 0.9f);
+            bg.color = Color.white;
 
             var hlg = go.GetComponent<HorizontalLayoutGroup>();
             hlg.padding = new RectOffset(12, 12, 12, 12);

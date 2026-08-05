@@ -41,7 +41,7 @@ namespace Assets.Scripts.LiveOps.Tournament
 
         [Header("Colors")]
         [SerializeField] private Color m_PlayerRowColor = new Color(0.49f, 0.37f, 1f, 1f);
-        [SerializeField] private Color m_BotRowColor = new Color(0.35f, 0.35f, 0.4f, 0.9f);
+        [SerializeField] private Color m_BotRowColor = Color.white;
 
         public Image Background { get => m_Background; set => m_Background = value; }
         public Button Button { get => m_Button; set => m_Button = value; }
