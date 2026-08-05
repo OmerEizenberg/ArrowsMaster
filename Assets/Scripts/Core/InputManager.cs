@@ -178,6 +178,8 @@ namespace Assets.Scripts.Core
 
         private bool TryRatioBasedSelection(Vector2 endScreenPos, float travelDistPixels)
         {
+            if (IsScreenPositionBlocked(endScreenPos)) return false;
+
             Vector3 worldEndPos = m_Camera.ScreenToWorldPoint(endScreenPos);
             worldEndPos.z = 0;
 
@@ -358,7 +360,8 @@ namespace Assets.Scripts.Core
         private bool IsScreenPositionBlocked(Vector2 screenPos)
         {
             float normalizedY = screenPos.y / Screen.height;
-            return normalizedY > 0.85f || normalizedY < 0.11f;
+            // Block top/bottom UI bands so taps on panels don't hit arrows.
+            return normalizedY > 0.85f || normalizedY < 0.125f;
         }
     }
 }
