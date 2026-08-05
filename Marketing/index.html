@@ -25,12 +25,50 @@
             user-select: none;
             touch-action: none;
             -webkit-tap-highlight-color: transparent;
+            cursor: none;
         }
 
         body {
             display: flex;
             flex-direction: column;
             align-items: stretch;
+        }
+
+        /* ─── Custom hand cursor ─────────────────────────────────────── */
+        #custom-cursor {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 48px;
+            height: 48px;
+            margin-left: -10px;
+            margin-top: -8px;
+            pointer-events: none;
+            z-index: 9999;
+            background: url('resources/sprites/hand-cursor.png') center / contain no-repeat;
+            transform: scale(1);
+            transform-origin: 10px 8px;
+            transition: transform 0.08s ease-out;
+            will-change: transform, left, top;
+            opacity: 0;
+        }
+
+        #custom-cursor.visible {
+            opacity: 1;
+        }
+
+        #custom-cursor.pressed {
+            transform: scale(0.78);
+            transition: transform 0.06s ease-in;
+        }
+
+        @media (hover: none), (pointer: coarse) {
+            html, body, canvas#gameCanvas, .btn {
+                cursor: auto;
+            }
+            #custom-cursor {
+                display: none !important;
+            }
         }
 
         /* ─── HUD ───────────────────────────────────────────────────── */
@@ -194,11 +232,7 @@
             display: block;
             width: 100%;
             height: 100%;
-            cursor: grab;
-        }
-
-        canvas#gameCanvas:active {
-            cursor: grabbing;
+            cursor: none;
         }
 
         .overlay-screen {
@@ -208,11 +242,13 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.96);
             z-index: 300;
             opacity: 0;
             pointer-events: none;
-            transition: opacity .3s;
+            transition: opacity .35s;
+            gap: clamp(14px, 3.5vw, 22px);
+            padding: 24px;
         }
 
         .overlay-screen.visible {
@@ -220,21 +256,79 @@
             pointer-events: all;
         }
 
-        .overlay-screen h1 {
-            font-size: clamp(26px, 7vw, 42px);
-            font-weight: 900;
-            color: #111;
-            margin-bottom: 8px;
-            text-align: center;
+        .end-icon {
+            width: clamp(140px, 38vw, 220px);
+            height: clamp(140px, 38vw, 220px);
+            border-radius: clamp(28px, 7vw, 48px);
+            object-fit: cover;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+            transform: scale(0.86);
+            opacity: 0;
+            transition: transform .45s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity .35s;
         }
 
-        .overlay-screen p {
-            font-size: clamp(13px, 3vw, 17px);
-            color: #555;
+        .overlay-screen.visible .end-icon {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .end-download {
+            font-size: clamp(22px, 6vw, 34px);
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            color: #111;
             text-align: center;
-            max-width: min(300px, 80vw);
-            line-height: 1.5;
-            margin-bottom: 24px;
+            text-transform: uppercase;
+        }
+
+        .end-search-field {
+            width: min(320px, 82vw);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: #f3f3f5;
+            border: 1.5px solid rgba(0, 0, 0, 0.08);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+
+        .end-search-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            opacity: 0.35;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111111' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") center / contain no-repeat;
+        }
+
+        .end-typewriter {
+            flex: 1;
+            min-height: 1.2em;
+            font-size: clamp(16px, 4.2vw, 20px);
+            font-weight: 700;
+            color: #111;
+            letter-spacing: 0.01em;
+            white-space: pre;
+        }
+
+        .end-typewriter::after {
+            content: '';
+            display: inline-block;
+            width: 2px;
+            height: 1.05em;
+            margin-left: 2px;
+            vertical-align: -0.12em;
+            background: #7b2cbf;
+            animation: caretBlink 0.7s steps(1) infinite;
+        }
+
+        .end-typewriter.done::after {
+            opacity: 0;
+            animation: none;
+        }
+
+        @keyframes caretBlink {
+            50% { opacity: 0; }
         }
 
         .btn {
@@ -242,7 +336,7 @@
             border-radius: 50px;
             font-size: clamp(15px, 3.5vw, 19px);
             font-weight: 800;
-            cursor: pointer;
+            cursor: none;
             border: none;
             transition: transform .1s;
             box-shadow: 0 6px 22px rgba(0, 0, 0, 0.15);
@@ -381,35 +475,62 @@
         <div id="combo-text" class="combo-text">Combo 2</div>
     </div>
     <div id="canvas-wrap"><canvas id="gameCanvas"></canvas></div>
-    <div class="overlay-screen" id="failure-screen">
-        <h1 id="fail-title">Out of Lives!</h1>
-        <p id="fail-subtitle">Tap Restart to try again</p><button class="btn btn-primary" onclick="restartLevel()">↩
-            Restart</button>
-    </div>
-    <div class="overlay-screen" id="win-screen">
-        <h1 id="win-text">Amazing!</h1>
-        <p>You cleared all arrows!</p><button class="btn btn-primary" onclick="restartLevel()">▶ Play Again</button>
+    <div class="overlay-screen" id="end-screen">
+        <img class="end-icon" src="resources/sprites/app-icon.png" alt="Arrows Legend" />
+        <div class="end-download">DOWNLOAD NOW!</div>
+        <div class="end-search-field" aria-hidden="true">
+            <div class="end-search-icon"></div>
+            <div class="end-typewriter" id="end-typewriter"></div>
+        </div>
     </div>
     <div id="wrong-flash"></div>
+    <div id="custom-cursor" aria-hidden="true"></div>
 
     <script>
         // ═══════════════════════════════════════════════════════════════════
         //  LEVEL ENGINE DATA
         // ═══════════════════════════════════════════════════════════════════
+        // Embedded Level8 (works with file:// and ad packages; no network fetch needed)
+        const LEVEL8_EMBEDDED = {"gridSize":{"x":26,"y":23},"duration":60,"arrows":[{"id":1,"path":[{"x":18,"y":17},{"x":18,"y":18},{"x":18,"y":19},{"x":18,"y":20},{"x":18,"y":21},{"x":19,"y":21},{"x":19,"y":20},{"x":20,"y":20},{"x":21,"y":20},{"x":22,"y":20}],"lookDirection":"right","color":"#000000"},{"id":2,"path":[{"x":4,"y":19},{"x":4,"y":18},{"x":4,"y":17},{"x":5,"y":17},{"x":5,"y":18},{"x":5,"y":19},{"x":5,"y":20},{"x":6,"y":20},{"x":7,"y":20},{"x":8,"y":20},{"x":8,"y":19},{"x":9,"y":19},{"x":9,"y":18},{"x":8,"y":18},{"x":8,"y":17},{"x":7,"y":17},{"x":7,"y":16},{"x":8,"y":16},{"x":9,"y":16},{"x":10,"y":16},{"x":11,"y":16},{"x":12,"y":16},{"x":13,"y":16},{"x":13,"y":15},{"x":14,"y":15},{"x":14,"y":16},{"x":15,"y":16},{"x":15,"y":17},{"x":14,"y":17},{"x":14,"y":18},{"x":15,"y":18},{"x":15,"y":19},{"x":16,"y":19},{"x":17,"y":19},{"x":17,"y":18},{"x":17,"y":17},{"x":16,"y":17},{"x":16,"y":16},{"x":17,"y":16},{"x":18,"y":16},{"x":18,"y":15},{"x":19,"y":15},{"x":20,"y":15},{"x":21,"y":15},{"x":22,"y":15}],"lookDirection":"right","color":"#000000"},{"id":3,"path":[{"x":16,"y":8},{"x":16,"y":9},{"x":16,"y":10},{"x":15,"y":10},{"x":15,"y":9},{"x":14,"y":9},{"x":14,"y":10},{"x":14,"y":11},{"x":13,"y":11},{"x":13,"y":12},{"x":14,"y":12},{"x":14,"y":13},{"x":15,"y":13},{"x":15,"y":12},{"x":16,"y":12},{"x":16,"y":11},{"x":17,"y":11},{"x":18,"y":11},{"x":19,"y":11},{"x":19,"y":10},{"x":18,"y":10},{"x":17,"y":10},{"x":17,"y":9},{"x":18,"y":9},{"x":19,"y":9},{"x":20,"y":9},{"x":20,"y":10},{"x":21,"y":10},{"x":21,"y":9},{"x":22,"y":9},{"x":22,"y":10},{"x":22,"y":11},{"x":21,"y":11},{"x":20,"y":11},{"x":20,"y":12},{"x":20,"y":13},{"x":20,"y":14},{"x":21,"y":14},{"x":22,"y":14}],"lookDirection":"right","color":"#000000"},{"id":4,"path":[{"x":23,"y":11},{"x":23,"y":10},{"x":23,"y":9}],"lookDirection":"down","color":"#000000"},{"id":5,"path":[{"x":21,"y":19},{"x":22,"y":19},{"x":23,"y":19},{"x":23,"y":18},{"x":23,"y":17},{"x":23,"y":16},{"x":24,"y":16},{"x":24,"y":15},{"x":24,"y":14},{"x":24,"y":13},{"x":24,"y":12},{"x":24,"y":11},{"x":24,"y":10}],"lookDirection":"down","color":"#000000"},{"id":6,"path":[{"x":21,"y":13},{"x":21,"y":12},{"x":22,"y":12},{"x":22,"y":13}],"lookDirection":"up","color":"#000000"},{"id":7,"path":[{"x":7,"y":12},{"x":6,"y":12},{"x":6,"y":13},{"x":7,"y":13},{"x":7,"y":14},{"x":6,"y":14},{"x":6,"y":15},{"x":7,"y":15},{"x":8,"y":15},{"x":8,"y":14},{"x":8,"y":13},{"x":8,"y":12},{"x":8,"y":11},{"x":8,"y":10},{"x":8,"y":9},{"x":7,"y":9},{"x":7,"y":10},{"x":7,"y":11},{"x":6,"y":11},{"x":6,"y":10},{"x":6,"y":9}],"lookDirection":"down","color":"#000000"},{"id":8,"path":[{"x":16,"y":14},{"x":15,"y":14},{"x":14,"y":14},{"x":13,"y":14},{"x":13,"y":13},{"x":12,"y":13},{"x":11,"y":13},{"x":10,"y":13},{"x":10,"y":12},{"x":11,"y":12},{"x":12,"y":12},{"x":12,"y":11},{"x":11,"y":11},{"x":10,"y":11},{"x":9,"y":11},{"x":9,"y":10},{"x":10,"y":10},{"x":11,"y":10}],"lookDirection":"right","color":"#000000"},{"id":9,"path":[{"x":22,"y":16},{"x":21,"y":16},{"x":20,"y":16},{"x":19,"y":16},{"x":19,"y":17},{"x":20,"y":17},{"x":21,"y":17},{"x":22,"y":17}],"lookDirection":"right","color":"#000000"},{"id":10,"path":[{"x":4,"y":8},{"x":4,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":6,"y":8}],"lookDirection":"right","color":"#000000"},{"id":11,"path":[{"x":20,"y":19},{"x":19,"y":19},{"x":19,"y":18},{"x":20,"y":18},{"x":21,"y":18},{"x":22,"y":18}],"lookDirection":"right","color":"#000000"},{"id":12,"path":[{"x":5,"y":7},{"x":6,"y":7},{"x":6,"y":6}],"lookDirection":"down","color":"#000000"},{"id":13,"path":[{"x":22,"y":8},{"x":21,"y":8},{"x":20,"y":8},{"x":19,"y":8},{"x":18,"y":8},{"x":18,"y":7},{"x":19,"y":7},{"x":20,"y":7},{"x":21,"y":7},{"x":21,"y":6},{"x":20,"y":6},{"x":19,"y":6},{"x":18,"y":6}],"lookDirection":"left","color":"#000000"},{"id":14,"path":[{"x":12,"y":6},{"x":13,"y":6},{"x":13,"y":7},{"x":12,"y":7},{"x":11,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":9,"y":8},{"x":8,"y":8},{"x":8,"y":7},{"x":9,"y":7},{"x":9,"y":6},{"x":10,"y":6},{"x":11,"y":6},{"x":11,"y":5},{"x":12,"y":5},{"x":12,"y":4},{"x":13,"y":4},{"x":13,"y":5},{"x":14,"y":5},{"x":14,"y":6}],"lookDirection":"up","color":"#000000"},{"id":15,"path":[{"x":13,"y":3},{"x":12,"y":3},{"x":12,"y":2},{"x":13,"y":2},{"x":14,"y":2},{"x":14,"y":3},{"x":15,"y":3},{"x":16,"y":3},{"x":16,"y":4},{"x":17,"y":4},{"x":17,"y":5},{"x":16,"y":5},{"x":15,"y":5},{"x":15,"y":6}],"lookDirection":"up","color":"#000000"},{"id":16,"path":[{"x":24,"y":18},{"x":24,"y":17}],"lookDirection":"down","color":"#000000"},{"id":17,"path":[{"x":17,"y":8},{"x":17,"y":7},{"x":17,"y":6},{"x":16,"y":6},{"x":16,"y":7},{"x":15,"y":7},{"x":15,"y":8}],"lookDirection":"up","color":"#000000"},{"id":18,"path":[{"x":9,"y":9},{"x":10,"y":9}],"lookDirection":"right","color":"#000000"},{"id":19,"path":[{"x":2,"y":11},{"x":2,"y":12},{"x":2,"y":13},{"x":3,"y":13},{"x":3,"y":14},{"x":4,"y":14},{"x":5,"y":14},{"x":5,"y":13},{"x":4,"y":13},{"x":4,"y":12},{"x":4,"y":11},{"x":3,"y":11},{"x":3,"y":10}],"lookDirection":"down","color":"#000000"},{"id":20,"path":[{"x":25,"y":15},{"x":25,"y":14}],"lookDirection":"down","color":"#000000"},{"id":22,"path":[{"x":14,"y":7},{"x":14,"y":8}],"lookDirection":"up","color":"#000000"},{"id":24,"path":[{"x":11,"y":9},{"x":11,"y":8},{"x":12,"y":8},{"x":12,"y":9}],"lookDirection":"up","color":"#000000"},{"id":27,"path":[{"x":16,"y":15},{"x":17,"y":15}],"lookDirection":"right","color":"#000000"},{"id":28,"path":[{"x":23,"y":15},{"x":23,"y":14},{"x":23,"y":13},{"x":23,"y":12}],"lookDirection":"down","color":"#000000"},{"id":29,"path":[{"x":10,"y":5},{"x":9,"y":5},{"x":8,"y":5},{"x":8,"y":4},{"x":9,"y":4},{"x":10,"y":4},{"x":11,"y":4},{"x":11,"y":3}],"lookDirection":"down","color":"#000000"},{"id":31,"path":[{"x":13,"y":8},{"x":13,"y":9}],"lookDirection":"up","color":"#000000"},{"id":35,"path":[{"x":6,"y":21},{"x":7,"y":21},{"x":8,"y":21},{"x":9,"y":21},{"x":9,"y":20},{"x":10,"y":20},{"x":10,"y":19},{"x":10,"y":18},{"x":10,"y":17},{"x":9,"y":17}],"lookDirection":"left","color":"#000000"},{"id":36,"path":[{"x":3,"y":19},{"x":3,"y":18},{"x":3,"y":17},{"x":2,"y":17},{"x":2,"y":16},{"x":3,"y":16},{"x":3,"y":15},{"x":4,"y":15},{"x":4,"y":16},{"x":5,"y":16},{"x":6,"y":16}],"lookDirection":"right","color":"#000000"},{"id":37,"path":[{"x":17,"y":14},{"x":17,"y":13},{"x":17,"y":12},{"x":18,"y":12}],"lookDirection":"right","color":"#000000"},{"id":39,"path":[{"x":11,"y":17},{"x":12,"y":17},{"x":12,"y":18}],"lookDirection":"up","color":"#000000"},{"id":41,"path":[{"x":15,"y":4},{"x":14,"y":4}],"lookDirection":"left","color":"#000000"},{"id":42,"color":"#000000","path":[{"x":5,"y":12},{"x":5,"y":11},{"x":5,"y":10},{"x":4,"y":10}],"lookDirection":"left"},{"id":43,"color":"#000000","path":[{"x":18,"y":13},{"x":19,"y":13},{"x":19,"y":12}],"lookDirection":"down"},{"id":44,"color":"#000000","path":[{"x":6,"y":17},{"x":6,"y":18},{"x":6,"y":19},{"x":7,"y":19},{"x":7,"y":18}],"lookDirection":"down"},{"id":45,"color":"#000000","path":[{"x":10,"y":14},{"x":10,"y":15}],"lookDirection":"up"},{"id":46,"color":"#000000","path":[{"x":12,"y":15},{"x":12,"y":14},{"x":11,"y":14},{"x":11,"y":15}],"lookDirection":"up"},{"id":47,"color":"#000000","path":[{"x":7,"y":8},{"x":7,"y":7},{"x":7,"y":6},{"x":7,"y":5}],"lookDirection":"down"},{"id":48,"color":"#000000","path":[{"x":18,"y":14},{"x":19,"y":14}],"lookDirection":"right"},{"id":49,"color":"#000000","path":[{"x":9,"y":15},{"x":9,"y":14},{"x":9,"y":13},{"x":9,"y":12}],"lookDirection":"down"},{"id":50,"color":"#000000","path":[{"x":11,"y":18},{"x":11,"y":19}],"lookDirection":"up"},{"id":51,"color":"#000000","path":[{"x":12,"y":10},{"x":13,"y":10}],"lookDirection":"right"},{"id":52,"color":"#000000","path":[{"x":17,"y":20},{"x":16,"y":20}],"lookDirection":"left"},{"id":53,"color":"#000000","path":[{"x":18,"y":5},{"x":19,"y":5}],"lookDirection":"right"},{"id":54,"color":"#000000","path":[{"x":2,"y":14},{"x":2,"y":15}],"lookDirection":"up"}]};
         let LEVEL_DATA = null;
 
         async function fetchLevelData() {
-            try {
-                const res = await fetch('LevelAD.json');
-                if (!res.ok) throw new Error("Status " + res.status);
-                LEVEL_DATA = await res.json();
-                console.log("Dynamically loaded LevelAD.json");
-            } catch (err) {
-                console.warn("Could not fetch LevelAD.json dynamically (CORS/File Not Found). Using internal fallback level.");
-                LEVEL_DATA = { "gridSize": { "x": 33, "y": 32 }, "duration": 60, "arrows": [{ "id": 1, "lookDirection": "up", "path": [{ "x": 23, "y": 5 }, { "x": 23, "y": 6 }, { "x": 23, "y": 7 }, { "x": 23, "y": 8 }, { "x": 24, "y": 8 }, { "x": 25, "y": 8 }, { "x": 26, "y": 8 }, { "x": 27, "y": 8 }, { "x": 27, "y": 9 }, { "x": 27, "y": 10 }], "color": "#393939" }] };
-            }
-            if (LEVEL_DATA && !LEVEL_DATA.duration) LEVEL_DATA.duration = 60;
+            LEVEL_DATA = LEVEL8_EMBEDDED;
+            if (!LEVEL_DATA.duration) LEVEL_DATA.duration = 60;
+            console.log("Loaded embedded Level8");
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  CUSTOM HAND CURSOR
+        // ═══════════════════════════════════════════════════════════════════
+        (function initCustomCursor() {
+            const cursor = document.getElementById('custom-cursor');
+            if (!cursor) return;
+            const coarse = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+            if (coarse) return;
+
+            window.addEventListener('pointermove', (e) => {
+                if (e.pointerType === 'touch') return;
+                cursor.style.left = e.clientX + 'px';
+                cursor.style.top = e.clientY + 'px';
+                cursor.classList.add('visible');
+            }, { passive: true });
+
+            window.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'touch') return;
+                cursor.classList.add('pressed');
+            }, { passive: true });
+
+            const release = (e) => {
+                if (e && e.pointerType === 'touch') return;
+                cursor.classList.remove('pressed');
+            };
+            window.addEventListener('pointerup', release, { passive: true });
+            window.addEventListener('pointercancel', release, { passive: true });
+
+            document.addEventListener('mouseleave', () => cursor.classList.remove('visible'));
+            document.documentElement.addEventListener('mouseenter', () => cursor.classList.add('visible'));
+        })();
 
 
         // ═══════════════════════════════════════════════════════════════════
@@ -649,8 +770,15 @@
                 this.bounceDur = 0.15; // Faster bounce
             }
             startBlockedAnim() {
-                this.lastAnimTarget = this.color; // Back to black after flash
-                this.colorAnim = { from: '#27ae60', to: '#e74c3c', t: 0, dur: 0.04, next: this.color };
+                // Animate from press highlight into final color (red if life was reduced)
+                this.lastAnimTarget = this.color;
+                this.colorAnim = { from: this.drawColor || '#27ae60', to: this.color, t: 0, dur: 0.12, next: null };
+            }
+
+            markAsMistake() {
+                this.color = '#e74c3c';
+                this.drawColor = '#e74c3c';
+                this.lastAnimTarget = '#e74c3c';
             }
         }
 
@@ -710,8 +838,10 @@
                 document.getElementById('timer-container').classList.toggle('visible', isTimerActive);
                 updateTimerDisplay();
 
-                document.getElementById('failure-screen').classList.remove('visible');
-                document.getElementById('win-screen').classList.remove('visible');
+                document.getElementById('end-screen').classList.remove('visible');
+                stopEndTypewriter();
+                document.getElementById('end-typewriter').textContent = '';
+                document.getElementById('end-typewriter').classList.remove('done');
 
                 SFX.playLevelInit();
 
@@ -855,28 +985,64 @@
                     isTimerActive = false;
                     canInteract = false;
                     SFX.playWin();
-                    document.getElementById('win-screen').classList.add('visible');
+                    showEndScreen();
                 }, 400);
                 (function step() { if (a.gone) return; if (!a.tryStep()) { a.isMoving = false; return; } setTimeout(step, 27); })();
             } else {
                 SFX.playMistake();
                 flashWrong();
-                a.startBlockedAnim();
-                a.startBounceAnim();
 
                 if (!a.hasReducedLife) {
                     a.hasReducedLife = true;
+                    a.markAsMistake();
                     lives--;
                     updateLivesUI();
                     if (lives <= 0) handleGameOver(false);
                 }
+
+                a.startBlockedAnim();
+                a.startBounceAnim();
 
                 // Reset combo on mistake
                 comboCount = 0;
             }
         }
 
-        function handleGameOver(tu) { canInteract = false; isTimerActive = false; document.getElementById('fail-title').textContent = tu ? "Time's Up!" : "Out of Lives!"; document.getElementById('failure-screen').classList.add('visible'); }
+        let endTypeTimer = null;
+        const END_TITLE = 'Arrows Legend';
+
+        function stopEndTypewriter() {
+            if (endTypeTimer) { clearTimeout(endTypeTimer); endTypeTimer = null; }
+        }
+
+        function startEndTypewriter() {
+            const el = document.getElementById('end-typewriter');
+            stopEndTypewriter();
+            el.textContent = '';
+            el.classList.remove('done');
+            let i = 0;
+            (function typeNext() {
+                if (i <= END_TITLE.length) {
+                    el.textContent = END_TITLE.slice(0, i);
+                    i++;
+                    endTypeTimer = setTimeout(typeNext, i === 1 ? 280 : 70);
+                } else {
+                    el.classList.add('done');
+                    endTypeTimer = null;
+                }
+            })();
+        }
+
+        function showEndScreen() {
+            document.getElementById('end-screen').classList.add('visible');
+            startEndTypewriter();
+        }
+
+        function handleGameOver(tu) {
+            canInteract = false;
+            isTimerActive = false;
+            showEndScreen();
+        }
         function tickTimer() { currentTime -= 0.1; if (currentTime <= 0) { currentTime = 0; handleGameOver(true); } updateTimerDisplay(); }
         function updateTimerDisplay() { const s = Math.ceil(currentTime), m = String(Math.floor(s / 60)).padStart(2, '0'), sec = String(s % 60).padStart(2, '0'); document.getElementById('timer-text').textContent = `${m}:${sec}`; }
         function updateLivesUI() { for (let i = 0; i < 3; i++) document.getElementById(`heart-${i}`).classList.toggle('inactive', i >= lives); }
