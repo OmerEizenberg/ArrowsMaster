@@ -265,9 +265,18 @@ namespace Assets.Scripts.Lobby
             {
                 LiveOpManager.Instance.CheckLiveOps();
                 LiveOpManager.Instance.SyncLobbyIcons();
+                RestoreTournamentScoreIfNeeded();
             }
 
             StartCoroutine(DeferredLobbyLiveOpsAndGae());
+        }
+
+        private static void RestoreTournamentScoreIfNeeded()
+        {
+            var tournament = LiveOpManager.Instance?
+                .GetActiveService(Assets.Scripts.LiveOps.TournamentLiveOpService.EventId)
+                as Assets.Scripts.LiveOps.TournamentLiveOpService;
+            tournament?.FlushPendingPersistence();
         }
 
         private IEnumerator DeferredLobbyLiveOpsAndGae()

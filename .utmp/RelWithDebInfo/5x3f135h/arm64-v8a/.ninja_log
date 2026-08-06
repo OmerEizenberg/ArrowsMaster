@@ -1,5 +1,5 @@
 # ninja log v5
-0	420	1785502958663485315	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	16ccb577cb4fe9a3
-420	633	1785502958860929527	/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5x3f135h/obj/arm64-v8a/libswappywrapper.so	c670489d9b16dbbf
-0	81	1785932294236269785	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	16ccb577cb4fe9a3
 82	153	1785932294296241264	/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5x3f135h/obj/arm64-v8a/libswappywrapper.so	c670489d9b16dbbf
+0	81	1785932294236269785	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	16ccb577cb4fe9a3
+0	73	1785962820916998509	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	16ccb577cb4fe9a3
+73	148	1785962820973846137	/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5x3f135h/obj/arm64-v8a/libswappywrapper.so	c670489d9b16dbbf

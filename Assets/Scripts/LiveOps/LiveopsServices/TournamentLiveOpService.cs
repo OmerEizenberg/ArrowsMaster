@@ -27,6 +27,7 @@ namespace Assets.Scripts.LiveOps
 
         private static string LastShownPlacePrefsKey(string uniqueId) => $"Tournament_LastShownPlace_{uniqueId}";
         private static string LastShownScorePrefsKey(string uniqueId) => $"Tournament_LastShownScore_{uniqueId}";
+        private static string PlayerScorePrefsKey(string uniqueId) => $"Tournament_PlayerScore_{uniqueId}";
 
         public override void OnActivate()
         {
@@ -45,6 +46,7 @@ namespace Assets.Scripts.LiveOps
             }
             else
             {
+                RestorePlayerScoreFromPrefs();
                 OverlayLastShownFromPrefs();
                 if (Progress.Status == TournamentStatus.Joined && TrustedTimeService.UtcNow >= CurrentWindow.EndUtc)
                     FinalizeIfNeeded();
@@ -53,6 +55,13 @@ namespace Assets.Scripts.LiveOps
             }
 
             NotifyStateChanged();
+        }
+
+        /// <summary>Flush any deferred tournament progress (call on app pause / quit).</summary>
+        public void FlushPendingPersistence()
+        {
+            RestorePlayerScoreFromPrefs();
+            FlushProgressIfDirty();
         }
 
         /// <summary>
@@ -301,6 +310,7 @@ namespace Assets.Scripts.LiveOps
             Progress.LastShownScore = -1;
             PlayerPrefs.DeleteKey(LastShownPlacePrefsKey(UniqueID));
             PlayerPrefs.DeleteKey(LastShownScorePrefsKey(UniqueID));
+            PlayerPrefs.DeleteKey(PlayerScorePrefsKey(UniqueID));
             Progress.PlayerName = GetOrCreatePlayerDisplayName();
             Progress.Bots = TournamentBotSimulator.CreateBotsOnJoin(
                 Config,
@@ -329,7 +339,10 @@ namespace Assets.Scripts.LiveOps
             }
 
             Progress.PlayerScore += amount;
-            MarkProgressDirty();
+            // Score changes once per level win — persist immediately so app kill before
+            // lobby/tick flush does not lose golden arrows.
+            PersistPlayerScoreToPrefs();
+            SaveState();
             NotifyStateChanged();
         }
 
@@ -658,6 +671,8 @@ namespace Assets.Scripts.LiveOps
             if (Progress == null) return;
             SaveProgress(JsonUtility.ToJson(Progress));
             m_ProgressDirty = false;
+            if (Progress.Status == TournamentStatus.Joined)
+                PersistPlayerScoreToPrefs();
         }
 
         private void MarkProgressDirty() => m_ProgressDirty = true;
@@ -666,6 +681,35 @@ namespace Assets.Scripts.LiveOps
         {
             if (m_ProgressDirty)
                 SaveState();
+        }
+
+        private void PersistPlayerScoreToPrefs()
+        {
+            if (Progress == null || string.IsNullOrEmpty(UniqueID)) return;
+            if (Progress.Status != TournamentStatus.Joined) return;
+            PlayerPrefs.SetInt(PlayerScorePrefsKey(UniqueID), Progress.PlayerScore);
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Recover score written during gameplay if the full progress JSON was not flushed
+        /// before the app was closed.
+        /// </summary>
+        private void RestorePlayerScoreFromPrefs()
+        {
+            if (Progress == null || string.IsNullOrEmpty(UniqueID)) return;
+            if (Progress.Status != TournamentStatus.Joined) return;
+
+            string key = PlayerScorePrefsKey(UniqueID);
+            if (!PlayerPrefs.HasKey(key)) return;
+
+            int savedScore = PlayerPrefs.GetInt(key, 0);
+            if (savedScore <= Progress.PlayerScore) return;
+
+            Progress.PlayerScore = savedScore;
+            MarkProgressDirty();
+            FlushProgressIfDirty();
+            Debug.Log($"[TournamentLiveOpService] Restored player score {savedScore} from local cache for {UniqueID}");
         }
 
         private void InvalidatePlaceCache()

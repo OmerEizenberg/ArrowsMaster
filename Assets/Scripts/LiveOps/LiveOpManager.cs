@@ -81,6 +81,28 @@ namespace Assets.Scripts.LiveOps
             CheckLiveOps();
         }
 
+        private void OnApplicationPause(bool paused)
+        {
+            if (!paused)
+                return;
+            FlushTournamentPersistence();
+        }
+
+        private void OnApplicationQuit()
+        {
+            FlushTournamentPersistence();
+        }
+
+        private static void FlushTournamentPersistence()
+        {
+            if (instance == null) return;
+            if (instance.activeServices.TryGetValue(TournamentLiveOpService.EventId, out var service) &&
+                service is TournamentLiveOpService tournament)
+            {
+                tournament.FlushPendingPersistence();
+            }
+        }
+
         private void Update()
         {
             if (instance != this) return;
