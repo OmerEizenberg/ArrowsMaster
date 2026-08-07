@@ -247,7 +247,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity .35s;
-            gap: clamp(14px, 3.5vw, 22px);
+            gap: clamp(28px, 6.5vw, 44px);
             padding: 24px;
         }
 
@@ -272,17 +272,45 @@
             opacity: 1;
         }
 
-        .end-download {
-            font-size: clamp(22px, 6vw, 34px);
-            font-weight: 900;
-            letter-spacing: 0.06em;
-            color: #111;
-            text-align: center;
-            text-transform: uppercase;
-            display: inline-block;
+        .end-download-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            /* ~15% smaller overall, and a bit less wide vs height */
+            width: min(250px, 64vw);
+            height: clamp(52px, 13vw, 66px);
+            padding: 0 clamp(14px, 3.5vw, 20px);
+            border: none;
+            background: transparent;
+            cursor: none;
+            -webkit-tap-highlight-color: transparent;
+            transform-origin: center center;
         }
 
-        .end-download.pump {
+        .end-download-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('resources/sprites/ButtonGreen.png') center / 100% 100% no-repeat;
+            pointer-events: none;
+        }
+
+        .end-download {
+            position: relative;
+            z-index: 1;
+            font-size: clamp(18px, 4.8vw, 26px);
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            color: #fff;
+            text-align: center;
+            text-transform: uppercase;
+            text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .end-download-btn.pump {
             animation: downloadPump 0.45s ease-out;
         }
 
@@ -635,7 +663,9 @@
     <div id="time-up-msg" aria-hidden="true"><span>Time is up!</span></div>
     <div class="overlay-screen" id="end-screen">
         <img class="end-icon" src="resources/sprites/app-icon.png" alt="Arrows Legend" />
-        <div class="end-download">DOWNLOAD NOW!</div>
+        <button class="end-download-btn" type="button" aria-label="Download Now">
+            <span class="end-download">DOWNLOAD NOW!</span>
+        </button>
         <div class="end-search-field" aria-hidden="true">
             <div class="end-search-icon"></div>
             <div class="end-typewriter" id="end-typewriter"></div>
@@ -1027,9 +1057,61 @@
         //  INPUT
         // ═══════════════════════════════════════════════════════════════════
         let pressTimer = null, pressTargetArrow = null, isPanning = false, lastPanPos = { x: 0, y: 0 }, panAccum = 0;
+        const activePointers = new Map(); // pointerId -> { x, y }
+        let isPinching = false, lastPinchDist = 0;
+
+        function clearPressTarget() {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+            if (pressTargetArrow) {
+                pressTargetArrow.drawColor = pressTargetArrow.color;
+                pressTargetArrow.isShowingHint = false;
+                pressTargetArrow = null;
+            }
+        }
+
+        function pinchDistance() {
+            const pts = [...activePointers.values()];
+            if (pts.length < 2) return 0;
+            return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        }
+
+        function applyZoomFactor(factor) {
+            targetCam.zoom = Math.min(Math.max(targetCam.zoom * factor, 0.1), 3.0);
+        }
+
+        // Matches CameraController.HandleMobileZoom in Unity:
+        // ortho += (prevDist - currDist) * (ortho / 500) * mobileZoomSpeed
+        // with mobileZoomSpeed = 0.5 (ArrowsMasterGame.unity).
+        // Our camera.zoom is the inverse of ortho size (larger = closer), so we divide.
+        const MOBILE_ZOOM_SPEED = 0.5;
+        const MOBILE_ZOOM_PIXEL_REF = 500;
+        function applyPinchZoom(prevDist, currDist) {
+            if (prevDist <= 0 || currDist <= 0) return;
+            const dpr = window.devicePixelRatio || 1;
+            const deltaMagnitudeDiff = (prevDist - currDist) * dpr;
+            const factor = 1 + (deltaMagnitudeDiff / MOBILE_ZOOM_PIXEL_REF) * MOBILE_ZOOM_SPEED;
+            if (factor <= 0.05) return;
+            const next = Math.min(Math.max(camera.zoom / factor, 0.1), 3.0);
+            // Apply immediately like Unity (no lerp lag on interaction zoom)
+            camera.zoom = targetCam.zoom = next;
+        }
+
         canvas.addEventListener('pointerdown', e => {
             if (!canInteract) return; e.preventDefault();
             resetIdleHint();
+            try { canvas.setPointerCapture(e.pointerId); } catch (_) { }
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (activePointers.size >= 2) {
+                // Second finger: enter pinch mode, cancel any pending tap/pan select
+                clearPressTarget();
+                isPanning = false;
+                isPinching = true;
+                lastPinchDist = pinchDistance();
+                return;
+            }
+
+            isPinching = false;
             const rect = canvas.getBoundingClientRect(), sx = (e.clientX - rect.left) * (canvas.width / rect.width), sy = (e.clientY - rect.top) * (canvas.height / rect.height);
             lastPanPos = { x: e.clientX, y: e.clientY }; isPanning = true; panAccum = 0;
             let bestArrow = null, bestDist = cellSize * 0.9 * camera.zoom;
@@ -1041,28 +1123,59 @@
             }
         });
         canvas.addEventListener('pointermove', e => {
+            if (!activePointers.has(e.pointerId)) return;
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (isPinching && activePointers.size >= 2) {
+                const dist = pinchDistance();
+                if (lastPinchDist > 0 && dist > 0) {
+                    applyPinchZoom(lastPinchDist, dist);
+                }
+                lastPinchDist = dist;
+                return;
+            }
+
             if (!isPanning) return;
             const dx = (e.clientX - lastPanPos.x) / camera.zoom, dy = (e.clientY - lastPanPos.y) / camera.zoom;
             camera.x -= dx; camera.y += dy; targetCam.x = camera.x; targetCam.y = camera.y;
             lastPanPos = { x: e.clientX, y: e.clientY }; panAccum += Math.hypot(dx, dy);
-            if (panAccum > 5) {
-                if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-                if (pressTargetArrow) {
-                    pressTargetArrow.drawColor = pressTargetArrow.color; // Reset color
-                    pressTargetArrow.isShowingHint = false;
-                    pressTargetArrow = null;
-                }
+            if (panAccum > 5) clearPressTarget();
+        });
+        function endPointer(e) {
+            if (!activePointers.has(e.pointerId)) return;
+            activePointers.delete(e.pointerId);
+            try { canvas.releasePointerCapture(e.pointerId); } catch (_) { }
+
+            if (activePointers.size < 2) {
+                isPinching = false;
+                lastPinchDist = 0;
             }
-        });
-        canvas.addEventListener('pointerup', e => {
-            isPanning = false;
-            resetIdleHint();
-            if (!pressTargetArrow) return;
-            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; onArrowClicked(pressTargetArrow); }
-            else { pressTargetArrow.isShowingHint = false; }
-            pressTargetArrow = null;
-        });
-        canvas.addEventListener('wheel', e => { e.preventDefault(); targetCam.zoom = Math.min(Math.max(targetCam.zoom * Math.pow(0.999, e.deltaY), 0.1), 3.0); });
+
+            if (activePointers.size === 1) {
+                // One finger left after pinch — resume pan from remaining finger, no accidental tap
+                const rem = [...activePointers.values()][0];
+                lastPanPos = { x: rem.x, y: rem.y };
+                isPanning = true;
+                panAccum = 999;
+                clearPressTarget();
+                return;
+            }
+
+            if (activePointers.size === 0) {
+                isPanning = false;
+                resetIdleHint();
+                if (!pressTargetArrow) return;
+                if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; onArrowClicked(pressTargetArrow); }
+                else { pressTargetArrow.isShowingHint = false; }
+                pressTargetArrow = null;
+            }
+        }
+        canvas.addEventListener('pointerup', endPointer);
+        canvas.addEventListener('pointercancel', endPointer);
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            applyZoomFactor(Math.pow(0.999, e.deltaY));
+        }, { passive: false });
 
         // ═══════════════════════════════════════════════════════════════════
         //  LEVEL ENGINE
@@ -1268,6 +1381,8 @@
         function showComboFeedback(n) {
             const el = document.getElementById('combo-text');
             el.textContent = `Combo ${n}`;
+            const COMBO_COLORS = ['#eb4d4b', '#f0932b', '#130f40', '#be2edd', '#6ab04c', '#f9ca24'];
+            el.style.color = COMBO_COLORS[Math.floor(Math.random() * COMBO_COLORS.length)];
             const qs = [
                 { t: '25%', l: '30%' },
                 { t: '25%', l: '70%' },
@@ -1403,7 +1518,7 @@
 
         function startDownloadPump() {
             stopDownloadPump();
-            const el = document.querySelector('.end-download');
+            const el = document.querySelector('.end-download-btn');
             const pump = () => {
                 el.classList.remove('pump');
                 void el.offsetWidth;
@@ -1415,7 +1530,7 @@
 
         function stopDownloadPump() {
             if (downloadPumpInterval) { clearInterval(downloadPumpInterval); downloadPumpInterval = null; }
-            const el = document.querySelector('.end-download');
+            const el = document.querySelector('.end-download-btn');
             if (el) el.classList.remove('pump');
         }
 
