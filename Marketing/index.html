@@ -2,9 +2,11 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Arrows Master – Play</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="ad.orientation" content="portrait,landscape">
+    <title>Arrows Legend</title>
+    <script src="https://tpc.googlesyndication.com/pagead/gadgets/html5/api/exitapi.js"></script>
     <style>
         /* ─── Reset & Base ──────────────────────────────────────────── */
         *,
@@ -76,11 +78,15 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: clamp(8px, 2vw, 14px) clamp(12px, 3vw, 20px) clamp(4px, 1vw, 8px);
+            width: 80%;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: clamp(8px, 2vw, 14px) 0 clamp(4px, 1vw, 8px);
             flex-shrink: 0;
             background: #fff;
             border-bottom: 1.5px solid rgba(0, 0, 0, 0.08);
             z-index: 100;
+            box-sizing: border-box;
         }
 
         #hearts-container {
@@ -242,18 +248,28 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.96);
+            background: rgba(255, 255, 255, 0.98);
             z-index: 300;
             opacity: 0;
             pointer-events: none;
             transition: opacity .35s;
             gap: clamp(28px, 6.5vw, 44px);
-            padding: 24px;
+            padding: 10vh 10vw;
+            box-sizing: border-box;
         }
 
         .overlay-screen.visible {
             opacity: 1;
             pointer-events: all;
+        }
+
+        .overlay-screen .end-safe {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(28px, 6.5vw, 44px);
         }
 
         .end-icon {
@@ -283,7 +299,7 @@
             padding: 0 clamp(14px, 3.5vw, 20px);
             border: none;
             background: transparent;
-            cursor: none;
+            cursor: pointer;
             -webkit-tap-highlight-color: transparent;
             transform-origin: center center;
             filter: drop-shadow(0 6px 0 rgba(39, 174, 96, 0.45))
@@ -301,7 +317,7 @@
         .end-download {
             position: relative;
             z-index: 1;
-            font-size: clamp(18px, 4.8vw, 26px);
+            font-size: clamp(14px, 3.84vw, 21px);
             font-weight: 900;
             letter-spacing: 0.06em;
             color: #fff;
@@ -314,6 +330,17 @@
 
         .end-download-btn.pump {
             animation: downloadPump 0.45s ease-out;
+        }
+
+        .end-cta-sub {
+            margin-top: -12px;
+            font-size: clamp(11px, 2.8vw, 13px);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #111;
+            text-align: center;
+            text-transform: uppercase;
+            line-height: 1.35;
         }
 
         @keyframes downloadPump {
@@ -526,7 +553,7 @@
             z-index: 350;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.45s ease-out;
+            transition: opacity 0.3s ease-out;
             padding: 24px;
         }
 
@@ -705,10 +732,10 @@
 </head>
 
 <body>
-    <audio id="bg-music" src="resources/sounds/ambient.mp3" preload="auto" autoplay loop playsinline></audio>
+    <audio id="bg-music" src="resources/sounds/ambient.mp3" preload="auto" loop playsinline></audio>
     <div id="loading">
         <div class="spin"></div>
-        <p>ARROWS MASTER</p>
+        <p>ARROWS LEGEND</p>
     </div>
     <div id="hud">
         <div id="hearts-container">
@@ -718,11 +745,11 @@
         </div>
         <div id="timer-container">
             <div id="timer-label">TIME</div>
-            <div id="timer-text">01:00</div>
+            <div id="timer-text">00:30</div>
         </div>
         <div id="arrows-left-holder">
             <div id="arrows-left-label">ARROWS</div>
-            <div id="arrows-left-text">–</div>
+            <div id="arrows-left-text">-</div>
         </div>
     </div>
     <div id="streak-bar">
@@ -735,13 +762,16 @@
     <div id="canvas-wrap"><canvas id="gameCanvas"></canvas></div>
     <div id="time-up-msg" aria-hidden="true"><span>Time is up!</span></div>
     <div class="overlay-screen" id="end-screen">
-        <img class="end-icon" src="resources/sprites/app-icon.png" alt="Arrows Legend" />
-        <button class="end-download-btn" type="button" aria-label="Download Now">
-            <span class="end-download">DOWNLOAD NOW!</span>
-        </button>
-        <div class="end-search-field" aria-hidden="true">
-            <div class="end-search-icon"></div>
-            <div class="end-typewriter" id="end-typewriter"></div>
+        <div class="end-safe">
+            <img class="end-icon" src="resources/sprites/app-icon.png" alt="Arrows Legend">
+            <div class="end-search-field" aria-hidden="true">
+                <div class="end-search-icon"></div>
+                <div class="end-typewriter" id="end-typewriter"></div>
+            </div>
+            <button class="end-download-btn" type="button" id="cta-btn" aria-label="Download Now">
+                <span class="end-download">DOWNLOAD NOW!</span>
+            </button>
+            <p class="end-cta-sub">DOWNLOAD TO PLAY<br>THE FULL GAME.</p>
         </div>
     </div>
     <div id="urgency-flash" aria-hidden="true"></div>
@@ -757,14 +787,14 @@
         // ═══════════════════════════════════════════════════════════════════
         //  LEVEL ENGINE DATA
         // ═══════════════════════════════════════════════════════════════════
-        // Embedded Level74 (works with file:// and ad packages; no network fetch needed)
-        const LEVEL74_EMBEDDED = {"gridSize":{"x":37,"y":35},"duration":60,"arrows":[{"id":1,"path":[{"x":32,"y":13},{"x":32,"y":14},{"x":32,"y":15},{"x":31,"y":15},{"x":30,"y":15},{"x":30,"y":16},{"x":30,"y":17},{"x":30,"y":18},{"x":29,"y":18},{"x":29,"y":19},{"x":30,"y":19},{"x":31,"y":19},{"x":31,"y":20},{"x":31,"y":21},{"x":32,"y":21},{"x":33,"y":21},{"x":33,"y":22},{"x":33,"y":23},{"x":33,"y":24},{"x":33,"y":25},{"x":32,"y":25},{"x":32,"y":24},{"x":32,"y":23},{"x":32,"y":22},{"x":31,"y":22},{"x":31,"y":23}],"lookDirection":"up","color":"#000000"},{"id":2,"path":[{"x":21,"y":29},{"x":21,"y":28},{"x":20,"y":28},{"x":20,"y":27},{"x":19,"y":27},{"x":19,"y":28},{"x":19,"y":29},{"x":18,"y":29},{"x":17,"y":29},{"x":17,"y":28},{"x":17,"y":27},{"x":18,"y":27},{"x":18,"y":26},{"x":19,"y":26},{"x":19,"y":25},{"x":20,"y":25},{"x":21,"y":25},{"x":21,"y":24},{"x":22,"y":24},{"x":23,"y":24},{"x":24,"y":24},{"x":24,"y":23},{"x":23,"y":23},{"x":22,"y":23},{"x":22,"y":22},{"x":21,"y":22},{"x":21,"y":23},{"x":20,"y":23}],"lookDirection":"left","color":"#000000"},{"id":3,"path":[{"x":5,"y":16},{"x":6,"y":16},{"x":7,"y":16},{"x":7,"y":15},{"x":6,"y":15},{"x":5,"y":15},{"x":5,"y":14},{"x":6,"y":14},{"x":7,"y":14}],"lookDirection":"right","color":"#000000"},{"id":4,"path":[{"x":13,"y":23},{"x":13,"y":22},{"x":13,"y":21},{"x":12,"y":21},{"x":12,"y":20},{"x":12,"y":19},{"x":11,"y":19},{"x":11,"y":18},{"x":11,"y":17},{"x":12,"y":17},{"x":13,"y":17},{"x":14,"y":17},{"x":15,"y":17},{"x":15,"y":18},{"x":16,"y":18},{"x":16,"y":17},{"x":17,"y":17},{"x":17,"y":18},{"x":18,"y":18},{"x":18,"y":17},{"x":19,"y":17},{"x":19,"y":16},{"x":18,"y":16},{"x":17,"y":16},{"x":16,"y":16},{"x":15,"y":16},{"x":14,"y":16},{"x":14,"y":15},{"x":15,"y":15},{"x":15,"y":14}],"lookDirection":"down","color":"#000000"},{"id":5,"path":[{"x":22,"y":16},{"x":22,"y":17},{"x":23,"y":17},{"x":23,"y":18},{"x":24,"y":18},{"x":24,"y":17},{"x":24,"y":16},{"x":23,"y":16},{"x":23,"y":15},{"x":22,"y":15},{"x":22,"y":14},{"x":21,"y":14},{"x":21,"y":15},{"x":21,"y":16},{"x":20,"y":16},{"x":20,"y":15},{"x":20,"y":14}],"lookDirection":"down","color":"#000000"},{"id":6,"path":[{"x":20,"y":24},{"x":19,"y":24},{"x":19,"y":23},{"x":18,"y":23},{"x":17,"y":23}],"lookDirection":"left","color":"#000000"},{"id":7,"path":[{"x":5,"y":13},{"x":5,"y":12},{"x":5,"y":11},{"x":6,"y":11},{"x":6,"y":12},{"x":6,"y":13},{"x":7,"y":13},{"x":7,"y":12},{"x":7,"y":11},{"x":8,"y":11},{"x":9,"y":11},{"x":9,"y":12},{"x":9,"y":13},{"x":9,"y":14}],"lookDirection":"up","color":"#000000"},{"id":8,"path":[{"x":28,"y":29},{"x":29,"y":29},{"x":29,"y":28},{"x":30,"y":28},{"x":30,"y":27},{"x":29,"y":27},{"x":28,"y":27},{"x":27,"y":27},{"x":26,"y":27},{"x":26,"y":26},{"x":26,"y":25},{"x":26,"y":24},{"x":25,"y":24},{"x":25,"y":23}],"lookDirection":"down","color":"#000000"},{"id":9,"path":[{"x":8,"y":7},{"x":9,"y":7},{"x":9,"y":8},{"x":10,"y":8},{"x":10,"y":7},{"x":11,"y":7},{"x":11,"y":8},{"x":11,"y":9},{"x":12,"y":9},{"x":13,"y":9},{"x":13,"y":8},{"x":13,"y":7},{"x":13,"y":6},{"x":12,"y":6},{"x":11,"y":6},{"x":11,"y":5},{"x":12,"y":5},{"x":12,"y":4},{"x":13,"y":4},{"x":14,"y":4},{"x":15,"y":4}],"lookDirection":"right","color":"#000000"},{"id":10,"path":[{"x":6,"y":18},{"x":6,"y":17},{"x":7,"y":17},{"x":7,"y":18},{"x":7,"y":19},{"x":7,"y":20},{"x":8,"y":20},{"x":9,"y":20}],"lookDirection":"right","color":"#000000"},{"id":11,"path":[{"x":35,"y":13},{"x":34,"y":13},{"x":33,"y":13},{"x":33,"y":14},{"x":33,"y":15},{"x":33,"y":16},{"x":33,"y":17},{"x":33,"y":18},{"x":34,"y":18},{"x":34,"y":19},{"x":33,"y":19},{"x":32,"y":19},{"x":32,"y":20}],"lookDirection":"up","color":"#000000"},{"id":12,"path":[{"x":28,"y":11},{"x":27,"y":11},{"x":27,"y":10},{"x":26,"y":10},{"x":25,"y":10},{"x":25,"y":11},{"x":24,"y":11},{"x":24,"y":12},{"x":25,"y":12},{"x":25,"y":13},{"x":25,"y":14},{"x":24,"y":14},{"x":24,"y":15},{"x":25,"y":15}],"lookDirection":"right","color":"#000000"},{"id":13,"path":[{"x":14,"y":18},{"x":13,"y":18},{"x":13,"y":19},{"x":14,"y":19},{"x":14,"y":20},{"x":14,"y":21},{"x":15,"y":21},{"x":16,"y":21},{"x":16,"y":20},{"x":17,"y":20}],"lookDirection":"right","color":"#000000"},{"id":14,"path":[{"x":16,"y":11},{"x":15,"y":11},{"x":14,"y":11},{"x":14,"y":10},{"x":13,"y":10},{"x":12,"y":10},{"x":12,"y":11},{"x":12,"y":12},{"x":12,"y":13},{"x":13,"y":13},{"x":14,"y":13},{"x":15,"y":13},{"x":16,"y":13},{"x":17,"y":13},{"x":17,"y":14},{"x":17,"y":15},{"x":18,"y":15},{"x":18,"y":14},{"x":18,"y":13},{"x":19,"y":13},{"x":19,"y":12},{"x":18,"y":12},{"x":17,"y":12},{"x":17,"y":11},{"x":17,"y":10},{"x":17,"y":9},{"x":17,"y":8},{"x":17,"y":7},{"x":18,"y":7},{"x":18,"y":6},{"x":17,"y":6},{"x":17,"y":5},{"x":17,"y":4},{"x":18,"y":4}],"lookDirection":"right","color":"#000000"},{"id":15,"path":[{"x":14,"y":22},{"x":14,"y":23},{"x":15,"y":23},{"x":15,"y":22},{"x":16,"y":22},{"x":17,"y":22},{"x":17,"y":21},{"x":18,"y":21},{"x":18,"y":20},{"x":19,"y":20},{"x":20,"y":20}],"lookDirection":"right","color":"#000000"},{"id":16,"path":[{"x":15,"y":6},{"x":16,"y":6},{"x":16,"y":5},{"x":15,"y":5},{"x":14,"y":5},{"x":14,"y":6},{"x":14,"y":7},{"x":15,"y":7},{"x":15,"y":8},{"x":14,"y":8},{"x":14,"y":9},{"x":15,"y":9}],"lookDirection":"right","color":"#000000"},{"id":17,"path":[{"x":20,"y":22},{"x":19,"y":22},{"x":19,"y":21},{"x":20,"y":21},{"x":21,"y":21},{"x":22,"y":21},{"x":22,"y":20}],"lookDirection":"down","color":"#000000"},{"id":18,"path":[{"x":31,"y":12},{"x":31,"y":13},{"x":30,"y":13},{"x":30,"y":12},{"x":29,"y":12},{"x":28,"y":12},{"x":27,"y":12},{"x":26,"y":12},{"x":26,"y":13},{"x":26,"y":14},{"x":26,"y":15},{"x":26,"y":16},{"x":27,"y":16},{"x":27,"y":17},{"x":27,"y":18},{"x":26,"y":18},{"x":26,"y":17},{"x":25,"y":17}],"lookDirection":"left","color":"#000000"},{"id":19,"path":[{"x":31,"y":7},{"x":31,"y":8},{"x":30,"y":8},{"x":30,"y":7},{"x":30,"y":6},{"x":31,"y":6},{"x":32,"y":6},{"x":32,"y":7},{"x":32,"y":8},{"x":32,"y":9},{"x":31,"y":9},{"x":30,"y":9},{"x":30,"y":10},{"x":31,"y":10},{"x":32,"y":10},{"x":33,"y":10},{"x":34,"y":10},{"x":34,"y":9}],"lookDirection":"down","color":"#000000"},{"id":20,"path":[{"x":23,"y":13},{"x":22,"y":13},{"x":21,"y":13},{"x":20,"y":13},{"x":20,"y":12},{"x":20,"y":11},{"x":19,"y":11},{"x":18,"y":11},{"x":18,"y":10},{"x":19,"y":10},{"x":19,"y":9}],"lookDirection":"down","color":"#000000"},{"id":21,"path":[{"x":8,"y":19},{"x":8,"y":18},{"x":8,"y":17},{"x":8,"y":16},{"x":8,"y":15},{"x":9,"y":15},{"x":9,"y":16},{"x":9,"y":17},{"x":9,"y":18},{"x":9,"y":19},{"x":10,"y":19},{"x":10,"y":20}],"lookDirection":"up","color":"#000000"},{"id":22,"path":[{"x":19,"y":18},{"x":20,"y":18},{"x":20,"y":19},{"x":19,"y":19},{"x":18,"y":19},{"x":17,"y":19},{"x":16,"y":19},{"x":15,"y":19},{"x":15,"y":20}],"lookDirection":"up","color":"#000000"},{"id":23,"path":[{"x":23,"y":22},{"x":24,"y":22},{"x":24,"y":21},{"x":23,"y":21},{"x":23,"y":20},{"x":24,"y":20},{"x":25,"y":20},{"x":26,"y":20},{"x":26,"y":19},{"x":27,"y":19},{"x":27,"y":20},{"x":27,"y":21},{"x":28,"y":21},{"x":28,"y":20},{"x":29,"y":20}],"lookDirection":"right","color":"#000000"},{"id":25,"path":[{"x":18,"y":9},{"x":18,"y":8},{"x":19,"y":8},{"x":19,"y":7}],"lookDirection":"down","color":"#000000"},{"id":26,"path":[{"x":20,"y":7},{"x":20,"y":8},{"x":20,"y":9},{"x":21,"y":9},{"x":21,"y":8},{"x":21,"y":7},{"x":21,"y":6},{"x":20,"y":6},{"x":19,"y":6},{"x":19,"y":5},{"x":19,"y":4},{"x":20,"y":4},{"x":20,"y":5},{"x":21,"y":5},{"x":21,"y":4},{"x":21,"y":3},{"x":20,"y":3},{"x":19,"y":3}],"lookDirection":"left","color":"#000000"},{"id":27,"path":[{"x":27,"y":26},{"x":28,"y":26},{"x":28,"y":25},{"x":27,"y":25},{"x":27,"y":24},{"x":28,"y":24},{"x":28,"y":23},{"x":29,"y":23},{"x":29,"y":24}],"lookDirection":"up","color":"#000000"},{"id":28,"path":[{"x":17,"y":26},{"x":17,"y":25},{"x":18,"y":25},{"x":18,"y":24},{"x":17,"y":24},{"x":16,"y":24},{"x":16,"y":25},{"x":16,"y":26}],"lookDirection":"up","color":"#000000"},{"id":29,"path":[{"x":32,"y":12},{"x":33,"y":12},{"x":34,"y":12},{"x":34,"y":11},{"x":33,"y":11},{"x":32,"y":11},{"x":31,"y":11},{"x":30,"y":11},{"x":29,"y":11},{"x":29,"y":10},{"x":29,"y":9},{"x":28,"y":9},{"x":27,"y":9},{"x":27,"y":8},{"x":28,"y":8},{"x":29,"y":8},{"x":29,"y":7}],"lookDirection":"down","color":"#000000"},{"id":30,"path":[{"x":33,"y":9},{"x":33,"y":8},{"x":33,"y":7},{"x":34,"y":7},{"x":34,"y":6}],"lookDirection":"down","color":"#000000"},{"id":31,"path":[{"x":11,"y":26},{"x":12,"y":26},{"x":13,"y":26},{"x":14,"y":26},{"x":15,"y":26},{"x":15,"y":25},{"x":14,"y":25},{"x":13,"y":25},{"x":13,"y":24},{"x":12,"y":24},{"x":12,"y":23},{"x":12,"y":22},{"x":11,"y":22},{"x":10,"y":22},{"x":10,"y":21},{"x":9,"y":21},{"x":8,"y":21},{"x":8,"y":22},{"x":9,"y":22},{"x":9,"y":23},{"x":10,"y":23},{"x":11,"y":23},{"x":11,"y":24},{"x":11,"y":25},{"x":10,"y":25}],"lookDirection":"left","color":"#000000"},{"id":32,"path":[{"x":18,"y":3},{"x":17,"y":3}],"lookDirection":"left","color":"#000000"},{"id":33,"path":[{"x":35,"y":12},{"x":35,"y":11},{"x":35,"y":10},{"x":35,"y":9}],"lookDirection":"down","color":"#000000"},{"id":36,"path":[{"x":12,"y":27},{"x":13,"y":27},{"x":14,"y":27},{"x":14,"y":28},{"x":15,"y":28},{"x":16,"y":28},{"x":16,"y":29}],"lookDirection":"up","color":"#000000"},{"id":37,"path":[{"x":20,"y":26},{"x":21,"y":26},{"x":21,"y":27},{"x":22,"y":27},{"x":22,"y":28},{"x":22,"y":29},{"x":22,"y":30},{"x":23,"y":30},{"x":23,"y":29},{"x":23,"y":28},{"x":24,"y":28},{"x":24,"y":29}],"lookDirection":"up","color":"#000000"},{"id":39,"path":[{"x":28,"y":28},{"x":27,"y":28},{"x":27,"y":29}],"lookDirection":"up","color":"#000000"},{"id":40,"path":[{"x":21,"y":12},{"x":21,"y":11},{"x":21,"y":10}],"lookDirection":"down","color":"#000000"},{"id":41,"path":[{"x":25,"y":18},{"x":25,"y":19},{"x":24,"y":19},{"x":23,"y":19},{"x":22,"y":19},{"x":21,"y":19},{"x":21,"y":18},{"x":21,"y":17}],"lookDirection":"down","color":"#000000"},{"id":43,"path":[{"x":35,"y":8},{"x":35,"y":7}],"lookDirection":"down","color":"#000000"},{"id":45,"path":[{"x":34,"y":14},{"x":34,"y":15}],"lookDirection":"up","color":"#000000"},{"id":46,"path":[{"x":27,"y":32},{"x":28,"y":32},{"x":28,"y":31},{"x":28,"y":30},{"x":27,"y":30},{"x":27,"y":31},{"x":26,"y":31},{"x":26,"y":30},{"x":26,"y":29},{"x":26,"y":28},{"x":25,"y":28},{"x":25,"y":29}],"lookDirection":"up","color":"#000000"},{"id":51,"path":[{"x":10,"y":5},{"x":10,"y":6},{"x":9,"y":6},{"x":9,"y":5},{"x":8,"y":5}],"lookDirection":"left","color":"#000000"},{"id":52,"path":[{"x":8,"y":12},{"x":8,"y":13}],"lookDirection":"up","color":"#000000"},{"id":53,"path":[{"x":9,"y":10},{"x":8,"y":10},{"x":8,"y":9},{"x":9,"y":9},{"x":10,"y":9},{"x":10,"y":10},{"x":11,"y":10},{"x":11,"y":11},{"x":11,"y":12},{"x":11,"y":13},{"x":11,"y":14},{"x":11,"y":15},{"x":11,"y":16},{"x":12,"y":16},{"x":13,"y":16},{"x":13,"y":15},{"x":13,"y":14}],"lookDirection":"down","color":"#000000"},{"id":58,"path":[{"x":7,"y":9},{"x":7,"y":10},{"x":6,"y":10},{"x":6,"y":9},{"x":6,"y":8},{"x":7,"y":8},{"x":8,"y":8}],"lookDirection":"right","color":"#000000"},{"id":59,"path":[{"x":25,"y":22},{"x":25,"y":21},{"x":26,"y":21},{"x":26,"y":22},{"x":26,"y":23},{"x":27,"y":23},{"x":27,"y":22}],"lookDirection":"down","color":"#000000"},{"id":60,"path":[{"x":31,"y":16},{"x":32,"y":16},{"x":32,"y":17},{"x":31,"y":17}],"lookDirection":"left","color":"#000000"},{"id":62,"path":[{"x":5,"y":10},{"x":5,"y":9},{"x":4,"y":9},{"x":4,"y":10},{"x":4,"y":11}],"lookDirection":"up","color":"#000000"},{"id":63,"path":[{"x":5,"y":6},{"x":6,"y":6},{"x":7,"y":6},{"x":7,"y":7},{"x":6,"y":7},{"x":5,"y":7},{"x":4,"y":7},{"x":4,"y":8},{"x":5,"y":8}],"lookDirection":"right","color":"#000000"},{"id":64,"path":[{"x":31,"y":18},{"x":32,"y":18}],"lookDirection":"right","color":"#000000"},{"id":66,"path":[{"x":22,"y":25},{"x":22,"y":26},{"x":23,"y":26},{"x":23,"y":25},{"x":24,"y":25},{"x":24,"y":26},{"x":24,"y":27},{"x":25,"y":27},{"x":25,"y":26}],"lookDirection":"down","color":"#000000"},{"id":67,"path":[{"x":18,"y":30},{"x":19,"y":30},{"x":20,"y":30},{"x":21,"y":30}],"lookDirection":"right","color":"#000000"},{"id":68,"color":"#000000","path":[{"x":19,"y":14},{"x":19,"y":15}],"lookDirection":"up"},{"id":69,"color":"#000000","path":[{"x":27,"y":14},{"x":28,"y":14},{"x":29,"y":14},{"x":30,"y":14},{"x":31,"y":14}],"lookDirection":"right"},{"id":70,"color":"#000000","path":[{"x":12,"y":7},{"x":12,"y":8}],"lookDirection":"up"},{"id":71,"color":"#000000","path":[{"x":28,"y":22},{"x":29,"y":22},{"x":30,"y":22}],"lookDirection":"right"},{"id":72,"color":"#000000","path":[{"x":30,"y":24},{"x":30,"y":23}],"lookDirection":"down"},{"id":73,"color":"#000000","path":[{"x":27,"y":13},{"x":28,"y":13},{"x":29,"y":13}],"lookDirection":"right"},{"id":74,"color":"#000000","path":[{"x":10,"y":14},{"x":10,"y":13},{"x":10,"y":12},{"x":10,"y":11}],"lookDirection":"down"},{"id":75,"color":"#000000","path":[{"x":29,"y":16},{"x":29,"y":15}],"lookDirection":"down"},{"id":76,"color":"#000000","path":[{"x":16,"y":27},{"x":15,"y":27}],"lookDirection":"left"},{"id":77,"color":"#000000","path":[{"x":30,"y":25},{"x":29,"y":25},{"x":29,"y":26},{"x":30,"y":26},{"x":31,"y":26},{"x":32,"y":26}],"lookDirection":"right"},{"id":78,"color":"#000000","path":[{"x":16,"y":7},{"x":16,"y":8}],"lookDirection":"up"},{"id":79,"color":"#000000","path":[{"x":31,"y":27},{"x":32,"y":27}],"lookDirection":"right"},{"id":80,"color":"#000000","path":[{"x":13,"y":12},{"x":13,"y":11}],"lookDirection":"down"},{"id":81,"color":"#000000","path":[{"x":10,"y":24},{"x":9,"y":24}],"lookDirection":"left"},{"id":82,"color":"#000000","path":[{"x":12,"y":14},{"x":12,"y":15}],"lookDirection":"up"},{"id":83,"color":"#000000","path":[{"x":28,"y":19},{"x":28,"y":18},{"x":28,"y":17}],"lookDirection":"down"},{"id":84,"color":"#000000","path":[{"x":10,"y":18},{"x":10,"y":17},{"x":10,"y":16},{"x":10,"y":15}],"lookDirection":"down"},{"id":85,"color":"#000000","path":[{"x":30,"y":21},{"x":29,"y":21}],"lookDirection":"left"},{"id":86,"color":"#000000","path":[{"x":15,"y":24},{"x":14,"y":24}],"lookDirection":"left"},{"id":87,"color":"#000000","path":[{"x":27,"y":15},{"x":28,"y":15}],"lookDirection":"right"},{"id":88,"color":"#000000","path":[{"x":11,"y":20},{"x":11,"y":21}],"lookDirection":"up"},{"id":90,"color":"#000000","path":[{"x":31,"y":24},{"x":31,"y":25}],"lookDirection":"up"},{"id":91,"color":"#000000","path":[{"x":16,"y":14},{"x":16,"y":15}],"lookDirection":"up"}]};
+        // Embedded Level8 (works with file:// and ad packages; no network fetch needed)
+        const LEVEL8_EMBEDDED = {"gridSize":{"x":26,"y":23},"duration":30,"arrows":[{"id":1,"path":[{"x":18,"y":17},{"x":18,"y":18},{"x":18,"y":19},{"x":18,"y":20},{"x":18,"y":21},{"x":19,"y":21},{"x":19,"y":20},{"x":20,"y":20},{"x":21,"y":20},{"x":22,"y":20}],"lookDirection":"right","color":"#000000"},{"id":2,"path":[{"x":4,"y":19},{"x":4,"y":18},{"x":4,"y":17},{"x":5,"y":17},{"x":5,"y":18},{"x":5,"y":19},{"x":5,"y":20},{"x":6,"y":20},{"x":7,"y":20},{"x":8,"y":20},{"x":8,"y":19},{"x":9,"y":19},{"x":9,"y":18},{"x":8,"y":18},{"x":8,"y":17},{"x":7,"y":17},{"x":7,"y":16},{"x":8,"y":16},{"x":9,"y":16},{"x":10,"y":16},{"x":11,"y":16},{"x":12,"y":16},{"x":13,"y":16},{"x":13,"y":15},{"x":14,"y":15},{"x":14,"y":16},{"x":15,"y":16},{"x":15,"y":17},{"x":14,"y":17},{"x":14,"y":18},{"x":15,"y":18},{"x":15,"y":19},{"x":16,"y":19},{"x":17,"y":19},{"x":17,"y":18},{"x":17,"y":17},{"x":16,"y":17},{"x":16,"y":16},{"x":17,"y":16},{"x":18,"y":16},{"x":18,"y":15},{"x":19,"y":15},{"x":20,"y":15},{"x":21,"y":15},{"x":22,"y":15}],"lookDirection":"right","color":"#000000"},{"id":3,"path":[{"x":16,"y":8},{"x":16,"y":9},{"x":16,"y":10},{"x":15,"y":10},{"x":15,"y":9},{"x":14,"y":9},{"x":14,"y":10},{"x":14,"y":11},{"x":13,"y":11},{"x":13,"y":12},{"x":14,"y":12},{"x":14,"y":13},{"x":15,"y":13},{"x":15,"y":12},{"x":16,"y":12},{"x":16,"y":11},{"x":17,"y":11},{"x":18,"y":11},{"x":19,"y":11},{"x":19,"y":10},{"x":18,"y":10},{"x":17,"y":10},{"x":17,"y":9},{"x":18,"y":9},{"x":19,"y":9},{"x":20,"y":9},{"x":20,"y":10},{"x":21,"y":10},{"x":21,"y":9},{"x":22,"y":9},{"x":22,"y":10},{"x":22,"y":11},{"x":21,"y":11},{"x":20,"y":11},{"x":20,"y":12},{"x":20,"y":13},{"x":20,"y":14},{"x":21,"y":14},{"x":22,"y":14}],"lookDirection":"right","color":"#000000"},{"id":4,"path":[{"x":23,"y":11},{"x":23,"y":10},{"x":23,"y":9}],"lookDirection":"down","color":"#000000"},{"id":5,"path":[{"x":21,"y":19},{"x":22,"y":19},{"x":23,"y":19},{"x":23,"y":18},{"x":23,"y":17},{"x":23,"y":16},{"x":24,"y":16},{"x":24,"y":15},{"x":24,"y":14},{"x":24,"y":13},{"x":24,"y":12},{"x":24,"y":11},{"x":24,"y":10}],"lookDirection":"down","color":"#000000"},{"id":6,"path":[{"x":21,"y":13},{"x":21,"y":12},{"x":22,"y":12},{"x":22,"y":13}],"lookDirection":"up","color":"#000000"},{"id":7,"path":[{"x":7,"y":12},{"x":6,"y":12},{"x":6,"y":13},{"x":7,"y":13},{"x":7,"y":14},{"x":6,"y":14},{"x":6,"y":15},{"x":7,"y":15},{"x":8,"y":15},{"x":8,"y":14},{"x":8,"y":13},{"x":8,"y":12},{"x":8,"y":11},{"x":8,"y":10},{"x":8,"y":9},{"x":7,"y":9},{"x":7,"y":10},{"x":7,"y":11},{"x":6,"y":11},{"x":6,"y":10},{"x":6,"y":9}],"lookDirection":"down","color":"#000000"},{"id":8,"path":[{"x":16,"y":14},{"x":15,"y":14},{"x":14,"y":14},{"x":13,"y":14},{"x":13,"y":13},{"x":12,"y":13},{"x":11,"y":13},{"x":10,"y":13},{"x":10,"y":12},{"x":11,"y":12},{"x":12,"y":12},{"x":12,"y":11},{"x":11,"y":11},{"x":10,"y":11},{"x":9,"y":11},{"x":9,"y":10},{"x":10,"y":10},{"x":11,"y":10}],"lookDirection":"right","color":"#000000"},{"id":9,"path":[{"x":22,"y":16},{"x":21,"y":16},{"x":20,"y":16},{"x":19,"y":16},{"x":19,"y":17},{"x":20,"y":17},{"x":21,"y":17},{"x":22,"y":17}],"lookDirection":"right","color":"#000000"},{"id":10,"path":[{"x":4,"y":8},{"x":4,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":6,"y":8}],"lookDirection":"right","color":"#000000"},{"id":11,"path":[{"x":20,"y":19},{"x":19,"y":19},{"x":19,"y":18},{"x":20,"y":18},{"x":21,"y":18},{"x":22,"y":18}],"lookDirection":"right","color":"#000000"},{"id":12,"path":[{"x":5,"y":7},{"x":6,"y":7},{"x":6,"y":6}],"lookDirection":"down","color":"#000000"},{"id":13,"path":[{"x":22,"y":8},{"x":21,"y":8},{"x":20,"y":8},{"x":19,"y":8},{"x":18,"y":8},{"x":18,"y":7},{"x":19,"y":7},{"x":20,"y":7},{"x":21,"y":7},{"x":21,"y":6},{"x":20,"y":6},{"x":19,"y":6},{"x":18,"y":6}],"lookDirection":"left","color":"#000000"},{"id":14,"path":[{"x":12,"y":6},{"x":13,"y":6},{"x":13,"y":7},{"x":12,"y":7},{"x":11,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":9,"y":8},{"x":8,"y":8},{"x":8,"y":7},{"x":9,"y":7},{"x":9,"y":6},{"x":10,"y":6},{"x":11,"y":6},{"x":11,"y":5},{"x":12,"y":5},{"x":12,"y":4},{"x":13,"y":4},{"x":13,"y":5},{"x":14,"y":5},{"x":14,"y":6}],"lookDirection":"up","color":"#000000"},{"id":15,"path":[{"x":13,"y":3},{"x":12,"y":3},{"x":12,"y":2},{"x":13,"y":2},{"x":14,"y":2},{"x":14,"y":3},{"x":15,"y":3},{"x":16,"y":3},{"x":16,"y":4},{"x":17,"y":4},{"x":17,"y":5},{"x":16,"y":5},{"x":15,"y":5},{"x":15,"y":6}],"lookDirection":"up","color":"#000000"},{"id":16,"path":[{"x":24,"y":18},{"x":24,"y":17}],"lookDirection":"down","color":"#000000"},{"id":17,"path":[{"x":17,"y":8},{"x":17,"y":7},{"x":17,"y":6},{"x":16,"y":6},{"x":16,"y":7},{"x":15,"y":7},{"x":15,"y":8}],"lookDirection":"up","color":"#000000"},{"id":18,"path":[{"x":9,"y":9},{"x":10,"y":9}],"lookDirection":"right","color":"#000000"},{"id":19,"path":[{"x":2,"y":11},{"x":2,"y":12},{"x":2,"y":13},{"x":3,"y":13},{"x":3,"y":14},{"x":4,"y":14},{"x":5,"y":14},{"x":5,"y":13},{"x":4,"y":13},{"x":4,"y":12},{"x":4,"y":11},{"x":3,"y":11},{"x":3,"y":10}],"lookDirection":"down","color":"#000000"},{"id":20,"path":[{"x":25,"y":15},{"x":25,"y":14}],"lookDirection":"down","color":"#000000"},{"id":22,"path":[{"x":14,"y":7},{"x":14,"y":8}],"lookDirection":"up","color":"#000000"},{"id":24,"path":[{"x":11,"y":9},{"x":11,"y":8},{"x":12,"y":8},{"x":12,"y":9}],"lookDirection":"up","color":"#000000"},{"id":27,"path":[{"x":16,"y":15},{"x":17,"y":15}],"lookDirection":"right","color":"#000000"},{"id":28,"path":[{"x":23,"y":15},{"x":23,"y":14},{"x":23,"y":13},{"x":23,"y":12}],"lookDirection":"down","color":"#000000"},{"id":29,"path":[{"x":10,"y":5},{"x":9,"y":5},{"x":8,"y":5},{"x":8,"y":4},{"x":9,"y":4},{"x":10,"y":4},{"x":11,"y":4},{"x":11,"y":3}],"lookDirection":"down","color":"#000000"},{"id":31,"path":[{"x":13,"y":8},{"x":13,"y":9}],"lookDirection":"up","color":"#000000"},{"id":35,"path":[{"x":6,"y":21},{"x":7,"y":21},{"x":8,"y":21},{"x":9,"y":21},{"x":9,"y":20},{"x":10,"y":20},{"x":10,"y":19},{"x":10,"y":18},{"x":10,"y":17},{"x":9,"y":17}],"lookDirection":"left","color":"#000000"},{"id":36,"path":[{"x":3,"y":19},{"x":3,"y":18},{"x":3,"y":17},{"x":2,"y":17},{"x":2,"y":16},{"x":3,"y":16},{"x":3,"y":15},{"x":4,"y":15},{"x":4,"y":16},{"x":5,"y":16},{"x":6,"y":16}],"lookDirection":"right","color":"#000000"},{"id":37,"path":[{"x":17,"y":14},{"x":17,"y":13},{"x":17,"y":12},{"x":18,"y":12}],"lookDirection":"right","color":"#000000"},{"id":39,"path":[{"x":11,"y":17},{"x":12,"y":17},{"x":12,"y":18}],"lookDirection":"up","color":"#000000"},{"id":41,"path":[{"x":15,"y":4},{"x":14,"y":4}],"lookDirection":"left","color":"#000000"},{"id":42,"color":"#000000","path":[{"x":5,"y":12},{"x":5,"y":11},{"x":5,"y":10},{"x":4,"y":10}],"lookDirection":"left"},{"id":43,"color":"#000000","path":[{"x":18,"y":13},{"x":19,"y":13},{"x":19,"y":12}],"lookDirection":"down"},{"id":44,"color":"#000000","path":[{"x":6,"y":17},{"x":6,"y":18},{"x":6,"y":19},{"x":7,"y":19},{"x":7,"y":18}],"lookDirection":"down"},{"id":45,"color":"#000000","path":[{"x":10,"y":14},{"x":10,"y":15}],"lookDirection":"up"},{"id":46,"color":"#000000","path":[{"x":12,"y":15},{"x":12,"y":14},{"x":11,"y":14},{"x":11,"y":15}],"lookDirection":"up"},{"id":47,"color":"#000000","path":[{"x":7,"y":8},{"x":7,"y":7},{"x":7,"y":6},{"x":7,"y":5}],"lookDirection":"down"},{"id":48,"color":"#000000","path":[{"x":18,"y":14},{"x":19,"y":14}],"lookDirection":"right"},{"id":49,"color":"#000000","path":[{"x":9,"y":15},{"x":9,"y":14},{"x":9,"y":13},{"x":9,"y":12}],"lookDirection":"down"},{"id":50,"color":"#000000","path":[{"x":11,"y":18},{"x":11,"y":19}],"lookDirection":"up"},{"id":51,"color":"#000000","path":[{"x":12,"y":10},{"x":13,"y":10}],"lookDirection":"right"},{"id":52,"color":"#000000","path":[{"x":17,"y":20},{"x":16,"y":20}],"lookDirection":"left"},{"id":53,"color":"#000000","path":[{"x":18,"y":5},{"x":19,"y":5}],"lookDirection":"right"},{"id":54,"color":"#000000","path":[{"x":2,"y":14},{"x":2,"y":15}],"lookDirection":"up"}]};
         let LEVEL_DATA = null;
 
         async function fetchLevelData() {
-            LEVEL_DATA = LEVEL74_EMBEDDED;
-            if (!LEVEL_DATA.duration) LEVEL_DATA.duration = 60;
-            console.log("Loaded embedded Level74");
+            LEVEL_DATA = LEVEL8_EMBEDDED;
+            if (!LEVEL_DATA.duration) LEVEL_DATA.duration = 30;
+            console.log("Loaded embedded Level8");
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -806,64 +836,53 @@
         const SFX = (() => {
             function mk(src) { const a = new Audio(); a.preload = 'auto'; a.src = src; return a; }
             const snd = {
-                arrowSelect: mk('resources/sounds/arrowFly.wav'),
-                mistake: mk('resources/sounds/Mistake.wav'),
-                levelInit: mk('resources/sounds/levelInit.wav'),
-                win: mk('resources/sounds/Won.wav'),
+                arrowSelect: mk('resources/sounds/arrowFly.mp3'),
+                mistake: mk('resources/sounds/Mistake.mp3'),
+                levelInit: mk('resources/sounds/levelInit.mp3'),
+                win: mk('resources/sounds/Won.mp3'),
                 good: mk('resources/sounds/Good.mp3'),
                 nice: mk('resources/sounds/Nice.mp3'),
                 excellent: mk('resources/sounds/Excellent.mp3'),
                 amazing: mk('resources/sounds/Amazing.mp3'),
                 perfect: mk('resources/sounds/Perfect.mp3'),
-                like: mk('resources/sounds/LikeSound.wav'),
+                like: mk('resources/sounds/LikeSound.mp3'),
                 streaks: Array.from({ length: 10 }, (_, i) => mk(`resources/sounds/streak_${String(i + 1).padStart(2, '0')}.ogg`)),
                 ambient: document.getElementById('bg-music') || mk('resources/sounds/ambient.mp3')
             };
-            const BG_VOLUME = 0.228; // ~15% louder than previous 0.198
+            const BG_VOLUME = 0.228;
             let musicStarted = false;
 
             function play(a, v = 1) { if (!a) return; try { const c = a.cloneNode(); c.volume = Math.min(1, v); c.play().catch(() => { }); } catch (e) { } }
 
             function startMusic() {
-                if (!snd.ambient) return;
+                if (!snd.ambient || musicStarted) return;
                 try {
                     snd.ambient.loop = true;
                     snd.ambient.volume = BG_VOLUME;
                     snd.ambient.muted = false;
-                    if (!snd.ambient.paused && !snd.ambient.ended) {
-                        musicStarted = true;
-                        return;
-                    }
-                    if (musicStarted) return;
                     const p = snd.ambient.play();
                     if (p && typeof p.then === 'function') {
-                        p.then(() => { musicStarted = true; }).catch(() => { });
+                        p.then(() => { musicStarted = true; cleanupUnlock(); }).catch(() => { });
                     } else {
                         musicStarted = true;
+                        cleanupUnlock();
                     }
                 } catch (e) { }
             }
 
-            // Start as soon as the page opens / audio can play (not waiting for a tap).
-            snd.ambient.loop = true;
-            snd.ambient.volume = BG_VOLUME;
-            snd.ambient.addEventListener('canplay', startMusic);
-            snd.ambient.addEventListener('canplaythrough', startMusic);
-            snd.ambient.addEventListener('loadeddata', startMusic);
-            window.addEventListener('pageshow', startMusic);
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) startMusic();
-            });
-            startMusic();
-            // Retry a few times while the file buffers / autoplay policy settles.
-            let retries = 0;
-            const retryId = setInterval(() => {
-                if (musicStarted || ++retries > 20) { clearInterval(retryId); return; }
-                startMusic();
-            }, 250);
+            // Google App Campaigns: do not enable sound before the user interacts.
+            function unlock() { startMusic(); }
+            function cleanupUnlock() {
+                window.removeEventListener('pointerdown', unlock);
+                window.removeEventListener('touchstart', unlock);
+                window.removeEventListener('keydown', unlock);
+            }
+            window.addEventListener('pointerdown', unlock, { passive: true });
+            window.addEventListener('touchstart', unlock, { passive: true });
+            window.addEventListener('keydown', unlock);
 
             return {
-                playArrowSelect: () => play(snd.arrowSelect, 0.765), // 10% quieter
+                playArrowSelect: () => play(snd.arrowSelect, 0.765),
                 playMistake: () => play(snd.mistake, 1),
                 playLevelInit: () => play(snd.levelInit, 0.8),
                 playWin: () => play(snd.win, 0.9),
@@ -1397,14 +1416,14 @@
                         resolve();
                     };
                     tip.addEventListener('transitionend', onFadeDone);
-                }, 2500);
+                }, 1000);
             });
         }
 
         async function entranceAnim() {
             return new Promise(resolve => {
                 let start = Date.now();
-                const totalDur = 800; // 0.8s for full growth
+                const totalDur = 500; // faster build for time-to-fun under 3s
                 arrowList.forEach(a => { a.isGrowing = true; a.growthT = 0; a.segments = []; });
                 function tick() {
                     let elapsed = Date.now() - start;
@@ -1655,9 +1674,32 @@
         }
 
         function showEndScreen() {
+            // Clear gameplay surface and present end card (search + CTA below)
+            clearIdleHint();
+            hideFingerHint();
+            document.getElementById('canvas-wrap').style.visibility = 'hidden';
+            document.getElementById('hud').style.visibility = 'hidden';
+            document.getElementById('streak-bar').style.visibility = 'hidden';
+            document.getElementById('tip-overlay').classList.remove('visible');
+            document.getElementById('time-up-msg').classList.remove('visible');
             document.getElementById('end-screen').classList.add('visible');
             startEndTypewriter();
         }
+
+        function openStoreCTA() {
+            try {
+                if (typeof ExitApi !== 'undefined' && ExitApi.exit) ExitApi.exit();
+            } catch (e) { }
+        }
+
+        (function wireCTA() {
+            const btn = document.getElementById('cta-btn');
+            if (!btn) return;
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                openStoreCTA();
+            });
+        })();
 
         function showTimeUpThenEnd() {
             const msg = document.getElementById('time-up-msg');
