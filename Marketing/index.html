@@ -719,6 +719,14 @@
             animation: fingerTap 1.1s ease-in-out infinite;
         }
 
+        /* drop-shadow filter on an animated element forces per-frame
+           re-rasterization on mobile GPUs — skip it on touch devices */
+        @media (pointer: coarse) {
+            #finger-hint {
+                filter: none;
+            }
+        }
+
         @keyframes fingerTap {
             0% {
                 transform: translate(-6%, -21%) scale(1);
@@ -851,34 +859,84 @@
         // ═══════════════════════════════════════════════════════════════════
         //  SOUND MANAGER
         // ═══════════════════════════════════════════════════════════════════
+        // Web Audio: each clip is decoded ONCE into an AudioBuffer; playback is a
+        // BufferSource start (~free). The old audio.cloneNode().play() created a
+        // brand-new media element per tap, which blocks the main thread for
+        // 50-300ms on iOS Safari / mobile Chrome — a huge hitch right when an
+        // arrow starts moving.
         const SFX = (() => {
-            function mk(src) { const a = new Audio(); a.preload = 'auto'; a.src = src; return a; }
-            const snd = {
-                arrowSelect: mk('resources/sounds/arrowFly.mp3'),
-                mistake: mk('resources/sounds/Mistake.mp3'),
-                levelInit: mk('resources/sounds/levelInit.mp3'),
-                win: mk('resources/sounds/Won.mp3'),
-                good: mk('resources/sounds/Good.mp3'),
-                nice: mk('resources/sounds/Nice.mp3'),
-                excellent: mk('resources/sounds/Excellent.mp3'),
-                amazing: mk('resources/sounds/Amazing.mp3'),
-                perfect: mk('resources/sounds/Perfect.mp3'),
-                like: mk('resources/sounds/LikeSound.mp3'),
-                streaks: Array.from({ length: 10 }, (_, i) => mk(`resources/sounds/streak_${String(i + 1).padStart(2, '0')}.ogg`)),
-                ambient: document.getElementById('bg-music') || mk('resources/sounds/ambient.mp3')
+            const FILES = {
+                arrowSelect: 'resources/sounds/arrowFly.mp3',
+                mistake: 'resources/sounds/Mistake.mp3',
+                levelInit: 'resources/sounds/levelInit.mp3',
+                win: 'resources/sounds/Won.mp3',
+                good: 'resources/sounds/Good.mp3',
+                nice: 'resources/sounds/Nice.mp3',
+                excellent: 'resources/sounds/Excellent.mp3',
+                amazing: 'resources/sounds/Amazing.mp3',
+                perfect: 'resources/sounds/Perfect.mp3',
+                like: 'resources/sounds/LikeSound.mp3'
             };
+            for (let i = 1; i <= 10; i++) FILES['streak' + i] = `resources/sounds/streak_${String(i).padStart(2, '0')}.ogg`;
+
+            const AC = window.AudioContext || window.webkitAudioContext;
+            let actx = null, decodeStarted = false;
+            const buffers = {};
+            const fallbackEls = {};
+
+            function decodeAll() {
+                if (decodeStarted || !AC) return;
+                try { actx = actx || new AC(); } catch (e) { return; }
+                decodeStarted = true;
+                Object.keys(FILES).forEach(name => {
+                    fetch(FILES[name])
+                        .then(r => r.arrayBuffer())
+                        .then(ab => new Promise((res, rej) => actx.decodeAudioData(ab, res, rej)))
+                        .then(buf => { buffers[name] = buf; })
+                        .catch(() => { }); // e.g. Safari can't decode ogg — skip silently
+                });
+            }
+
+            // Only used before decode finishes or when Web Audio is unavailable.
+            function fallbackPlay(name, v) {
+                try {
+                    let a = fallbackEls[name];
+                    if (!a) { a = new Audio(); a.preload = 'auto'; a.src = FILES[name]; fallbackEls[name] = a; }
+                    a.volume = Math.min(1, v);
+                    a.currentTime = 0;
+                    a.play().catch(() => { });
+                } catch (e) { }
+            }
+
+            function play(name, v = 1) {
+                const buf = buffers[name];
+                if (actx && buf) {
+                    try {
+                        if (actx.state === 'suspended') actx.resume().catch(() => { });
+                        const src = actx.createBufferSource();
+                        src.buffer = buf;
+                        const g = actx.createGain();
+                        g.gain.value = Math.min(1, v);
+                        src.connect(g);
+                        g.connect(actx.destination);
+                        src.start(0);
+                        return;
+                    } catch (e) { }
+                }
+                fallbackPlay(name, v);
+            }
+
+            const ambient = document.getElementById('bg-music') || (() => { const a = new Audio(); a.preload = 'auto'; a.src = 'resources/sounds/ambient.mp3'; return a; })();
             const BG_VOLUME = 0.228;
             let musicStarted = false;
 
-            function play(a, v = 1) { if (!a) return; try { const c = a.cloneNode(); c.volume = Math.min(1, v); c.play().catch(() => { }); } catch (e) { } }
-
             function startMusic() {
-                if (!snd.ambient || musicStarted) return;
+                if (!ambient || musicStarted) return;
                 try {
-                    snd.ambient.loop = true;
-                    snd.ambient.volume = BG_VOLUME;
-                    snd.ambient.muted = false;
-                    const p = snd.ambient.play();
+                    ambient.loop = true;
+                    ambient.volume = BG_VOLUME;
+                    ambient.muted = false;
+                    const p = ambient.play();
                     if (p && typeof p.then === 'function') {
                         p.then(() => { musicStarted = true; cleanupUnlock(); }).catch(() => { });
                     } else {
@@ -889,7 +947,11 @@
             }
 
             // Google App Campaigns: do not enable sound before the user interacts.
-            function unlock() { startMusic(); }
+            function unlock() {
+                decodeAll();
+                if (actx && actx.state === 'suspended') actx.resume().catch(() => { });
+                startMusic();
+            }
             function cleanupUnlock() {
                 window.removeEventListener('pointerdown', unlock);
                 window.removeEventListener('touchstart', unlock);
@@ -900,22 +962,17 @@
             window.addEventListener('keydown', unlock);
 
             return {
-                playArrowSelect: () => play(snd.arrowSelect, 0.765),
-                playMistake: () => play(snd.mistake, 1),
-                playLevelInit: () => play(snd.levelInit, 0.8),
-                playWin: () => play(snd.win, 0.9),
+                playArrowSelect: () => play('arrowSelect', 0.765),
+                playMistake: () => play('mistake', 1),
+                playLevelInit: () => play('levelInit', 0.8),
+                playWin: () => play('win', 0.9),
                 playVibe: (type) => {
-                    if (type === 'good') play(snd.good, 1);
-                    else if (type === 'nice') play(snd.nice, 1);
-                    else if (type === 'excellent') play(snd.excellent, 1);
-                    else if (type === 'amazing') play(snd.amazing, 1);
-                    else if (type === 'perfect') play(snd.perfect, 1);
+                    if (FILES[type]) play(type, 1);
                 },
                 playStreak: (n) => {
-                    const idx = Math.min(n - 1, 9);
-                    play(snd.streaks[idx], 1);
+                    play('streak' + Math.min(Math.max(n, 1), 10), 1);
                 },
-                playLike: () => play(snd.like, 1),
+                playLike: () => play('like', 1),
                 startMusic,
                 resume: () => startMusic()
             };
@@ -950,7 +1007,6 @@
             return IS_COARSE && ((window.innerWidth * window.innerHeight) >= 900 * 1800);
         })();
         const USE_INSTANT_ENTRANCE = IS_LOW_END; // LevelManager low-end path
-        const USE_SIMPLE_HEAD_WHILE_MOVING = IS_LOW_END; // skip sprite blit while moving
         const SKIP_CLICK_FX = IS_LOW_END;
         // Cap backing-store size on phones (full retina 3x kills fill-rate).
         const MAX_DPR = (IS_COARSE || IS_LOW_END) ? 1 : Math.min(window.devicePixelRatio || 1, 1.75);
@@ -1096,25 +1152,22 @@
         }
         headImg.onload = ensureHeadTints;
 
-        function nearestHeadTint(col) {
+        // Exact body-matching head tint (same PNG, source-atop once into cache — never approx color).
+        function headTintForColor(col) {
+            if (!col) col = '#000000';
             ensureHeadTints();
             if (headTintCache.has(col)) return headTintCache.get(col);
-            // Animated rgb() → pick closest of the 3 cached tints (no per-frame source-atop).
-            let r = 0, g = 0, b = 0;
-            if (typeof col === 'string' && col[0] === '#') {
-                if (col.length === 4) {
-                    r = parseInt(col[1] + col[1], 16); g = parseInt(col[2] + col[2], 16); b = parseInt(col[3] + col[3], 16);
-                } else {
-                    r = parseInt(col.slice(1, 3), 16); g = parseInt(col.slice(3, 5), 16); b = parseInt(col.slice(5, 7), 16);
-                }
-            } else if (typeof col === 'string' && col.startsWith('rgb')) {
-                const m = col.match(/(\d+)/g);
-                if (m && m.length >= 3) { r = +m[0]; g = +m[1]; b = +m[2]; }
-            }
-            // Prefer green / red when clearly tinted; else black
-            if (g > r + 30 && g > b + 20) return headTintCache.get('#27ae60') || null;
-            if (r > g + 30 && r > b + 20) return headTintCache.get('#e74c3c') || null;
-            return headTintCache.get('#000000') || null;
+            if (!headImg.complete || headImg.naturalWidth <= 0) return null;
+            const s = 64;
+            const c = document.createElement('canvas');
+            c.width = c.height = s;
+            const x = c.getContext('2d');
+            x.drawImage(headImg, 0, 0, s, s);
+            x.globalCompositeOperation = 'source-atop';
+            x.fillStyle = col;
+            x.fillRect(0, 0, s, s);
+            headTintCache.set(col, c);
+            return c;
         }
 
         function ensureGridTexture() {
@@ -1141,24 +1194,25 @@
             return gridTex;
         }
 
-        function drawGridLayer(ctx) {
-            const tex = ensureGridTexture();
-            ctx.save();
-            ctx.translate(viewW * 0.5, viewH * 0.5);
-            ctx.scale(camera.zoom, -camera.zoom);
-            ctx.translate(-camera.x, -camera.y);
-            ctx.drawImage(tex, 0, 0);
-            ctx.restore();
-        }
-
-        // Bake grid + idle arrows once; while something moves we only redraw dynamic arrows.
-        let staticLayer = null, staticLayerValid = false, staticCamKey = '';
+        // ── World-space board bake ─────────────────────────────────────────
+        // Grid + idle arrows are rendered ONCE into an offscreen texture in
+        // world pixels. Camera pan / pinch / glide never re-render arrows;
+        // every frame is just one transformed drawImage of the same bitmap.
+        // The bake is refreshed only when an arrow actually changes state.
+        let boardTex = null, boardTexValid = false, boardBakeScale = 1;
         let currentDpr = 1;
         const MOVE_STEP_DUR = (IS_COARSE || IS_LOW_END) ? 0.05 : 0.032; // matches Unity fast-step threshold
         const BLOCK_STEP_DUR = (IS_COARSE || IS_LOW_END) ? 0.05 : 0.032;
         const IMPACT_PAUSE_S = 0.14;
 
-        function invalidateStaticLayer() { staticLayerValid = false; }
+        function invalidateStaticLayer() { boardTexValid = false; }
+
+        const BAKE_SCALE_MIN = 0.4, BAKE_SCALE_MAX = 1.5;
+        function desiredBakeScale() {
+            // A little headroom over the current zoom keeps idle arrows crisp
+            // after small zoom-ins without forcing a rebake.
+            return Math.min(BAKE_SCALE_MAX, Math.max(BAKE_SCALE_MIN, camera.zoom * 1.25));
+        }
 
         function isArrowDynamic(a) {
             if (!a || a.gone) return false;
@@ -1177,25 +1231,38 @@
                 && Math.abs(camera.zoom - targetCam.zoom) <= 0.0005;
         }
 
-        function rebuildStaticLayer() {
-            if (!staticLayer) staticLayer = document.createElement('canvas');
-            if (staticLayer.width !== canvas.width || staticLayer.height !== canvas.height) {
-                staticLayer.width = canvas.width;
-                staticLayer.height = canvas.height;
-            }
-            const sctx = staticLayer.getContext('2d', { alpha: false, willReadFrequently: false });
-            sctx.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
-            sctx.imageSmoothingEnabled = true;
-            sctx.fillStyle = '#ffffff';
-            sctx.fillRect(0, 0, viewW, viewH);
-            drawGridLayer(sctx);
+        function rebuildBoardTex() {
+            const worldW = Math.max(1, gridSize.x * cellSize);
+            const worldH = Math.max(1, gridSize.y * cellSize);
+            const k = desiredBakeScale();
+            boardBakeScale = k;
+            const w = Math.max(1, Math.round(worldW * k));
+            const h = Math.max(1, Math.round(worldH * k));
+            if (!boardTex) boardTex = document.createElement('canvas');
+            if (boardTex.width !== w || boardTex.height !== h) { boardTex.width = w; boardTex.height = h; }
+            const b = boardTex.getContext('2d');
+            b.setTransform(1, 0, 0, 1, 0, 0);
+            b.clearRect(0, 0, w, h);
+            b.imageSmoothingEnabled = true;
+            // Grid dots, flipped so texture rows match world Y-up.
+            b.save();
+            b.translate(0, h);
+            b.scale(k, -k);
+            b.drawImage(ensureGridTexture(), 0, 0);
+            b.restore();
+            // Aim the shared camera at the texture so Arrow.draw() lands in
+            // world pixels: screenX = k*worldX, screenY = k*(worldH - worldY).
+            const cx = camera.x, cy = camera.y, cz = camera.zoom;
+            camera.zoom = k;
+            camera.x = (viewW * 0.5) / k;
+            camera.y = worldH - (viewH * 0.5) / k;
             for (let i = 0; i < arrowList.length; i++) {
                 const a = arrowList[i];
                 if (a.gone || isArrowDynamic(a)) continue;
-                a.draw(sctx);
+                a.draw(b);
             }
-            staticLayerValid = true;
-            staticCamKey = camera.x.toFixed(2) + ',' + camera.y.toFixed(2) + ',' + camera.zoom.toFixed(4) + ',' + viewW + 'x' + viewH;
+            camera.x = cx; camera.y = cy; camera.zoom = cz;
+            boardTexValid = true;
         }
 
         class Arrow {
@@ -1218,19 +1285,26 @@
 
             get head() { return this.segments[this.segments.length - 1]; }
 
-            // Follow last segment direction for head rotation
+            // Follow last segment direction for head rotation (reused array — no per-frame alloc)
             get visualDirection() {
+                if (!this._vDir) this._vDir = [0, 0];
+                const out = this._vDir;
                 const count = this.segments.length;
                 if (count >= 2) {
                     const h = this.segments[count - 1], p = this.segments[count - 2];
                     const dx = h.x - p.x, dy = h.y - p.y;
-                    if (dx !== 0 || dy !== 0) return [dx * (Math.abs(dx) > Math.abs(dy) ? 1 : 0), dy * (Math.abs(dy) > Math.abs(dx) ? 1 : 0)];
+                    if (dx !== 0 || dy !== 0) {
+                        out[0] = dx * (Math.abs(dx) > Math.abs(dy) ? 1 : 0);
+                        out[1] = dy * (Math.abs(dy) > Math.abs(dx) ? 1 : 0);
+                        return out;
+                    }
                 } else if (this.isGrowing && this.pathData.length >= 2) {
-                    // During entrance, look at the next point in path if possible
                     const h = this.pathData[1], p = this.pathData[0];
-                    return [h.x - p.x, h.y - p.y];
+                    out[0] = h.x - p.x; out[1] = h.y - p.y;
+                    return out;
                 }
-                return this.lookDir;
+                out[0] = this.lookDir[0]; out[1] = this.lookDir[1];
+                return out;
             }
 
             canMoveForward() {
@@ -1372,6 +1446,94 @@
                 if (q && q.resolve) q.resolve();
             }
 
+            // Port of ArrowController.UpdateLinePositions — keep stroke on grid (corner inject on turns).
+            _linePt(i) {
+                if (!this._lineBuf) this._lineBuf = [];
+                let p = this._lineBuf[i];
+                if (!p) { p = { x: 0, y: 0 }; this._lineBuf[i] = p; }
+                return p;
+            }
+            // No inner closures here — a per-frame closure per moving arrow was a real GC source on mobile.
+            _pushLinePt(len, x, y, snap2) {
+                if (len > 0) {
+                    const prev = this._linePt(len - 1);
+                    const dx = prev.x - x, dy = prev.y - y;
+                    if (dx * dx + dy * dy <= snap2) return len;
+                }
+                const p = this._linePt(len);
+                p.x = x; p.y = y;
+                return len + 1;
+            }
+            buildGridAlignedStroke(segs) {
+                const out = this._lineBuf || (this._lineBuf = []);
+                let len = 0;
+                const n = segs.length;
+                if (n === 0) { out.length = 0; return out; }
+                const snap = Math.max(0.35, cellSize * camera.zoom * 0.02);
+                const snap2 = snap * snap;
+                if (!this._tmpA) { this._tmpA = { x: 0, y: 0 }; this._tmpB = { x: 0, y: 0 }; }
+
+                if (n === 1) {
+                    len = this._pushLinePt(len, segs[0].x, segs[0].y, snap2);
+                    out.length = len;
+                    return out;
+                }
+
+                const hasGrid = this.segments && this.segments.length === n && !this.isGrowing;
+                // Cache each segment's snapped grid screen pos once (was recomputed twice per pair before).
+                let prevSnapX = 0, prevSnapY = 0, havePrevSnap = false;
+
+                for (let i = 0; i < n - 1; i++) {
+                    let p1x = segs[i].x, p1y = segs[i].y;
+                    let p2x = segs[i + 1].x, p2y = segs[i + 1].y;
+                    let g1x = 0, g1y = 0, g2x = 0, g2y = 0;
+
+                    if (hasGrid) {
+                        if (havePrevSnap) {
+                            g1x = prevSnapX; g1y = prevSnapY;
+                        } else {
+                            gridToScreenInto(this.segments[i].x, this.segments[i].y, this._tmpA);
+                            g1x = this._tmpA.x; g1y = this._tmpA.y;
+                        }
+                        if ((p1x - g1x) * (p1x - g1x) + (p1y - g1y) * (p1y - g1y) < snap2) {
+                            p1x = g1x; p1y = g1y;
+                        }
+                        gridToScreenInto(this.segments[i + 1].x, this.segments[i + 1].y, this._tmpB);
+                        g2x = this._tmpB.x; g2y = this._tmpB.y;
+                        if ((p2x - g2x) * (p2x - g2x) + (p2y - g2y) * (p2y - g2y) < snap2) {
+                            p2x = g2x; p2y = g2y;
+                        }
+                        prevSnapX = g2x; prevSnapY = g2y; havePrevSnap = true;
+                    }
+
+                    len = this._pushLinePt(len, p1x, p1y, snap2);
+
+                    // Inject elbow if chord is diagonal (Unity turn-corner fix)
+                    if (Math.abs(p1x - p2x) > snap && Math.abs(p1y - p2y) > snap) {
+                        let cx, cy;
+                        if (hasGrid) {
+                            const s1 = Math.abs(p1x - g1x) + Math.abs(p1y - g1y)
+                                + Math.abs(p2x - g1x) + Math.abs(p2y - g1y);
+                            const s2 = Math.abs(p1x - g2x) + Math.abs(p1y - g2y)
+                                + Math.abs(p2x - g2x) + Math.abs(p2y - g2y);
+                            if (s1 <= s2) { cx = g1x; cy = g1y; }
+                            else { cx = g2x; cy = g2y; }
+                        } else {
+                            const e1x = p1x, e1y = p2y, e2x = p2x, e2y = p1y;
+                            const s1 = Math.abs(p1y - e1y) + Math.abs(p2x - e1x);
+                            const s2 = Math.abs(p1x - e2x) + Math.abs(p2y - e2y);
+                            if (s1 <= s2) { cx = e1x; cy = e1y; }
+                            else { cx = e2x; cy = e2y; }
+                        }
+                        len = this._pushLinePt(len, cx, cy, snap2);
+                    }
+                }
+
+                len = this._pushLinePt(len, segs[n - 1].x, segs[n - 1].y, snap2);
+                out.length = len;
+                return out;
+            }
+
             draw(ctx) {
                 if (this.gone) return;
                 const segs = this.getVisualPositions();
@@ -1379,20 +1541,20 @@
 
                 const col = this.drawColor, cs = cellSize * camera.zoom;
                 const n = segs.length;
+                const stroke = this.buildGridAlignedStroke(segs);
 
-                // Body stroke (no per-frame array allocs)
-                if (n > 1) {
+                if (stroke.length > 1) {
                     ctx.strokeStyle = col;
                     ctx.lineWidth = cs * 0.21;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.beginPath();
-                    ctx.moveTo(segs[0].x, segs[0].y);
-                    for (let i = 1; i < n; i++) ctx.lineTo(segs[i].x, segs[i].y);
+                    ctx.moveTo(stroke[0].x, stroke[0].y);
+                    for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y);
                     ctx.stroke();
                 }
 
-                // Soft segment dots: desktop/hi-end only (Unity hides body segment sprites)
+                // Soft segment dots: desktop/hi-end only
                 if (!IS_COARSE && !IS_LOW_END) {
                     ctx.fillStyle = 'rgba(0,0,0,0.06)';
                     const rad = cs * 0.34;
@@ -1403,7 +1565,6 @@
                     }
                 }
 
-                // Hint
                 if (!this.isMoving && this.isShowingHint && this.canMoveForward()) {
                     const h = segs[n - 1];
                     const end = gridToScreen(this.segments[this.segments.length - 1].x + this.lookDir[0] * 60, this.segments[this.segments.length - 1].y + this.lookDir[1] * 60);
@@ -1418,14 +1579,20 @@
                     ctx.restore();
                 }
 
-                // Head — cached tinted sprite (never source-atop on the main canvas)
+                // Head PNG always, tinted to exact body color
                 const vDir = this.visualDirection;
                 const hPos = segs[n - 1], angle = Math.atan2(vDir[0], vDir[1]), hs = cs * 0.72;
                 ctx.save();
                 ctx.translate(hPos.x, hPos.y);
                 ctx.rotate(angle);
-                // Low-end: triangle head while moving (Unity skips expensive visual rebuilds on fast steps).
-                if (USE_SIMPLE_HEAD_WHILE_MOVING && this.isMoving) {
+                let tinted = this._tintImg;
+                if (this._tintCol !== col) {
+                    this._tintCol = col;
+                    this._tintImg = tinted = headTintForColor(col);
+                }
+                if (tinted) {
+                    ctx.drawImage(tinted, -hs * 0.5, -hs * 0.5, hs, hs);
+                } else {
                     ctx.fillStyle = col;
                     ctx.beginPath();
                     ctx.moveTo(0, -hs * 0.5);
@@ -1433,23 +1600,6 @@
                     ctx.lineTo(hs * 0.35, hs * 0.35);
                     ctx.closePath();
                     ctx.fill();
-                } else {
-                    let tinted = this._tintImg;
-                    if (this._tintCol !== col) {
-                        this._tintCol = col;
-                        this._tintImg = tinted = nearestHeadTint(col);
-                    }
-                    if (tinted) {
-                        ctx.drawImage(tinted, -hs * 0.5, -hs * 0.5, hs, hs);
-                    } else {
-                        ctx.fillStyle = col;
-                        ctx.beginPath();
-                        ctx.moveTo(0, -hs * 0.5);
-                        ctx.lineTo(-hs * 0.35, hs * 0.35);
-                        ctx.lineTo(hs * 0.35, hs * 0.35);
-                        ctx.closePath();
-                        ctx.fill();
-                    }
                 }
                 ctx.restore();
             }
@@ -1509,18 +1659,13 @@
                     return out;
                 }
                 if (this.bounceT < 1) {
-                    const propagationT = this.bounceT * 1.35;
-                    const nudgeScale = cellSize * camera.zoom * 0.45;
-                    const last = n - 1;
-                    for (let i = 0; i < n; i++) {
-                        const p = out[i];
-                        const segDelay = (last - i) * 0.035;
-                        const localT = Math.min(1, Math.max(0, (propagationT - segDelay) * 3.0));
-                        const nudge = nudgeScale * Math.sin(localT * Math.PI);
-                        // bounce mutates in place (base already in out)
-                        p.x += this.lookDir[0] * nudge;
-                        p.y -= this.lookDir[1] * nudge;
-                    }
+                    // Impact bump only along look axis on the head — keeps body on grid lines
+                    // (full-body wave was causing diagonal chord shake).
+                    const localT = Math.min(1, Math.max(0, this.bounceT * 3.0));
+                    const nudge = cellSize * camera.zoom * 0.35 * Math.sin(localT * Math.PI);
+                    const head = out[n - 1];
+                    head.x += this.lookDir[0] * nudge;
+                    head.y -= this.lookDir[1] * nudge;
                     return out;
                 }
                 return out;
@@ -1858,14 +2003,20 @@
             hideFingerHint();
         }
 
+        let fingerHintLastX = -1e9, fingerHintLastY = -1e9;
         function updateFingerHintPosition() {
             if (!idleHintArrow || idleHintArrow.gone) { hideFingerHint(); return; }
             const segs = idleHintArrow.getVisualPositions();
             if (!segs || !segs.length) return;
             const headScreen = segs[segs.length - 1];
+            const x = canvasRect.left + headScreen.x * (canvasRect.width / viewW);
+            const y = canvasRect.top + headScreen.y * (canvasRect.height / viewH);
+            // Writing the same left/top re-dirties style + layout every frame.
+            if (Math.abs(x - fingerHintLastX) < 0.5 && Math.abs(y - fingerHintLastY) < 0.5) return;
+            fingerHintLastX = x; fingerHintLastY = y;
             const el = document.getElementById('finger-hint');
-            el.style.left = (canvasRect.left + headScreen.x * (canvasRect.width / viewW)) + 'px';
-            el.style.top = (canvasRect.top + headScreen.y * (canvasRect.height / viewH)) + 'px';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
         }
 
         function showIntroTip() {
@@ -1961,6 +2112,15 @@
             return gridToScreenInto(gx, gy, { x: 0, y: 0 });
         }
 
+        // Restarts a CSS animation without forcing a synchronous layout (no offsetWidth read).
+        // A forced reflow here landed on the exact frame an arrow starts moving and caused a hitch.
+        function restartAnimClass(el, ...classes) {
+            el.classList.remove(...classes);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => el.classList.add(...classes));
+            });
+        }
+
         function showVibe() {
             const vibes = [
                 { t: 'GOOD!', s: 'good' },
@@ -1973,9 +2133,7 @@
             const el = document.getElementById('vibe-text');
             el.textContent = v.t;
             SFX.playVibe(v.s);
-            el.classList.remove('show', 'punch');
-            void el.offsetWidth;
-            el.classList.add('show', 'punch');
+            restartAnimClass(el, 'show', 'punch');
             if (vibeTimer) clearTimeout(vibeTimer);
             vibeTimer = setTimeout(() => el.classList.remove('show'), 1200);
         }
@@ -1993,9 +2151,7 @@
             ];
             const q = qs[Math.floor(Math.random() * qs.length)];
             el.style.top = q.t; el.style.left = q.l;
-            el.classList.remove('show', 'punch');
-            void el.offsetWidth;
-            el.classList.add('show', 'punch');
+            restartAnimClass(el, 'show', 'punch');
             if (comboTimer) clearTimeout(comboTimer);
             comboTimer = setTimeout(() => el.classList.remove('show'), 800);
         }
@@ -2105,11 +2261,7 @@
         function startDownloadPump() {
             stopDownloadPump();
             const el = document.querySelector('.end-download-btn');
-            const pump = () => {
-                el.classList.remove('pump');
-                void el.offsetWidth;
-                el.classList.add('pump');
-            };
+            const pump = () => restartAnimClass(el, 'pump');
             pump();
             downloadPumpInterval = setInterval(pump, 1000);
         }
@@ -2216,7 +2368,7 @@
             updateUrgencyFlash();
         }
         function updateLivesUI() { for (let i = 0; i < 3; i++) document.getElementById(`heart-${i}`).classList.toggle('inactive', i >= lives); }
-        function updateArrowsLeftUI(n) { const el = document.getElementById('arrows-left-text'); el.textContent = n; el.classList.remove('punch-simple'); void el.offsetWidth; el.classList.add('punch-simple'); }
+        function updateArrowsLeftUI(n) { const el = document.getElementById('arrows-left-text'); el.textContent = n; restartAnimClass(el, 'punch-simple'); }
         function flashWrong() { const el = document.getElementById('wrong-flash'); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 220); }
         function lerpColor(a, b, t) { const h2r = (h) => { let r = 0, g = 0, b = 0; if (h.length == 4) { r = parseInt(h[1] + h[1], 16); g = parseInt(h[2] + h[2], 16); b = parseInt(h[3] + h[3], 16); } else { r = parseInt(h.slice(1, 3), 16); g = parseInt(h.slice(3, 5), 16); b = parseInt(h.slice(5, 7), 16); } return { r, g, b }; }; const c1 = h2r(a), c2 = h2r(b); return `rgb(${Math.round(c1.r + (c2.r - c1.r) * t)},${Math.round(c1.g + (c2.g - c1.g) * t)},${Math.round(c1.b + (c2.b - c1.b) * t)})`; }
         function restartLevel() { location.reload(); }
@@ -2226,47 +2378,49 @@
         let sceneDirty = true;
         let wasSceneDirty = true;
 
-        function sceneNeedsDraw() {
-            if (!cameraSettled()) return true;
-            for (let i = 0; i < arrowList.length; i++) {
-                const a = arrowList[i];
-                if (a.gone) continue;
-                if (isArrowDynamic(a)) return true;
-            }
-            return false;
-        }
+        // Reused every frame — avoids a fresh array + a second isArrowDynamic scan just to draw.
+        const dynamicArrowsBuf = [];
 
         function gameLoop(ts) {
             const dt = Math.min((ts - lastTime) / 1000, 0.1); lastTime = ts;
             camera.x += (targetCam.x - camera.x) * CAM_LERP;
             camera.y += (targetCam.y - camera.y) * CAM_LERP;
             camera.zoom += (targetCam.zoom - camera.zoom) * CAM_LERP;
-            for (let i = 0; i < arrowList.length; i++) arrowList[i].update(dt);
 
-            const dirty = sceneDirty || sceneNeedsDraw();
+            dynamicArrowsBuf.length = 0;
+            for (let i = 0; i < arrowList.length; i++) {
+                const a = arrowList[i];
+                a.update(dt);
+                const dyn = !a.gone && isArrowDynamic(a);
+                if (dyn) dynamicArrowsBuf.push(a);
+                // Arrow just came to rest (or escaped): fold it into the bake once.
+                if (a._wasDynamic && !dyn) boardTexValid = false;
+                a._wasDynamic = dyn;
+            }
+
+            const camBusy = !cameraSettled();
+            const dirty = sceneDirty || camBusy || dynamicArrowsBuf.length > 0;
             if (dirty || wasSceneDirty) {
                 sceneDirty = false;
-                const camBusy = !cameraSettled();
-                const camKey = camera.x.toFixed(2) + ',' + camera.y.toFixed(2) + ',' + camera.zoom.toFixed(4) + ',' + viewW + 'x' + viewH;
 
-                if (camBusy) {
-                    // Camera moving: full redraw (static bake would be wrong every frame)
-                    invalidateStaticLayer();
-                    ctx2d.fillStyle = '#ffffff';
-                    ctx2d.fillRect(0, 0, viewW, viewH);
-                    drawGridLayer(ctx2d);
-                    for (let i = 0; i < arrowList.length; i++) arrowList[i].draw(ctx2d);
-                } else {
-                    if (!staticLayerValid || staticCamKey !== camKey) rebuildStaticLayer();
-                    // Blit baked idle board, then only dynamic arrows (Unity: body LineRenderer + moving head)
-                    ctx2d.setTransform(1, 0, 0, 1, 0, 0);
-                    ctx2d.drawImage(staticLayer, 0, 0);
-                    ctx2d.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
-                    for (let i = 0; i < arrowList.length; i++) {
-                        const a = arrowList[i];
-                        if (!a.gone && isArrowDynamic(a)) a.draw(ctx2d);
-                    }
+                if (!boardTexValid) rebuildBoardTex();
+                else if (!camBusy && activePointers.size === 0) {
+                    // Quality-only rebake, at most once after a zoom gesture ends.
+                    const want = desiredBakeScale();
+                    if (want > boardBakeScale * 1.3 || want < boardBakeScale * 0.7) rebuildBoardTex();
                 }
+
+                ctx2d.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
+                ctx2d.fillStyle = '#ffffff';
+                ctx2d.fillRect(0, 0, viewW, viewH);
+                // One blit moves the whole baked board with the camera.
+                const worldH = gridSize.y * cellSize;
+                const s = camera.zoom / boardBakeScale;
+                ctx2d.translate(viewW * 0.5 - camera.x * camera.zoom, viewH * 0.5 - (worldH - camera.y) * camera.zoom);
+                ctx2d.scale(s, s);
+                ctx2d.drawImage(boardTex, 0, 0);
+                ctx2d.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
+                for (let i = 0; i < dynamicArrowsBuf.length; i++) dynamicArrowsBuf[i].draw(ctx2d);
             }
             if (idleHintArrow) {
                 fingerHintFrame++;
