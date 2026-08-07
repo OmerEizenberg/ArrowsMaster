@@ -286,6 +286,8 @@
             cursor: none;
             -webkit-tap-highlight-color: transparent;
             transform-origin: center center;
+            filter: drop-shadow(0 6px 0 rgba(39, 174, 96, 0.45))
+                    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22));
         }
 
         .end-download-btn::before {
@@ -579,6 +581,77 @@
             transform: scale(1);
         }
 
+        /* ─── Click ripple (matches Unity ClickContainer / ClickAnimation) ── */
+        #click-fx-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 260;
+            overflow: hidden;
+        }
+
+        .click-fx {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 56px;
+            height: 56px;
+            margin: -28px 0 0 -28px;
+            pointer-events: none;
+        }
+
+        .click-fx-spread,
+        .click-fx-dot {
+            position: absolute;
+            inset: 0;
+            background-color: rgb(53, 59, 72);
+            -webkit-mask: url('resources/sprites/Circle04.png') center / contain no-repeat;
+            mask: url('resources/sprites/Circle04.png') center / contain no-repeat;
+            transform-origin: center center;
+        }
+
+        .click-fx-spread {
+            animation: clickSpread 0.52s ease-out forwards;
+        }
+
+        .click-fx-dot {
+            animation: clickDot 0.42s ease-out forwards;
+        }
+
+        @keyframes clickSpread {
+            0% {
+                transform: scale(1);
+                opacity: 0.58;
+            }
+
+            38% {
+                transform: scale(1.5);
+                opacity: 0.48;
+            }
+
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        @keyframes clickDot {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            48% {
+                transform: scale(1);
+                opacity: 0.48;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+
         /* ─── Idle finger hint ──────────────────────────────────────── */
         /* The fingertip (upper-left of the source image) is anchored to the target point,
            not the image center, so the tap visually lands right on the arrow's head. */
@@ -677,6 +750,7 @@
         <p>Tap None Blocked Arrow</p>
     </div>
     <div id="finger-hint" aria-hidden="true"></div>
+    <div id="click-fx-layer" aria-hidden="true"></div>
     <div id="custom-cursor" aria-hidden="true"></div>
 
     <script>
@@ -1059,6 +1133,8 @@
         let pressTimer = null, pressTargetArrow = null, isPanning = false, lastPanPos = { x: 0, y: 0 }, panAccum = 0;
         const activePointers = new Map(); // pointerId -> { x, y }
         let isPinching = false, lastPinchDist = 0;
+        let gestureWasPinch = false;
+        let pressStartClient = { x: 0, y: 0 };
 
         function clearPressTarget() {
             if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
@@ -1067,6 +1143,19 @@
                 pressTargetArrow.isShowingHint = false;
                 pressTargetArrow = null;
             }
+        }
+
+        // Matches Unity ClickContainer: soft circle spreads to 2x and fades out.
+        function spawnClickEffect(clientX, clientY) {
+            const layer = document.getElementById('click-fx-layer');
+            if (!layer) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'click-fx';
+            wrap.style.left = clientX + 'px';
+            wrap.style.top = clientY + 'px';
+            wrap.innerHTML = '<div class="click-fx-spread"></div><div class="click-fx-dot"></div>';
+            layer.appendChild(wrap);
+            setTimeout(() => wrap.remove(), 600);
         }
 
         function pinchDistance() {
@@ -1107,11 +1196,14 @@
                 clearPressTarget();
                 isPanning = false;
                 isPinching = true;
+                gestureWasPinch = true;
                 lastPinchDist = pinchDistance();
                 return;
             }
 
             isPinching = false;
+            gestureWasPinch = false;
+            pressStartClient = { x: e.clientX, y: e.clientY };
             const rect = canvas.getBoundingClientRect(), sx = (e.clientX - rect.left) * (canvas.width / rect.width), sy = (e.clientY - rect.top) * (canvas.height / rect.height);
             lastPanPos = { x: e.clientX, y: e.clientY }; isPanning = true; panAccum = 0;
             let bestArrow = null, bestDist = cellSize * 0.9 * camera.zoom;
@@ -1164,6 +1256,13 @@
             if (activePointers.size === 0) {
                 isPanning = false;
                 resetIdleHint();
+                // Same as Unity InputManager: spawn click ripple on a short single-finger tap
+                const moveThresh = Math.max(40, window.innerHeight * 0.03);
+                const moved = Math.hypot(e.clientX - pressStartClient.x, e.clientY - pressStartClient.y);
+                if (!gestureWasPinch && moved < moveThresh) {
+                    spawnClickEffect(e.clientX, e.clientY);
+                }
+                gestureWasPinch = false;
                 if (!pressTargetArrow) return;
                 if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; onArrowClicked(pressTargetArrow); }
                 else { pressTargetArrow.isShowingHint = false; }
