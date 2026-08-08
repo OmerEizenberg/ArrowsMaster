@@ -256,6 +256,7 @@
             gap: clamp(28px, 6.5vw, 44px);
             padding: 10vh 10vw;
             box-sizing: border-box;
+            overflow: visible;
         }
 
         .overlay-screen.visible {
@@ -270,6 +271,7 @@
             flex-direction: column;
             align-items: center;
             gap: clamp(28px, 6.5vw, 44px);
+            overflow: visible;
         }
 
         .end-icon {
@@ -296,7 +298,11 @@
             flex-direction: column;
             align-items: center;
             gap: 0;
-            isolation: isolate;
+            overflow: visible;
+            /* Padding expands the paint box so Safari doesn't clip the button's
+               drop-shadow lip/glow (filter outsets are otherwise cut flush). */
+            padding: 14px 28px 34px;
+            margin: -14px -28px -10px;
         }
 
         .end-download-btn {
@@ -314,6 +320,7 @@
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
             transform-origin: center center;
+            overflow: visible;
             filter: drop-shadow(0 6px 0 rgba(39, 174, 96, 0.45))
                     drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22));
         }
@@ -346,8 +353,8 @@
 
         .end-cta-sub {
             position: relative;
-            z-index: 1;
-            margin-top: -12px;
+            z-index: -1;
+            margin-top: 10px;
             font-size: clamp(11px, 2.8vw, 13px);
             font-weight: 700;
             letter-spacing: 0.04em;
@@ -355,6 +362,8 @@
             text-align: center;
             text-transform: uppercase;
             line-height: 1.35;
+            background: transparent;
+            pointer-events: none;
         }
 
         @keyframes downloadPump {
@@ -1094,18 +1103,45 @@
             const worldY = camera.y - (sy - viewH * 0.5) / camera.zoom;
             return { gx: Math.floor(worldX / cellSize), gy: Math.floor(worldY / cellSize) };
         }
+        // Minimum forgiving tap radius in CSS pixels (~Apple/Google touch target
+        // guidance). On zoomed-out boards a single grid cell can render at just a
+        // few pixels, so a fixed "3x3 cells" search (the old approach) shrank to a
+        // useless hit area and felt like taps were being dropped. We now size the
+        // search in cells to always cover this many screen pixels, then — like
+        // Unity's InputManager.GetClosestArrow — pick the arrow whose nearest
+        // occupied cell is actually closest to the tap, instead of whichever
+        // arrow happened to be scanned first.
+        const MIN_TAP_PX = 26;
         function pickArrowAtScreen(sx, sy) {
+            const cs = cellSize * camera.zoom;
+            if (cs <= 0) return null;
+            const cellRadius = Math.max(1, Math.ceil(MIN_TAP_PX / cs));
             const g = screenToGrid(sx, sy);
-            // 3×3 neighborhood for fat-finger tolerance (Unity rounds to nearest cell).
-            for (let dy = -1; dy <= 1; dy++) {
-                for (let dx = -1; dx <= 1; dx++) {
-                    const occ = getOccupant(g.gx + dx, g.gy + dy);
+            const worldX = (sx - viewW * 0.5) / camera.zoom + camera.x;
+            const worldY = camera.y - (sy - viewH * 0.5) / camera.zoom;
+
+            let bestMovable = null, bestMovableDist = Infinity;
+            let bestAny = null, bestAnyDist = Infinity;
+            for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+                for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+                    const gx = g.gx + dx, gy = g.gy + dy;
+                    const occ = getOccupant(gx, gy);
                     if (occ === null) continue;
                     const a = arrowById.get(occ);
-                    if (a && !a.gone && !a.isMoving) return a;
+                    if (!a || a.gone || a.isMoving) continue;
+                    // An arrow can occupy several cells in range; each cell is
+                    // compared independently so the arrow's closest cell wins.
+                    const cellCx = gx * cellSize + cellSize * 0.5;
+                    const cellCy = gy * cellSize + cellSize * 0.5;
+                    const dist = Math.hypot(worldX - cellCx, worldY - cellCy);
+                    if (dist < bestAnyDist) { bestAnyDist = dist; bestAny = a; }
+                    if (a.canMoveForward() && dist < bestMovableDist) { bestMovableDist = dist; bestMovable = a; }
                 }
             }
-            return null;
+            // Prefer a movable arrow within the forgiving radius; otherwise fall
+            // back to the closest arrow at all (so tapping a blocked arrow still
+            // shows its normal "can't move" feedback instead of silently missing).
+            return bestMovable || bestAny;
         }
 
         function syncCanvasRect() {
@@ -1150,7 +1186,18 @@
                 headTintCache.set(col, c);
             }
         }
-        headImg.onload = ensureHeadTints;
+        // If the board was baked before Head.png finished loading, idle arrows
+        // kept the geometric-triangle fallback forever. Rebake once the sprite is ready.
+        headImg.onload = () => {
+            ensureHeadTints();
+            for (let i = 0; i < arrowList.length; i++) {
+                arrowList[i]._tintCol = null;
+                arrowList[i]._tintImg = null;
+            }
+            invalidateStaticLayer();
+            sceneDirty = true;
+        };
+        if (headImg.complete && headImg.naturalWidth > 0) ensureHeadTints();
 
         // Exact body-matching head tint (same PNG, source-atop once into cache — never approx color).
         function headTintForColor(col) {
@@ -1201,8 +1248,10 @@
         // The bake is refreshed only when an arrow actually changes state.
         let boardTex = null, boardTexValid = false, boardBakeScale = 1;
         let currentDpr = 1;
-        const MOVE_STEP_DUR = (IS_COARSE || IS_LOW_END) ? 0.05 : 0.032; // matches Unity fast-step threshold
-        const BLOCK_STEP_DUR = (IS_COARSE || IS_LOW_END) ? 0.05 : 0.032;
+        // 15% faster than the Unity fast-step threshold, per user request.
+        const SPEED_UP = 1.15;
+        const MOVE_STEP_DUR = ((IS_COARSE || IS_LOW_END) ? 0.05 : 0.032) / SPEED_UP;
+        const BLOCK_STEP_DUR = ((IS_COARSE || IS_LOW_END) ? 0.05 : 0.032) / SPEED_UP;
         const IMPACT_PAUSE_S = 0.14;
 
         function invalidateStaticLayer() { boardTexValid = false; }
@@ -1543,9 +1592,31 @@
                 const n = segs.length;
                 const stroke = this.buildGridAlignedStroke(segs);
 
+                // Head.png: tip at top, triangle base ~y=33/40, shaft stub ~y=36-39
+                // with shaft width 14/40 of the sprite. Size the head so that stub
+                // exactly matches the body stroke — eliminates the shoulder "pick".
+                const lineW = cs * 0.21;
+                const HEAD_SHAFT_FRAC = 14 / 40;
+                const hs = lineW / HEAD_SHAFT_FRAC;
+                const vDir = this.visualDirection;
+                const vLen = Math.hypot(vDir[0], vDir[1]) || 1;
+                // Screen look: grid Y is up, canvas Y is down.
+                const lookX = vDir[0] / vLen;
+                const lookY = -vDir[1] / vLen;
+
+                // Unity UpdateLinePositions: pull the stroke end back under the head
+                // so the body doesn't poke past the triangle base.
+                // Shaft junction sits ~0.39 of the sprite behind center.
+                if (stroke.length > 1) {
+                    const tuck = hs * ((35.5 - 20) / 40);
+                    const last = stroke[stroke.length - 1];
+                    last.x -= lookX * tuck;
+                    last.y -= lookY * tuck;
+                }
+
                 if (stroke.length > 1) {
                     ctx.strokeStyle = col;
-                    ctx.lineWidth = cs * 0.21;
+                    ctx.lineWidth = lineW;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.beginPath();
@@ -1579,28 +1650,20 @@
                     ctx.restore();
                 }
 
-                // Head PNG always, tinted to exact body color
-                const vDir = this.visualDirection;
-                const hPos = segs[n - 1], angle = Math.atan2(vDir[0], vDir[1]), hs = cs * 0.72;
-                ctx.save();
-                ctx.translate(hPos.x, hPos.y);
-                ctx.rotate(angle);
+                // Head PNG only (never the geometric triangle fallback — that was
+                // the "sometimes wrong sprite" bug while Head.png was still loading
+                // or when a stale bake captured it).
+                const hPos = segs[n - 1], angle = Math.atan2(vDir[0], vDir[1]);
                 let tinted = this._tintImg;
                 if (this._tintCol !== col) {
                     this._tintCol = col;
                     this._tintImg = tinted = headTintForColor(col);
                 }
-                if (tinted) {
-                    ctx.drawImage(tinted, -hs * 0.5, -hs * 0.5, hs, hs);
-                } else {
-                    ctx.fillStyle = col;
-                    ctx.beginPath();
-                    ctx.moveTo(0, -hs * 0.5);
-                    ctx.lineTo(-hs * 0.35, hs * 0.35);
-                    ctx.lineTo(hs * 0.35, hs * 0.35);
-                    ctx.closePath();
-                    ctx.fill();
-                }
+                if (!tinted) return;
+                ctx.save();
+                ctx.translate(hPos.x, hPos.y);
+                ctx.rotate(angle);
+                ctx.drawImage(tinted, -hs * 0.5, -hs * 0.5, hs, hs);
                 ctx.restore();
             }
 
@@ -2033,7 +2096,7 @@
                         resolve();
                     };
                     tip.addEventListener('transitionend', onFadeDone);
-                }, 1000);
+                }, 1500);
             });
         }
 
