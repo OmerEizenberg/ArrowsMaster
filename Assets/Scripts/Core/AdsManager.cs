@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections;
+using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -163,10 +164,58 @@ namespace Assets.Scripts.Core
                     info.RevenuePrecision,
                     info.Revenue);
             }
+
+            public static AdAnalyticsPayload FromPendingEntry(PendingAdRevenueEntry entry)
+            {
+                return new AdAnalyticsPayload(
+                    entry.NetworkName,
+                    entry.AdUnitId,
+                    entry.AdFormat,
+                    entry.MediationPath,
+                    entry.MaxPlacement,
+                    entry.RevenuePrecision,
+                    entry.EstimatedRevenueUsd);
+            }
+        }
+
+        /// <summary>
+        /// A single impression whose estimated (adInfo.Revenue-at-display-time) value is being
+        /// held while we wait for the real OnAdRevenuePaidEvent. See the "PENDING AD REVENUE"
+        /// region below for the full estimate/real-value/timeout flow.
+        /// </summary>
+        [Serializable]
+        private class PendingAdRevenueEntry
+        {
+            public string Id;
+            public string AdFormat;
+            public double EstimatedRevenueUsd;
+            public string NetworkName;
+            public string AdUnitId;
+            public string MediationPath;
+            public string MaxPlacement;
+            public string RevenuePrecision;
+            public long CreatedAtUnixMs;
+        }
+
+        /// <summary>Pending estimates, kept in a separate array per ad type to avoid any cross-type collision.</summary>
+        [Serializable]
+        private class PendingAdRevenueStore
+        {
+            public List<PendingAdRevenueEntry> Interstitial = new List<PendingAdRevenueEntry>();
+            public List<PendingAdRevenueEntry> Rewarded = new List<PendingAdRevenueEntry>();
         }
 
         private const string MediationPathDirectMax = "direct_max";
         private const string MediationPathLiftEngine = "liftengine";
+
+        // Interstitial/Rewarded, direct-MAX path only — see "PENDING AD REVENUE" region.
+        private const float PendingAdRevenueTimeoutSeconds = 30f;
+        private const string PendingAdRevenueFileName = "pending_ad_revenue.json";
+        private const string AdFormatInterstitial = "interstitial";
+        private const string AdFormatRewarded = "rewarded";
+
+        private PendingAdRevenueStore _pendingAdRevenueStore;
+        private string _pendingAdRevenueFilePath;
 
         private const float HealthCheckIntervalSeconds = 20f;
         private const float MaxInitStuckRecoverySeconds = 40f;
@@ -277,6 +326,9 @@ namespace Assets.Scripts.Core
 
             _coinsExplosionPrefab = Resources.Load<GameObject>("CoinsSmallExplosion");
 
+            LoadPendingAdRevenueStore();
+            StartCoroutine(PendingAdRevenueTimeoutRoutine());
+
             _ = InitializeSDK();
             StartCoroutine(AdHealthCheckRoutine());
         }
@@ -284,6 +336,11 @@ namespace Assets.Scripts.Core
         private void Start()
         {
             SubscribeToNoAdsStatus();
+
+            // Runs after every object's Awake has completed, so FirebaseManager.Instance is
+            // guaranteed to exist here (its LogFunnelEvent queues internally until Firebase
+            // itself finishes initializing, so it's safe to call this early).
+            FlushLeftoverPendingAdRevenueOnLaunch();
         }
 
         private void Update()
@@ -1180,7 +1237,11 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Interstitial Ad Displayed.");
             if (!_liftEngineReady)
-                LogAdViewed(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "interstitial", MediationPathDirectMax));
+            {
+                var payload = AdAnalyticsPayload.FromMaxAdInfo(adInfo, "interstitial", MediationPathDirectMax);
+                LogAdViewed(payload);
+                TrackPendingAdRevenue(AdFormatInterstitial, payload);
+            }
             SetCachedReady(ref _interstitialReady, false);
             PrepareAllAdsAfterClose();
         }
@@ -1224,6 +1285,18 @@ namespace Assets.Scripts.Core
                 return;
 
             AdMonetizationOptimizer.RecordInterstitialAd(adInfo);
+
+            // No pending estimate for this ad type → already sent via 30s timeout / launch flush,
+            // or never queued. Either way the train left; ignore to avoid duplicate ad_impression.
+            if (!TryResolvePendingAdRevenue(AdFormatInterstitial))
+            {
+                Debug.LogWarning(
+                    $"[AdsManager] Ignoring late/unmatched interstitial OnAdRevenuePaidEvent " +
+                    $"(network={adInfo?.NetworkName}, unit={adUnitId}, revenue={adInfo?.Revenue}) — " +
+                    "no pending estimate waiting for this callback.");
+                return;
+            }
+
             LogAdIlrd(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "interstitial", MediationPathDirectMax));
         }
 
@@ -1431,7 +1504,11 @@ namespace Assets.Scripts.Core
         {
             Debug.Log("[AdsManager] Rewarded Ad Displayed.");
             if (!_liftEngineReady)
-                LogAdViewed(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "rewarded", MediationPathDirectMax));
+            {
+                var payload = AdAnalyticsPayload.FromMaxAdInfo(adInfo, "rewarded", MediationPathDirectMax);
+                LogAdViewed(payload);
+                TrackPendingAdRevenue(AdFormatRewarded, payload);
+            }
             SetCachedReady(ref _rewardedReady, false);
             PrepareAllAdsAfterClose();
         }
@@ -1471,6 +1548,18 @@ namespace Assets.Scripts.Core
                 return;
 
             AdMonetizationOptimizer.RecordRewardedAd(adInfo);
+
+            // No pending estimate for this ad type → already sent via 30s timeout / launch flush,
+            // or never queued. Either way the train left; ignore to avoid duplicate ad_impression.
+            if (!TryResolvePendingAdRevenue(AdFormatRewarded))
+            {
+                Debug.LogWarning(
+                    $"[AdsManager] Ignoring late/unmatched rewarded OnAdRevenuePaidEvent " +
+                    $"(network={adInfo?.NetworkName}, unit={adUnitId}, revenue={adInfo?.Revenue}) — " +
+                    "no pending estimate waiting for this callback.");
+                return;
+            }
+
             LogAdIlrd(AdAnalyticsPayload.FromMaxAdInfo(adInfo, "rewarded", MediationPathDirectMax));
         }
 
@@ -2175,6 +2264,237 @@ namespace Assets.Scripts.Core
             NotifyAdClosed();
             PrepareAllAdsAfterClose();
             RefreshAllReadiness();
+        }
+
+        // ════════════════════════════════════════════
+        //  PENDING AD REVENUE — estimate now, real value within 30s
+        //  Interstitial & Rewarded, direct-MAX path only (banner and the LiftEngine path are
+        //  untouched — see AdsManager notes / design conversation).
+        //
+        //  - On display: adInfo.Revenue is already populated (MAX exposes the same Revenue
+        //    field on every lifecycle callback), so we snapshot it as an ESTIMATE and push it
+        //    onto a per-ad-type array, then persist that array to disk.
+        //  - On OnAdRevenuePaidEvent (the REAL value): drop the oldest pending estimate for
+        //    that ad type (FIFO — MAX gives no per-impression id beyond ad unit) and persist.
+        //    The real value itself is sent by the caller's existing LogAdIlrd call, using the
+        //    callback's own AdInfo — this code only clears the matching estimate.
+        //  - If that callback arrives with NOTHING pending for that ad type (already timed out
+        //    / flushed / never queued): IGNORE it. Do not send a second ad_impression.
+        //  - If no revenue-paid callback arrives within 30s: send ad_impression using the
+        //    stored ESTIMATE instead, so a missing/delayed ILRD callback never silently drops
+        //    the impression.
+        //  - Because the array is on disk, an estimate survives the app being closed. Anything
+        //    left over at next launch is flushed immediately with its estimate — a real
+        //    callback from the previous (now-dead) MAX SDK session can never arrive.
+        //  - Arrays are kept strictly separate per ad type so a revenue-paid callback can only
+        //    ever resolve/clear an estimate of its OWN ad type.
+        // ════════════════════════════════════════════
+
+        private void LoadPendingAdRevenueStore()
+        {
+            _pendingAdRevenueFilePath = Path.Combine(Application.persistentDataPath, PendingAdRevenueFileName);
+            _pendingAdRevenueStore = null;
+
+            try
+            {
+                if (File.Exists(_pendingAdRevenueFilePath))
+                {
+                    string json = File.ReadAllText(_pendingAdRevenueFilePath);
+                    _pendingAdRevenueStore = JsonUtility.FromJson<PendingAdRevenueStore>(json);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] Failed to load pending ad revenue store: {e.Message}");
+            }
+
+            if (_pendingAdRevenueStore == null)
+                _pendingAdRevenueStore = new PendingAdRevenueStore();
+
+            if (_pendingAdRevenueStore.Interstitial == null)
+                _pendingAdRevenueStore.Interstitial = new List<PendingAdRevenueEntry>();
+
+            if (_pendingAdRevenueStore.Rewarded == null)
+                _pendingAdRevenueStore.Rewarded = new List<PendingAdRevenueEntry>();
+        }
+
+        private void PersistPendingAdRevenueStore()
+        {
+            if (string.IsNullOrEmpty(_pendingAdRevenueFilePath) || _pendingAdRevenueStore == null)
+                return;
+
+            try
+            {
+                bool isEmpty = _pendingAdRevenueStore.Interstitial.Count == 0 &&
+                               _pendingAdRevenueStore.Rewarded.Count == 0;
+
+                if (isEmpty)
+                {
+                    if (File.Exists(_pendingAdRevenueFilePath))
+                        File.Delete(_pendingAdRevenueFilePath);
+                    return;
+                }
+
+                string json = JsonUtility.ToJson(_pendingAdRevenueStore);
+                File.WriteAllText(_pendingAdRevenueFilePath, json);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AdsManager] Failed to persist pending ad revenue store: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Sends ad_impression for every estimate left over from a previous app session. Its
+        /// real OnAdRevenuePaidEvent callback belonged to a MAX SDK session that no longer
+        /// exists, so it can never arrive — the estimate is the best data we'll ever have.
+        /// </summary>
+        private void FlushLeftoverPendingAdRevenueOnLaunch()
+        {
+            if (_pendingAdRevenueStore == null)
+                return;
+
+            int flushedCount = FlushPendingAdRevenueList(AdFormatInterstitial, _pendingAdRevenueStore.Interstitial);
+            flushedCount += FlushPendingAdRevenueList(AdFormatRewarded, _pendingAdRevenueStore.Rewarded);
+
+            if (flushedCount > 0)
+            {
+                Debug.Log($"[AdsManager] Flushed {flushedCount} leftover ad revenue estimate(s) from a previous session.");
+                PersistPendingAdRevenueStore();
+            }
+        }
+
+        private int FlushPendingAdRevenueList(string adFormat, List<PendingAdRevenueEntry> entries)
+        {
+            if (entries == null || entries.Count == 0)
+                return 0;
+
+            int count = entries.Count;
+            foreach (var entry in entries)
+            {
+                Debug.LogWarning(
+                    $"[AdsManager] Leftover {adFormat} ad revenue estimate from a previous session " +
+                    $"(network={entry.NetworkName}, unit={entry.AdUnitId}) — sending ad_impression with the estimated value.");
+                LogAdIlrd(AdAnalyticsPayload.FromPendingEntry(entry));
+            }
+
+            entries.Clear();
+            return count;
+        }
+
+        private List<PendingAdRevenueEntry> GetPendingAdRevenueList(string adFormat)
+        {
+            if (_pendingAdRevenueStore == null)
+                return null;
+
+            switch (adFormat)
+            {
+                case AdFormatInterstitial:
+                    return _pendingAdRevenueStore.Interstitial;
+                case AdFormatRewarded:
+                    return _pendingAdRevenueStore.Rewarded;
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// Stores adInfo.Revenue as an estimate for this impression right after it's displayed,
+        /// so we have something to fall back to if OnAdRevenuePaidEvent never arrives (or is
+        /// delayed past <see cref="PendingAdRevenueTimeoutSeconds"/>).
+        /// </summary>
+        private void TrackPendingAdRevenue(string adFormat, AdAnalyticsPayload payload)
+        {
+            if (payload.RevenueUsd <= 0d)
+                return;
+
+            var list = GetPendingAdRevenueList(adFormat);
+            if (list == null)
+                return;
+
+            list.Add(new PendingAdRevenueEntry
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                AdFormat = adFormat,
+                EstimatedRevenueUsd = payload.RevenueUsd,
+                NetworkName = payload.NetworkName,
+                AdUnitId = payload.AdUnitId,
+                MediationPath = payload.MediationPath,
+                MaxPlacement = payload.MaxPlacement,
+                RevenuePrecision = payload.RevenuePrecision,
+                CreatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            });
+
+            PersistPendingAdRevenueStore();
+        }
+
+        /// <summary>
+        /// The real OnAdRevenuePaidEvent arrived in time — drop the oldest matching estimate for
+        /// this ad type (FIFO). Returns false when nothing is waiting (late/unmatched callback);
+        /// caller must then skip LogAdIlrd to avoid duplicate impressions.
+        /// </summary>
+        private bool TryResolvePendingAdRevenue(string adFormat)
+        {
+            var list = GetPendingAdRevenueList(adFormat);
+            if (list == null || list.Count == 0)
+                return false;
+
+            list.RemoveAt(0);
+            PersistPendingAdRevenueStore();
+            return true;
+        }
+
+        private IEnumerator PendingAdRevenueTimeoutRoutine()
+        {
+            var wait = new WaitForSeconds(1f);
+            while (true)
+            {
+                yield return wait;
+
+                try
+                {
+                    if (_pendingAdRevenueStore == null)
+                        continue;
+
+                    CheckPendingAdRevenueTimeouts(AdFormatInterstitial, _pendingAdRevenueStore.Interstitial);
+                    CheckPendingAdRevenueTimeouts(AdFormatRewarded, _pendingAdRevenueStore.Rewarded);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[AdsManager] PendingAdRevenueTimeoutRoutine error: {e.Message}");
+                }
+            }
+        }
+
+        /// <summary>Sends ad_impression with the stored estimate for any entry that's been waiting too long.</summary>
+        private void CheckPendingAdRevenueTimeouts(string adFormat, List<PendingAdRevenueEntry> entries)
+        {
+            if (entries == null || entries.Count == 0)
+                return;
+
+            long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long timeoutMs = (long)(PendingAdRevenueTimeoutSeconds * 1000f);
+
+            // Entries are appended in display order, so the oldest (soonest to time out) is
+            // always at the front — stop at the first one that hasn't timed out yet.
+            int removeCount = 0;
+            while (removeCount < entries.Count && nowMs - entries[removeCount].CreatedAtUnixMs >= timeoutMs)
+                removeCount++;
+
+            if (removeCount == 0)
+                return;
+
+            var timedOut = entries.GetRange(0, removeCount);
+            entries.RemoveRange(0, removeCount);
+            PersistPendingAdRevenueStore();
+
+            foreach (var entry in timedOut)
+            {
+                Debug.LogWarning(
+                    $"[AdsManager] No OnAdRevenuePaidEvent within {PendingAdRevenueTimeoutSeconds}s for {adFormat} " +
+                    $"(network={entry.NetworkName}, unit={entry.AdUnitId}) — sending ad_impression with the estimated value.");
+                LogAdIlrd(AdAnalyticsPayload.FromPendingEntry(entry));
+            }
         }
 
         // ════════════════════════════════════════════
