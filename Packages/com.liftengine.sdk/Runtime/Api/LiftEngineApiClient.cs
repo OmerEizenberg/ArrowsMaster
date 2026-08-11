@@ -160,7 +160,7 @@ namespace LiftEngine.Api
 
         public void TrackActiveView(string bundleId, string deviceId, string adType, string placementId,
             string keyword, string auctionId, long timestamp, float rev, int mulIndex,
-            float[] ecpmHistory = null)
+            float flr = 0f, float[] ecpmHistory = null)
         {
             var historyJson = JsonConvert.SerializeObject(ecpmHistory ?? Array.Empty<float>());
             var query = BuildTrackQuery(new Dictionary<string, string>
@@ -177,7 +177,7 @@ namespace LiftEngine.Api
                 ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 // Self-contained per-format history for this impression — do not join device report.
                 ["ecpm_history"] = historyJson
-            }, rev);
+            }, rev, flr);
 
             _host.StartCoroutine(Get("GET", "/v1/track/activeview" + query, true, null));
         }
@@ -223,7 +223,7 @@ namespace LiftEngine.Api
             _host.StartCoroutine(Get("GET", "/v1/track/error" + query, true, null));
         }
 
-        private static string BuildTrackQuery(Dictionary<string, string> fields, float? rev)
+        private static string BuildTrackQuery(Dictionary<string, string> fields, float? rev, float? flr = null)
         {
             var sb = new StringBuilder("?");
             foreach (var pair in fields)
@@ -239,7 +239,15 @@ namespace LiftEngine.Api
                 sb.Append("rev=");
                 sb.Append(rev.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
-            else if (sb.Length > 1 && sb[^1] == '&')
+
+            if (flr.HasValue)
+            {
+                if (rev.HasValue)
+                    sb.Append('&');
+                sb.Append("flr=");
+                sb.Append(flr.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            else if (!rev.HasValue && sb.Length > 1 && sb[^1] == '&')
             {
                 sb.Length--;
             }

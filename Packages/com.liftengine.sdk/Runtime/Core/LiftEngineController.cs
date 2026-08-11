@@ -53,6 +53,7 @@ namespace LiftEngine
             public string Keyword;
             public string AuctionId;
             public int MulIndex;
+            public float Flr;
             public string Plc;
             public bool ViewSent;
         }
@@ -480,6 +481,7 @@ namespace LiftEngine
 
             var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
             var mulIndex = _context.GetWinningMultiplierIndex(info.Format);
+            var flr = _context.GetWinningFloor(info.Format);
             var plc = ResolveImpressionPlc(info);
 
             return new ActiveViewWaiter
@@ -488,6 +490,7 @@ namespace LiftEngine
                 Keyword = keyword,
                 AuctionId = auctionId,
                 MulIndex = mulIndex,
+                Flr = flr,
                 Plc = plc,
                 ViewSent = false
             };
@@ -604,9 +607,9 @@ namespace LiftEngine
                 $"Track activeview — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
                 $"keyword={waiter.Keyword}, auction_id={waiter.AuctionId}, Mulindex={waiter.MulIndex}, " +
-                $"timestamp={timestamp}, rev={rev}, ecpm_history_len={ecpmHistory.Length}");
+                $"timestamp={timestamp}, rev={rev}, flr={waiter.Flr}, ecpm_history_len={ecpmHistory.Length}");
             _api.TrackActiveView(bundleId, deviceId, adType, plc, waiter.Keyword, waiter.AuctionId, timestamp,
-                rev, waiter.MulIndex, ecpmHistory);
+                rev, waiter.MulIndex, waiter.Flr, ecpmHistory);
         }
 
         /// <summary>

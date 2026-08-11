@@ -252,8 +252,18 @@ namespace LiftEngine.Context
         public int GetWinningMultiplierIndex(LiftEngineAdFormat format) =>
             _winningMultiplierIndexes.TryGetValue(format, out var index) ? index : -1;
 
-        public void SetWinningMultiplierIndex(LiftEngineAdFormat format, int mulIndex) =>
+        /// <summary>
+        /// Payload floor value sent to MAX for the current fill
+        /// (<c>prediction * multipliers[i]</c>, or <c>0</c> on fallback).
+        /// </summary>
+        public float GetWinningFloor(LiftEngineAdFormat format) =>
+            _winningFloors.TryGetValue(format, out var flr) ? flr : 0f;
+
+        public void SetWinningMultiplierIndex(LiftEngineAdFormat format, int mulIndex, float flr = 0f)
+        {
             _winningMultiplierIndexes[format] = mulIndex;
+            _winningFloors[format] = flr;
+        }
 
         public string GetMaxPlacement(LiftEngineAdFormat format)
         {
@@ -268,6 +278,7 @@ namespace LiftEngine.Context
         private readonly Dictionary<LiftEngineAdFormat, string> _payloadKeys = new();
         private readonly Dictionary<LiftEngineAdFormat, string> _maxPlacements = new();
         private readonly Dictionary<LiftEngineAdFormat, int> _winningMultiplierIndexes = new();
+        private readonly Dictionary<LiftEngineAdFormat, float> _winningFloors = new();
 
         /// <summary>
         /// Stores predict auction context independently per ad format.
@@ -279,8 +290,9 @@ namespace LiftEngine.Context
             string payloadKey, string treatment = null, Dictionary<string, int> groupRatios = null)
         {
             _store.SaveAuctionContext(format, keyword, auctionId);
-            // New auction: winning multiplier is unknown until a load attempt fills.
+            // New auction: winning multiplier / floor is unknown until a load attempt fills.
             _winningMultiplierIndexes.Remove(format);
+            _winningFloors.Remove(format);
 
             if (!string.IsNullOrEmpty(payloadKey))
                 _payloadKeys[format] = payloadKey;
@@ -329,6 +341,7 @@ namespace LiftEngine.Context
             _payloadKeys.Remove(format);
             _maxPlacements.Remove(format);
             _winningMultiplierIndexes.Remove(format);
+            _winningFloors.Remove(format);
         }
 
         public void ClearContextData() => _store.ClearAll();

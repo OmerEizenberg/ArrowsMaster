@@ -72,7 +72,7 @@ namespace LiftEngine.Ads
                 if (success)
                 {
                     LiftEngineLogger.LogAttempt(i, $"{format} — fill success at attempt {i}.");
-                    _context.SetWinningMultiplierIndex(format, i);
+                    _context.SetWinningMultiplierIndex(format, i, scaledValue);
                     onComplete?.Invoke(true);
                     yield break;
                 }
@@ -114,7 +114,7 @@ namespace LiftEngine.Ads
                 if (success)
                 {
                     LiftEngineLogger.LogAttempt(FallbackAttemptIndex, $"{format} — fill success on fallback load.");
-                    _context.SetWinningMultiplierIndex(format, FallbackAttemptIndex);
+                    _context.SetWinningMultiplierIndex(format, FallbackAttemptIndex, 0f);
                     onComplete?.Invoke(true);
                     yield break;
                 }
