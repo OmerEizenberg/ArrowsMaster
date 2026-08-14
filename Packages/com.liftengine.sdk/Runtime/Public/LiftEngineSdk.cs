@@ -64,8 +64,8 @@ namespace LiftEngine
             client.CheckHealth(callback);
         }
 
-        public static void SetAttribution(string appsFlyerInstallType, string mediaSource) =>
-            _controller?.SetAttribution(appsFlyerInstallType, mediaSource);
+        public static void SetAttribution(string installType, string mediaSource) =>
+            _controller?.SetAttribution(installType, mediaSource);
 
         public static void SetIdfaApproved(bool approved) =>
             _controller?.SetIdfaApproved(approved);

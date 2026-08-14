@@ -73,9 +73,9 @@ namespace LiftEngine.Context
             }));
         }
 
-        public void SetAttribution(string appsFlyerInstallType, string mediaSource)
+        public void SetAttribution(string installType, string mediaSource)
         {
-            var normalized = PredictDataNormalizers.NormalizeInstallType(appsFlyerInstallType);
+            var normalized = PredictDataNormalizers.NormalizeInstallType(installType);
             _store.SaveAttribution(normalized, mediaSource);
         }
 

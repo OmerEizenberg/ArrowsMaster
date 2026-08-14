@@ -446,7 +446,7 @@ namespace LiftEngine.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Context", EditorStyles.boldLabel);
 
-            _debugInstallType = EditorGUILayout.TextField("AppsFlyer Install Type", _debugInstallType);
+            _debugInstallType = EditorGUILayout.TextField("Install Type", _debugInstallType);
             _debugMediaSource = EditorGUILayout.TextField("Media Source", _debugMediaSource);
 
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
