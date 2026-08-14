@@ -2261,6 +2261,19 @@ namespace Assets.Scripts.Core
                     BuildAdAnalyticsParameters(analyticsPayload, includeRevenue: true));
             }
 
+            if (TenjinManager.Instance != null)
+            {
+                TenjinManager.Instance.TrackAppLovinImpression(
+                    creativeId: null,
+                    placement: analyticsPayload.MaxPlacement,
+                    format: analyticsPayload.AdFormat,
+                    networkPlacement: null,
+                    revenuePrecision: analyticsPayload.RevenuePrecision,
+                    adUnitId: analyticsPayload.AdUnitId,
+                    revenue: analyticsPayload.RevenueUsd,
+                    networkName: analyticsPayload.NetworkName);
+            }
+
 #if !UNITY_EDITOR
             if (!SingularSDK.Initialized)
             {

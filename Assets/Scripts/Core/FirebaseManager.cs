@@ -460,6 +460,9 @@ public class FirebaseManager : MonoBehaviour, SingularLinkHandler, SingularDefer
             SingularSDK.SetCustomUserId(pendingAnalyticsUserId);
 #endif
 
+        if (TenjinManager.Instance != null)
+            TenjinManager.Instance.SetCustomerUserId(pendingAnalyticsUserId);
+
         if (!isInitialized)
             return;
 

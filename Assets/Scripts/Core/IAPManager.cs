@@ -494,6 +494,11 @@ namespace Assets.Scripts.Core
             SingularSDK.CustomRevenue("Purchase", metadataSingular.isoCurrencyCode, (double)metadataSingular.localizedPrice);
             // ------------------------------------------------
 
+            // --- Tenjin: validated IAP transaction ---
+            if (TenjinManager.Instance != null)
+                TenjinManager.Instance.TrackPurchase(product);
+            // -----------------------------------------
+
             Assets.Scripts.LiveOps.DailyMissionsLiveOpService.NotifyPurchaseMade();
             LiftEngine.LiftEngineSdk.NotifyPurchase((float)metadataSingular.localizedPrice);
             OnPurchaseSuccess?.Invoke(id);
