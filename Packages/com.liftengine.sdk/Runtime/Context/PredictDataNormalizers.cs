@@ -5,12 +5,12 @@ namespace LiftEngine.Context
 {
     internal static class PredictDataNormalizers
     {
-        public static string NormalizeInstallType(string appsFlyerValue)
+        public static string NormalizeInstallType(string installType)
         {
-            if (string.IsNullOrEmpty(appsFlyerValue))
+            if (string.IsNullOrEmpty(installType))
                 return null;
 
-            return appsFlyerValue switch
+            return installType switch
             {
                 "Organic" => "organic",
                 "Non-organic" => "acquired",
