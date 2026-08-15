@@ -18,7 +18,7 @@ LiftEngine runs **on top of** MAX — you must already have MAX initialized in y
 
 ## Quick Start
 
-1. Install the package from the `.tgz` (Package Manager → Add package from tarball)
+1. Install the package (`.tgz` or private registry — provided by LiftEngine)
 2. Install **AppLovin MAX** and **Newtonsoft JSON** if not already present
 3. Open **Window → LiftEngine → Integration Manager**
 4. Create `Assets/Resources/LiftEngineSettings.asset` and enter your API key + MAX ad unit IDs
@@ -49,6 +49,7 @@ LiftEngineSdk.ShowAd(LiftEngineAdFormat.Rewarded, null, new LiftEngineShowAdCall
 |----------|----------|
 | [Integration Guide](Documentation~/INTEGRATION.md) | Full setup, API reference, QA checklist |
 | [AI Integration Prompt](Documentation~/CURSOR_INTEGRATION_PROMPT.md) | One-shot Cursor prompt for automatic wiring |
+| [Changelog](CHANGELOG.md) | Version history |
 
 ---
 

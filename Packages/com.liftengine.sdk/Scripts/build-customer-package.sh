@@ -12,8 +12,14 @@ REPO_ROOT="$(cd "$PKG_DIR/../.." && pwd)"
 DIST_DIR="$REPO_ROOT/dist/liftengine-sdk-build"
 OUTPUT_TGZ="$REPO_ROOT/dist/com.liftengine.sdk-${VERSION}.tgz"
 
-RUNTIME_DLL="$REPO_ROOT/Library/ScriptAssemblies/LiftEngine.Runtime.dll"
-EDITOR_DLL="$REPO_ROOT/Library/ScriptAssemblies/LiftEngine.Editor.dll"
+RUNTIME_DLL="$REPO_ROOT/dist/_dlls/LiftEngine.Runtime.dll"
+EDITOR_DLL="$REPO_ROOT/dist/_dlls/LiftEngine.Editor.dll"
+if [[ ! -f "$RUNTIME_DLL" ]]; then
+  RUNTIME_DLL="$REPO_ROOT/Library/ScriptAssemblies/LiftEngine.Runtime.dll"
+fi
+if [[ ! -f "$EDITOR_DLL" ]]; then
+  EDITOR_DLL="$REPO_ROOT/Library/ScriptAssemblies/LiftEngine.Editor.dll"
+fi
 
 if [[ ! -f "$RUNTIME_DLL" ]]; then
   echo "ERROR: $RUNTIME_DLL not found."
@@ -35,7 +41,6 @@ mkdir -p "$DIST_DIR/com.liftengine.sdk/Editor/Plugins"
 # Copy package metadata and docs
 cp "$PKG_DIR/package.json" "$DIST_DIR/com.liftengine.sdk/"
 cp "$PKG_DIR/README.md" "$DIST_DIR/com.liftengine.sdk/"
-cp "$PKG_DIR/CHANGELOG.md" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
 cp "$PKG_DIR/LICENSE.md" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
 cp -R "$PKG_DIR/Documentation~" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
 # Customer docs only — exclude internal distribution guide
@@ -101,14 +106,53 @@ import json, sys
 p = '$DIST_DIR/com.liftengine.sdk/package.json'
 with open(p) as f: d = json.load(f)
 d['version'] = '$VERSION'
+d.pop('changelogUrl', None)
 with open(p, 'w') as f: json.dump(d, f, indent=2); f.write('\n')
 "
 fi
 
+# Customer install note (package root)
+cat > "$DIST_DIR/com.liftengine.sdk/INSTALL.md" << EOF
+# LiftEngine SDK ${VERSION} — Install
+
+## Requirements
+- Unity 2021.3 or newer
+- AppLovin MAX 8.0+ (installed first)
+- Newtonsoft Json (\`com.unity.nuget.newtonsoft-json\` 3.2.1+)
+
+## Install
+1. Install AppLovin MAX from the Unity Package Manager or MAX dashboard export.
+2. In Unity: **Window → Package Manager → + → Add package from tarball** and select \`com.liftengine.sdk-${VERSION}.tgz\`.
+3. Create settings: **Assets/Resources/LiftEngineSettings.asset** (or use **Window → LiftEngine → Integration Manager**).
+4. Paste your LiftEngine API key, set environment, and enter MAX ad unit IDs.
+5. Initialize **after** MAX is initialized. See \`Documentation~/INTEGRATION.md\`.
+6. Optional: paste \`Documentation~/CURSOR_INTEGRATION_PROMPT.md\` into Cursor after the package is imported.
+
+Do not copy a package folder into \`Packages/\`. Do not unpack or replace the DLLs.
+EOF
+
 mkdir -p "$(dirname "$OUTPUT_TGZ")"
 tar -czf "$OUTPUT_TGZ" -C "$DIST_DIR" com.liftengine.sdk
 
+# Ready-to-send zip: tarball + docs only (no folder-drop package)
+SHIP_DIR="$REPO_ROOT/dist/LiftEngine-SDK-${VERSION}"
+rm -rf "$SHIP_DIR"
+mkdir -p "$SHIP_DIR/Documentation"
+cp "$OUTPUT_TGZ" "$SHIP_DIR/"
+cp "$DIST_DIR/com.liftengine.sdk/README.md" "$SHIP_DIR/"
+cp "$DIST_DIR/com.liftengine.sdk/INSTALL.md" "$SHIP_DIR/"
+cp "$DIST_DIR/com.liftengine.sdk/LICENSE.md" "$SHIP_DIR/" 2>/dev/null || true
+cp "$DIST_DIR/com.liftengine.sdk/Documentation~/INTEGRATION.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
+cp "$DIST_DIR/com.liftengine.sdk/Documentation~/CURSOR_INTEGRATION_PROMPT.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
+
+SHIP_ZIP="$REPO_ROOT/dist/LiftEngine-SDK-${VERSION}.zip"
+rm -f "$SHIP_ZIP"
+(cd "$REPO_ROOT/dist" && zip -qr "LiftEngine-SDK-${VERSION}.zip" "LiftEngine-SDK-${VERSION}")
+
 echo ""
-echo "Done: $OUTPUT_TGZ"
+echo "Done:"
+echo "  $OUTPUT_TGZ"
+echo "  $SHIP_DIR"
+echo "  $SHIP_ZIP"
 echo "Verify: tar -tzf $OUTPUT_TGZ | head -30"
 echo "Next: test in a fresh Unity project before sending to customer."

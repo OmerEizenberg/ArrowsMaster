@@ -6,8 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-08-15
+
 ### Changed
-- Customer integration guide and AI prompt cover wiring only (no internal service details)
+- Customer integration guide and AI prompt cover wiring only
+- Package description is integration-focused
 
 ## [1.1.1] - 2026-07-11
 

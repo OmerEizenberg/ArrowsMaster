@@ -1,0 +1,26 @@
+Unity Editor version:    6000.3.16f1 (a56f230f6470)
+Branch:                  6000.3/staging
+Build type:              Release
+Batch mode:              YES
+macOS version:           Version 26.2 (Build 25C56)
+Darwin version:          25.2.0
+Architecture:            arm64
+Running under Rosetta:   NO
+Available memory:        24576 MB
+Date:                    2026-08-15T19:24:51Z
+[Licensing::Module] Trying to connect to existing licensing client channel...
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-omereizenberg" at "2026-08-15T19:24:51.399919Z"
+Launching external process: /Applications/Unity/Hub/Editor/6000.3.16f1/Unity.app/Contents/Resources/PackageManager/Server/UnityPackageManager
+
+COMMAND LINE ARGUMENTS:
+/Applications/Unity/Hub/Editor/6000.3.16f1/Unity.app/Contents/MacOS/Unity
+-batchmode
+-nographics
+-quit
+-projectPath
+/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster
+-logFile
+/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster/dist/unity-compile.log
+Successfully changed project path to: /Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster
+/Users/omereizenberg/Documents/ArrowsLegendGit/ArrowsMaster
+[Package Manager] Server process was shutdown

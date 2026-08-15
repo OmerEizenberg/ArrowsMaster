@@ -9,7 +9,7 @@ Ad monetization layer for **AppLovin MAX**. LiftEngine sits on top of your exist
 | | Minimum |
 |---|---------|
 | Unity | 2021.3 LTS |
-| AppLovin MAX | 8.0+ |
+| AppLovin MAX | 7.0+ |
 | Newtonsoft JSON | 3.2.1 |
 
 LiftEngine runs **on top of** MAX — you must already have MAX initialized in your project.
@@ -18,7 +18,7 @@ LiftEngine runs **on top of** MAX — you must already have MAX initialized in y
 
 ## Quick Start
 
-1. Install the package from the `.tgz` (Package Manager → Add package from tarball)
+1. Install the package (`.tgz` or private registry — provided by LiftEngine)
 2. Install **AppLovin MAX** and **Newtonsoft JSON** if not already present
 3. Open **Window → LiftEngine → Integration Manager**
 4. Create `Assets/Resources/LiftEngineSettings.asset` and enter your API key + MAX ad unit IDs
@@ -49,6 +49,7 @@ LiftEngineSdk.ShowAd(LiftEngineAdFormat.Rewarded, null, new LiftEngineShowAdCall
 |----------|----------|
 | [Integration Guide](Documentation~/INTEGRATION.md) | Full setup, API reference, QA checklist |
 | [AI Integration Prompt](Documentation~/CURSOR_INTEGRATION_PROMPT.md) | One-shot Cursor prompt for automatic wiring |
+| [Changelog](CHANGELOG.md) | Version history |
 
 ---
 
@@ -71,3 +72,24 @@ If settings are missing, the API key is empty, or init fails, your game should c
 ## Support
 
 Contact your LiftEngine account manager. For integration issues, include Unity version, MAX version, platform, and `[LiftEngine]` log excerpts from a staging build.
+
+_________________________________________________________________________
+# LiftEngine SDK License
+
+Copyright (c) LiftEngine. All rights reserved.
+
+This software is proprietary and licensed to authorized customers only.
+
+## Permitted use
+
+- Integrate the SDK into licensed game applications
+- Configure `LiftEngineSettings` for your ad units and environments
+- Distribute the SDK as part of your built game binaries (iOS/Android)
+
+## Restrictions
+
+- Do not redistribute the SDK package, source code, or precompiled assemblies to third parties
+- Do not reverse engineer, decompile, or disassemble the precompiled runtime
+- Do not remove or alter proprietary notices
+- API keys are issued per license — do not share across unrelated titles without approval
+

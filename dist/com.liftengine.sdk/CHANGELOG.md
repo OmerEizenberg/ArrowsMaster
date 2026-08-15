@@ -4,6 +4,14 @@ All notable changes to the LiftEngine Unity SDK are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+## [1.1.2] - 2026-08-15
+
+### Changed
+- Customer integration guide and AI prompt cover wiring only
+- Package description is integration-focused
+
 ## [1.1.1] - 2026-07-11
 
 ### Security
@@ -20,15 +28,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [1.1.0] - 2026-07-11
 
 ### Added
-- Multi-model optimization support (ML, algorithmic, and baseline paths)
-- Public optimization callback events without exposing internal response fields
+- Optimization callbacks on the public API
 - Firebase / GA4 analytics wiring guidance in integration docs
 
 ### Changed
 - Customer documentation sanitized — integration guide and AI prompt only
-- Integration Manager debug UI uses generic "optimization" terminology
-- `LiftEngineAdInfo` includes placement metadata for analytics
-- LiftEngine track placement IDs are hardcoded — integrators only configure API key and MAX ad unit IDs
+- Integration Manager debug UI uses generic terminology
 
 ### Fixed
 - Merged latest MAX mediation improvements from production branch

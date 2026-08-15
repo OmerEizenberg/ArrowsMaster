@@ -1,11 +1,10 @@
 {
   "name": "com.liftengine.sdk",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "displayName": "LiftEngine SDK",
-  "description": "Ad monetization optimization for AppLovin MAX. Improves ad revenue through LiftEngine cloud intelligence with automatic preloading and graceful MAX fallback.",
+  "description": "Ad monetization layer for AppLovin MAX. Route ads through LiftEngineSdk after MAX is initialized, with automatic preloading and MAX fallback.",
   "unity": "2021.3",
   "documentationUrl": "Documentation~/INTEGRATION.md",
-  "changelogUrl": "CHANGELOG.md",
   "licensesUrl": "LICENSE.md",
   "author": {
     "name": "LiftEngine",
