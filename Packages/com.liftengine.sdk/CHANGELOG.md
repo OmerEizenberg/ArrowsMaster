@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Changed
-- Predict / prewarm is deferred until the first successful report (backend requires report-before-predict); failed first reports retry automatically
+- Customer integration guide and AI prompt cover wiring only (no internal service details)
 
 ## [1.1.1] - 2026-07-11
 
@@ -25,15 +25,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [1.1.0] - 2026-07-11
 
 ### Added
-- Multi-model optimization support (ML, algorithmic, and baseline paths)
-- Public optimization callback events without exposing internal response fields
+- Optimization callbacks on the public API
 - Firebase / GA4 analytics wiring guidance in integration docs
 
 ### Changed
 - Customer documentation sanitized — integration guide and AI prompt only
-- Integration Manager debug UI uses generic "optimization" terminology
-- `LiftEngineAdInfo` includes placement metadata for analytics
-- LiftEngine track placement IDs are hardcoded — integrators only configure API key and MAX ad unit IDs
+- Integration Manager debug UI uses generic terminology
 
 ### Fixed
 - Merged latest MAX mediation improvements from production branch
