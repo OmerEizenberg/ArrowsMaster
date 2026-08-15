@@ -29,7 +29,7 @@ namespace LiftEngine.Api
             }));
         }
 
-        public void RequestOptimization(string deviceId, LiftEngineAdFormat format, PredictDataPayload data,
+        public void RequestOptimization(string deviceId, LiftEngineAdFormat format, ContextPayload data,
             Action<LiftEngineOptimizationResult> onSuccess, Action<LiftEngineError> onFailure)
         {
             // Only the format being prewarmed. data (incl. ecpm_history) is format-specific —
@@ -39,7 +39,7 @@ namespace LiftEngine.Api
             data.ad_type = targetModel;
             data.ecpm_history = EcpmHistoryBuffer.GetForFormat(format);
 
-            var body = new PredictRequestBody
+            var body = new OptimizationRequestBody
             {
                 models = new[] { targetModel },
                 data = data
@@ -49,7 +49,7 @@ namespace LiftEngine.Api
             var path = AppendQueryParam($"/api/v1/predict/{deviceId}", "ad_type", targetModel);
             var modelsLabel = targetModel;
             LiftEngineLogger.LogClient(
-                $"Predict {targetModel} — ad_type={data.ad_type}, " +
+                $"Optimization {targetModel} — ad_type={data.ad_type}, " +
                 $"ecpm_history=[{FormatEcpmHistory(data.ecpm_history)}]");
             _host.StartCoroutine(PostOptimization(path, modelsLabel, json, (code, response) =>
             {
@@ -101,7 +101,7 @@ namespace LiftEngine.Api
             }));
         }
 
-        public void Report(string deviceId, PredictDataPayload data, Action<bool> callback)
+        public void Report(string deviceId, ContextPayload data, Action<bool> callback)
         {
             var path = $"/api/v1/report/{deviceId}";
             if (!string.IsNullOrEmpty(data?.ad_type))
@@ -139,7 +139,7 @@ namespace LiftEngine.Api
         }
 
         public void TrackView(string bundleId, string deviceId, string adType, string placementId,
-            string keyword, string auctionId, long timestamp, int mulIndex)
+            string keyword, string auctionId, long timestamp, int attemptIndex)
         {
             var query = BuildTrackQuery(new Dictionary<string, string>
             {
@@ -151,7 +151,7 @@ namespace LiftEngine.Api
                 ["plc"] = placementId ?? string.Empty,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
-                ["Mulindex"] = mulIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Mulindex"] = attemptIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture)
             }, null);
 
@@ -159,8 +159,8 @@ namespace LiftEngine.Api
         }
 
         public void TrackActiveView(string bundleId, string deviceId, string adType, string placementId,
-            string keyword, string auctionId, long timestamp, float rev, int mulIndex,
-            float flr = 0f, float[] ecpmHistory = null)
+            string keyword, string auctionId, long timestamp, float rev, int attemptIndex,
+            float appliedValue = 0f, float[] ecpmHistory = null)
         {
             var historyJson = JsonConvert.SerializeObject(ecpmHistory ?? Array.Empty<float>());
             var query = BuildTrackQuery(new Dictionary<string, string>
@@ -173,11 +173,11 @@ namespace LiftEngine.Api
                 ["plc"] = placementId ?? string.Empty,
                 ["keyword"] = keyword ?? string.Empty,
                 ["auction_id"] = auctionId ?? string.Empty,
-                ["Mulindex"] = mulIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Mulindex"] = attemptIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["timestamp"] = timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 // Self-contained per-format history for this impression — do not join device report.
                 ["ecpm_history"] = historyJson
-            }, rev, flr);
+            }, rev, appliedValue);
 
             _host.StartCoroutine(Get("GET", "/v1/track/activeview" + query, true, null));
         }
@@ -223,7 +223,7 @@ namespace LiftEngine.Api
             _host.StartCoroutine(Get("GET", "/v1/track/error" + query, true, null));
         }
 
-        private static string BuildTrackQuery(Dictionary<string, string> fields, float? rev, float? flr = null)
+        private static string BuildTrackQuery(Dictionary<string, string> fields, float? rev, float? appliedValue = null)
         {
             var sb = new StringBuilder("?");
             foreach (var pair in fields)
@@ -240,12 +240,12 @@ namespace LiftEngine.Api
                 sb.Append(rev.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
 
-            if (flr.HasValue)
+            if (appliedValue.HasValue)
             {
                 if (rev.HasValue)
                     sb.Append('&');
                 sb.Append("flr=");
-                sb.Append(flr.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                sb.Append(appliedValue.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
             else if (!rev.HasValue && sb.Length > 1 && sb[^1] == '&')
             {

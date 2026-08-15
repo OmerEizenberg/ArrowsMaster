@@ -75,7 +75,7 @@ namespace LiftEngine.Context
 
         public void SetAttribution(string installType, string mediaSource)
         {
-            var normalized = PredictDataNormalizers.NormalizeInstallType(installType);
+            var normalized = ContextNormalizers.NormalizeInstallType(installType);
             _store.SaveAttribution(normalized, mediaSource);
         }
 
@@ -115,7 +115,7 @@ namespace LiftEngine.Context
                 return;
             }
 
-            var ecpm = PredictDataNormalizers.RevenuePerImpressionToEcpm(revenueUsd);
+            var ecpm = ContextNormalizers.RevenuePerImpressionToEcpm(revenueUsd);
             EcpmHistoryBuffer.Push(format, ecpm);
 
             var snapshot = EcpmHistoryBuffer.GetForFormat(format);
@@ -125,14 +125,14 @@ namespace LiftEngine.Context
                 $"ecpm={ecpm.ToString(CultureInfo.InvariantCulture)}, history=[{FormatHistory(snapshot)}]");
         }
 
-        public PredictDataPayload BuildPayload(LiftEngineAdFormat format) =>
+        public ContextPayload BuildPayload(LiftEngineAdFormat format) =>
             BuildPayload((LiftEngineAdFormat?)format);
 
         /// <param name="format">
         /// When null (context-only report), format-specific fields stay at defaults and
         /// <c>ecpm_history</c> is omitted — no interstitial/auto format fallback.
         /// </param>
-        public PredictDataPayload BuildPayload(LiftEngineAdFormat? format)
+        public ContextPayload BuildPayload(LiftEngineAdFormat? format)
         {
             _session.EnsureDailyRollover(_store);
             _store.RecordActiveDay();
@@ -169,7 +169,7 @@ namespace LiftEngine.Context
                 ecpmHistory = EcpmHistoryBuffer.GetForFormat(format.Value) ?? Array.Empty<float>();
             }
 
-            var payload = new PredictDataPayload
+            var payload = new ContextPayload
             {
                 os = DeviceOsProvider.GetOs(),
                 country_code = countryCode,
@@ -179,27 +179,27 @@ namespace LiftEngine.Context
                 day_num = Math.Max(1, _store.ActiveDayCount),
                 hour_of_day = nowUtc.Hour,
                 media_source = string.IsNullOrEmpty(_store.MediaSource) ? null : _store.MediaSource,
-                wifi = PredictDataNormalizers.WifiFlag(),
+                wifi = ContextNormalizers.WifiFlag(),
                 idfa_approved = ResolveIdfaApproved(),
-                has_made_deposit = PredictDataNormalizers.HasMadeDeposit(daysToFtd),
+                has_made_deposit = ContextNormalizers.HasMadeDeposit(daysToFtd),
                 days_since_installed = daysSinceInstall,
                 ltv_gross_up_to_date = ltv,
                 days_from_install_to_ftd = daysToFtd,
                 ftd_amount = _store.FtdAmount,
                 days_since_last_purchase = daysSinceLastPurchase,
-                payer_ind = PredictDataNormalizers.PayerInd(ltv),
+                payer_ind = ContextNormalizers.PayerInd(ltv),
                 ad_number_life_time = _store.GetLifetimeTotalRaw(),
                 ad_number_life_time_ad_type = typeRaw,
                 daily_ad_number = dailyAdNumber,
                 daily_ad_number_ad_type = typeDailyRaw,
-                daily_ad_type_share = PredictDataNormalizers.DailyAdTypeShare(
+                daily_ad_type_share = ContextNormalizers.DailyAdTypeShare(
                     dailyAdNumber, typeDailyRaw),
                 session_ad_number = _store.GetSessionTotalRaw(),
                 session_ad_number_ad_type = typeSessionRaw,
                 ad_type = adType,
                 ecpm_history = ecpmHistory,
-                sec_from_last_ad = PredictDataNormalizers.SecFromLastAd(_store.LastAdUtc),
-                device_memory = PredictDataNormalizers.DeviceMemoryGb(),
+                sec_from_last_ad = ContextNormalizers.SecFromLastAd(_store.LastAdUtc),
+                device_memory = ContextNormalizers.DeviceMemoryGb(),
                 app_version = Application.version
             };
 
@@ -222,14 +222,6 @@ namespace LiftEngine.Context
             return !string.IsNullOrEmpty(auctionId);
         }
 
-        /// <summary>
-        /// Ensures track/view and track/activeview can always be sent when an ad fills without a predict auction id
-        /// (optimization timeout/failure with fallback load).
-        /// </summary>
-        /// <param name="force">
-        /// When true, always mint a new fallback id (e.g. optimize failed and prior predict must not
-        /// be reused for the next load). When false, keep an existing valid auction id.
-        /// </param>
         public void EnsureFallbackAuctionContext(LiftEngineAdFormat format, bool force = false)
         {
             if (!force && HasValidAuctionContext(format))
@@ -246,23 +238,16 @@ namespace LiftEngine.Context
         public string GetPayloadKey(LiftEngineAdFormat format) =>
             _payloadKeys.TryGetValue(format, out var payloadKey) ? payloadKey : null;
 
-        /// <summary>
-        /// Index into predict <c>multipliers</c> that produced the current fill (-1 = fallback / none).
-        /// </summary>
-        public int GetWinningMultiplierIndex(LiftEngineAdFormat format) =>
-            _winningMultiplierIndexes.TryGetValue(format, out var index) ? index : -1;
+        public int GetAppliedAttemptIndex(LiftEngineAdFormat format) =>
+            _appliedAttemptIndexes.TryGetValue(format, out var index) ? index : -1;
 
-        /// <summary>
-        /// Payload floor value sent to MAX for the current fill
-        /// (<c>prediction * multipliers[i]</c>, or <c>0</c> on fallback).
-        /// </summary>
-        public float GetWinningFloor(LiftEngineAdFormat format) =>
-            _winningFloors.TryGetValue(format, out var flr) ? flr : 0f;
+        public float GetAppliedValue(LiftEngineAdFormat format) =>
+            _appliedValues.TryGetValue(format, out var value) ? value : 0f;
 
-        public void SetWinningMultiplierIndex(LiftEngineAdFormat format, int mulIndex, float flr = 0f)
+        public void SetAppliedAttempt(LiftEngineAdFormat format, int attemptIndex, float appliedValue = 0f)
         {
-            _winningMultiplierIndexes[format] = mulIndex;
-            _winningFloors[format] = flr;
+            _appliedAttemptIndexes[format] = attemptIndex;
+            _appliedValues[format] = appliedValue;
         }
 
         public string GetMaxPlacement(LiftEngineAdFormat format)
@@ -277,22 +262,15 @@ namespace LiftEngine.Context
 
         private readonly Dictionary<LiftEngineAdFormat, string> _payloadKeys = new();
         private readonly Dictionary<LiftEngineAdFormat, string> _maxPlacements = new();
-        private readonly Dictionary<LiftEngineAdFormat, int> _winningMultiplierIndexes = new();
-        private readonly Dictionary<LiftEngineAdFormat, float> _winningFloors = new();
+        private readonly Dictionary<LiftEngineAdFormat, int> _appliedAttemptIndexes = new();
+        private readonly Dictionary<LiftEngineAdFormat, float> _appliedValues = new();
 
-        /// <summary>
-        /// Stores predict auction context independently per ad format.
-        /// Rewarded, interstitial, and banner each have their own payload key and MAX placement.
-        /// MAX placement is selected from the predict <c>treatment</c> field when present;
-        /// otherwise weighted random from saved <c>group_ratios</c>.
-        /// </summary>
         public void SetAuctionContext(LiftEngineAdFormat format, string keyword, string auctionId,
             string payloadKey, string treatment = null, Dictionary<string, int> groupRatios = null)
         {
             _store.SaveAuctionContext(format, keyword, auctionId);
-            // New auction: winning multiplier / floor is unknown until a load attempt fills.
-            _winningMultiplierIndexes.Remove(format);
-            _winningFloors.Remove(format);
+            _appliedAttemptIndexes.Remove(format);
+            _appliedValues.Remove(format);
 
             if (!string.IsNullOrEmpty(payloadKey))
                 _payloadKeys[format] = payloadKey;
@@ -340,8 +318,8 @@ namespace LiftEngine.Context
             _store.ClearAuctionContext(format);
             _payloadKeys.Remove(format);
             _maxPlacements.Remove(format);
-            _winningMultiplierIndexes.Remove(format);
-            _winningFloors.Remove(format);
+            _appliedAttemptIndexes.Remove(format);
+            _appliedValues.Remove(format);
         }
 
         public void ClearContextData() => _store.ClearAll();

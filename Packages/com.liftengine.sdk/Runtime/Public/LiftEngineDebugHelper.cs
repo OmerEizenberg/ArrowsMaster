@@ -36,7 +36,6 @@ namespace LiftEngine
             service.SetAttribution(installType, mediaSource);
 
             var settings = UnityEngine.Resources.Load<LiftEngineSettings>(LiftEngineSettings.DefaultResourcePath);
-            // Mirror production predict: one model + that format's payload (incl. ecpm_history).
             var model = settings != null
                 ? settings.GetModelName(format)
                 : format switch
@@ -53,10 +52,5 @@ namespace LiftEngine
                 data = service.BuildPayload(format)
             }, Formatting.Indented);
         }
-
-        [System.Obsolete("Use BuildContextPayloadPreview")]
-        public static string BuildPredictPayloadPreview(LiftEngineAdFormat format, string installType = "Organic",
-            string mediaSource = null) =>
-            BuildContextPayloadPreview(format, installType, mediaSource);
     }
 }

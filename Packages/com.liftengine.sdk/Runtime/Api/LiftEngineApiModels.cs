@@ -11,22 +11,24 @@ namespace LiftEngine.Api
         public string keyword;
         public string auction_id;
         public string param;
-        public float prediction;
+        [JsonProperty("prediction")]
+        public float BaseValue;
         public float cpm;
-        public float[] multipliers;
+        [JsonProperty("multipliers")]
+        public float[] Factors;
         public string treatment;
         public Dictionary<string, int> group_ratios;
 
         [JsonIgnore]
-        public bool HasMultipliers =>
-            multipliers != null && multipliers.Length > 0;
+        public bool HasFactors =>
+            Factors != null && Factors.Length > 0;
 
         public void ResolveOptimizationValue(float fallback)
         {
             if (cpm > 0f)
-                prediction = cpm;
-            else if (prediction <= 0f)
-                prediction = fallback;
+                BaseValue = cpm;
+            else if (BaseValue <= 0f)
+                BaseValue = fallback;
         }
     }
 
@@ -57,10 +59,10 @@ namespace LiftEngine.Api
         public long? Timestamp;
     }
 
-    internal class PredictRequestBody
+    internal class OptimizationRequestBody
     {
         public string[] models;
-        public Context.PredictDataPayload data;
+        public Context.ContextPayload data;
     }
 
     internal class ApiResponseArrayWrapper

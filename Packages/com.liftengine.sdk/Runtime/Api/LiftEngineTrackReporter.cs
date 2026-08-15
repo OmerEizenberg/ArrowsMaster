@@ -36,7 +36,7 @@ namespace LiftEngine.Api
                 PlacementId = placementId,
                 Keyword = keyword,
                 AdUnitId = resolvedAdUnitId,
-                Timestamp = PredictDataNormalizers.UnixTimestampSeconds()
+                Timestamp = ContextNormalizers.UnixTimestampSeconds()
             };
 
             LiftEngineLogger.LogClient(

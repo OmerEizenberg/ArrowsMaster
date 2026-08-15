@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace LiftEngine.Context
 {
-    internal static class PredictDataNormalizers
+    internal static class ContextNormalizers
     {
         public static string NormalizeInstallType(string installType)
         {

@@ -44,24 +44,23 @@ namespace LiftEngine.Ads
 
             var payloadKey = optimization?.param;
 
-            if (optimization == null || optimization.multipliers == null || optimization.multipliers.Length == 0)
+            if (optimization == null || !optimization.HasFactors)
             {
                 LiftEngineLogger.LogAttemptWarning(FallbackAttemptIndex,
-                    $"{format} — no optimization multipliers available → using fallback load");
+                    $"{format} — no params available → using fallback load");
                 LiftEngineSignalBus.Publish(new OptimizationUnavailableSignal(format));
                 yield return FallbackLoadUntilFill(format, adUnitId, payloadKey, maxPlacement, onComplete);
                 yield break;
             }
 
-            var requireRevenue = RequiresRevenueForMultiplierPhase(format);
+            var requireRevenue = RequiresRevenueForAttemptPhase(format);
 
-            for (var i = 0; i < optimization.multipliers.Length; i++)
+            for (var i = 0; i < optimization.Factors.Length; i++)
             {
-                var scaledValue = optimization.prediction * optimization.multipliers[i];
-                var payloadValue = PredictDataNormalizers.FormatPayloadValue(scaledValue);
+                var scaledValue = optimization.BaseValue * optimization.Factors[i];
+                var payloadValue = ContextNormalizers.FormatPayloadValue(scaledValue);
                 LiftEngineLogger.LogAttempt(i,
-                    $"{format} — load attempt {i} with multiplier[{i}]={optimization.multipliers[i]}, " +
-                    $"value={payloadValue}, requireRevenue={requireRevenue}");
+                    $"{format} — load attempt {i}, value={payloadValue}, requireRevenue={requireRevenue}");
 
                 _mediation.AddPayload(format, adUnitId, payloadKey, payloadValue);
                 _mediation.RequestLoad(format, adUnitId, maxPlacement);
@@ -72,7 +71,7 @@ namespace LiftEngine.Ads
                 if (success)
                 {
                     LiftEngineLogger.LogAttempt(i, $"{format} — fill success at attempt {i}.");
-                    _context.SetWinningMultiplierIndex(format, i, scaledValue);
+                    _context.SetAppliedAttempt(format, i, scaledValue);
                     onComplete?.Invoke(true);
                     yield break;
                 }
@@ -87,7 +86,7 @@ namespace LiftEngine.Ads
             yield return FallbackLoadUntilFill(format, adUnitId, payloadKey, maxPlacement, onComplete);
         }
 
-        private bool RequiresRevenueForMultiplierPhase(LiftEngineAdFormat format)
+        private bool RequiresRevenueForAttemptPhase(LiftEngineAdFormat format)
         {
             if (format == LiftEngineAdFormat.Banner)
                 return false;
@@ -114,7 +113,7 @@ namespace LiftEngine.Ads
                 if (success)
                 {
                     LiftEngineLogger.LogAttempt(FallbackAttemptIndex, $"{format} — fill success on fallback load.");
-                    _context.SetWinningMultiplierIndex(format, FallbackAttemptIndex, 0f);
+                    _context.SetAppliedAttempt(format, FallbackAttemptIndex, 0f);
                     onComplete?.Invoke(true);
                     yield break;
                 }
