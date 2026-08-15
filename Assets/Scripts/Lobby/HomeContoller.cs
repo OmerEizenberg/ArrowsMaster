@@ -265,15 +265,28 @@ namespace Assets.Scripts.Lobby
             {
                 LiveOpManager.Instance.CheckLiveOps();
                 LiveOpManager.Instance.SyncLobbyIcons();
+                RestoreTournamentScoreIfNeeded();
             }
 
-            StartCoroutine(DeferredGaeCommitAfterLobbyPopups());
+            StartCoroutine(DeferredLobbyLiveOpsAndGae());
         }
 
-        private IEnumerator DeferredGaeCommitAfterLobbyPopups()
+        private static void RestoreTournamentScoreIfNeeded()
+        {
+            var tournament = LiveOpManager.Instance?
+                .GetActiveService(Assets.Scripts.LiveOps.TournamentLiveOpService.EventId)
+                as Assets.Scripts.LiveOps.TournamentLiveOpService;
+            tournament?.FlushPendingPersistence();
+        }
+
+        private IEnumerator DeferredLobbyLiveOpsAndGae()
         {
             yield return null;
             yield return null;
+
+            // Finished tournament results take priority when entering the lobby.
+            Assets.Scripts.LiveOps.Tournament.TournamentResultsPopupView.TryShowPending();
+
             NotifyGaePendingCommit();
         }
 

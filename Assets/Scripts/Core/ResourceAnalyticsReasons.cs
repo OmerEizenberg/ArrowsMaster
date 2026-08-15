@@ -21,6 +21,7 @@ namespace Assets.Scripts.Core
         public const string PassClaim = "pass_claim";
         public const string PassClaimPremium = "pass_claim_premium";
         public const string GaeStageReward = "gae_stage_reward";
+        public const string TournamentClaim = "tournament_claim";
 
         public const string IapNoAdsCoins999 = "iap_noads_coins_999";
         public const string IapCoins199 = "iap_coins_199";

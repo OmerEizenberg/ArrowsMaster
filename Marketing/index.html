@@ -2,9 +2,11 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Arrows Master – Play</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="ad.orientation" content="portrait,landscape">
+    <title>Arrows Legend</title>
+    <script src="https://tpc.googlesyndication.com/pagead/gadgets/html5/api/exitapi.js"></script>
     <style>
         /* ─── Reset & Base ──────────────────────────────────────────── */
         *,
@@ -25,6 +27,7 @@
             user-select: none;
             touch-action: none;
             -webkit-tap-highlight-color: transparent;
+            cursor: none;
         }
 
         body {
@@ -33,16 +36,57 @@
             align-items: stretch;
         }
 
+        /* ─── Custom hand cursor ─────────────────────────────────────── */
+        #custom-cursor {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 48px;
+            height: 48px;
+            margin-left: -10px;
+            margin-top: -8px;
+            pointer-events: none;
+            z-index: 9999;
+            background: url('resources/sprites/hand-cursor.png') center / contain no-repeat;
+            transform: scale(1);
+            transform-origin: 10px 8px;
+            transition: transform 0.08s ease-out;
+            will-change: transform, left, top;
+            opacity: 0;
+        }
+
+        #custom-cursor.visible {
+            opacity: 1;
+        }
+
+        #custom-cursor.pressed {
+            transform: scale(0.78);
+            transition: transform 0.06s ease-in;
+        }
+
+        @media (hover: none), (pointer: coarse) {
+            html, body, canvas#gameCanvas, .btn {
+                cursor: auto;
+            }
+            #custom-cursor {
+                display: none !important;
+            }
+        }
+
         /* ─── HUD ───────────────────────────────────────────────────── */
         #hud {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: clamp(8px, 2vw, 14px) clamp(12px, 3vw, 20px) clamp(4px, 1vw, 8px);
+            width: 80%;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: clamp(8px, 2vw, 14px) 0 clamp(4px, 1vw, 8px);
             flex-shrink: 0;
             background: #fff;
             border-bottom: 1.5px solid rgba(0, 0, 0, 0.08);
             z-index: 100;
+            box-sizing: border-box;
         }
 
         #hearts-container {
@@ -194,11 +238,7 @@
             display: block;
             width: 100%;
             height: 100%;
-            cursor: grab;
-        }
-
-        canvas#gameCanvas:active {
-            cursor: grabbing;
+            cursor: none;
         }
 
         .overlay-screen {
@@ -208,11 +248,15 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.98);
             z-index: 300;
             opacity: 0;
             pointer-events: none;
-            transition: opacity .3s;
+            transition: opacity .35s;
+            gap: clamp(28px, 6.5vw, 44px);
+            padding: 10vh 10vw;
+            box-sizing: border-box;
+            overflow: visible;
         }
 
         .overlay-screen.visible {
@@ -220,21 +264,172 @@
             pointer-events: all;
         }
 
-        .overlay-screen h1 {
-            font-size: clamp(26px, 7vw, 42px);
-            font-weight: 900;
-            color: #111;
-            margin-bottom: 8px;
-            text-align: center;
+        .overlay-screen .end-safe {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(28px, 6.5vw, 44px);
+            overflow: visible;
         }
 
-        .overlay-screen p {
-            font-size: clamp(13px, 3vw, 17px);
-            color: #555;
+        .end-icon {
+            width: clamp(140px, 38vw, 220px);
+            height: clamp(140px, 38vw, 220px);
+            border-radius: clamp(28px, 7vw, 48px);
+            object-fit: cover;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+            transform: scale(0.86);
+            opacity: 0;
+            transition: transform .45s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity .35s;
+        }
+
+        .overlay-screen.visible .end-icon {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* CTA block always paints above search/typewriter (pump transform creates stacking contexts). */
+        .end-cta {
+            position: relative;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            overflow: visible;
+            /* Padding expands the paint box so Safari doesn't clip the button's
+               drop-shadow lip/glow (filter outsets are otherwise cut flush). */
+            padding: 14px 28px 34px;
+            margin: -14px -28px -10px;
+        }
+
+        .end-download-btn {
+            position: relative;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            /* ~15% smaller overall, and a bit less wide vs height */
+            width: min(250px, 64vw);
+            height: clamp(52px, 13vw, 66px);
+            padding: 0 clamp(14px, 3.5vw, 20px);
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transform-origin: center center;
+            overflow: visible;
+            filter: drop-shadow(0 6px 0 rgba(39, 174, 96, 0.45))
+                    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.22));
+        }
+
+        .end-download-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('resources/sprites/ButtonGreen.png') center / 100% 100% no-repeat;
+            pointer-events: none;
+        }
+
+        .end-download {
+            position: relative;
+            z-index: 1;
+            font-size: clamp(14px, 3.84vw, 21px);
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            color: #fff;
             text-align: center;
-            max-width: min(300px, 80vw);
-            line-height: 1.5;
-            margin-bottom: 24px;
+            text-transform: uppercase;
+            text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .end-download-btn.pump {
+            animation: downloadPump 0.45s ease-out;
+        }
+
+        .end-cta-sub {
+            position: relative;
+            z-index: -1;
+            margin-top: 10px;
+            font-size: clamp(11px, 2.8vw, 13px);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #111;
+            text-align: center;
+            text-transform: uppercase;
+            line-height: 1.35;
+            background: transparent;
+            pointer-events: none;
+        }
+
+        @keyframes downloadPump {
+            0% {
+                transform: scale(1);
+            }
+
+            35% {
+                transform: scale(1.14);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .end-search-field {
+            position: relative;
+            z-index: 1;
+            width: min(320px, 82vw);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: #f3f3f5;
+            border: 1.5px solid rgba(0, 0, 0, 0.08);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+
+        .end-search-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            opacity: 0.35;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111111' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") center / contain no-repeat;
+        }
+
+        .end-typewriter {
+            flex: 1;
+            min-height: 1.2em;
+            font-size: clamp(16px, 4.2vw, 20px);
+            font-weight: 700;
+            color: #111;
+            letter-spacing: 0.01em;
+            white-space: pre;
+        }
+
+        .end-typewriter::after {
+            content: '';
+            display: inline-block;
+            width: 2px;
+            height: 1.05em;
+            margin-left: 2px;
+            vertical-align: -0.12em;
+            background: #7b2cbf;
+            animation: caretBlink 0.7s steps(1) infinite;
+        }
+
+        .end-typewriter.done::after {
+            opacity: 0;
+            animation: none;
+        }
+
+        @keyframes caretBlink {
+            50% { opacity: 0; }
         }
 
         .btn {
@@ -242,7 +437,7 @@
             border-radius: 50px;
             font-size: clamp(15px, 3.5vw, 19px);
             font-weight: 800;
-            cursor: pointer;
+            cursor: none;
             border: none;
             transition: transform .1s;
             box-shadow: 0 6px 22px rgba(0, 0, 0, 0.15);
@@ -262,12 +457,33 @@
             inset: 0;
             pointer-events: none;
             z-index: 250;
-            background: rgba(231, 76, 60, 0);
-            transition: background .1s;
+            opacity: 0;
+            transition: opacity .14s ease-out;
+            background:
+                radial-gradient(ellipse 115% 95% at 50% 50%,
+                    rgba(231, 76, 60, 0) 42%,
+                    rgba(231, 76, 60, 0.18) 58%,
+                    rgba(231, 76, 60, 0.42) 74%,
+                    rgba(231, 76, 60, 0.62) 100%);
         }
 
         #wrong-flash.flash {
-            background: rgba(231, 76, 60, 0.22);
+            opacity: 1;
+        }
+
+        /* Same vignette as mistake, driven in JS for a slow per-second pulse in the last 5s */
+        #urgency-flash {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 240;
+            opacity: 0;
+            background:
+                radial-gradient(ellipse 115% 95% at 50% 50%,
+                    rgba(231, 76, 60, 0) 42%,
+                    rgba(231, 76, 60, 0.18) 58%,
+                    rgba(231, 76, 60, 0.42) 74%,
+                    rgba(231, 76, 60, 0.62) 100%);
         }
 
         #loading {
@@ -350,13 +566,209 @@
         .combo-text.show {
             opacity: 1;
         }
+
+        /* ─── Intro tip ─────────────────────────────────────────────── */
+        #tip-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 350;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-out;
+            padding: 24px;
+        }
+
+        #tip-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #tip-overlay p {
+            color: #fff;
+            font-size: clamp(20px, 5.5vw, 32px);
+            font-weight: 800;
+            text-align: center;
+            letter-spacing: 0.02em;
+            line-height: 1.35;
+            max-width: 16em;
+            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+        }
+
+        /* ─── Time is up ─────────────────────────────────────────────── */
+        #time-up-msg {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 320;
+            background: rgba(255, 255, 255, 0.55);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        #time-up-msg.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #time-up-msg span {
+            color: #e74c3c;
+            font-size: clamp(32px, 9vw, 56px);
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            text-align: center;
+            text-transform: uppercase;
+            text-shadow: 0 4px 18px rgba(231, 76, 60, 0.25);
+            transform: scale(0.92);
+            transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        #time-up-msg.visible span {
+            transform: scale(1);
+        }
+
+        /* ─── Click ripple (matches Unity ClickContainer / ClickAnimation) ── */
+        #click-fx-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 260;
+            overflow: hidden;
+        }
+
+        .click-fx {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 56px;
+            height: 56px;
+            margin: -28px 0 0 -28px;
+            pointer-events: none;
+        }
+
+        .click-fx-spread,
+        .click-fx-dot {
+            position: absolute;
+            inset: 0;
+            background-color: rgb(53, 59, 72);
+            -webkit-mask: url('resources/sprites/Circle04.png') center / contain no-repeat;
+            mask: url('resources/sprites/Circle04.png') center / contain no-repeat;
+            transform-origin: center center;
+        }
+
+        .click-fx-spread {
+            animation: clickSpread 0.52s ease-out forwards;
+        }
+
+        .click-fx-dot {
+            animation: clickDot 0.42s ease-out forwards;
+        }
+
+        @keyframes clickSpread {
+            0% {
+                transform: scale(1);
+                opacity: 0.58;
+            }
+
+            38% {
+                transform: scale(1.5);
+                opacity: 0.48;
+            }
+
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        @keyframes clickDot {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            48% {
+                transform: scale(1);
+                opacity: 0.48;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* ─── Idle finger hint ──────────────────────────────────────── */
+        /* The fingertip (upper-left of the source image) is anchored to the target point,
+           not the image center, so the tap visually lands right on the arrow's head. */
+        #finger-hint {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: clamp(56px, 15vw, 84px);
+            height: clamp(56px, 15vw, 84px);
+            background: url('resources/sprites/finger-tap.png') center / contain no-repeat;
+            transform-origin: 6% 21%;
+            pointer-events: none;
+            z-index: 380;
+            opacity: 0;
+            filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.28));
+            transition: opacity 0.3s ease;
+            will-change: transform, left, top, opacity;
+        }
+
+        #finger-hint.visible {
+            opacity: 1;
+            animation: fingerTap 1.1s ease-in-out infinite;
+        }
+
+        /* drop-shadow filter on an animated element forces per-frame
+           re-rasterization on mobile GPUs — skip it on touch devices */
+        @media (pointer: coarse) {
+            #finger-hint {
+                filter: none;
+            }
+        }
+
+        @keyframes fingerTap {
+            0% {
+                transform: translate(-6%, -21%) scale(1);
+            }
+
+            18% {
+                transform: translate(-10%, -31%) scale(1.05);
+            }
+
+            32% {
+                transform: translate(-2%, -13%) scale(0.88);
+            }
+
+            46% {
+                transform: translate(-2%, -13%) scale(0.88);
+            }
+
+            64% {
+                transform: translate(-7%, -23%) scale(1);
+            }
+
+            100% {
+                transform: translate(-6%, -21%) scale(1);
+            }
+        }
     </style>
 </head>
 
 <body>
+    <audio id="bg-music" src="resources/sounds/ambient.mp3" preload="auto" loop playsinline></audio>
     <div id="loading">
         <div class="spin"></div>
-        <p>ARROWS MASTER</p>
+        <p>ARROWS LEGEND</p>
     </div>
     <div id="hud">
         <div id="hearts-container">
@@ -366,11 +778,11 @@
         </div>
         <div id="timer-container">
             <div id="timer-label">TIME</div>
-            <div id="timer-text">01:00</div>
+            <div id="timer-text">00:30</div>
         </div>
         <div id="arrows-left-holder">
             <div id="arrows-left-label">ARROWS</div>
-            <div id="arrows-left-text">–</div>
+            <div id="arrows-left-text">-</div>
         </div>
     </div>
     <div id="streak-bar">
@@ -381,94 +793,526 @@
         <div id="combo-text" class="combo-text">Combo 2</div>
     </div>
     <div id="canvas-wrap"><canvas id="gameCanvas"></canvas></div>
-    <div class="overlay-screen" id="failure-screen">
-        <h1 id="fail-title">Out of Lives!</h1>
-        <p id="fail-subtitle">Tap Restart to try again</p><button class="btn btn-primary" onclick="restartLevel()">↩
-            Restart</button>
+    <div id="time-up-msg" aria-hidden="true"><span>Time is up!</span></div>
+    <div class="overlay-screen" id="end-screen">
+        <div class="end-safe">
+            <img class="end-icon" src="resources/sprites/app-icon.png" alt="Arrows Legend">
+            <div class="end-search-field" aria-hidden="true">
+                <div class="end-search-icon"></div>
+                <div class="end-typewriter" id="end-typewriter"></div>
+            </div>
+            <div class="end-cta">
+                <button class="end-download-btn" type="button" id="cta-btn" aria-label="Download Now">
+                    <span class="end-download">DOWNLOAD NOW!</span>
+                </button>
+                <p class="end-cta-sub">DOWNLOAD TO PLAY<br>THE FULL GAME.</p>
+            </div>
+        </div>
     </div>
-    <div class="overlay-screen" id="win-screen">
-        <h1 id="win-text">Amazing!</h1>
-        <p>You cleared all arrows!</p><button class="btn btn-primary" onclick="restartLevel()">▶ Play Again</button>
-    </div>
+    <div id="urgency-flash" aria-hidden="true"></div>
     <div id="wrong-flash"></div>
+    <div id="tip-overlay" aria-hidden="true">
+        <p>Tap None Blocked Arrow</p>
+    </div>
+    <div id="finger-hint" aria-hidden="true"></div>
+    <div id="click-fx-layer" aria-hidden="true"></div>
+    <div id="custom-cursor" aria-hidden="true"></div>
 
     <script>
         // ═══════════════════════════════════════════════════════════════════
         //  LEVEL ENGINE DATA
         // ═══════════════════════════════════════════════════════════════════
+        // Embedded Level8 (works with file:// and ad packages; no network fetch needed)
+        const LEVEL8_EMBEDDED = {"gridSize":{"x":26,"y":23},"duration":30,"arrows":[{"id":1,"path":[{"x":18,"y":17},{"x":18,"y":18},{"x":18,"y":19},{"x":18,"y":20},{"x":18,"y":21},{"x":19,"y":21},{"x":19,"y":20},{"x":20,"y":20},{"x":21,"y":20},{"x":22,"y":20}],"lookDirection":"right","color":"#000000"},{"id":2,"path":[{"x":4,"y":19},{"x":4,"y":18},{"x":4,"y":17},{"x":5,"y":17},{"x":5,"y":18},{"x":5,"y":19},{"x":5,"y":20},{"x":6,"y":20},{"x":7,"y":20},{"x":8,"y":20},{"x":8,"y":19},{"x":9,"y":19},{"x":9,"y":18},{"x":8,"y":18},{"x":8,"y":17},{"x":7,"y":17},{"x":7,"y":16},{"x":8,"y":16},{"x":9,"y":16},{"x":10,"y":16},{"x":11,"y":16},{"x":12,"y":16},{"x":13,"y":16},{"x":13,"y":15},{"x":14,"y":15},{"x":14,"y":16},{"x":15,"y":16},{"x":15,"y":17},{"x":14,"y":17},{"x":14,"y":18},{"x":15,"y":18},{"x":15,"y":19},{"x":16,"y":19},{"x":17,"y":19},{"x":17,"y":18},{"x":17,"y":17},{"x":16,"y":17},{"x":16,"y":16},{"x":17,"y":16},{"x":18,"y":16},{"x":18,"y":15},{"x":19,"y":15},{"x":20,"y":15},{"x":21,"y":15},{"x":22,"y":15}],"lookDirection":"right","color":"#000000"},{"id":3,"path":[{"x":16,"y":8},{"x":16,"y":9},{"x":16,"y":10},{"x":15,"y":10},{"x":15,"y":9},{"x":14,"y":9},{"x":14,"y":10},{"x":14,"y":11},{"x":13,"y":11},{"x":13,"y":12},{"x":14,"y":12},{"x":14,"y":13},{"x":15,"y":13},{"x":15,"y":12},{"x":16,"y":12},{"x":16,"y":11},{"x":17,"y":11},{"x":18,"y":11},{"x":19,"y":11},{"x":19,"y":10},{"x":18,"y":10},{"x":17,"y":10},{"x":17,"y":9},{"x":18,"y":9},{"x":19,"y":9},{"x":20,"y":9},{"x":20,"y":10},{"x":21,"y":10},{"x":21,"y":9},{"x":22,"y":9},{"x":22,"y":10},{"x":22,"y":11},{"x":21,"y":11},{"x":20,"y":11},{"x":20,"y":12},{"x":20,"y":13},{"x":20,"y":14},{"x":21,"y":14},{"x":22,"y":14}],"lookDirection":"right","color":"#000000"},{"id":4,"path":[{"x":23,"y":11},{"x":23,"y":10},{"x":23,"y":9}],"lookDirection":"down","color":"#000000"},{"id":5,"path":[{"x":21,"y":19},{"x":22,"y":19},{"x":23,"y":19},{"x":23,"y":18},{"x":23,"y":17},{"x":23,"y":16},{"x":24,"y":16},{"x":24,"y":15},{"x":24,"y":14},{"x":24,"y":13},{"x":24,"y":12},{"x":24,"y":11},{"x":24,"y":10}],"lookDirection":"down","color":"#000000"},{"id":6,"path":[{"x":21,"y":13},{"x":21,"y":12},{"x":22,"y":12},{"x":22,"y":13}],"lookDirection":"up","color":"#000000"},{"id":7,"path":[{"x":7,"y":12},{"x":6,"y":12},{"x":6,"y":13},{"x":7,"y":13},{"x":7,"y":14},{"x":6,"y":14},{"x":6,"y":15},{"x":7,"y":15},{"x":8,"y":15},{"x":8,"y":14},{"x":8,"y":13},{"x":8,"y":12},{"x":8,"y":11},{"x":8,"y":10},{"x":8,"y":9},{"x":7,"y":9},{"x":7,"y":10},{"x":7,"y":11},{"x":6,"y":11},{"x":6,"y":10},{"x":6,"y":9}],"lookDirection":"down","color":"#000000"},{"id":8,"path":[{"x":16,"y":14},{"x":15,"y":14},{"x":14,"y":14},{"x":13,"y":14},{"x":13,"y":13},{"x":12,"y":13},{"x":11,"y":13},{"x":10,"y":13},{"x":10,"y":12},{"x":11,"y":12},{"x":12,"y":12},{"x":12,"y":11},{"x":11,"y":11},{"x":10,"y":11},{"x":9,"y":11},{"x":9,"y":10},{"x":10,"y":10},{"x":11,"y":10}],"lookDirection":"right","color":"#000000"},{"id":9,"path":[{"x":22,"y":16},{"x":21,"y":16},{"x":20,"y":16},{"x":19,"y":16},{"x":19,"y":17},{"x":20,"y":17},{"x":21,"y":17},{"x":22,"y":17}],"lookDirection":"right","color":"#000000"},{"id":10,"path":[{"x":4,"y":8},{"x":4,"y":9},{"x":5,"y":9},{"x":5,"y":8},{"x":6,"y":8}],"lookDirection":"right","color":"#000000"},{"id":11,"path":[{"x":20,"y":19},{"x":19,"y":19},{"x":19,"y":18},{"x":20,"y":18},{"x":21,"y":18},{"x":22,"y":18}],"lookDirection":"right","color":"#000000"},{"id":12,"path":[{"x":5,"y":7},{"x":6,"y":7},{"x":6,"y":6}],"lookDirection":"down","color":"#000000"},{"id":13,"path":[{"x":22,"y":8},{"x":21,"y":8},{"x":20,"y":8},{"x":19,"y":8},{"x":18,"y":8},{"x":18,"y":7},{"x":19,"y":7},{"x":20,"y":7},{"x":21,"y":7},{"x":21,"y":6},{"x":20,"y":6},{"x":19,"y":6},{"x":18,"y":6}],"lookDirection":"left","color":"#000000"},{"id":14,"path":[{"x":12,"y":6},{"x":13,"y":6},{"x":13,"y":7},{"x":12,"y":7},{"x":11,"y":7},{"x":10,"y":7},{"x":10,"y":8},{"x":9,"y":8},{"x":8,"y":8},{"x":8,"y":7},{"x":9,"y":7},{"x":9,"y":6},{"x":10,"y":6},{"x":11,"y":6},{"x":11,"y":5},{"x":12,"y":5},{"x":12,"y":4},{"x":13,"y":4},{"x":13,"y":5},{"x":14,"y":5},{"x":14,"y":6}],"lookDirection":"up","color":"#000000"},{"id":15,"path":[{"x":13,"y":3},{"x":12,"y":3},{"x":12,"y":2},{"x":13,"y":2},{"x":14,"y":2},{"x":14,"y":3},{"x":15,"y":3},{"x":16,"y":3},{"x":16,"y":4},{"x":17,"y":4},{"x":17,"y":5},{"x":16,"y":5},{"x":15,"y":5},{"x":15,"y":6}],"lookDirection":"up","color":"#000000"},{"id":16,"path":[{"x":24,"y":18},{"x":24,"y":17}],"lookDirection":"down","color":"#000000"},{"id":17,"path":[{"x":17,"y":8},{"x":17,"y":7},{"x":17,"y":6},{"x":16,"y":6},{"x":16,"y":7},{"x":15,"y":7},{"x":15,"y":8}],"lookDirection":"up","color":"#000000"},{"id":18,"path":[{"x":9,"y":9},{"x":10,"y":9}],"lookDirection":"right","color":"#000000"},{"id":19,"path":[{"x":2,"y":11},{"x":2,"y":12},{"x":2,"y":13},{"x":3,"y":13},{"x":3,"y":14},{"x":4,"y":14},{"x":5,"y":14},{"x":5,"y":13},{"x":4,"y":13},{"x":4,"y":12},{"x":4,"y":11},{"x":3,"y":11},{"x":3,"y":10}],"lookDirection":"down","color":"#000000"},{"id":20,"path":[{"x":25,"y":15},{"x":25,"y":14}],"lookDirection":"down","color":"#000000"},{"id":22,"path":[{"x":14,"y":7},{"x":14,"y":8}],"lookDirection":"up","color":"#000000"},{"id":24,"path":[{"x":11,"y":9},{"x":11,"y":8},{"x":12,"y":8},{"x":12,"y":9}],"lookDirection":"up","color":"#000000"},{"id":27,"path":[{"x":16,"y":15},{"x":17,"y":15}],"lookDirection":"right","color":"#000000"},{"id":28,"path":[{"x":23,"y":15},{"x":23,"y":14},{"x":23,"y":13},{"x":23,"y":12}],"lookDirection":"down","color":"#000000"},{"id":29,"path":[{"x":10,"y":5},{"x":9,"y":5},{"x":8,"y":5},{"x":8,"y":4},{"x":9,"y":4},{"x":10,"y":4},{"x":11,"y":4},{"x":11,"y":3}],"lookDirection":"down","color":"#000000"},{"id":31,"path":[{"x":13,"y":8},{"x":13,"y":9}],"lookDirection":"up","color":"#000000"},{"id":35,"path":[{"x":6,"y":21},{"x":7,"y":21},{"x":8,"y":21},{"x":9,"y":21},{"x":9,"y":20},{"x":10,"y":20},{"x":10,"y":19},{"x":10,"y":18},{"x":10,"y":17},{"x":9,"y":17}],"lookDirection":"left","color":"#000000"},{"id":36,"path":[{"x":3,"y":19},{"x":3,"y":18},{"x":3,"y":17},{"x":2,"y":17},{"x":2,"y":16},{"x":3,"y":16},{"x":3,"y":15},{"x":4,"y":15},{"x":4,"y":16},{"x":5,"y":16},{"x":6,"y":16}],"lookDirection":"right","color":"#000000"},{"id":37,"path":[{"x":17,"y":14},{"x":17,"y":13},{"x":17,"y":12},{"x":18,"y":12}],"lookDirection":"right","color":"#000000"},{"id":39,"path":[{"x":11,"y":17},{"x":12,"y":17},{"x":12,"y":18}],"lookDirection":"up","color":"#000000"},{"id":41,"path":[{"x":15,"y":4},{"x":14,"y":4}],"lookDirection":"left","color":"#000000"},{"id":42,"color":"#000000","path":[{"x":5,"y":12},{"x":5,"y":11},{"x":5,"y":10},{"x":4,"y":10}],"lookDirection":"left"},{"id":43,"color":"#000000","path":[{"x":18,"y":13},{"x":19,"y":13},{"x":19,"y":12}],"lookDirection":"down"},{"id":44,"color":"#000000","path":[{"x":6,"y":17},{"x":6,"y":18},{"x":6,"y":19},{"x":7,"y":19},{"x":7,"y":18}],"lookDirection":"down"},{"id":45,"color":"#000000","path":[{"x":10,"y":14},{"x":10,"y":15}],"lookDirection":"up"},{"id":46,"color":"#000000","path":[{"x":12,"y":15},{"x":12,"y":14},{"x":11,"y":14},{"x":11,"y":15}],"lookDirection":"up"},{"id":47,"color":"#000000","path":[{"x":7,"y":8},{"x":7,"y":7},{"x":7,"y":6},{"x":7,"y":5}],"lookDirection":"down"},{"id":48,"color":"#000000","path":[{"x":18,"y":14},{"x":19,"y":14}],"lookDirection":"right"},{"id":49,"color":"#000000","path":[{"x":9,"y":15},{"x":9,"y":14},{"x":9,"y":13},{"x":9,"y":12}],"lookDirection":"down"},{"id":50,"color":"#000000","path":[{"x":11,"y":18},{"x":11,"y":19}],"lookDirection":"up"},{"id":51,"color":"#000000","path":[{"x":12,"y":10},{"x":13,"y":10}],"lookDirection":"right"},{"id":52,"color":"#000000","path":[{"x":17,"y":20},{"x":16,"y":20}],"lookDirection":"left"},{"id":53,"color":"#000000","path":[{"x":18,"y":5},{"x":19,"y":5}],"lookDirection":"right"},{"id":54,"color":"#000000","path":[{"x":2,"y":14},{"x":2,"y":15}],"lookDirection":"up"}]};
         let LEVEL_DATA = null;
 
         async function fetchLevelData() {
-            try {
-                const res = await fetch('LevelAD.json');
-                if (!res.ok) throw new Error("Status " + res.status);
-                LEVEL_DATA = await res.json();
-                console.log("Dynamically loaded LevelAD.json");
-            } catch (err) {
-                console.warn("Could not fetch LevelAD.json dynamically (CORS/File Not Found). Using internal fallback level.");
-                LEVEL_DATA = { "gridSize": { "x": 33, "y": 32 }, "duration": 60, "arrows": [{ "id": 1, "lookDirection": "up", "path": [{ "x": 23, "y": 5 }, { "x": 23, "y": 6 }, { "x": 23, "y": 7 }, { "x": 23, "y": 8 }, { "x": 24, "y": 8 }, { "x": 25, "y": 8 }, { "x": 26, "y": 8 }, { "x": 27, "y": 8 }, { "x": 27, "y": 9 }, { "x": 27, "y": 10 }], "color": "#393939" }] };
-            }
-            if (LEVEL_DATA && !LEVEL_DATA.duration) LEVEL_DATA.duration = 60;
+            LEVEL_DATA = LEVEL8_EMBEDDED;
+            if (!LEVEL_DATA.duration) LEVEL_DATA.duration = 30;
+            console.log("Loaded embedded Level8");
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        //  CUSTOM HAND CURSOR
+        // ═══════════════════════════════════════════════════════════════════
+        (function initCustomCursor() {
+            const cursor = document.getElementById('custom-cursor');
+            if (!cursor) return;
+            const coarse = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+            if (coarse) return;
+
+            window.addEventListener('pointermove', (e) => {
+                if (e.pointerType === 'touch') return;
+                cursor.style.left = e.clientX + 'px';
+                cursor.style.top = e.clientY + 'px';
+                cursor.classList.add('visible');
+            }, { passive: true });
+
+            window.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'touch') return;
+                cursor.classList.add('pressed');
+            }, { passive: true });
+
+            const release = (e) => {
+                if (e && e.pointerType === 'touch') return;
+                cursor.classList.remove('pressed');
+            };
+            window.addEventListener('pointerup', release, { passive: true });
+            window.addEventListener('pointercancel', release, { passive: true });
+
+            document.addEventListener('mouseleave', () => cursor.classList.remove('visible'));
+            document.documentElement.addEventListener('mouseenter', () => cursor.classList.add('visible'));
+        })();
 
 
         // ═══════════════════════════════════════════════════════════════════
         //  SOUND MANAGER
         // ═══════════════════════════════════════════════════════════════════
+        // Web Audio: each clip is decoded ONCE into an AudioBuffer; playback is a
+        // BufferSource start (~free). The old audio.cloneNode().play() created a
+        // brand-new media element per tap, which blocks the main thread for
+        // 50-300ms on iOS Safari / mobile Chrome — a huge hitch right when an
+        // arrow starts moving.
         const SFX = (() => {
-            function mk(src) { const a = new Audio(); a.preload = 'auto'; a.src = src; return a; }
-            const snd = {
-                arrowSelect: mk('resources/sounds/arrowFly.wav'),
-                mistake: mk('resources/sounds/Mistake.wav'),
-                levelInit: mk('resources/sounds/levelInit.wav'),
-                win: mk('resources/sounds/Won.wav'),
-                good: mk('resources/sounds/Good.mp3'),
-                nice: mk('resources/sounds/Nice.mp3'),
-                excellent: mk('resources/sounds/Excellent.mp3'),
-                amazing: mk('resources/sounds/Amazing.mp3'),
-                perfect: mk('resources/sounds/Perfect.mp3'),
-                like: mk('resources/sounds/LikeSound.wav'),
-                streaks: Array.from({ length: 10 }, (_, i) => mk(`resources/sounds/streak_${String(i + 1).padStart(2, '0')}.ogg`))
+            const FILES = {
+                arrowSelect: 'resources/sounds/arrowFly.mp3',
+                mistake: 'resources/sounds/Mistake.mp3',
+                levelInit: 'resources/sounds/levelInit.mp3',
+                win: 'resources/sounds/Won.mp3',
+                good: 'resources/sounds/Good.mp3',
+                nice: 'resources/sounds/Nice.mp3',
+                excellent: 'resources/sounds/Excellent.mp3',
+                amazing: 'resources/sounds/Amazing.mp3',
+                perfect: 'resources/sounds/Perfect.mp3',
+                like: 'resources/sounds/LikeSound.mp3'
             };
-            function play(a, v = 1) { if (!a) return; try { const c = a.cloneNode(); c.volume = Math.min(1, v); c.play().catch(() => { }); } catch (e) { } }
+            for (let i = 1; i <= 10; i++) FILES['streak' + i] = `resources/sounds/streak_${String(i).padStart(2, '0')}.ogg`;
+
+            const AC = window.AudioContext || window.webkitAudioContext;
+            let actx = null, decodeStarted = false;
+            const buffers = {};
+            const fallbackEls = {};
+
+            function decodeAll() {
+                if (decodeStarted || !AC) return;
+                try { actx = actx || new AC(); } catch (e) { return; }
+                decodeStarted = true;
+                Object.keys(FILES).forEach(name => {
+                    fetch(FILES[name])
+                        .then(r => r.arrayBuffer())
+                        .then(ab => new Promise((res, rej) => actx.decodeAudioData(ab, res, rej)))
+                        .then(buf => { buffers[name] = buf; })
+                        .catch(() => { }); // e.g. Safari can't decode ogg — skip silently
+                });
+            }
+
+            // Only used before decode finishes or when Web Audio is unavailable.
+            function fallbackPlay(name, v) {
+                try {
+                    let a = fallbackEls[name];
+                    if (!a) { a = new Audio(); a.preload = 'auto'; a.src = FILES[name]; fallbackEls[name] = a; }
+                    a.volume = Math.min(1, v);
+                    a.currentTime = 0;
+                    a.play().catch(() => { });
+                } catch (e) { }
+            }
+
+            function play(name, v = 1) {
+                const buf = buffers[name];
+                if (actx && buf) {
+                    try {
+                        if (actx.state === 'suspended') actx.resume().catch(() => { });
+                        const src = actx.createBufferSource();
+                        src.buffer = buf;
+                        const g = actx.createGain();
+                        g.gain.value = Math.min(1, v);
+                        src.connect(g);
+                        g.connect(actx.destination);
+                        src.start(0);
+                        return;
+                    } catch (e) { }
+                }
+                fallbackPlay(name, v);
+            }
+
+            const ambient = document.getElementById('bg-music') || (() => { const a = new Audio(); a.preload = 'auto'; a.src = 'resources/sounds/ambient.mp3'; return a; })();
+            const BG_VOLUME = 0.228;
+            let musicStarted = false;
+
+            function startMusic() {
+                if (!ambient || musicStarted) return;
+                try {
+                    ambient.loop = true;
+                    ambient.volume = BG_VOLUME;
+                    ambient.muted = false;
+                    const p = ambient.play();
+                    if (p && typeof p.then === 'function') {
+                        p.then(() => { musicStarted = true; cleanupUnlock(); }).catch(() => { });
+                    } else {
+                        musicStarted = true;
+                        cleanupUnlock();
+                    }
+                } catch (e) { }
+            }
+
+            // Google App Campaigns: do not enable sound before the user interacts.
+            function unlock() {
+                decodeAll();
+                if (actx && actx.state === 'suspended') actx.resume().catch(() => { });
+                startMusic();
+            }
+            function cleanupUnlock() {
+                window.removeEventListener('pointerdown', unlock);
+                window.removeEventListener('touchstart', unlock);
+                window.removeEventListener('keydown', unlock);
+            }
+            window.addEventListener('pointerdown', unlock, { passive: true });
+            window.addEventListener('touchstart', unlock, { passive: true });
+            window.addEventListener('keydown', unlock);
+
             return {
-                playArrowSelect: () => play(snd.arrowSelect, 0.85),
-                playMistake: () => play(snd.mistake, 1),
-                playLevelInit: () => play(snd.levelInit, 0.8),
-                playWin: () => play(snd.win, 0.9),
+                playArrowSelect: () => play('arrowSelect', 0.765),
+                playMistake: () => play('mistake', 1),
+                playLevelInit: () => play('levelInit', 0.8),
+                playWin: () => play('win', 0.9),
                 playVibe: (type) => {
-                    if (type === 'good') play(snd.good, 1);
-                    else if (type === 'nice') play(snd.nice, 1);
-                    else if (type === 'excellent') play(snd.excellent, 1);
-                    else if (type === 'amazing') play(snd.amazing, 1);
-                    else if (type === 'perfect') play(snd.perfect, 1);
+                    if (FILES[type]) play(type, 1);
                 },
                 playStreak: (n) => {
-                    const idx = Math.min(n - 1, 9);
-                    play(snd.streaks[idx], 1);
+                    play('streak' + Math.min(Math.max(n, 1), 10), 1);
                 },
-                playLike: () => play(snd.like, 1),
-                resume: () => { }
+                playLike: () => play('like', 1),
+                startMusic,
+                resume: () => startMusic()
             };
         })();
 
         // ═══════════════════════════════════════════════════════════════════
         //  GAME STATE
         // ═══════════════════════════════════════════════════════════════════
-        let lives = 3, arrowList = [], activeArrowsCount = 0, gridSize = { x: 33, y: 32 }, cellSize = 40;
+        let lives = 3, arrowList = [], arrowById = new Map(), activeArrowsCount = 0, gridSize = { x: 33, y: 32 }, cellSize = 40;
         let camera = { x: 0, y: 0, zoom: 0.1 }, targetCam = { x: 0, y: 0, zoom: 1.0 }, CAM_LERP = 0.08;
         let canInteract = false, timerInterval = null, currentTime = 60, isTimerActive = false;
         let comboCount = 0, lastSuccessTime = 0, vibeTimer = null, comboTimer = null;
         let isWinning = false, isEntranceFinished = false;
+        let idleHintTimer = null, idleHintArrow = null;
+        const IDLE_HINT_DELAY_MS = 3000;
 
         const DIR_MAP = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
-        const canvas = document.getElementById('gameCanvas'), ctx2d = canvas.getContext('2d'), headImg = new Image(); headImg.src = 'resources/sprites/Head.png';
-        const occupancy = {}, occKey = (x, y) => `${x},${y}`;
+        const canvas = document.getElementById('gameCanvas');
+        // Opaque + desync'd canvas: big mobile GPU win vs default alpha compositing.
+        const ctx2d = canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
+        const headImg = new Image(); headImg.src = 'resources/sprites/Head.png';
+        const IS_COARSE = window.matchMedia('(pointer: coarse)').matches;
+        // Mirrors DevicePerformanceProfile.DetectLowEnd / Apply in the Unity game.
+        const IS_LOW_END = (function detectLowEnd() {
+            try {
+                const mem = navigator.deviceMemory; // GiB, Chrome/Android
+                if (mem && mem <= 3) return true;
+            } catch (_) { }
+            const cores = navigator.hardwareConcurrency || 0;
+            if (cores > 0 && cores <= 4) return true;
+            if (IS_COARSE && (window.devicePixelRatio || 1) >= 2.5) return true;
+            return IS_COARSE && ((window.innerWidth * window.innerHeight) >= 900 * 1800);
+        })();
+        const USE_INSTANT_ENTRANCE = IS_LOW_END; // LevelManager low-end path
+        const SKIP_CLICK_FX = IS_LOW_END;
+        // Cap backing-store size on phones (full retina 3x kills fill-rate).
+        const MAX_DPR = (IS_COARSE || IS_LOW_END) ? 1 : Math.min(window.devicePixelRatio || 1, 1.75);
+        try { if (typeof document !== 'undefined') document.documentElement.style.setProperty('--perf', IS_LOW_END ? 'low' : 'hi'); } catch (_) { }
+        let viewW = 0, viewH = 0, canvasRect = { left: 0, top: 0, width: 1, height: 1 };
+        let gridTex = null, gridTexKey = '';
+        const headTintCache = new Map();
+        const HEAD_CACHE_COLORS = ['#000000', '#27ae60', '#e74c3c'];
 
-        function registerOcc(x, y, id) { occupancy[occKey(x, y)] = id; }
-        function releaseOcc(x, y) { delete occupancy[occKey(x, y)]; }
-        function getOccupant(x, y) { return occupancy[occKey(x, y)] ?? null; }
+        // Numeric occupancy (no per-lookup string allocs)
+        const OCC_W = 64;
+        const occupancy = new Int32Array(OCC_W * OCC_W);
+        occupancy.fill(-1);
+        const occIdx = (x, y) => y * OCC_W + x;
+        function clearOccupancy() { occupancy.fill(-1); }
+        function registerOcc(x, y, id) { if (x >= 0 && y >= 0 && x < OCC_W && y < OCC_W) occupancy[occIdx(x, y)] = id; }
+        function releaseOcc(x, y) { if (x >= 0 && y >= 0 && x < OCC_W && y < OCC_W) occupancy[occIdx(x, y)] = -1; }
+        function getOccupant(x, y) {
+            if (x < 0 || y < 0 || x >= OCC_W || y >= OCC_W) return null;
+            const v = occupancy[occIdx(x, y)];
+            return v < 0 ? null : v;
+        }
         function isOOB(x, y) { return x < 0 || y < 0 || x >= gridSize.x || y >= gridSize.y; }
+
+        // Port of ArrowDependencyTree — O(1) free checks after build / OnArrowStartedMoving.
+        const depTree = {
+            blockers: new Map(),
+            dependents: new Map(),
+            free: new Set(),
+            build() {
+                this.blockers.clear();
+                this.dependents.clear();
+                this.free.clear();
+                for (let i = 0; i < arrowList.length; i++) {
+                    const a = arrowList[i];
+                    if (a.gone) continue;
+                    this.blockers.set(a.id, new Set());
+                    this.dependents.set(a.id, new Set());
+                }
+                for (let i = 0; i < arrowList.length; i++) {
+                    const a = arrowList[i];
+                    if (a.gone || !a.segments.length) continue;
+                    let cx = a.head.x + a.lookDir[0], cy = a.head.y + a.lookDir[1];
+                    while (!isOOB(cx, cy)) {
+                        const occ = getOccupant(cx, cy);
+                        if (occ !== null && occ !== a.id) {
+                            const other = arrowById.get(occ);
+                            if (other && !other.isMoving && !other.gone) {
+                                this.blockers.get(a.id).add(occ);
+                                this.dependents.get(occ).add(a.id);
+                            }
+                        }
+                        cx += a.lookDir[0]; cy += a.lookDir[1];
+                    }
+                }
+                for (let i = 0; i < arrowList.length; i++) {
+                    const a = arrowList[i];
+                    if (a.gone) continue;
+                    const b = this.blockers.get(a.id);
+                    if (b && b.size === 0) this.free.add(a.id);
+                }
+            },
+            onStartedMoving(arrow) {
+                const deps = this.dependents.get(arrow.id);
+                if (deps) {
+                    for (const depId of deps) {
+                        const b = this.blockers.get(depId);
+                        if (b) {
+                            b.delete(arrow.id);
+                            if (b.size === 0) this.free.add(depId);
+                        }
+                    }
+                    deps.clear();
+                }
+                this.free.delete(arrow.id);
+            },
+            isFree(arrow) {
+                return this.free.has(arrow.id);
+            }
+        };
+
+        // Port of GridTapUtility — occupancy grid hit, not full visual scan.
+        function screenToGrid(sx, sy) {
+            const worldX = (sx - viewW * 0.5) / camera.zoom + camera.x;
+            const worldY = camera.y - (sy - viewH * 0.5) / camera.zoom;
+            return { gx: Math.floor(worldX / cellSize), gy: Math.floor(worldY / cellSize) };
+        }
+        // Minimum forgiving tap radius in CSS pixels (~Apple/Google touch target
+        // guidance). On zoomed-out boards a single grid cell can render at just a
+        // few pixels, so a fixed "3x3 cells" search (the old approach) shrank to a
+        // useless hit area and felt like taps were being dropped. We now size the
+        // search in cells to always cover this many screen pixels, then — like
+        // Unity's InputManager.GetClosestArrow — pick the arrow whose nearest
+        // occupied cell is actually closest to the tap, instead of whichever
+        // arrow happened to be scanned first.
+        const MIN_TAP_PX = 26;
+        function pickArrowAtScreen(sx, sy) {
+            const cs = cellSize * camera.zoom;
+            if (cs <= 0) return null;
+            const cellRadius = Math.max(1, Math.ceil(MIN_TAP_PX / cs));
+            const g = screenToGrid(sx, sy);
+            const worldX = (sx - viewW * 0.5) / camera.zoom + camera.x;
+            const worldY = camera.y - (sy - viewH * 0.5) / camera.zoom;
+
+            let bestMovable = null, bestMovableDist = Infinity;
+            let bestAny = null, bestAnyDist = Infinity;
+            for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+                for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+                    const gx = g.gx + dx, gy = g.gy + dy;
+                    const occ = getOccupant(gx, gy);
+                    if (occ === null) continue;
+                    const a = arrowById.get(occ);
+                    if (!a || a.gone || a.isMoving) continue;
+                    // An arrow can occupy several cells in range; each cell is
+                    // compared independently so the arrow's closest cell wins.
+                    const cellCx = gx * cellSize + cellSize * 0.5;
+                    const cellCy = gy * cellSize + cellSize * 0.5;
+                    const dist = Math.hypot(worldX - cellCx, worldY - cellCy);
+                    if (dist < bestAnyDist) { bestAnyDist = dist; bestAny = a; }
+                    if (a.canMoveForward() && dist < bestMovableDist) { bestMovableDist = dist; bestMovable = a; }
+                }
+            }
+            // Prefer a movable arrow within the forgiving radius; otherwise fall
+            // back to the closest arrow at all (so tapping a blocked arrow still
+            // shows its normal "can't move" feedback instead of silently missing).
+            return bestMovable || bestAny;
+        }
+
+        function syncCanvasRect() {
+            const r = canvas.getBoundingClientRect();
+            canvasRect = { left: r.left, top: r.top, width: r.width || 1, height: r.height || 1 };
+        }
+
+        function resizeGameCanvas() {
+            const wrap = document.getElementById('canvas-wrap');
+            viewW = Math.max(1, wrap.clientWidth || 400);
+            viewH = Math.max(1, wrap.clientHeight || 600);
+            const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+            const bw = Math.max(1, Math.floor(viewW * dpr));
+            const bh = Math.max(1, Math.floor(viewH * dpr));
+            if (canvas.width !== bw || canvas.height !== bh) {
+                canvas.width = bw;
+                canvas.height = bh;
+            }
+            canvas.style.width = viewW + 'px';
+            canvas.style.height = viewH + 'px';
+            currentDpr = dpr;
+            ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx2d.imageSmoothingEnabled = true;
+            syncCanvasRect();
+            gridTexKey = '';
+            invalidateStaticLayer();
+        }
+
+        function ensureHeadTints() {
+            if (!headImg.complete || headImg.naturalWidth <= 0) return;
+            if (headTintCache.size >= HEAD_CACHE_COLORS.length) return;
+            const s = 64;
+            for (const col of HEAD_CACHE_COLORS) {
+                if (headTintCache.has(col)) continue;
+                const c = document.createElement('canvas');
+                c.width = c.height = s;
+                const x = c.getContext('2d');
+                x.drawImage(headImg, 0, 0, s, s);
+                x.globalCompositeOperation = 'source-atop';
+                x.fillStyle = col;
+                x.fillRect(0, 0, s, s);
+                headTintCache.set(col, c);
+            }
+        }
+        // If the board was baked before Head.png finished loading, idle arrows
+        // kept the geometric-triangle fallback forever. Rebake once the sprite is ready.
+        headImg.onload = () => {
+            ensureHeadTints();
+            for (let i = 0; i < arrowList.length; i++) {
+                arrowList[i]._tintCol = null;
+                arrowList[i]._tintImg = null;
+            }
+            invalidateStaticLayer();
+            sceneDirty = true;
+        };
+        if (headImg.complete && headImg.naturalWidth > 0) ensureHeadTints();
+
+        // Exact body-matching head tint (same PNG, source-atop once into cache — never approx color).
+        function headTintForColor(col) {
+            if (!col) col = '#000000';
+            ensureHeadTints();
+            if (headTintCache.has(col)) return headTintCache.get(col);
+            if (!headImg.complete || headImg.naturalWidth <= 0) return null;
+            const s = 64;
+            const c = document.createElement('canvas');
+            c.width = c.height = s;
+            const x = c.getContext('2d');
+            x.drawImage(headImg, 0, 0, s, s);
+            x.globalCompositeOperation = 'source-atop';
+            x.fillStyle = col;
+            x.fillRect(0, 0, s, s);
+            headTintCache.set(col, c);
+            return c;
+        }
+
+        function ensureGridTexture() {
+            const key = gridSize.x + 'x' + gridSize.y + ':' + cellSize;
+            if (gridTex && gridTexKey === key) return gridTex;
+            gridTexKey = key;
+            const w = Math.max(1, gridSize.x * cellSize);
+            const h = Math.max(1, gridSize.y * cellSize);
+            gridTex = document.createElement('canvas');
+            gridTex.width = w;
+            gridTex.height = h;
+            const g = gridTex.getContext('2d');
+            g.fillStyle = 'rgba(0,0,0,0.06)';
+            const rad = cellSize * 0.1;
+            // Fewer dots on coarse pointers (still readable, far cheaper).
+            const step = IS_COARSE ? 2 : 1;
+            for (let gx = 0; gx < gridSize.x; gx += step) {
+                for (let gy = 0; gy < gridSize.y; gy += step) {
+                    g.beginPath();
+                    g.arc(gx * cellSize + cellSize * 0.5, gy * cellSize + cellSize * 0.5, rad, 0, Math.PI * 2);
+                    g.fill();
+                }
+            }
+            return gridTex;
+        }
+
+        // ── World-space board bake ─────────────────────────────────────────
+        // Grid + idle arrows are rendered ONCE into an offscreen texture in
+        // world pixels. Camera pan / pinch / glide never re-render arrows;
+        // every frame is just one transformed drawImage of the same bitmap.
+        // The bake is refreshed only when an arrow actually changes state.
+        let boardTex = null, boardTexValid = false, boardBakeScale = 1;
+        let currentDpr = 1;
+        // 15% faster than the Unity fast-step threshold, per user request.
+        const SPEED_UP = 1.15;
+        const MOVE_STEP_DUR = ((IS_COARSE || IS_LOW_END) ? 0.05 : 0.032) / SPEED_UP;
+        const BLOCK_STEP_DUR = ((IS_COARSE || IS_LOW_END) ? 0.05 : 0.032) / SPEED_UP;
+        const IMPACT_PAUSE_S = 0.14;
+
+        function invalidateStaticLayer() { boardTexValid = false; }
+
+        const BAKE_SCALE_MIN = 0.4, BAKE_SCALE_MAX = 1.5;
+        function desiredBakeScale() {
+            // A little headroom over the current zoom keeps idle arrows crisp
+            // after small zoom-ins without forcing a rebake.
+            return Math.min(BAKE_SCALE_MAX, Math.max(BAKE_SCALE_MIN, camera.zoom * 1.25));
+        }
+
+        function isArrowDynamic(a) {
+            if (!a || a.gone) return false;
+            if (a.isMoving || a.isGrowing || a.isShowingHint) return true;
+            if (a.moveT != null && a.moveT < 1) return true;
+            if (a.bounceT < 1) return true;
+            if (a.colorAnim) return true;
+            if (a.drawColor !== a.color) return true; // press highlight
+            if (a._animQueue) return true;
+            return false;
+        }
+
+        function cameraSettled() {
+            return Math.abs(camera.x - targetCam.x) <= 0.02
+                && Math.abs(camera.y - targetCam.y) <= 0.02
+                && Math.abs(camera.zoom - targetCam.zoom) <= 0.0005;
+        }
+
+        function rebuildBoardTex() {
+            const worldW = Math.max(1, gridSize.x * cellSize);
+            const worldH = Math.max(1, gridSize.y * cellSize);
+            const k = desiredBakeScale();
+            boardBakeScale = k;
+            const w = Math.max(1, Math.round(worldW * k));
+            const h = Math.max(1, Math.round(worldH * k));
+            if (!boardTex) boardTex = document.createElement('canvas');
+            if (boardTex.width !== w || boardTex.height !== h) { boardTex.width = w; boardTex.height = h; }
+            const b = boardTex.getContext('2d');
+            b.setTransform(1, 0, 0, 1, 0, 0);
+            b.clearRect(0, 0, w, h);
+            b.imageSmoothingEnabled = true;
+            // Grid dots, flipped so texture rows match world Y-up.
+            b.save();
+            b.translate(0, h);
+            b.scale(k, -k);
+            b.drawImage(ensureGridTexture(), 0, 0);
+            b.restore();
+            // Aim the shared camera at the texture so Arrow.draw() lands in
+            // world pixels: screenX = k*worldX, screenY = k*(worldH - worldY).
+            const cx = camera.x, cy = camera.y, cz = camera.zoom;
+            camera.zoom = k;
+            camera.x = (viewW * 0.5) / k;
+            camera.y = worldH - (viewH * 0.5) / k;
+            for (let i = 0; i < arrowList.length; i++) {
+                const a = arrowList[i];
+                if (a.gone || isArrowDynamic(a)) continue;
+                a.draw(b);
+            }
+            camera.x = cx; camera.y = cy; camera.zoom = cz;
+            boardTexValid = true;
+        }
 
         class Arrow {
             constructor(d) {
@@ -490,30 +1334,40 @@
 
             get head() { return this.segments[this.segments.length - 1]; }
 
-            // Follow last segment direction for head rotation
+            // Follow last segment direction for head rotation (reused array — no per-frame alloc)
             get visualDirection() {
+                if (!this._vDir) this._vDir = [0, 0];
+                const out = this._vDir;
                 const count = this.segments.length;
                 if (count >= 2) {
                     const h = this.segments[count - 1], p = this.segments[count - 2];
                     const dx = h.x - p.x, dy = h.y - p.y;
-                    if (dx !== 0 || dy !== 0) return [dx * (Math.abs(dx) > Math.abs(dy) ? 1 : 0), dy * (Math.abs(dy) > Math.abs(dx) ? 1 : 0)];
+                    if (dx !== 0 || dy !== 0) {
+                        out[0] = dx * (Math.abs(dx) > Math.abs(dy) ? 1 : 0);
+                        out[1] = dy * (Math.abs(dy) > Math.abs(dx) ? 1 : 0);
+                        return out;
+                    }
                 } else if (this.isGrowing && this.pathData.length >= 2) {
-                    // During entrance, look at the next point in path if possible
                     const h = this.pathData[1], p = this.pathData[0];
-                    return [h.x - p.x, h.y - p.y];
+                    out[0] = h.x - p.x; out[1] = h.y - p.y;
+                    return out;
                 }
-                return this.lookDir;
+                out[0] = this.lookDir[0]; out[1] = this.lookDir[1];
+                return out;
             }
 
             canMoveForward() {
                 if (!this.segments.length) return false;
+                // O(1) path from ArrowDependencyTree when available
+                if (depTree.isFree(this)) return true;
+                // Fallback: GridManager.IsArrowFreeByForwardRay
                 const h = this.head;
                 let cx = h.x + this.lookDir[0], cy = h.y + this.lookDir[1];
                 while (!isOOB(cx, cy)) {
                     const occ = getOccupant(cx, cy);
                     if (occ !== null && occ !== this.id) {
-                        const other = arrowList.find(a => a.id === occ);
-                        if (other && !other.isMoving) return false;
+                        const other = arrowById.get(occ);
+                        if (other && !other.isMoving && !other.gone) return false;
                     }
                     cx += this.lookDir[0]; cy += this.lookDir[1];
                 }
@@ -527,38 +1381,206 @@
                 const tail = this.segments[0];
                 if (!isOOB(tail.x, tail.y)) releaseOcc(tail.x, tail.y);
 
-                this.moveSources = this.segments.map(s => gridToScreen(s.x, s.y));
-                for (let i = 0; i < this.segments.length - 1; i++) this.segments[i] = { ...this.segments[i + 1] };
-                this.segments[this.segments.length - 1] = { x: nx, y: ny };
+                const n = this.segments.length;
+                if (!this.moveSources || this.moveSources.length < n) {
+                    this.moveSources = new Array(n);
+                    this.moveTargets = new Array(n);
+                    for (let i = 0; i < n; i++) {
+                        this.moveSources[i] = { x: 0, y: 0 };
+                        this.moveTargets[i] = { x: 0, y: 0 };
+                    }
+                }
+                for (let i = 0; i < n; i++) gridToScreenInto(this.segments[i].x, this.segments[i].y, this.moveSources[i]);
+
+                for (let i = 0; i < n - 1; i++) {
+                    this.segments[i].x = this.segments[i + 1].x;
+                    this.segments[i].y = this.segments[i + 1].y;
+                }
+                this.segments[n - 1].x = nx;
+                this.segments[n - 1].y = ny;
 
                 if (!isOOB(nx, ny)) registerOcc(nx, ny, this.id);
                 else this.escaping = true;
 
-                if (this.segments.every(s => isOOB(s.x, s.y))) { this.gone = true; return true; }
-                this.moveTargets = this.segments.map(s => gridToScreen(s.x, s.y));
+                let allOob = true;
+                for (let i = 0; i < n; i++) {
+                    if (!isOOB(this.segments[i].x, this.segments[i].y)) { allOob = false; break; }
+                }
+                if (allOob) { this.gone = true; invalidateStaticLayer(); return true; }
+                for (let i = 0; i < n; i++) gridToScreenInto(this.segments[i].x, this.segments[i].y, this.moveTargets[i]);
+                this.moveSources.length = n;
+                this.moveTargets.length = n;
                 this.moveT = 0;
                 return true;
             }
 
             update(dt) {
                 if (this.gone) return;
-                if (this.moveT < 1) this.moveT = Math.min(1, this.moveT + dt / 0.017);
-                if (this.bounceT < 1) this.bounceT = Math.min(1, this.bounceT + dt / this.bounceDur);
-                if (this.isGrowing) {
-                    // Logic handled in entranceAnim tick for synchronization
+                const stepDur = this._animQueue ? BLOCK_STEP_DUR : MOVE_STEP_DUR;
+                if (this.moveT != null && this.moveT < 1) {
+                    this.moveT = Math.min(1, this.moveT + dt / stepDur);
                 }
+                if (this.bounceT < 1) this.bounceT = Math.min(1, this.bounceT + dt / this.bounceDur);
+
                 if (this.colorAnim) {
                     this.colorAnim.t = Math.min(1, this.colorAnim.t + dt / this.colorAnim.dur);
-                    this.drawColor = lerpColor(this.colorAnim.from, this.colorAnim.to, this.colorAnim.t);
+                    // Discrete tint (no per-frame rgb string) — still reads as a flash
+                    this.drawColor = this.colorAnim.t < 0.55 ? this.colorAnim.from : this.colorAnim.to;
                     if (this.colorAnim.t >= 1) {
                         if (this.colorAnim.next) this.colorAnim = { from: this.colorAnim.to, to: this.colorAnim.next, t: 0, dur: this.colorAnim.dur, next: null };
                         else {
                             this.colorAnim = null;
-                            // Don't revert to this.color if we want to stay red
                             this.drawColor = this.lastAnimTarget || this.color;
                         }
                     }
                 }
+
+                // RAF-driven step chains (smooth 60fps, no setTimeout jitter)
+                if (this._autoStep && (this.moveT == null || this.moveT >= 1)) {
+                    if (this.gone) { this._autoStep = false; this.isMoving = false; invalidateStaticLayer(); }
+                    else if (!this.tryStep()) {
+                        this._autoStep = false;
+                        this.isMoving = false;
+                        invalidateStaticLayer();
+                    }
+                }
+
+                if (this._animQueue) this._advanceAnimQueue(dt);
+            }
+
+            _advanceAnimQueue(dt) {
+                const q = this._animQueue;
+                if (!q) return;
+                if (q.phase === 'impact') {
+                    q.impactWait -= dt;
+                    if (q.impactWait <= 0) {
+                        this.bounceT = 1;
+                        q.phase = 'reverse';
+                        if (q.idx > 0) {
+                            q.idx--;
+                            this.animateSegmentsTo(q.history[q.idx]);
+                        } else {
+                            this._finishAnimQueue();
+                        }
+                    }
+                    return;
+                }
+                if (this.moveT != null && this.moveT < 1) return;
+                if (q.phase === 'forward') {
+                    if (q.idx < q.history.length - 1) {
+                        q.idx++;
+                        this.animateSegmentsTo(q.history[q.idx]);
+                    } else {
+                        q.phase = 'impact';
+                        q.impactWait = IMPACT_PAUSE_S;
+                        SFX.playMistake();
+                        flashWrong();
+                        this.startBlockedAnim();
+                        this.startBounceAnim();
+                    }
+                } else if (q.phase === 'reverse') {
+                    if (q.idx > 0) {
+                        q.idx--;
+                        this.animateSegmentsTo(q.history[q.idx]);
+                    } else {
+                        this._finishAnimQueue();
+                    }
+                }
+            }
+
+            _finishAnimQueue() {
+                const q = this._animQueue;
+                this._animQueue = null;
+                invalidateStaticLayer();
+                if (q && q.resolve) q.resolve();
+            }
+
+            // Port of ArrowController.UpdateLinePositions — keep stroke on grid (corner inject on turns).
+            _linePt(i) {
+                if (!this._lineBuf) this._lineBuf = [];
+                let p = this._lineBuf[i];
+                if (!p) { p = { x: 0, y: 0 }; this._lineBuf[i] = p; }
+                return p;
+            }
+            // No inner closures here — a per-frame closure per moving arrow was a real GC source on mobile.
+            _pushLinePt(len, x, y, snap2) {
+                if (len > 0) {
+                    const prev = this._linePt(len - 1);
+                    const dx = prev.x - x, dy = prev.y - y;
+                    if (dx * dx + dy * dy <= snap2) return len;
+                }
+                const p = this._linePt(len);
+                p.x = x; p.y = y;
+                return len + 1;
+            }
+            buildGridAlignedStroke(segs) {
+                const out = this._lineBuf || (this._lineBuf = []);
+                let len = 0;
+                const n = segs.length;
+                if (n === 0) { out.length = 0; return out; }
+                const snap = Math.max(0.35, cellSize * camera.zoom * 0.02);
+                const snap2 = snap * snap;
+                if (!this._tmpA) { this._tmpA = { x: 0, y: 0 }; this._tmpB = { x: 0, y: 0 }; }
+
+                if (n === 1) {
+                    len = this._pushLinePt(len, segs[0].x, segs[0].y, snap2);
+                    out.length = len;
+                    return out;
+                }
+
+                const hasGrid = this.segments && this.segments.length === n && !this.isGrowing;
+                // Cache each segment's snapped grid screen pos once (was recomputed twice per pair before).
+                let prevSnapX = 0, prevSnapY = 0, havePrevSnap = false;
+
+                for (let i = 0; i < n - 1; i++) {
+                    let p1x = segs[i].x, p1y = segs[i].y;
+                    let p2x = segs[i + 1].x, p2y = segs[i + 1].y;
+                    let g1x = 0, g1y = 0, g2x = 0, g2y = 0;
+
+                    if (hasGrid) {
+                        if (havePrevSnap) {
+                            g1x = prevSnapX; g1y = prevSnapY;
+                        } else {
+                            gridToScreenInto(this.segments[i].x, this.segments[i].y, this._tmpA);
+                            g1x = this._tmpA.x; g1y = this._tmpA.y;
+                        }
+                        if ((p1x - g1x) * (p1x - g1x) + (p1y - g1y) * (p1y - g1y) < snap2) {
+                            p1x = g1x; p1y = g1y;
+                        }
+                        gridToScreenInto(this.segments[i + 1].x, this.segments[i + 1].y, this._tmpB);
+                        g2x = this._tmpB.x; g2y = this._tmpB.y;
+                        if ((p2x - g2x) * (p2x - g2x) + (p2y - g2y) * (p2y - g2y) < snap2) {
+                            p2x = g2x; p2y = g2y;
+                        }
+                        prevSnapX = g2x; prevSnapY = g2y; havePrevSnap = true;
+                    }
+
+                    len = this._pushLinePt(len, p1x, p1y, snap2);
+
+                    // Inject elbow if chord is diagonal (Unity turn-corner fix)
+                    if (Math.abs(p1x - p2x) > snap && Math.abs(p1y - p2y) > snap) {
+                        let cx, cy;
+                        if (hasGrid) {
+                            const s1 = Math.abs(p1x - g1x) + Math.abs(p1y - g1y)
+                                + Math.abs(p2x - g1x) + Math.abs(p2y - g1y);
+                            const s2 = Math.abs(p1x - g2x) + Math.abs(p1y - g2y)
+                                + Math.abs(p2x - g2x) + Math.abs(p2y - g2y);
+                            if (s1 <= s2) { cx = g1x; cy = g1y; }
+                            else { cx = g2x; cy = g2y; }
+                        } else {
+                            const e1x = p1x, e1y = p2y, e2x = p2x, e2y = p1y;
+                            const s1 = Math.abs(p1y - e1y) + Math.abs(p2x - e1x);
+                            const s2 = Math.abs(p1x - e2x) + Math.abs(p2y - e2y);
+                            if (s1 <= s2) { cx = e1x; cy = e1y; }
+                            else { cx = e2x; cy = e2y; }
+                        }
+                        len = this._pushLinePt(len, cx, cy, snap2);
+                    }
+                }
+
+                len = this._pushLinePt(len, segs[n - 1].x, segs[n - 1].y, snap2);
+                out.length = len;
+                return out;
             }
 
             draw(ctx) {
@@ -567,76 +1589,149 @@
                 if (!segs || !segs.length) return;
 
                 const col = this.drawColor, cs = cellSize * camera.zoom;
+                const n = segs.length;
+                const stroke = this.buildGridAlignedStroke(segs);
 
-                // Draw Body Line
-                if (segs.length > 1) {
-                    ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = cs * 0.21; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                    ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y);
-                    segs.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-                    ctx.stroke(); ctx.restore();
-                }
-
-                // Draw Dots behind segments
-                ctx.save(); segs.forEach(pos => {
-                    ctx.beginPath(); ctx.arc(pos.x, pos.y, cs * 0.34, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fill();
-                }); ctx.restore();
-
-                // Hint
-                if (!this.isMoving && this.isShowingHint && this.canMoveForward()) {
-                    const h = segs[segs.length - 1], end = gridToScreen(this.segments[this.segments.length - 1].x + this.lookDir[0] * 60, this.segments[this.segments.length - 1].y + this.lookDir[1] * 60);
-                    ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = cs * 0.09; ctx.setLineDash([cs * 0.12, cs * 0.16]);
-                    ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(end.x, end.y); ctx.stroke(); ctx.restore();
-                }
-
-                // Head
+                // Head.png: tip at top, triangle base ~y=33/40, shaft stub ~y=36-39
+                // with shaft width 14/40 of the sprite. Size the head so that stub
+                // exactly matches the body stroke — eliminates the shoulder "pick".
+                const lineW = cs * 0.21;
+                const HEAD_SHAFT_FRAC = 14 / 40;
+                const hs = lineW / HEAD_SHAFT_FRAC;
                 const vDir = this.visualDirection;
-                const hPos = segs[segs.length - 1], angle = Math.atan2(vDir[0], vDir[1]), hs = cs * 0.72;
-                ctx.save(); ctx.translate(hPos.x, hPos.y); ctx.rotate(angle);
-                if (headImg.complete && headImg.naturalWidth > 0) {
-                    ctx.drawImage(headImg, -hs * 0.5, -hs * 0.5, hs, hs);
-                    ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = col; ctx.fillRect(-hs, -hs, hs * 2, hs * 2); ctx.globalCompositeOperation = 'source-over';
-                } else {
-                    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, -hs * 0.5); ctx.lineTo(-hs * 0.35, hs * 0.35); ctx.lineTo(hs * 0.35, hs * 0.35); ctx.closePath(); ctx.fill();
+                const vLen = Math.hypot(vDir[0], vDir[1]) || 1;
+                // Screen look: grid Y is up, canvas Y is down.
+                const lookX = vDir[0] / vLen;
+                const lookY = -vDir[1] / vLen;
+
+                // Unity UpdateLinePositions: pull the stroke end back under the head
+                // so the body doesn't poke past the triangle base.
+                // Shaft junction sits ~0.39 of the sprite behind center.
+                if (stroke.length > 1) {
+                    const tuck = hs * ((35.5 - 20) / 40);
+                    const last = stroke[stroke.length - 1];
+                    last.x -= lookX * tuck;
+                    last.y -= lookY * tuck;
                 }
+
+                if (stroke.length > 1) {
+                    ctx.strokeStyle = col;
+                    ctx.lineWidth = lineW;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(stroke[0].x, stroke[0].y);
+                    for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y);
+                    ctx.stroke();
+                }
+
+                // Soft segment dots: desktop/hi-end only
+                if (!IS_COARSE && !IS_LOW_END) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+                    const rad = cs * 0.34;
+                    for (let i = 0; i < n; i++) {
+                        ctx.beginPath();
+                        ctx.arc(segs[i].x, segs[i].y, rad, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                if (!this.isMoving && this.isShowingHint && this.canMoveForward()) {
+                    const h = segs[n - 1];
+                    const end = gridToScreen(this.segments[this.segments.length - 1].x + this.lookDir[0] * 60, this.segments[this.segments.length - 1].y + this.lookDir[1] * 60);
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+                    ctx.lineWidth = cs * 0.09;
+                    ctx.setLineDash([cs * 0.12, cs * 0.16]);
+                    ctx.beginPath();
+                    ctx.moveTo(h.x, h.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Head PNG only (never the geometric triangle fallback — that was
+                // the "sometimes wrong sprite" bug while Head.png was still loading
+                // or when a stale bake captured it).
+                const hPos = segs[n - 1], angle = Math.atan2(vDir[0], vDir[1]);
+                let tinted = this._tintImg;
+                if (this._tintCol !== col) {
+                    this._tintCol = col;
+                    this._tintImg = tinted = headTintForColor(col);
+                }
+                if (!tinted) return;
+                ctx.save();
+                ctx.translate(hPos.x, hPos.y);
+                ctx.rotate(angle);
+                ctx.drawImage(tinted, -hs * 0.5, -hs * 0.5, hs, hs);
                 ctx.restore();
             }
 
+            _visPoint(i) {
+                if (!this._vis) this._vis = [];
+                let p = this._vis[i];
+                if (!p) { p = { x: 0, y: 0 }; this._vis[i] = p; }
+                return p;
+            }
+
             getVisualPositions() {
+                if (!this._vis) this._vis = [];
+                const out = this._vis;
+
                 if (this.isGrowing && this.growthT < 1) {
                     const total = this.pathData.length;
                     const progress = this.growthT * total;
                     const count = Math.ceil(progress);
-                    if (count === 0) return [];
-                    const base = this.pathData.slice(0, count).map(p => gridToScreen(p.x, p.y));
-                    if (base.length > 1) {
-                        const last = base[base.length - 1];
-                        const prev = base[base.length - 2];
-                        const partial = progress % 1 || 1;
-                        base[base.length - 1] = { x: prev.x + (last.x - prev.x) * partial, y: prev.y + (last.y - prev.y) * partial };
+                    out.length = count;
+                    if (count === 0) return out;
+                    for (let i = 0; i < count; i++) {
+                        const p = this.pathData[i];
+                        gridToScreenInto(p.x, p.y, this._visPoint(i));
                     }
-                    return base;
+                    if (count > 1) {
+                        const last = out[count - 1], prev = out[count - 2];
+                        const partial = progress % 1 || 1;
+                        const dest = this._visPoint(count - 1);
+                        dest.x = prev.x + (last.x - prev.x) * partial;
+                        dest.y = prev.y + (last.y - prev.y) * partial;
+                    }
+                    return out;
                 }
 
-                const base = this.segments.map(s => gridToScreen(s.x, s.y));
-                if (this.moveT < 1 && this.moveSources && this.moveTargets) {
+                const n = this.segments.length;
+                out.length = n;
+                for (let i = 0; i < n; i++) {
+                    const s = this.segments[i];
+                    gridToScreenInto(s.x, s.y, this._visPoint(i));
+                }
+                if (this.moveT != null && this.moveT < 1 && this.moveSources && this.moveTargets) {
                     const t = 1 - Math.pow(1 - this.moveT, 2.5);
-                    return this.moveSources.map((src, i) => {
+                    const m = this.moveSources.length;
+                    out.length = m;
+                    for (let i = 0; i < m; i++) {
+                        const src = this.moveSources[i];
                         const tgt = this.moveTargets[i];
-                        return tgt ? { x: src.x + (tgt.x - src.x) * t, y: src.y + (tgt.y - src.y) * t } : src;
-                    });
+                        const dest = this._visPoint(i);
+                        if (tgt) {
+                            dest.x = src.x + (tgt.x - src.x) * t;
+                            dest.y = src.y + (tgt.y - src.y) * t;
+                        } else {
+                            dest.x = src.x; dest.y = src.y;
+                        }
+                    }
+                    return out;
                 }
                 if (this.bounceT < 1) {
-                    const totalCycle = 1.35;
-                    const propagationT = this.bounceT * totalCycle;
-                    return base.map((p, i) => {
-                        const segDelay = (this.segments.length - 1 - i) * 0.035;
-                        const localT = Math.min(1, Math.max(0, (propagationT - segDelay) * 3.0));
-                        const nudge = cellSize * camera.zoom * 0.45 * Math.sin(localT * Math.PI);
-                        return { x: p.x + this.lookDir[0] * nudge, y: p.y - this.lookDir[1] * nudge };
-                    });
+                    // Impact bump only along look axis on the head — keeps body on grid lines
+                    // (full-body wave was causing diagonal chord shake).
+                    const localT = Math.min(1, Math.max(0, this.bounceT * 3.0));
+                    const nudge = cellSize * camera.zoom * 0.35 * Math.sin(localT * Math.PI);
+                    const head = out[n - 1];
+                    head.x += this.lookDir[0] * nudge;
+                    head.y -= this.lookDir[1] * nudge;
+                    return out;
                 }
-                return base;
+                return out;
             }
 
             startSuccessAnim() {
@@ -646,11 +1741,73 @@
             }
             startBounceAnim() {
                 this.bounceT = 0;
-                this.bounceDur = 0.15; // Faster bounce
+                this.bounceDur = 0.16;
             }
+            // Fired at the moment of impact so the red flash is actually visible
+            // (previously the color was snapped to red before this ran, making the "animation" a no-op).
             startBlockedAnim() {
-                this.lastAnimTarget = this.color; // Back to black after flash
-                this.colorAnim = { from: '#27ae60', to: '#e74c3c', t: 0, dur: 0.04, next: this.color };
+                this.lastAnimTarget = this.color;
+                this.colorAnim = { from: this.drawColor || this.color, to: this.color, t: 0, dur: 0.16, next: null };
+            }
+
+            markAsMistake() {
+                this.color = '#e74c3c';
+                this.lastAnimTarget = '#e74c3c';
+            }
+
+            // Only checks the immediate next cell (unlike canMoveForward, which scans the whole path ahead).
+            isNextStepBlocked(fromSeg) {
+                const nx = fromSeg.x + this.lookDir[0], ny = fromSeg.y + this.lookDir[1];
+                if (isOOB(nx, ny)) return true;
+                const occ = getOccupant(nx, ny);
+                return occ !== null && occ !== this.id;
+            }
+
+            // Simulates walking forward (without touching the real occupancy grid) until truly blocked,
+            // returning every intermediate position so the animation can walk forward then retrace it exactly.
+            simulateForwardHistory() {
+                const history = [this.segments.map(s => ({ ...s }))];
+                let sim = this.segments.map(s => ({ ...s }));
+                const MAX_STEPS = 60;
+                for (let i = 0; i < MAX_STEPS; i++) {
+                    if (this.isNextStepBlocked(sim[sim.length - 1])) break;
+                    const nx = sim[sim.length - 1].x + this.lookDir[0], ny = sim[sim.length - 1].y + this.lookDir[1];
+                    for (let j = 0; j < sim.length - 1; j++) sim[j] = { ...sim[j + 1] };
+                    sim[sim.length - 1] = { x: nx, y: ny };
+                    history.push(sim.map(s => ({ ...s })));
+                }
+                return history;
+            }
+
+            // Tweens visually from the current on-screen position to a new grid snapshot.
+            animateSegmentsTo(newSegs) {
+                const vis = this.getVisualPositions();
+                const n = newSegs.length;
+                if (!this.moveSources || this.moveSources.length < n) {
+                    this.moveSources = new Array(n);
+                    this.moveTargets = new Array(n);
+                    for (let i = 0; i < n; i++) {
+                        this.moveSources[i] = { x: 0, y: 0 };
+                        this.moveTargets[i] = { x: 0, y: 0 };
+                    }
+                }
+                for (let i = 0; i < n; i++) {
+                    const src = vis[i] || vis[vis.length - 1] || { x: 0, y: 0 };
+                    this.moveSources[i].x = src.x;
+                    this.moveSources[i].y = src.y;
+                }
+                if (!this.segments || this.segments.length !== n) {
+                    this.segments = newSegs.map(s => ({ x: s.x, y: s.y }));
+                } else {
+                    for (let i = 0; i < n; i++) {
+                        this.segments[i].x = newSegs[i].x;
+                        this.segments[i].y = newSegs[i].y;
+                    }
+                }
+                for (let i = 0; i < n; i++) gridToScreenInto(this.segments[i].x, this.segments[i].y, this.moveTargets[i]);
+                this.moveSources.length = n;
+                this.moveTargets.length = n;
+                this.moveT = 0;
             }
         }
 
@@ -658,48 +1815,164 @@
         //  INPUT
         // ═══════════════════════════════════════════════════════════════════
         let pressTimer = null, pressTargetArrow = null, isPanning = false, lastPanPos = { x: 0, y: 0 }, panAccum = 0;
+        const activePointers = new Map(); // pointerId -> { x, y }
+        let isPinching = false, lastPinchDist = 0;
+        let gestureWasPinch = false;
+        let pressStartClient = { x: 0, y: 0 };
+
+        function clearPressTarget() {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+            if (pressTargetArrow) {
+                pressTargetArrow.drawColor = pressTargetArrow.color;
+                pressTargetArrow.isShowingHint = false;
+                pressTargetArrow = null;
+                invalidateStaticLayer();
+                sceneDirty = true;
+            }
+        }
+
+        // Matches Unity ClickContainer: soft circle spreads to 2x and fades out.
+        function spawnClickEffect(clientX, clientY) {
+            const layer = document.getElementById('click-fx-layer');
+            if (!layer) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'click-fx';
+            wrap.style.left = clientX + 'px';
+            wrap.style.top = clientY + 'px';
+            wrap.innerHTML = '<div class="click-fx-spread"></div><div class="click-fx-dot"></div>';
+            layer.appendChild(wrap);
+            setTimeout(() => wrap.remove(), 600);
+        }
+
+        function pinchDistance() {
+            const pts = [...activePointers.values()];
+            if (pts.length < 2) return 0;
+            return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        }
+
+        function applyZoomFactor(factor) {
+            targetCam.zoom = Math.min(Math.max(targetCam.zoom * factor, 0.1), 3.0);
+            sceneDirty = true;
+        }
+
+        // Matches CameraController.HandleMobileZoom in Unity:
+        // ortho += (prevDist - currDist) * (ortho / 500) * mobileZoomSpeed
+        // with mobileZoomSpeed = 0.5 (ArrowsMasterGame.unity).
+        // Our camera.zoom is the inverse of ortho size (larger = closer), so we divide.
+        const MOBILE_ZOOM_SPEED = 0.5;
+        const MOBILE_ZOOM_PIXEL_REF = 500;
+        function applyPinchZoom(prevDist, currDist) {
+            if (prevDist <= 0 || currDist <= 0) return;
+            const dpr = window.devicePixelRatio || 1;
+            const deltaMagnitudeDiff = (prevDist - currDist) * dpr;
+            const factor = 1 + (deltaMagnitudeDiff / MOBILE_ZOOM_PIXEL_REF) * MOBILE_ZOOM_SPEED;
+            if (factor <= 0.05) return;
+            const next = Math.min(Math.max(camera.zoom / factor, 0.1), 3.0);
+            // Apply immediately like Unity (no lerp lag on interaction zoom)
+            camera.zoom = targetCam.zoom = next; sceneDirty = true;
+        }
+
         canvas.addEventListener('pointerdown', e => {
             if (!canInteract) return; e.preventDefault();
-            const rect = canvas.getBoundingClientRect(), sx = (e.clientX - rect.left) * (canvas.width / rect.width), sy = (e.clientY - rect.top) * (canvas.height / rect.height);
+            resetIdleHint();
+            try { canvas.setPointerCapture(e.pointerId); } catch (_) { }
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (activePointers.size >= 2) {
+                // Second finger: enter pinch mode, cancel any pending tap/pan select
+                clearPressTarget();
+                isPanning = false;
+                isPinching = true;
+                gestureWasPinch = true;
+                lastPinchDist = pinchDistance();
+                return;
+            }
+
+            isPinching = false;
+            gestureWasPinch = false;
+            pressStartClient = { x: e.clientX, y: e.clientY };
+            const sx = (e.clientX - canvasRect.left) * (viewW / canvasRect.width), sy = (e.clientY - canvasRect.top) * (viewH / canvasRect.height);
             lastPanPos = { x: e.clientX, y: e.clientY }; isPanning = true; panAccum = 0;
-            let bestArrow = null, bestDist = cellSize * 0.9 * camera.zoom;
-            arrowList.forEach(a => { if (a.gone) return; a.getVisualPositions().forEach(pos => { const d = Math.hypot(pos.x - sx, pos.y - sy); if (d < bestDist) { bestDist = d; bestArrow = a; } }); });
+            const bestArrow = pickArrowAtScreen(sx, sy);
             if (bestArrow) {
                 pressTargetArrow = bestArrow;
                 pressTargetArrow.drawColor = '#27ae60'; // Highlight Green
-                pressTimer = setTimeout(() => { if (pressTargetArrow) pressTargetArrow.isShowingHint = true; pressTimer = null; }, 500);
+                invalidateStaticLayer();
+                sceneDirty = true;
+                pressTimer = setTimeout(() => { if (pressTargetArrow) { pressTargetArrow.isShowingHint = true; sceneDirty = true; } pressTimer = null; }, 500);
             }
         });
         canvas.addEventListener('pointermove', e => {
+            if (!activePointers.has(e.pointerId)) return;
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (isPinching && activePointers.size >= 2) {
+                const dist = pinchDistance();
+                if (lastPinchDist > 0 && dist > 0) {
+                    applyPinchZoom(lastPinchDist, dist);
+                }
+                lastPinchDist = dist;
+                return;
+            }
+
             if (!isPanning) return;
             const dx = (e.clientX - lastPanPos.x) / camera.zoom, dy = (e.clientY - lastPanPos.y) / camera.zoom;
-            camera.x -= dx; camera.y += dy; targetCam.x = camera.x; targetCam.y = camera.y;
+            camera.x -= dx; camera.y += dy; targetCam.x = camera.x; targetCam.y = camera.y; sceneDirty = true;
             lastPanPos = { x: e.clientX, y: e.clientY }; panAccum += Math.hypot(dx, dy);
-            if (panAccum > 5) {
-                if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-                if (pressTargetArrow) {
-                    pressTargetArrow.drawColor = pressTargetArrow.color; // Reset color
-                    pressTargetArrow.isShowingHint = false;
-                    pressTargetArrow = null;
-                }
+            if (panAccum > 5) clearPressTarget();
+        });
+        function endPointer(e) {
+            if (!activePointers.has(e.pointerId)) return;
+            activePointers.delete(e.pointerId);
+            try { canvas.releasePointerCapture(e.pointerId); } catch (_) { }
+
+            if (activePointers.size < 2) {
+                isPinching = false;
+                lastPinchDist = 0;
             }
-        });
-        canvas.addEventListener('pointerup', e => {
-            isPanning = false; if (!pressTargetArrow) return;
-            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; onArrowClicked(pressTargetArrow); }
-            else { pressTargetArrow.isShowingHint = false; }
-            pressTargetArrow = null;
-        });
-        canvas.addEventListener('wheel', e => { e.preventDefault(); targetCam.zoom = Math.min(Math.max(targetCam.zoom * Math.pow(0.999, e.deltaY), 0.1), 3.0); });
+
+            if (activePointers.size === 1) {
+                // One finger left after pinch — resume pan from remaining finger, no accidental tap
+                const rem = [...activePointers.values()][0];
+                lastPanPos = { x: rem.x, y: rem.y };
+                isPanning = true;
+                panAccum = 999;
+                clearPressTarget();
+                return;
+            }
+
+            if (activePointers.size === 0) {
+                isPanning = false;
+                resetIdleHint();
+                // Same as Unity InputManager: spawn click ripple on a short single-finger tap
+                const moveThresh = Math.max(40, window.innerHeight * 0.03);
+                const moved = Math.hypot(e.clientX - pressStartClient.x, e.clientY - pressStartClient.y);
+                if (!SKIP_CLICK_FX && !gestureWasPinch && moved < moveThresh) {
+                    spawnClickEffect(e.clientX, e.clientY);
+                }
+                gestureWasPinch = false;
+                if (!pressTargetArrow) return;
+                if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; onArrowClicked(pressTargetArrow); }
+                else { pressTargetArrow.isShowingHint = false; }
+                pressTargetArrow = null;
+            }
+        }
+        canvas.addEventListener('pointerup', endPointer);
+        canvas.addEventListener('pointercancel', endPointer);
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            applyZoomFactor(Math.pow(0.999, e.deltaY));
+        }, { passive: false });
 
         // ═══════════════════════════════════════════════════════════════════
         //  LEVEL ENGINE
         // ═══════════════════════════════════════════════════════════════════
         async function loadLevel() {
             try {
-                for (let k in occupancy) delete occupancy[k];
+                clearOccupancy();
                 gridSize = LEVEL_DATA.gridSize;
                 arrowList = LEVEL_DATA.arrows.map(d => new Arrow(d));
+                arrowById = new Map(arrowList.map(a => [a.id, a]));
                 activeArrowsCount = arrowList.length; lives = 3;
 
                 currentTime = LEVEL_DATA.duration || 0;
@@ -710,8 +1983,13 @@
                 document.getElementById('timer-container').classList.toggle('visible', isTimerActive);
                 updateTimerDisplay();
 
-                document.getElementById('failure-screen').classList.remove('visible');
-                document.getElementById('win-screen').classList.remove('visible');
+                document.getElementById('end-screen').classList.remove('visible');
+                document.getElementById('time-up-msg').classList.remove('visible');
+                document.getElementById('time-up-msg').setAttribute('aria-hidden', 'true');
+                stopEndTypewriter();
+                document.getElementById('end-typewriter').textContent = '';
+                document.getElementById('end-typewriter').classList.remove('done');
+                document.getElementById('timer-text').classList.remove('warning');
 
                 SFX.playLevelInit();
 
@@ -732,15 +2010,118 @@
 
                 // 3. Glide zoom into gameplay framing
                 targetCam.zoom = gameplayZoom;
-                isEntranceFinished = true; canInteract = true;
+                isEntranceFinished = true;
+                await showIntroTip();
+                canInteract = true;
+                // Idle countdown starts only now, right as the tip has fully vanished.
+                resetIdleHint();
                 if (isTimerActive) timerInterval = setInterval(tickTimer, 100);
             } catch (e) { console.error("Load failed:", e); }
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        //  IDLE FINGER HINT
+        // ═══════════════════════════════════════════════════════════════════
+        function scheduleIdleHint() {
+            clearTimeout(idleHintTimer);
+            idleHintTimer = null;
+            if (!canInteract) return;
+            idleHintTimer = setTimeout(triggerIdleHint, IDLE_HINT_DELAY_MS);
+        }
+
+        function triggerIdleHint() {
+            idleHintTimer = null;
+            if (!canInteract) return;
+            const candidates = [];
+            for (let i = 0; i < arrowList.length; i++) {
+                const a = arrowList[i];
+                if (a.gone || a.isMoving) continue;
+                if (depTree.isFree(a) || a.canMoveForward()) candidates.push(a);
+            }
+            if (!candidates.length) return;
+            idleHintArrow = candidates[Math.floor(Math.random() * candidates.length)];
+            const el = document.getElementById('finger-hint');
+            el.classList.add('visible');
+            el.setAttribute('aria-hidden', 'false');
+            updateFingerHintPosition();
+        }
+
+        function hideFingerHint() {
+            idleHintArrow = null;
+            const el = document.getElementById('finger-hint');
+            el.classList.remove('visible');
+            el.setAttribute('aria-hidden', 'true');
+        }
+
+        // Hides any hint currently shown and restarts the 3s idle countdown from now.
+        function resetIdleHint() {
+            hideFingerHint();
+            scheduleIdleHint();
+        }
+
+        // Stops the idle-hint system entirely (game over / win / not interactable).
+        function clearIdleHint() {
+            clearTimeout(idleHintTimer);
+            idleHintTimer = null;
+            hideFingerHint();
+        }
+
+        let fingerHintLastX = -1e9, fingerHintLastY = -1e9;
+        function updateFingerHintPosition() {
+            if (!idleHintArrow || idleHintArrow.gone) { hideFingerHint(); return; }
+            const segs = idleHintArrow.getVisualPositions();
+            if (!segs || !segs.length) return;
+            const headScreen = segs[segs.length - 1];
+            const x = canvasRect.left + headScreen.x * (canvasRect.width / viewW);
+            const y = canvasRect.top + headScreen.y * (canvasRect.height / viewH);
+            // Writing the same left/top re-dirties style + layout every frame.
+            if (Math.abs(x - fingerHintLastX) < 0.5 && Math.abs(y - fingerHintLastY) < 0.5) return;
+            fingerHintLastX = x; fingerHintLastY = y;
+            const el = document.getElementById('finger-hint');
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+        }
+
+        function showIntroTip() {
+            return new Promise(resolve => {
+                const tip = document.getElementById('tip-overlay');
+                tip.setAttribute('aria-hidden', 'false');
+                tip.classList.add('visible');
+                setTimeout(() => {
+                    tip.classList.remove('visible');
+                    tip.setAttribute('aria-hidden', 'true');
+                    const onFadeDone = (e) => {
+                        if (e.propertyName !== 'opacity') return;
+                        tip.removeEventListener('transitionend', onFadeDone);
+                        resolve();
+                    };
+                    tip.addEventListener('transitionend', onFadeDone);
+                }, 2000);
+            });
+        }
+
+        function materializeAllArrows() {
+            for (let i = 0; i < arrowList.length; i++) {
+                const a = arrowList[i];
+                a.isGrowing = false;
+                a.growthT = 1;
+                a.segments = a.pathData.map(s => ({ x: s.x, y: s.y }));
+                for (let j = 0; j < a.segments.length; j++) registerOcc(a.segments[j].x, a.segments[j].y, a.id);
+            }
+            depTree.build();
+            invalidateStaticLayer();
+            sceneDirty = true;
+        }
+
         async function entranceAnim() {
+            // Unity LevelManager: UseInstantEntrance on low-end devices
+            if (USE_INSTANT_ENTRANCE) {
+                materializeAllArrows();
+                return;
+            }
             return new Promise(resolve => {
                 let start = Date.now();
-                const totalDur = 800; // 0.8s for full growth
+                const totalDur = IS_LOW_END ? 280 : 500;
                 arrowList.forEach(a => { a.isGrowing = true; a.growthT = 0; a.segments = []; });
                 function tick() {
                     let elapsed = Date.now() - start;
@@ -748,12 +2129,7 @@
                     arrowList.forEach(a => { a.growthT = t; });
                     if (t < 1) requestAnimationFrame(tick);
                     else {
-                        arrowList.forEach(a => {
-                            a.isGrowing = false;
-                            a.growthT = 1;
-                            a.segments = [...a.pathData];
-                            a.segments.forEach(s => registerOcc(s.x, s.y, a.id));
-                        });
+                        materializeAllArrows();
                         resolve();
                     }
                 }
@@ -764,7 +2140,8 @@
         function recalcLayout() {
             if (!arrowList || arrowList.length === 0) {
                 targetCam.x = (gridSize.x * 0.5) * cellSize; targetCam.y = (gridSize.y * 0.5) * cellSize;
-                targetCam.zoom = 1.0; return;
+                targetCam.zoom = 1.0;
+                return;
             }
             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             arrowList.forEach(a => a.pathData.forEach(p => {
@@ -772,13 +2149,39 @@
                 minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
             }));
             const w = (maxX - minX + 1) * cellSize, h = (maxY - minY + 1) * cellSize;
-            const ww = Math.max(canvas.width, 100), hh = Math.max(canvas.height, 100);
+            const ww = Math.max(viewW || canvas.width, 100), hh = Math.max(viewH || canvas.height, 100);
             targetCam.zoom = Math.max(0.01, Math.min((ww - 60) / w, (hh - 60) / h, 1.5));
             targetCam.x = (minX + maxX + 1) * 0.5 * cellSize; targetCam.y = (minY + maxY + 1) * 0.5 * cellSize;
         }
 
+        // Same red edge vignette as the mistake flash, pulsed slowly once per game-second.
+        function updateUrgencyFlash() {
+            const el = document.getElementById('urgency-flash');
+            if (!isTimerActive || currentTime <= 0 || currentTime > 5) {
+                el.style.opacity = '0';
+                return;
+            }
+            const frac = currentTime % 1;
+            const soft = Math.pow(Math.sin(frac * Math.PI), 0.85);
+            el.style.opacity = String(0.22 + 0.78 * soft);
+        }
+
+        function gridToScreenInto(gx, gy, out) {
+            out.x = viewW * 0.5 + (gx * cellSize + cellSize * 0.5 - camera.x) * camera.zoom;
+            out.y = viewH * 0.5 - (gy * cellSize + cellSize * 0.5 - camera.y) * camera.zoom;
+            return out;
+        }
         function gridToScreen(gx, gy) {
-            return { x: canvas.width * 0.5 + (gx * cellSize + cellSize * 0.5 - camera.x) * camera.zoom, y: canvas.height * 0.5 - (gy * cellSize + cellSize * 0.5 - camera.y) * camera.zoom };
+            return gridToScreenInto(gx, gy, { x: 0, y: 0 });
+        }
+
+        // Restarts a CSS animation without forcing a synchronous layout (no offsetWidth read).
+        // A forced reflow here landed on the exact frame an arrow starts moving and caused a hitch.
+        function restartAnimClass(el, ...classes) {
+            el.classList.remove(...classes);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => el.classList.add(...classes));
+            });
         }
 
         function showVibe() {
@@ -793,9 +2196,7 @@
             const el = document.getElementById('vibe-text');
             el.textContent = v.t;
             SFX.playVibe(v.s);
-            el.classList.remove('show', 'punch');
-            void el.offsetWidth;
-            el.classList.add('show', 'punch');
+            restartAnimClass(el, 'show', 'punch');
             if (vibeTimer) clearTimeout(vibeTimer);
             vibeTimer = setTimeout(() => el.classList.remove('show'), 1200);
         }
@@ -803,6 +2204,8 @@
         function showComboFeedback(n) {
             const el = document.getElementById('combo-text');
             el.textContent = `Combo ${n}`;
+            const COMBO_COLORS = ['#eb4d4b', '#f0932b', '#130f40', '#be2edd', '#6ab04c', '#f9ca24'];
+            el.style.color = COMBO_COLORS[Math.floor(Math.random() * COMBO_COLORS.length)];
             const qs = [
                 { t: '25%', l: '30%' },
                 { t: '25%', l: '70%' },
@@ -811,9 +2214,7 @@
             ];
             const q = qs[Math.floor(Math.random() * qs.length)];
             el.style.top = q.t; el.style.left = q.l;
-            el.classList.remove('show', 'punch');
-            void el.offsetWidth;
-            el.classList.add('show', 'punch');
+            restartAnimClass(el, 'show', 'punch');
             if (comboTimer) clearTimeout(comboTimer);
             comboTimer = setTimeout(() => el.classList.remove('show'), 800);
         }
@@ -852,67 +2253,257 @@
                 activeArrowsCount--; updateArrowsLeftUI(activeArrowsCount);
                 if (activeArrowsCount <= 0) setTimeout(() => {
                     isWinning = true;
-                    isTimerActive = false;
+                    stopTimer();
                     canInteract = false;
+                    clearIdleHint();
                     SFX.playWin();
-                    document.getElementById('win-screen').classList.add('visible');
+                    showEndScreen();
                 }, 400);
-                (function step() { if (a.gone) return; if (!a.tryStep()) { a.isMoving = false; return; } setTimeout(step, 27); })();
+                invalidateStaticLayer();
+                depTree.onStartedMoving(a);
+                a._autoStep = true;
+                a.tryStep();
             } else {
-                SFX.playMistake();
-                flashWrong();
-                a.startBlockedAnim();
-                a.startBounceAnim();
+                a.isMoving = true;
+                a.isShowingHint = false;
+                comboCount = 0;
+                invalidateStaticLayer();
 
+                let lostLastLife = false;
                 if (!a.hasReducedLife) {
                     a.hasReducedLife = true;
+                    a.markAsMistake();
                     lives--;
                     updateLivesUI();
-                    if (lives <= 0) handleGameOver(false);
+                    lostLastLife = lives <= 0;
                 }
 
-                // Reset combo on mistake
-                comboCount = 0;
+                runBlockedArrowAnimation(a).then(() => {
+                    a.isMoving = false;
+                    if (lostLastLife) handleGameOver(false);
+                });
             }
         }
 
-        function handleGameOver(tu) { canInteract = false; isTimerActive = false; document.getElementById('fail-title').textContent = tu ? "Time's Up!" : "Out of Lives!"; document.getElementById('failure-screen').classList.add('visible'); }
-        function tickTimer() { currentTime -= 0.1; if (currentTime <= 0) { currentTime = 0; handleGameOver(true); } updateTimerDisplay(); }
-        function updateTimerDisplay() { const s = Math.ceil(currentTime), m = String(Math.floor(s / 60)).padStart(2, '0'), sec = String(s % 60).padStart(2, '0'); document.getElementById('timer-text').textContent = `${m}:${sec}`; }
+        // Walks the arrow forward through any free cells until it truly hits the obstacle,
+        // bumps into it (turning red exactly on impact), then retraces its steps back to start.
+        function runBlockedArrowAnimation(a) {
+            return new Promise(resolve => {
+                const history = a.simulateForwardHistory();
+                a._animQueue = {
+                    history,
+                    idx: 0,
+                    phase: 'forward',
+                    impactWait: 0,
+                    resolve
+                };
+                if (history.length > 1) {
+                    a._animQueue.idx = 1;
+                    a.animateSegmentsTo(history[1]);
+                } else {
+                    a._animQueue.phase = 'impact';
+                    a._animQueue.impactWait = IMPACT_PAUSE_S;
+                    SFX.playMistake();
+                    flashWrong();
+                    a.startBlockedAnim();
+                    a.startBounceAnim();
+                }
+            });
+        }
+
+        let endTypeTimer = null;
+        let downloadPumpInterval = null;
+        const END_TITLE = 'Arrows Legend';
+        const TYPE_MS_PER_CHAR = 95;
+
+        function stopEndTypewriter() {
+            if (endTypeTimer) { clearTimeout(endTypeTimer); endTypeTimer = null; }
+            stopDownloadPump();
+        }
+
+        function startDownloadPump() {
+            stopDownloadPump();
+            const el = document.querySelector('.end-download-btn');
+            const pump = () => restartAnimClass(el, 'pump');
+            pump();
+            downloadPumpInterval = setInterval(pump, 1000);
+        }
+
+        function stopDownloadPump() {
+            if (downloadPumpInterval) { clearInterval(downloadPumpInterval); downloadPumpInterval = null; }
+            const el = document.querySelector('.end-download-btn');
+            if (el) el.classList.remove('pump');
+        }
+
+        function startEndTypewriter() {
+            const el = document.getElementById('end-typewriter');
+            stopEndTypewriter();
+            el.textContent = '';
+            el.classList.remove('done');
+            let i = 0;
+            // Brief pause so the end screen can fade in, then type at writing speed
+            endTypeTimer = setTimeout(function typeNext() {
+                if (i <= END_TITLE.length) {
+                    el.textContent = END_TITLE.slice(0, i);
+                    i++;
+                    const delay = i === 1 ? 0 : (END_TITLE[i - 2] === ' ' ? TYPE_MS_PER_CHAR * 1.6 : TYPE_MS_PER_CHAR);
+                    endTypeTimer = setTimeout(typeNext, delay);
+                } else {
+                    el.classList.add('done');
+                    endTypeTimer = null;
+                    startDownloadPump();
+                }
+            }, 420);
+        }
+
+        function showEndScreen() {
+            // Clear gameplay surface and present end card (search + CTA below)
+            clearIdleHint();
+            hideFingerHint();
+            document.getElementById('canvas-wrap').style.visibility = 'hidden';
+            document.getElementById('hud').style.visibility = 'hidden';
+            document.getElementById('streak-bar').style.visibility = 'hidden';
+            document.getElementById('tip-overlay').classList.remove('visible');
+            document.getElementById('time-up-msg').classList.remove('visible');
+            document.getElementById('end-screen').classList.add('visible');
+            startEndTypewriter();
+        }
+
+        function openStoreCTA() {
+            try {
+                if (typeof ExitApi !== 'undefined' && ExitApi.exit) ExitApi.exit();
+            } catch (e) { }
+        }
+
+        (function wireCTA() {
+            const btn = document.getElementById('cta-btn');
+            if (!btn) return;
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                openStoreCTA();
+            });
+        })();
+
+        function showTimeUpThenEnd() {
+            const msg = document.getElementById('time-up-msg');
+            msg.setAttribute('aria-hidden', 'false');
+            msg.classList.add('visible');
+            setTimeout(() => {
+                msg.classList.remove('visible');
+                msg.setAttribute('aria-hidden', 'true');
+                setTimeout(showEndScreen, 400);
+            }, 1800);
+        }
+
+        function stopTimer() {
+            isTimerActive = false;
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        }
+
+        function handleGameOver(isTimeUp) {
+            canInteract = false;
+            clearIdleHint();
+            stopTimer();
+            updateUrgencyFlash();
+            if (isTimeUp) showTimeUpThenEnd();
+            else showEndScreen();
+        }
+
+        // 10% faster than real time: 60 game seconds ≈ 54 real seconds
+        const TIMER_SPEED = 1.1;
+        function tickTimer() {
+            currentTime -= 0.1 * TIMER_SPEED;
+            if (currentTime <= 0) {
+                currentTime = 0;
+                updateTimerDisplay();
+                handleGameOver(true);
+                return;
+            }
+            updateTimerDisplay();
+        }
+        function updateTimerDisplay() {
+            const s = Math.ceil(currentTime);
+            const m = String(Math.floor(s / 60)).padStart(2, '0');
+            const sec = String(s % 60).padStart(2, '0');
+            const el = document.getElementById('timer-text');
+            el.textContent = `${m}:${sec}`;
+            el.classList.toggle('warning', isTimerActive && currentTime > 0 && currentTime <= 5);
+            updateUrgencyFlash();
+        }
         function updateLivesUI() { for (let i = 0; i < 3; i++) document.getElementById(`heart-${i}`).classList.toggle('inactive', i >= lives); }
-        function updateArrowsLeftUI(n) { const el = document.getElementById('arrows-left-text'); el.textContent = n; el.classList.remove('punch-simple'); void el.offsetWidth; el.classList.add('punch-simple'); }
+        function updateArrowsLeftUI(n) { const el = document.getElementById('arrows-left-text'); el.textContent = n; restartAnimClass(el, 'punch-simple'); }
         function flashWrong() { const el = document.getElementById('wrong-flash'); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 220); }
         function lerpColor(a, b, t) { const h2r = (h) => { let r = 0, g = 0, b = 0; if (h.length == 4) { r = parseInt(h[1] + h[1], 16); g = parseInt(h[2] + h[2], 16); b = parseInt(h[3] + h[3], 16); } else { r = parseInt(h.slice(1, 3), 16); g = parseInt(h.slice(3, 5), 16); b = parseInt(h.slice(5, 7), 16); } return { r, g, b }; }; const c1 = h2r(a), c2 = h2r(b); return `rgb(${Math.round(c1.r + (c2.r - c1.r) * t)},${Math.round(c1.g + (c2.g - c1.g) * t)},${Math.round(c1.b + (c2.b - c1.b) * t)})`; }
         function restartLevel() { location.reload(); }
 
         let lastTime = 0;
+        let fingerHintFrame = 0;
+        let sceneDirty = true;
+        let wasSceneDirty = true;
+
+        // Reused every frame — avoids a fresh array + a second isArrowDynamic scan just to draw.
+        const dynamicArrowsBuf = [];
+
         function gameLoop(ts) {
             const dt = Math.min((ts - lastTime) / 1000, 0.1); lastTime = ts;
             camera.x += (targetCam.x - camera.x) * CAM_LERP;
             camera.y += (targetCam.y - camera.y) * CAM_LERP;
             camera.zoom += (targetCam.zoom - camera.zoom) * CAM_LERP;
-            arrowList.forEach(a => a.update(dt));
-            ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-            // Grid
-            ctx2d.save(); ctx2d.fillStyle = 'rgba(0,0,0,0.06)';
-            for (let gx = 0; gx < gridSize.x; gx++) { for (let gy = 0; gy < gridSize.y; gy++) { const pos = gridToScreen(gx, gy); ctx2d.beginPath(); ctx2d.arc(pos.x, pos.y, cellSize * camera.zoom * 0.1, 0, Math.PI * 2); ctx2d.fill(); } }
-            ctx2d.restore();
-            arrowList.forEach(a => a.draw(ctx2d));
+
+            dynamicArrowsBuf.length = 0;
+            for (let i = 0; i < arrowList.length; i++) {
+                const a = arrowList[i];
+                a.update(dt);
+                const dyn = !a.gone && isArrowDynamic(a);
+                if (dyn) dynamicArrowsBuf.push(a);
+                // Arrow just came to rest (or escaped): fold it into the bake once.
+                if (a._wasDynamic && !dyn) boardTexValid = false;
+                a._wasDynamic = dyn;
+            }
+
+            const camBusy = !cameraSettled();
+            const dirty = sceneDirty || camBusy || dynamicArrowsBuf.length > 0;
+            if (dirty || wasSceneDirty) {
+                sceneDirty = false;
+
+                if (!boardTexValid) rebuildBoardTex();
+                else if (!camBusy && activePointers.size === 0) {
+                    // Quality-only rebake, at most once after a zoom gesture ends.
+                    const want = desiredBakeScale();
+                    if (want > boardBakeScale * 1.3 || want < boardBakeScale * 0.7) rebuildBoardTex();
+                }
+
+                ctx2d.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
+                ctx2d.fillStyle = '#ffffff';
+                ctx2d.fillRect(0, 0, viewW, viewH);
+                // One blit moves the whole baked board with the camera.
+                const worldH = gridSize.y * cellSize;
+                const s = camera.zoom / boardBakeScale;
+                ctx2d.translate(viewW * 0.5 - camera.x * camera.zoom, viewH * 0.5 - (worldH - camera.y) * camera.zoom);
+                ctx2d.scale(s, s);
+                ctx2d.drawImage(boardTex, 0, 0);
+                ctx2d.setTransform(currentDpr, 0, 0, currentDpr, 0, 0);
+                for (let i = 0; i < dynamicArrowsBuf.length; i++) dynamicArrowsBuf[i].draw(ctx2d);
+            }
+            if (idleHintArrow) {
+                fingerHintFrame++;
+                if ((fingerHintFrame & 1) === 0) updateFingerHintPosition();
+            }
+            wasSceneDirty = dirty;
             requestAnimationFrame(gameLoop);
         }
 
-        window.addEventListener('resize', () => { canvas.width = document.getElementById('canvas-wrap').clientWidth; canvas.height = document.getElementById('canvas-wrap').clientHeight; recalcLayout(); });
-        window.dispatchEvent(new Event('resize'));
+        function markSceneDirty() { sceneDirty = true; invalidateStaticLayer(); }
+
+        window.addEventListener('resize', () => { resizeGameCanvas(); recalcLayout(); markSceneDirty(); });
+        resizeGameCanvas();
         (async () => {
             await fetchLevelData();
-            // Wait a moment for DOM layout to settle if needed
-            if (canvas.width <= 0) {
-                canvas.width = document.getElementById('canvas-wrap').clientWidth || 400;
-                canvas.height = document.getElementById('canvas-wrap').clientHeight || 600;
-            }
+            resizeGameCanvas();
             const buildPromise = loadLevel();
             document.activeElement?.blur();
             document.getElementById('loading').classList.add('hidden');
+            markSceneDirty();
             requestAnimationFrame(ts => { lastTime = ts; gameLoop(ts); });
             await buildPromise;
         })();

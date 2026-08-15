@@ -1,6 +1,6 @@
 # LiftEngine SDK for Unity
 
-Ad monetization optimization layer for **AppLovin MAX**. LiftEngine improves ad revenue through cloud intelligence, preloading ads in the background, and reporting context — while your game keeps full control of when and where ads appear.
+Ad monetization layer for **AppLovin MAX**. LiftEngine sits on top of your existing MAX integration: you keep control of when ads show, and you route load/show through `LiftEngineSdk` after MAX is initialized.
 
 ---
 

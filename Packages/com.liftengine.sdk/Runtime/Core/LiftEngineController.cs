@@ -52,7 +52,8 @@ namespace LiftEngine
             public LiftEngineAdFormat Format;
             public string Keyword;
             public string AuctionId;
-            public int MulIndex;
+            public int AttemptIndex;
+            public float AppliedValue;
             public string Plc;
             public bool ViewSent;
         }
@@ -148,17 +149,14 @@ namespace LiftEngine
             if (LiftEngineRuntimeTuning.PrewarmOnInit)
                 _prewarmAllRequestedAfterFirstReport = true;
 
-            EnsureFirstReportBeforePredict();
+            EnsureFirstReportBeforePrewarm();
         }
 
-        /// <summary>
-        /// Backend requires report before predict. Blocks all prewarm/predict until first report succeeds.
-        /// </summary>
-        private void EnsureFirstReportBeforePredict()
+        private void EnsureFirstReportBeforePrewarm()
         {
             if (_firstReportSucceeded)
             {
-                UnlockPredictAndFlushPrewarm();
+                UnlockPrewarm();
                 return;
             }
 
@@ -184,8 +182,8 @@ namespace LiftEngine
             if (_firstReportSucceeded || !IsInitialized)
                 yield break;
 
-            LiftEngineLogger.LogClient("Report — retrying first report before predict");
-            EnsureFirstReportBeforePredict();
+            LiftEngineLogger.LogClient("Report — retrying first report before prewarm");
+            EnsureFirstReportBeforePrewarm();
         }
 
         private void OnFirstReportSucceeded()
@@ -201,12 +199,12 @@ namespace LiftEngine
             }
 
             if (IsInitialized)
-                UnlockPredictAndFlushPrewarm();
+                UnlockPrewarm();
         }
 
-        private void UnlockPredictAndFlushPrewarm()
+        private void UnlockPrewarm()
         {
-            _prewarm.AllowPredictAfterFirstReport();
+            _prewarm.AllowPrewarmAfterFirstReport();
 
             if (!_prewarmAllRequestedAfterFirstReport)
                 return;
@@ -473,13 +471,14 @@ namespace LiftEngine
             {
                 LiftEngineTrackReporter.ReportError(
                     _api, _settings, _context, info.Format, "no_auction_context",
-                    "Impression without predict auction_id; applying fallback auction context.",
+                    "Impression without auction_id; applying fallback auction context.",
                     info);
                 _context.EnsureFallbackAuctionContext(info.Format);
             }
 
             var (keyword, auctionId) = _context.GetAuctionContext(info.Format);
-            var mulIndex = _context.GetWinningMultiplierIndex(info.Format);
+            var attemptIndex = _context.GetAppliedAttemptIndex(info.Format);
+            var appliedValue = _context.GetAppliedValue(info.Format);
             var plc = ResolveImpressionPlc(info);
 
             return new ActiveViewWaiter
@@ -487,7 +486,8 @@ namespace LiftEngine
                 Format = info.Format,
                 Keyword = keyword,
                 AuctionId = auctionId,
-                MulIndex = mulIndex,
+                AttemptIndex = attemptIndex,
+                AppliedValue = appliedValue,
                 Plc = plc,
                 ViewSent = false
             };
@@ -561,7 +561,7 @@ namespace LiftEngine
 
         private void SendTrackView(ActiveViewWaiter waiter)
         {
-            var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
+            var timestamp = ContextNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
             var adType = _settings.GetModelName(waiter.Format);
@@ -577,15 +577,15 @@ namespace LiftEngine
             LiftEngineLogger.LogClient(
                 $"Track view — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
-                $"keyword={waiter.Keyword}, auction_id={waiter.AuctionId}, Mulindex={waiter.MulIndex}, " +
+                $"keyword={waiter.Keyword}, auction_id={waiter.AuctionId}, attempt={waiter.AttemptIndex}, " +
                 $"timestamp={timestamp}");
             _api.TrackView(bundleId, deviceId, adType, plc, waiter.Keyword, waiter.AuctionId, timestamp,
-                waiter.MulIndex);
+                waiter.AttemptIndex);
         }
 
         private void SendTrackActiveView(ActiveViewWaiter waiter, float rev)
         {
-            var timestamp = PredictDataNormalizers.UnixTimestampSeconds();
+            var timestamp = ContextNormalizers.UnixTimestampSeconds();
             var bundleId = Application.identifier;
             var deviceId = Ads.DeviceIdProvider.GetDeviceId();
             var adType = _settings.GetModelName(waiter.Format);
@@ -603,10 +603,10 @@ namespace LiftEngine
             LiftEngineLogger.LogClient(
                 $"Track activeview — ad_type={adType}, bundle={bundleId}, device={deviceId}, " +
                 $"app_version={Application.version}, plc={plc}, placement_id={plc}, " +
-                $"keyword={waiter.Keyword}, auction_id={waiter.AuctionId}, Mulindex={waiter.MulIndex}, " +
-                $"timestamp={timestamp}, rev={rev}, ecpm_history_len={ecpmHistory.Length}");
+                $"keyword={waiter.Keyword}, auction_id={waiter.AuctionId}, attempt={waiter.AttemptIndex}, " +
+                $"timestamp={timestamp}, rev={rev}, v={waiter.AppliedValue}, ecpm_history_len={ecpmHistory.Length}");
             _api.TrackActiveView(bundleId, deviceId, adType, plc, waiter.Keyword, waiter.AuctionId, timestamp,
-                rev, waiter.MulIndex, ecpmHistory);
+                rev, waiter.AttemptIndex, waiter.AppliedValue, ecpmHistory);
         }
 
         /// <summary>

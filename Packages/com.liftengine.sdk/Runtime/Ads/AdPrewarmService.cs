@@ -20,7 +20,7 @@ namespace LiftEngine.Ads
         private readonly bool[] _prewarmInFlight = new bool[3];
         private readonly bool[] _queuedUntilFirstReport = new bool[3];
         private bool _refillLoopStarted;
-        private bool _predictAllowedAfterFirstReport;
+        private bool _prewarmAllowedAfterFirstReport;
 
         public AdPrewarmService(
             LiftEngineSettings settings,
@@ -46,16 +46,13 @@ namespace LiftEngine.Ads
             return _states[(int)format] == AdPrewarmState.Ready && _mediation.IsReady(format, adUnitId);
         }
 
-        /// <summary>
-        /// Predict is blocked until the first successful report. Call this after report returns 200.
-        /// </summary>
-        public void AllowPredictAfterFirstReport()
+        public void AllowPrewarmAfterFirstReport()
         {
-            if (_predictAllowedAfterFirstReport)
+            if (_prewarmAllowedAfterFirstReport)
                 return;
 
-            _predictAllowedAfterFirstReport = true;
-            LiftEngineLogger.LogClient("Prewarm — first report OK; predict unlocked");
+            _prewarmAllowedAfterFirstReport = true;
+            LiftEngineLogger.LogClient("Prewarm — first report OK; prewarm unlocked");
 
             for (var i = 0; i < _queuedUntilFirstReport.Length; i++)
             {
@@ -86,7 +83,7 @@ namespace LiftEngine.Ads
         public void Prewarm(LiftEngineAdFormat format)
         {
             var index = (int)format;
-            if (!_predictAllowedAfterFirstReport)
+            if (!_prewarmAllowedAfterFirstReport)
             {
                 _queuedUntilFirstReport[index] = true;
                 LiftEngineLogger.LogClient(
@@ -109,7 +106,7 @@ namespace LiftEngine.Ads
             {
                 yield return new WaitForSeconds(LiftEngineRuntimeTuning.PrewarmRetryIntervalSeconds);
 
-                if (!_predictAllowedAfterFirstReport)
+                if (!_prewarmAllowedAfterFirstReport)
                     continue;
 
                 for (var i = 0; i < _states.Length; i++)
@@ -147,7 +144,6 @@ namespace LiftEngine.Ads
 
             // Do not clear auction context here: an in-flight impression may still need
             // the previous auction_id for activeview (MAX often fires revenue after hidden).
-            // New predict/fallback results override via SetAuctionContext below.
             LiftEngineLogger.LogClient($"Prewarm {format} — requesting optimization");
 
             var payload = _context.BuildPayload(format);
@@ -182,13 +178,13 @@ namespace LiftEngine.Ads
                 {
                     LiftEngineTrackReporter.ReportError(
                         _api, _settings, _context, format, "optimization_missing_auction",
-                        "Predict response returned without auction_id.", adUnitId: adUnitId);
+                        "Optimization response returned without auction_id.", adUnitId: adUnitId);
                     _context.EnsureFallbackAuctionContext(format);
                 }
 
                 LiftEngineLogger.LogBackend(
                     $"{format} optimization OK — placement={_context.GetMaxPlacement(format)}, " +
-                    $"multipliers={optimization.multipliers?.Length ?? 0}");
+                    $"attempts={optimization.Factors?.Length ?? 0}");
                 LiftEngineSdkCallbacks.RaiseOptimizationSuccess(format);
             }
             else
@@ -207,7 +203,6 @@ namespace LiftEngine.Ads
                 LiftEngineSignalBus.Publish(new OptimizationUnavailableSignal(format));
                 LiftEngineTrackReporter.ReportError(
                     _api, _settings, _context, format, "optimization_failed", reason, adUnitId: adUnitId);
-                // Force a new fallback so the next load is not attributed to a prior predict auction.
                 _context.EnsureFallbackAuctionContext(format, force: true);
             }
 

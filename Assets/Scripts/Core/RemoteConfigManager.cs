@@ -37,6 +37,7 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_NETFLIX_EFFECT = "NetflixEffect";
     public const string KEY_IS_GAE = "isGAE";
     public const string KEY_IS_OFFLINE = "isOffline";
+    public const string KEY_TOURNAMENT_ON = "TournamentOn";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
     private readonly Dictionary<string, object> activeValues = new Dictionary<string, object>();
@@ -110,6 +111,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_NETFLIX_EFFECT] = false;
         defaults[KEY_IS_GAE] = true;
         defaults[KEY_IS_OFFLINE] = false;
+        defaults[KEY_TOURNAMENT_ON] = true;
     }
 
     private void InitializeActiveValuesFromDefaults()
@@ -636,6 +638,12 @@ public class RemoteConfigManager : MonoBehaviour
     /// When true, the app allows offline play. When false, a reconnect popup is shown after sustained loss of connectivity.
     /// </summary>
     public bool IsOfflineSupported => GetBool(KEY_IS_OFFLINE);
+
+    /// <summary>
+    /// Master switch for Golden Tournament. Defaults to true. Cached to disk after each Firebase fetch.
+    /// </summary>
+    public bool IsTournamentOn => GetBool(KEY_TOURNAMENT_ON);
+
     public float PtsMul => (float)GetDouble(KEY_PTS_MUL);
 
     #endregion

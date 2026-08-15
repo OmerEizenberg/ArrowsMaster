@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Assets.Scripts.Core;
 using Assets.Scripts.Lobby;
+using Assets.Scripts.LiveOps.Tournament;
 using System.Globalization;
 
 namespace Assets.Scripts.LiveOps
@@ -66,13 +67,40 @@ namespace Assets.Scripts.LiveOps
 
         private float checkInterval = 60f; // Check every minute
         private float timer = 0f;
+        private float tournamentUiInterval = 1f;
+        private float tournamentUiTimer = 0f;
 
         private void Start()
         {
             if (instance != this) return;
 
+            // Warm trusted UTC clock for tournament anti-cheat scheduling.
+            _ = TrustedTimeService.Instance;
+
             Init();
             CheckLiveOps();
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (!paused)
+                return;
+            FlushTournamentPersistence();
+        }
+
+        private void OnApplicationQuit()
+        {
+            FlushTournamentPersistence();
+        }
+
+        private static void FlushTournamentPersistence()
+        {
+            if (instance == null) return;
+            if (instance.activeServices.TryGetValue(TournamentLiveOpService.EventId, out var service) &&
+                service is TournamentLiveOpService tournament)
+            {
+                tournament.FlushPendingPersistence();
+            }
         }
 
         private void Update()
@@ -85,15 +113,36 @@ namespace Assets.Scripts.LiveOps
                 timer = 0f;
                 CheckLiveOps();
             }
+
+            tournamentUiTimer += Time.deltaTime;
+            if (tournamentUiTimer >= tournamentUiInterval)
+            {
+                tournamentUiTimer = 0f;
+                TickTournamentUi();
+            }
+        }
+
+        private void TickTournamentUi()
+        {
+            var tournament = GetActiveService(TournamentLiveOpService.EventId) as TournamentLiveOpService;
+            tournament?.TickFinalize();
+
+            // Pending results stay queued offline; show claim popup only once online in lobby.
+            if (TournamentLiveOpService.HasPendingResults() && NetworkReconnectManager.IsOnline)
+                TryShowTournamentResultsIfInLobby();
         }
 
         public void CheckLiveOps()
         {
-            DateTime now = DateTime.Now;
+            DateTime nowLocal = DateTime.Now;
+            DateTime nowUtc = TrustedTimeService.UtcNow;
+
             foreach (var so in AllLiveOps)
             {
-                bool shouldBeActive = IsCurrentlyActive(so, now);
-                string uniqueID = GetUniqueEventID(so, now);
+                bool isTournament = TournamentSchedule.IsTournamentLiveOp(so.EventID);
+                DateTime scheduleNow = isTournament ? nowUtc : nowLocal;
+                bool shouldBeActive = IsCurrentlyActive(so, scheduleNow, isTournament);
+                string uniqueID = GetUniqueEventID(so, scheduleNow, isTournament);
 
                 if (shouldBeActive)
                 {
@@ -103,23 +152,40 @@ namespace Assets.Scripts.LiveOps
                     }
                     else if (activeServices[so.EventID].UniqueID != uniqueID)
                     {
-                        // New period detected (e.g. new day for Daily Missions, new week for others)
+                        // New period detected (e.g. new day for Daily Missions, new tournament window)
+                        if (isTournament)
+                            TournamentLiveOpService.PreserveFinishedResultsBeforeCleanup(activeServices[so.EventID].UniqueID);
+
                         DeactivateLiveOp(so.EventID);
                         ActivateLiveOp(so, uniqueID);
+
+                        if (isTournament)
+                            TryShowTournamentResultsIfInLobby();
+                    }
+                    else if (isTournament)
+                    {
+                        var tournament = activeServices[so.EventID] as TournamentLiveOpService;
+                        tournament?.TickFinalize();
                     }
                 }
                 else
                 {
                     if (activeServices.ContainsKey(so.EventID))
                     {
+                        if (isTournament)
+                            TournamentLiveOpService.PreserveFinishedResultsBeforeCleanup(activeServices[so.EventID].UniqueID);
                         DeactivateLiveOp(so.EventID);
                     }
                 }
             }
         }
 
-        private bool IsCurrentlyActive(LiveOpSO so, DateTime now)
+        private bool IsCurrentlyActive(LiveOpSO so, DateTime now, bool isTournament)
         {
+            // Tournament windows are continuous back-to-back UTC slots.
+            if (isTournament)
+                return true;
+
             if (so.ActiveDays == null || !so.ActiveDays.Contains(now.DayOfWeek))
                 return false;
 
@@ -134,8 +200,11 @@ namespace Assets.Scripts.LiveOps
             return now.Hour >= startHour && now.Hour < endHour;
         }
 
-        private string GetUniqueEventID(LiveOpSO so, DateTime now)
+        private string GetUniqueEventID(LiveOpSO so, DateTime now, bool isTournament)
         {
+            if (isTournament)
+                return TournamentSchedule.GetCurrentWindow(now).UniqueId;
+
             // Daily Missions reset each calendar day.
             if (so.EventID == DailyMissionsLiveOpService.EventId)
                 return $"{so.EventID}_{now:yyyy-MM-dd}";
@@ -160,6 +229,15 @@ namespace Assets.Scripts.LiveOps
             Debug.Log($"[LiveOpManager] Activating LiveOp: {uniqueID}");
             
             // Clear old data if exists for this event but with a different UniqueID
+            // Tournament finished results are snapshotted before this cleanup.
+            string previousId = PlayerPrefs.GetString("LiveOpCurrentID_" + so.EventID, string.Empty);
+            if (TournamentSchedule.IsTournamentLiveOp(so.EventID) &&
+                !string.IsNullOrEmpty(previousId) &&
+                previousId != uniqueID)
+            {
+                TournamentLiveOpService.PreserveFinishedResultsBeforeCleanup(previousId);
+            }
+
             UserDataManager.Instance.CleanupLiveOpData(so.EventID, uniqueID);
 
             Type serviceType = Type.GetType(so.ServiceClassName);
@@ -201,7 +279,18 @@ namespace Assets.Scripts.LiveOps
         public void InstantiateIcon(ALiveOpService service)
         {
             if (service == null || service.SO == null) return;
-            if (service.IconInstance != null) return;
+
+            // Unity fake-null: destroyed lobby icons must be cleared so we can recreate.
+            if (service.IconInstance == null)
+                service.IconInstance = null;
+            else
+            {
+                // Lobby already has this icon — re-bind so badge state refreshes on home enter.
+                if (!service.IconInstance.activeSelf)
+                    service.IconInstance.SetActive(true);
+                BindIconView(service, service.IconInstance);
+                return;
+            }
 
             HomeContoller lobby = FindFirstObjectByType<HomeContoller>();
             if (lobby == null || !lobby.gameObject.activeInHierarchy) return;
@@ -212,15 +301,17 @@ namespace Assets.Scripts.LiveOps
             if (TryBindExistingIcon(service, container)) return;
 
             GameObject prefab = Resources.Load<GameObject>(service.SO.IconPrefabName);
-            if (prefab == null) return;
+            if (prefab == null)
+            {
+                Debug.LogError($"[LiveOpManager] Missing icon prefab Resources/{service.SO.IconPrefabName}");
+                return;
+            }
 
             GameObject icon = Instantiate(prefab, container);
             icon.name = service.SO.IconPrefabName;
             service.IconInstance = icon;
 
-            LiveOpIconView view = icon.GetComponent<LiveOpIconView>();
-            if (view != null)
-                view.Initialize(service);
+            BindIconView(service, icon);
         }
 
         /// <summary>
@@ -246,13 +337,29 @@ namespace Assets.Scripts.LiveOps
                 if (IsIconBoundToAnotherService(child.gameObject, service)) continue;
 
                 service.IconInstance = child.gameObject;
-                LiveOpIconView view = child.GetComponent<LiveOpIconView>();
-                if (view != null)
-                    view.Initialize(service);
+                if (!child.gameObject.activeSelf)
+                    child.gameObject.SetActive(true);
+                BindIconView(service, child.gameObject);
                 return true;
             }
 
             return false;
+        }
+
+        private static void BindIconView(ALiveOpService service, GameObject icon)
+        {
+            if (service is TournamentLiveOpService tournamentService)
+            {
+                TournamentBadgeView badge = icon.GetComponent<TournamentBadgeView>();
+                if (badge == null)
+                    badge = icon.AddComponent<TournamentBadgeView>();
+                badge.Initialize(tournamentService);
+                return;
+            }
+
+            LiveOpIconView view = icon.GetComponent<LiveOpIconView>();
+            if (view != null)
+                view.Initialize(service);
         }
 
         private static bool IsMatchingIconObject(GameObject obj, string prefabName)
@@ -290,6 +397,15 @@ namespace Assets.Scripts.LiveOps
         {
             activeServices.TryGetValue(eventID, out var service);
             return service;
+        }
+
+        private static void TryShowTournamentResultsIfInLobby()
+        {
+            HomeContoller lobby = FindFirstObjectByType<HomeContoller>();
+            if (lobby == null || !lobby.gameObject.activeInHierarchy)
+                return;
+
+            TournamentResultsPopupView.TryShowPending();
         }
     }
 }

@@ -1121,6 +1121,10 @@ namespace Assets.Scripts.Core
             // Award Collected Currency
             if (collectedLevelCurrency > 0)
             {
+                // Tournament always counts combo currency as Golden Arrows while joined,
+                // regardless of the GAE/coins toggle.
+                Assets.Scripts.LiveOps.TournamentLiveOpService.NotifyGoldenArrowsEarned(collectedLevelCurrency);
+
                 if (Assets.Scripts.GAE.GAEManager.Instance.IsGameplayGaeCurrencyActive)
                 {
                     Assets.Scripts.GAE.GAEManager.Instance.QueueLevelWinArrows(collectedLevelCurrency);

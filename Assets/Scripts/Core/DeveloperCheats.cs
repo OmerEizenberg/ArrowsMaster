@@ -1,8 +1,11 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Assets.Scripts.LiveOps;
+using Assets.Scripts.LiveOps.Tournament;
 
 namespace Assets.Scripts.Core
 {
@@ -226,6 +229,157 @@ namespace Assets.Scripts.Core
         private void CheatAddShuffleBooster()
         {
             AddShuffleBoosters();
+        }
+
+        [ContextMenu("Cheat: Tournament Join")]
+        public void CheatTournamentJoin()
+        {
+            var service = Assets.Scripts.LiveOps.LiveOpManager.Instance?
+                .GetActiveService(Assets.Scripts.LiveOps.TournamentLiveOpService.EventId)
+                as Assets.Scripts.LiveOps.TournamentLiveOpService;
+            if (service == null)
+            {
+                Debug.LogWarning("[CHEAT] Tournament service not active.");
+                return;
+            }
+
+            if (UserDataManager.Instance != null && UserDataManager.Instance.CurrentLevel < 30)
+                UserDataManager.Instance.SetLevel(30);
+
+            bool joined = service.TryJoin();
+            Debug.Log(joined ? "[CHEAT] Joined tournament." : "[CHEAT] Tournament join failed.");
+        }
+
+        [ContextMenu("Cheat: Tournament Force Finish")]
+        public void CheatTournamentForceFinish()
+        {
+            var service = Assets.Scripts.LiveOps.LiveOpManager.Instance?
+                .GetActiveService(Assets.Scripts.LiveOps.TournamentLiveOpService.EventId)
+                as Assets.Scripts.LiveOps.TournamentLiveOpService;
+            if (service == null)
+            {
+                Debug.LogWarning("[CHEAT] Tournament service not active.");
+                return;
+            }
+
+            service.DebugForceFinishNow();
+            Assets.Scripts.LiveOps.Tournament.TournamentResultsPopupView.TryShowPending();
+        }
+
+        [ContextMenu("Cheat: Add 500 Tournament Golden Arrows")]
+        public void CheatTournamentAddScore()
+        {
+            Assets.Scripts.LiveOps.TournamentLiveOpService.NotifyGoldenArrowsEarned(500);
+            Debug.Log("[CHEAT] Added 500 tournament golden arrows.");
+        }
+
+        [ContextMenu("Cheat: Add 1000 Tournament Golden Arrows")]
+        public void CheatTournamentAddScore1000()
+        {
+            Assets.Scripts.LiveOps.TournamentLiveOpService.NotifyGoldenArrowsEarned(1000);
+            Debug.Log("[CHEAT] Added 1000 tournament golden arrows.");
+        }
+
+        [ContextMenu("Cheat: Tournament Jump To Last 2 Minutes")]
+        public void CheatTournamentLast2Minutes()
+        {
+            var service = LiveOpManager.Instance?
+                .GetActiveService(TournamentLiveOpService.EventId)
+                as TournamentLiveOpService;
+            if (service == null)
+            {
+                Debug.LogWarning("[CHEAT] Tournament service not active. Join a tournament first.");
+                return;
+            }
+
+            if (service.Status != TournamentStatus.Joined)
+            {
+                Debug.LogWarning("[CHEAT] Join the tournament first (Cheat: Tournament Join).");
+                return;
+            }
+
+            var rem = service.GetRemainingTime();
+            var target = TimeSpan.FromMinutes(2);
+            if (rem <= target)
+            {
+                Debug.Log($"[CHEAT] Already within last 2 minutes (remaining {rem}).");
+                return;
+            }
+
+            var delta = rem - target;
+            CheatTournamentAdvance(delta);
+            Debug.Log($"[CHEAT] Jumped to last 2 minutes. Remaining≈{service.GetRemainingTime()}.");
+        }
+
+        [ContextMenu("Cheat: Tournament +1 Hour")]
+        public void CheatTournamentPlus1Hour()
+        {
+            CheatTournamentAdvance(TimeSpan.FromHours(1));
+        }
+
+        [ContextMenu("Cheat: Tournament +6 Hours")]
+        public void CheatTournamentPlus6Hours()
+        {
+            CheatTournamentAdvance(TimeSpan.FromHours(6));
+        }
+
+        [ContextMenu("Cheat: Tournament +1 Day")]
+        public void CheatTournamentPlus1Day()
+        {
+            CheatTournamentAdvance(TimeSpan.FromDays(1));
+        }
+
+        [ContextMenu("Cheat: Tournament Clear Time Offset")]
+        public void CheatTournamentClearTimeOffset()
+        {
+            TrustedTimeService.Instance.ClearDebugOffset();
+            if (LiveOpManager.Instance != null)
+                LiveOpManager.Instance.CheckLiveOps();
+            Debug.Log("[CHEAT] Cleared trusted-time debug offset.");
+        }
+
+        [ContextMenu("Cheat: Tournament Reset To Pending Join")]
+        public void CheatTournamentResetToPendingJoin()
+        {
+            var service = LiveOpManager.Instance?
+                .GetActiveService(TournamentLiveOpService.EventId)
+                as TournamentLiveOpService;
+            if (service == null)
+            {
+                LiveOpManager.Instance?.CheckLiveOps();
+                service = LiveOpManager.Instance?
+                    .GetActiveService(TournamentLiveOpService.EventId)
+                    as TournamentLiveOpService;
+            }
+
+            if (service == null)
+            {
+                Debug.LogWarning("[CHEAT] Tournament service not active.");
+                return;
+            }
+
+            service.DebugResetToPendingJoin();
+            LiveOpManager.Instance?.SyncLobbyIcons();
+            Debug.Log("[CHEAT] Tournament reset to PendingJoin — badge should show in lobby.");
+        }
+
+        private void CheatTournamentAdvance(TimeSpan delta)
+        {
+            var service = LiveOpManager.Instance?
+                .GetActiveService(TournamentLiveOpService.EventId)
+                as TournamentLiveOpService;
+
+            if (service != null)
+            {
+                service.DebugSimulateTime(delta);
+            }
+            else
+            {
+                TrustedTimeService.Instance.AddDebugOffset(delta);
+                LiveOpManager.Instance?.CheckLiveOps();
+            }
+
+            Debug.Log($"[CHEAT] Advanced tournament time by {delta}. UtcNow={TrustedTimeService.UtcNow:u}");
         }
 
         #endregion

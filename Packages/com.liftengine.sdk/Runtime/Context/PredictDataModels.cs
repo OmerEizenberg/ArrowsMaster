@@ -7,7 +7,7 @@ using UnityEngine;
 namespace LiftEngine.Context
 {
     [Serializable]
-    internal class PredictDataPayload
+    internal class ContextPayload
     {
         public string os;
         public string country_code;
