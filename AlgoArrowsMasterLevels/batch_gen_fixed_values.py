@@ -7,42 +7,35 @@ import collections
 import re
 from PIL import Image
 
-# --- DIFFICULTY CONFIGURATIONS ---
+# Shared reverse-backtracking settings used by all difficulties.
+REVERSE_GEN_CONFIG = {
+    "TARGET_DENSITY": 0.8651,
+    "TURN_CHANCE": 0.03,
+    "LENGTH_TIERS": [
+        (0.01, (2, 6)),  # Short: 1%
+        (0.02, (5, 12)), # Mid: 2%
+        (0.97, (13, 47))  # Long: 97%
+    ],
+    "MAX_RETRY_ATTEMPTS": 100,
+}
+
+# HARD_FACTOR scales FIXED_LEVEL_VALUES (min/max width).
+# MIN_MULTIPLY_LEVEL: levels at or below this stay unscaled; levels above it are multiplied.
 DIFFICULTY_CONFIGS = {
-    1: { # Based on old "Difficulty 3" (Hard)
-        "SHORT_PATH_PROBABILITY": 0.3,
-        "SHORT_PATH_RANGE": (3, 7),
-        "LONG_PATH_RANGE": (7, 22),
-        "TURN_PROBABILITY": 0.7,
-        "TARGET_BLOCKED_PROBABILITY": 0.5,
-        "PERPENDICULAR_PREFERENCE": 0.0,
-        "MAX_RETRY_ATTEMPTS": 100,
-        "MIN_SEEDS": 1,
-        "MAX_SEEDS": 3,
-        "SORT_STRATEGY": "center"
+    1: {
+        **REVERSE_GEN_CONFIG,
+        "HARD_FACTOR": 0.8,
+        "MIN_MULTIPLY_LEVEL": 9,
     },
-    2: { # Based on old "Difficulty 4" (Very Hard / Interlocking)
-        "SHORT_PATH_PROBABILITY": 0.2,
-        "SHORT_PATH_RANGE": (3, 10),
-        "LONG_PATH_RANGE": (9, 30),
-        "TURN_PROBABILITY": 0.7,
-        "TARGET_BLOCKED_PROBABILITY": 0.8,
-        "PERPENDICULAR_PREFERENCE": 0.8,
-        "MAX_RETRY_ATTEMPTS": 100,
-        "MIN_SEEDS": 1,
-        "MAX_SEEDS": 5,
-        "SORT_STRATEGY": "seeds"
+    2: {
+        **REVERSE_GEN_CONFIG,
+        "HARD_FACTOR": 1.2,
+        "MIN_MULTIPLY_LEVEL": 9,
     },
-    3: { # New Reverse-Backtracking Logic
-        "TARGET_DENSITY": 0.8651,
-        "TURN_CHANCE": 0.03,
-        "LENGTH_TIERS": [
-            (0.01, (2, 6)),  # Short: 1%
-            (0.02, (5, 12)), # Mid: 2%
-            (0.97, (13, 47))  # Long: 97%
-        ],
-        "MAX_RETRY_ATTEMPTS": 100
-    }
+    3: {
+        **REVERSE_GEN_CONFIG,
+        "HARD_FACTOR": 1.0,
+    },
 }
 
 # --- FIXED LEVEL VALUES CONFIGURATION ---
@@ -439,10 +432,10 @@ def post_process_fill_gaps(level_data, image_path, config):
     return level_data
 
 def generate_difficulty_1(image_path, grid_width, grid_height, config):
-    return run_core_generator(image_path, grid_width, grid_height, config)
+    return generate_difficulty_3(image_path, grid_width, grid_height, config)
 
 def generate_difficulty_2(image_path, grid_width, grid_height, config):
-    return run_core_generator(image_path, grid_width, grid_height, config)
+    return generate_difficulty_3(image_path, grid_width, grid_height, config)
 
 def merge_stuck_arrows(level_data, shape_mask=None):
     """
@@ -978,17 +971,28 @@ def run_core_generator(image_path, grid_width, grid_height, config):
         "duration": len(occupied_info) * DURATION_MULTIPLIER
     }
 
-def get_width_range_for_level(filename):
-    """Extracts level number from filename and returns (min, max) width range."""
-    # Find the first number in the filename
+def get_width_range_for_level(filename, difficulty=1):
+    """Extracts level number from filename and returns (min, max) width range.
+
+    HARD_FACTOR from the difficulty config scales the fixed widths for levels
+    strictly above MIN_MULTIPLY_LEVEL. Levels at or below that stay as-is.
+    """
     match = re.search(r'\d+', filename)
     if not match:
         return DEFAULT_WIDTH_RANGE
-    
+
     level_num = int(match.group())
-    
-    # Check if level_num exists in our fixed configuration
-    return FIXED_LEVEL_VALUES.get(level_num, DEFAULT_WIDTH_RANGE)
+    min_width, max_width = FIXED_LEVEL_VALUES.get(level_num, DEFAULT_WIDTH_RANGE)
+
+    diff_config = DIFFICULTY_CONFIGS.get(difficulty, DIFFICULTY_CONFIGS[1])
+    hard_factor = float(diff_config.get("HARD_FACTOR", 1.0))
+    min_multiply_level = int(diff_config.get("MIN_MULTIPLY_LEVEL", 0))
+
+    if level_num > min_multiply_level and hard_factor != 1.0:
+        min_width = max(1, int(round(min_width * hard_factor)))
+        max_width = max(min_width, int(round(max_width * hard_factor)))
+
+    return (min_width, max_width)
 
 def main():
     parser = argparse.ArgumentParser(description="Bulk generate AlgoArrows levels with fixed width based on level number in filename.")
@@ -1031,7 +1035,7 @@ def main():
             with Image.open(img_path) as img:
                 orig_w, orig_h = img.size
             
-            min_width, max_width = get_width_range_for_level(img_name)
+            min_width, max_width = get_width_range_for_level(img_name, difficulty=args.difficulty)
             target_val = random.randint(min_width, max_width)
             
             if orig_w >= orig_h:

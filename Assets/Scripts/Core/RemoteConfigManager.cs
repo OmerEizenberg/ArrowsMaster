@@ -38,6 +38,7 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_IS_GAE = "isGAE";
     public const string KEY_IS_OFFLINE = "isOffline";
     public const string KEY_TOURNAMENT_ON = "TournamentOn";
+    public const string KEY_DIFFICULTY_CURVE = "DifficultyCurve";
 
     private readonly Dictionary<string, object> defaults = new Dictionary<string, object>();
     private readonly Dictionary<string, object> activeValues = new Dictionary<string, object>();
@@ -112,6 +113,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_IS_GAE] = true;
         defaults[KEY_IS_OFFLINE] = false;
         defaults[KEY_TOURNAMENT_ON] = true;
+        defaults[KEY_DIFFICULTY_CURVE] = 1L;
     }
 
     private void InitializeActiveValuesFromDefaults()
@@ -643,6 +645,23 @@ public class RemoteConfigManager : MonoBehaviour
     /// Master switch for Golden Tournament. Defaults to true. Cached to disk after each Firebase fetch.
     /// </summary>
     public bool IsTournamentOn => GetBool(KEY_TOURNAMENT_ON);
+
+    /// <summary>
+    /// 0 = Easy (LevelsEasy), 1 = Hard (Levels), 2 = Harder (LevelsHard).
+    /// Defaults to 1 when unavailable or out of range. Affects normal progression only.
+    /// </summary>
+    public int DifficultyCurve
+    {
+        get
+        {
+            int value = (int)GetLong(KEY_DIFFICULTY_CURVE);
+            if (value < 0 || value > 2)
+            {
+                return 1;
+            }
+            return value;
+        }
+    }
 
     public float PtsMul => (float)GetDouble(KEY_PTS_MUL);
 

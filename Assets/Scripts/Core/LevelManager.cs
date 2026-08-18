@@ -51,7 +51,36 @@ namespace Assets.Scripts.Core
         // Cached yield instructions — avoids per-frame allocation
         // Start removed to prevent auto-loading. Level is loaded via GameManager.StartLevel.
 
+        private const string LevelsFolderDefault = "Levels";
+        private const string LevelsFolderEasy = "LevelsEasy";
+        private const string LevelsFolderHard = "LevelsHard";
+
         private int m_MaxLevelIndex = -1;
+        private string m_CountedLevelsFolder;
+
+        /// <summary>
+        /// Folder used for normal campaign progression based on remote config DifficultyCurve.
+        /// Calendar/challenge levels are unaffected and always load from ChallengeLevels.
+        /// 0 = LevelsEasy, 1 = Levels, 2 = LevelsHard. Defaults to Levels.
+        /// </summary>
+        public static string GetNormalLevelsFolder()
+        {
+            int curve = 1;
+            if (RemoteConfigManager.Instance != null)
+            {
+                curve = RemoteConfigManager.Instance.DifficultyCurve;
+            }
+
+            switch (curve)
+            {
+                case 0:
+                    return LevelsFolderEasy;
+                case 2:
+                    return LevelsFolderHard;
+                default:
+                    return LevelsFolderDefault;
+            }
+        }
 
         private void Awake()
         {
@@ -70,15 +99,16 @@ namespace Assets.Scripts.Core
 
         public void InitializeLevelCount()
         {
-            // Only initialize if not already done
-            if (m_MaxLevelIndex != -1) return;
+            string folder = GetNormalLevelsFolder();
+            // Only initialize if not already done for this folder
+            if (m_MaxLevelIndex != -1 && m_CountedLevelsFolder == folder) return;
 
             int i = 1;
             while (true)
             {
                 // lightly check if file exists by trying to load it
                 // We stop when we don't find the next level
-                string levelName = $"Levels/Level{i}";
+                string levelName = $"{folder}/Level{i}";
                 TextAsset levelAsset = Resources.Load<TextAsset>(levelName);
                 if (levelAsset == null)
                 {
@@ -88,22 +118,24 @@ namespace Assets.Scripts.Core
                 Resources.UnloadAsset(levelAsset);
                 i++;
             }
-            Debug.Log($"[LevelManager] Max Level Index initialized to: {m_MaxLevelIndex}");
+            m_CountedLevelsFolder = folder;
+            Debug.Log($"[LevelManager] Max Level Index initialized to: {m_MaxLevelIndex} (folder: {folder})");
         }
 
         public TextAsset GetLevelTextAsset(string levelId)
         {
-            if (m_MaxLevelIndex == -1) InitializeLevelCount();
+            string folder = GetNormalLevelsFolder();
+            if (m_MaxLevelIndex == -1 || m_CountedLevelsFolder != folder) InitializeLevelCount();
 
-            TextAsset jsonFile = Resources.Load<TextAsset>($"Levels/{levelId}");
+            TextAsset jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId}");
             
             // Case-insensitive fallback
             if (jsonFile == null)
             {
                 if (levelId.StartsWith("level")) 
-                    jsonFile = Resources.Load<TextAsset>($"Levels/{levelId.Replace("level", "Level")}");
+                    jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId.Replace("level", "Level")}");
                 else if (levelId.StartsWith("Level"))
-                    jsonFile = Resources.Load<TextAsset>($"Levels/{levelId.Replace("Level", "level")}");
+                    jsonFile = Resources.Load<TextAsset>($"{folder}/{levelId.Replace("Level", "level")}");
             }
 
             if (jsonFile == null)
@@ -136,7 +168,7 @@ namespace Assets.Scripts.Core
                          int newIdx = (tempIdx % range) + startLoopIdx;
                          
                         string newLevelId = "Level" + newIdx;
-                        jsonFile = Resources.Load<TextAsset>($"Levels/{newLevelId}");
+                        jsonFile = Resources.Load<TextAsset>($"{folder}/{newLevelId}");
                     }
                 }
             }

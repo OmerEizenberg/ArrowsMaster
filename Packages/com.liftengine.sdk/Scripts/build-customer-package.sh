@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Builds a customer-facing LiftEngine SDK .tgz with precompiled DLLs.
+# Builds a customer-facing LiftEngine SDK folder for Unity "Add package from disk".
 # Usage: ./Packages/com.liftengine.sdk/Scripts/build-customer-package.sh [version]
-# Requires: Unity project already compiled (Library/ScriptAssemblies/*.dll exist)
 
 set -euo pipefail
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-1.1.6}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$PKG_DIR/../.." && pwd)"
 DIST_DIR="$REPO_ROOT/dist/liftengine-sdk-build"
-OUTPUT_TGZ="$REPO_ROOT/dist/com.liftengine.sdk-${VERSION}.tgz"
+PKG_STAGE="$DIST_DIR/com.liftengine.sdk"
 
 RUNTIME_DLL="$REPO_ROOT/dist/_dlls/LiftEngine.Runtime.dll"
 EDITOR_DLL="$REPO_ROOT/dist/_dlls/LiftEngine.Editor.dll"
@@ -35,85 +34,179 @@ fi
 echo "Building com.liftengine.sdk v${VERSION}..."
 
 rm -rf "$DIST_DIR"
-mkdir -p "$DIST_DIR/com.liftengine.sdk/Runtime/Plugins"
-mkdir -p "$DIST_DIR/com.liftengine.sdk/Editor/Plugins"
+mkdir -p "$PKG_STAGE/Plugins"
+mkdir -p "$PKG_STAGE/Editor/Plugins"
+mkdir -p "$PKG_STAGE/Runtime"
 
-# Copy package metadata and docs
-cp "$PKG_DIR/package.json" "$DIST_DIR/com.liftengine.sdk/"
-cp "$PKG_DIR/README.md" "$DIST_DIR/com.liftengine.sdk/"
-cp "$PKG_DIR/LICENSE.md" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
-cp -R "$PKG_DIR/Documentation~" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
-# Customer docs only — exclude internal distribution guide
-rm -f "$DIST_DIR/com.liftengine.sdk/Documentation~/DISTRIBUTION.md" 2>/dev/null || true
-cp -R "$PKG_DIR/Samples~" "$DIST_DIR/com.liftengine.sdk/" 2>/dev/null || true
+cp "$PKG_DIR/package.json" "$PKG_STAGE/"
+cp "$PKG_DIR/README.md" "$PKG_STAGE/"
+cp "$PKG_DIR/CHANGELOG.md" "$PKG_STAGE/"
+cp "$PKG_DIR/LICENSE.md" "$PKG_STAGE/" 2>/dev/null || true
+cp -R "$PKG_DIR/Documentation~" "$PKG_STAGE/" 2>/dev/null || true
+rm -f "$PKG_STAGE/Documentation~/DISTRIBUTION.md" 2>/dev/null || true
+cp -R "$PKG_DIR/Samples~" "$PKG_STAGE/" 2>/dev/null || true
+cp "$PKG_DIR/Runtime/link.xml" "$PKG_STAGE/Runtime/" 2>/dev/null || true
 
-# Copy DLLs
-cp "$RUNTIME_DLL" "$DIST_DIR/com.liftengine.sdk/Runtime/Plugins/"
-cp "$EDITOR_DLL" "$DIST_DIR/com.liftengine.sdk/Editor/Plugins/"
+# Runtime plugin at package root Plugins/ — not under any asmdef
+cp "$RUNTIME_DLL" "$PKG_STAGE/Plugins/LiftEngine.Runtime.dll"
+cp "$EDITOR_DLL" "$PKG_STAGE/Editor/Plugins/LiftEngine.Editor.dll"
 
-# Keep only LiftEngineSettings as runtime source
-cp "$PKG_DIR/Runtime/Core/LiftEngineSettings.cs" "$DIST_DIR/com.liftengine.sdk/Runtime/"
-cp "$PKG_DIR/Runtime/link.xml" "$DIST_DIR/com.liftengine.sdk/Runtime/" 2>/dev/null || true
+# Do not ship LiftEngineSettings.cs (type is in the runtime DLL).
+# Do not ship Runtime/LiftEngine.Runtime.asmdef (name collision + hides plugin from Assembly-CSharp).
 
-# Customer-facing asmdef (references precompiled DLL)
-cat > "$DIST_DIR/com.liftengine.sdk/Runtime/LiftEngine.Runtime.asmdef" << 'EOF'
+cat > "$PKG_STAGE/Editor/LiftEngine.Editor.asmdef" << 'EOF'
 {
-  "name": "LiftEngine.Runtime",
-  "rootNamespace": "LiftEngine",
-  "references": [
-    "MaxSdk.Scripts",
-    "Newtonsoft.Json"
-  ],
-  "precompiledReferences": [
-    "LiftEngine.Runtime.dll"
-  ],
-  "includePlatforms": [],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "autoReferenced": true,
-  "versionDefines": [
-    {
-      "name": "com.applovin.mediation.ads",
-      "expression": "",
-      "define": "LIFTENGINE_MAX"
-    }
-  ]
-}
-EOF
-
-cat > "$DIST_DIR/com.liftengine.sdk/Editor/LiftEngine.Editor.asmdef" << 'EOF'
-{
-  "name": "LiftEngine.Editor",
+  "name": "LiftEngine.Editor.Package",
   "rootNamespace": "LiftEngine.Editor",
   "references": [
-    "LiftEngine.Runtime",
     "Newtonsoft.Json"
   ],
   "precompiledReferences": [
-    "LiftEngine.Editor.dll"
+    "LiftEngine.Editor.dll",
+    "LiftEngine.Runtime.dll"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
-  "autoReferenced": true
+  "autoReferenced": true,
+  "overrideReferences": false
 }
 EOF
 
-# Bump version in dist package.json
-if command -v python3 &>/dev/null; then
-  python3 -c "
-import json, sys
-p = '$DIST_DIR/com.liftengine.sdk/package.json'
+cat > "$PKG_STAGE/Plugins/LiftEngine.Runtime.dll.meta" << 'EOF'
+fileFormatVersion: 2
+guid: 297f8c283ca664eb5bd85e0860c51460
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints: []
+  isPreloaded: 0
+  isOverridable: 1
+  isExplicitlyReferenced: 0
+  validateReferences: 1
+  platformData:
+  - first:
+      : Any
+    second:
+      enabled: 1
+      settings: {}
+  - first:
+      Any: 
+    second:
+      enabled: 1
+      settings: {}
+  - first:
+      Editor: Editor
+    second:
+      enabled: 1
+      settings:
+        DefaultValueInitialized: true
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+EOF
+
+cat > "$PKG_STAGE/Editor/Plugins/LiftEngine.Editor.dll.meta" << 'EOF'
+fileFormatVersion: 2
+guid: a2502ecb50af34929aec221d9982e85a
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints: []
+  isPreloaded: 0
+  isOverridable: 1
+  isExplicitlyReferenced: 0
+  validateReferences: 1
+  platformData:
+  - first:
+      : Any
+    second:
+      enabled: 0
+      settings: {}
+  - first:
+      Any: 
+    second:
+      enabled: 0
+      settings: {}
+  - first:
+      Editor: Editor
+    second:
+      enabled: 1
+      settings:
+        CPU: AnyCPU
+        DefaultValueInitialized: true
+        OS: AnyOS
+  - first:
+      Android: Android
+    second:
+      enabled: 0
+      settings:
+        CPU: AnyCPU
+  - first:
+      iPhone: iOS
+    second:
+      enabled: 0
+      settings:
+        CompileFlags: 
+        FrameworkDependencies: 
+  - first:
+      tvOS: tvOS
+    second:
+      enabled: 0
+      settings:
+        CompileFlags: 
+        FrameworkDependencies: 
+  - first:
+      Standalone: Win
+    second:
+      enabled: 0
+      settings:
+        CPU: None
+  - first:
+      Standalone: Win64
+    second:
+      enabled: 0
+      settings:
+        CPU: None
+  - first:
+      Standalone: OSXUniversal
+    second:
+      enabled: 0
+      settings:
+        CPU: None
+  - first:
+      Standalone: Linux64
+    second:
+      enabled: 0
+      settings:
+        CPU: None
+  - first:
+      Windows Store Apps: WindowsStoreApps
+    second:
+      enabled: 0
+      settings:
+        CPU: AnyCPU
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+EOF
+
+python3 -c "
+import json
+p = '$PKG_STAGE/package.json'
 with open(p) as f: d = json.load(f)
 d['version'] = '$VERSION'
-d.pop('changelogUrl', None)
 with open(p, 'w') as f: json.dump(d, f, indent=2); f.write('\n')
 "
-fi
 
-# Customer install note (package root)
-cat > "$DIST_DIR/com.liftengine.sdk/INSTALL.md" << EOF
+cat > "$PKG_STAGE/INSTALL.md" << EOF
 # LiftEngine SDK ${VERSION} — Install
+
+Use **Add package from disk**. Do not use Add package from tarball.
 
 ## Requirements
 - Unity 2021.3 or newer
@@ -121,29 +214,46 @@ cat > "$DIST_DIR/com.liftengine.sdk/INSTALL.md" << EOF
 - Newtonsoft Json (\`com.unity.nuget.newtonsoft-json\` 3.2.1+)
 
 ## Install
-1. Install AppLovin MAX from the Unity Package Manager or MAX dashboard export.
-2. In Unity: **Window → Package Manager → + → Add package from tarball** and select \`com.liftengine.sdk-${VERSION}.tgz\`.
-3. Create settings: **Assets/Resources/LiftEngineSettings.asset** (or use **Window → LiftEngine → Integration Manager**).
-4. Paste your LiftEngine API key, set environment, and enter MAX ad unit IDs.
-5. Initialize **after** MAX is initialized. See \`Documentation~/INTEGRATION.md\`.
-6. Optional: paste \`Documentation~/CURSOR_INTEGRATION_PROMPT.md\` into Cursor after the package is imported.
+1. Unzip the LiftEngine SDK zip and keep the \`com.liftengine.sdk\` folder on disk.
+2. In Unity: **Window → Package Manager → + → Add package from disk…**
+3. Select \`com.liftengine.sdk/package.json\`.
+4. Create settings: **Assets/Resources/LiftEngineSettings.asset** (or **Window → LiftEngine → Integration Manager**).
+5. Paste your LiftEngine API key, set environment, and enter MAX ad unit IDs.
+6. Initialize **after** MAX is initialized. See \`Documentation~/INTEGRATION.md\`.
+7. Optional: paste \`Documentation~/CURSOR_INTEGRATION_PROMPT.md\` into Cursor after the package is imported.
 
-Do not copy a package folder into \`Packages/\`. Do not unpack or replace the DLLs.
+After import, a script under \`Assets/\` with \`using LiftEngine;\` must compile with no \`csc.rsp\` and no \`extern alias\`.
+
+Do not copy the folder into the project's \`Packages/\` directory. Do not unpack or replace the DLLs. Do not delete the unzipped SDK folder — Unity keeps a \`file:\` path to it.
 EOF
 
-mkdir -p "$(dirname "$OUTPUT_TGZ")"
-tar -czf "$OUTPUT_TGZ" -C "$DIST_DIR" com.liftengine.sdk
+python3 -c "
+import json
+from pathlib import Path
+p = Path('$PKG_STAGE') / 'package.json'
+assert p.is_file(), p
+d = json.loads(p.read_text())
+d['version'] = '$VERSION'
+p.write_text(json.dumps(d, indent=2) + '\n')
+assert not (Path('$PKG_STAGE') / 'Runtime' / 'LiftEngineSettings.cs').exists()
+assert not list(Path('$PKG_STAGE').rglob('LiftEngine.Runtime.asmdef'))
+assert (Path('$PKG_STAGE') / 'Plugins' / 'LiftEngine.Runtime.dll').is_file()
+assert (Path('$PKG_STAGE') / 'Plugins' / 'LiftEngine.Runtime.dll.meta').is_file()
+editor_meta = (Path('$PKG_STAGE') / 'Editor' / 'Plugins' / 'LiftEngine.Editor.dll.meta').read_text()
+assert 'iPhone: iOS' in editor_meta and 'Android: Android' in editor_meta
+assert 'isExplicitlyReferenced: 0' in (Path('$PKG_STAGE') / 'Plugins' / 'LiftEngine.Runtime.dll.meta').read_text()
+print('package folder ok')
+"
 
-# Ready-to-send zip: tarball + docs only (no folder-drop package)
 SHIP_DIR="$REPO_ROOT/dist/LiftEngine-SDK-${VERSION}"
 rm -rf "$SHIP_DIR"
 mkdir -p "$SHIP_DIR/Documentation"
-cp "$OUTPUT_TGZ" "$SHIP_DIR/"
-cp "$DIST_DIR/com.liftengine.sdk/README.md" "$SHIP_DIR/"
-cp "$DIST_DIR/com.liftengine.sdk/INSTALL.md" "$SHIP_DIR/"
-cp "$DIST_DIR/com.liftengine.sdk/LICENSE.md" "$SHIP_DIR/" 2>/dev/null || true
-cp "$DIST_DIR/com.liftengine.sdk/Documentation~/INTEGRATION.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
-cp "$DIST_DIR/com.liftengine.sdk/Documentation~/CURSOR_INTEGRATION_PROMPT.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
+cp -R "$PKG_STAGE" "$SHIP_DIR/com.liftengine.sdk"
+cp "$PKG_STAGE/INSTALL.md" "$SHIP_DIR/INSTALL.txt"
+cp "$PKG_STAGE/LICENSE.md" "$SHIP_DIR/LICENSE.txt" 2>/dev/null || true
+cp "$PKG_STAGE/Documentation~/PACKAGING.md" "$SHIP_DIR/PACKAGING.md" 2>/dev/null || true
+cp "$PKG_STAGE/Documentation~/INTEGRATION.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
+cp "$PKG_STAGE/Documentation~/CURSOR_INTEGRATION_PROMPT.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
 
 SHIP_ZIP="$REPO_ROOT/dist/LiftEngine-SDK-${VERSION}.zip"
 rm -f "$SHIP_ZIP"
@@ -151,8 +261,8 @@ rm -f "$SHIP_ZIP"
 
 echo ""
 echo "Done:"
-echo "  $OUTPUT_TGZ"
 echo "  $SHIP_DIR"
 echo "  $SHIP_ZIP"
-echo "Verify: tar -tzf $OUTPUT_TGZ | head -30"
-echo "Next: test in a fresh Unity project before sending to customer."
+echo "Package folder:"
+find "$SHIP_DIR/com.liftengine.sdk" -type f | head -40
+echo "Next: Package Manager → Add package from disk → com.liftengine.sdk/package.json"

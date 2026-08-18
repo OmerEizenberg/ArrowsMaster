@@ -18,7 +18,7 @@ LiftEngine runs **on top of** MAX — you must already have MAX initialized in y
 
 ## Quick Start
 
-1. Install the package from the `.tgz` (Package Manager → Add package from tarball)
+1. Unzip the SDK and install with **Package Manager → Add package from disk** → select `com.liftengine.sdk/package.json`. After import, `using LiftEngine;` in `Assets/` scripts must compile with no `csc.rsp` or `extern alias`.
 2. Install **AppLovin MAX** and **Newtonsoft JSON** if not already present
 3. Open **Window → LiftEngine → Integration Manager**
 4. Create `Assets/Resources/LiftEngineSettings.asset` and enter your API key + MAX ad unit IDs

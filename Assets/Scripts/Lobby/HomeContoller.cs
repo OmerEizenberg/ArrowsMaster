@@ -635,12 +635,12 @@ namespace Assets.Scripts.Lobby
                 }
 
                 levelId = $"Level{currentLevel}";
-                folder = "Levels";
+                folder = LevelManager.GetNormalLevelsFolder();
             }
 
             TextAsset jsonFile = null;
 
-            if (folder == "Levels" && GameManager.Instance != null && GameManager.Instance.levelManager != null)
+            if (folder != "ChallengeLevels" && GameManager.Instance != null && GameManager.Instance.levelManager != null)
             {
                 jsonFile = GameManager.Instance.levelManager.GetLevelTextAsset(levelId);
             }

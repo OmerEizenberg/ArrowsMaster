@@ -161,25 +161,14 @@ namespace LiftEngine.Context
     {
         public static string GetOs()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            return "android";
-#elif UNITY_IOS && !UNITY_EDITOR
-            return "ios";
-#elif UNITY_EDITOR
-            return UnityEditor.EditorUserBuildSettings.activeBuildTarget switch
-            {
-                UnityEditor.BuildTarget.Android => "android",
-                UnityEditor.BuildTarget.iOS => "ios",
-                _ => "unknown"
-            };
-#else
+            // Runtime-only checks. Never reference UnityEditor — a precompiled
+            // Runtime DLL that AssemblyRefs UnityEditor.dll fails Unity 6 player builds.
             return Application.platform switch
             {
                 RuntimePlatform.Android => "android",
                 RuntimePlatform.IPhonePlayer => "ios",
                 _ => "unknown"
             };
-#endif
         }
     }
 
