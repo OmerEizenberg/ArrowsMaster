@@ -26,9 +26,9 @@ public class RemoteConfigManager : MonoBehaviour
     public const string KEY_REWARDED_AD_COINS_COOLDOWN = "RewardedAdCoinsCooldown";
     public const string KEY_SHARE_TEXT = "ShareText";
     public const string KEY_SHARE_URL = "ShareUrl";
-    public const string KEY_IS_INTERSTITIAL_ACTIVE = "isInterstitialActive";
     public const string KEY_IS_DYNAMIC_MAX_ZOOM = "isDynamicMaxZoom";
     public const string KEY_AD_COOLDOWN = "adCooldown";
+    public const string KEY_ADS_START_LEVEL = "AdsStartLevel";
     public const string KEY_ALL_LEVELS_TIMER = "AllLevelsTimer";
     public const string KEY_PTS_MUL = "PTS_Mul";
     public const string KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED = "isPostWinLevelChoiceEnabled";
@@ -94,22 +94,22 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_FORCE_UPDATE_VERSION_IOS] = string.Empty;
         defaults[KEY_SOFT_UPDATE_VERSION_ANDROID] = string.Empty;
         defaults[KEY_SOFT_UPDATE_VERSION_IOS] = string.Empty;
-        defaults[KEY_FIRST_PLAY_ON] = 1600L;
-        defaults[KEY_SEC_PLAY_ON] = 3200L;
-        defaults[KEY_THIRD_PLAY_ON] = 4200L;
-        defaults[KEY_COINS_REWARDED_AD] = 2000L;
-        defaults[KEY_REWARDED_AD_COINS_COOLDOWN] = 240L;
+        defaults[KEY_FIRST_PLAY_ON] = 1400L;
+        defaults[KEY_SEC_PLAY_ON] = 2800L;
+        defaults[KEY_THIRD_PLAY_ON] = 3200L;
+        defaults[KEY_COINS_REWARDED_AD] = 1800L;
+        defaults[KEY_REWARDED_AD_COINS_COOLDOWN] = 270L;
         defaults[KEY_SHARE_TEXT] = "Check out Arrows Legend! Can you beat my level?";
         defaults[KEY_SHARE_URL] = "https://play.google.com/store/apps/details?id=com.Arrows.Master";
-        defaults[KEY_IS_INTERSTITIAL_ACTIVE] = true;
         defaults[KEY_IS_DYNAMIC_MAX_ZOOM] = true;
         defaults[KEY_AD_COOLDOWN] = 60L;
+        defaults[KEY_ADS_START_LEVEL] = 12L;
         defaults[KEY_ALL_LEVELS_TIMER] = false;
-        defaults[KEY_PTS_MUL] = 0.28d;
+        defaults[KEY_PTS_MUL] = 0.23d;
         defaults[KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED] = true;
-        defaults[KEY_ONE_LIFE_PLAY_ON] = false;
+        defaults[KEY_ONE_LIFE_PLAY_ON] = true;
         defaults[KEY_IS_SHUFFLE_ON] = true;
-        defaults[KEY_NETFLIX_EFFECT] = false;
+        defaults[KEY_NETFLIX_EFFECT] = true;
         defaults[KEY_IS_GAE] = true;
         defaults[KEY_IS_OFFLINE] = false;
         defaults[KEY_TOURNAMENT_ON] = true;
@@ -524,7 +524,6 @@ public class RemoteConfigManager : MonoBehaviour
     {
         if (Assets.Scripts.Core.UserDataManager.Instance == null) return;
 
-        Assets.Scripts.Core.UserDataManager.Instance.IsInterstitialActive = GetBool(KEY_IS_INTERSTITIAL_ACTIVE);
         Assets.Scripts.Core.UserDataManager.Instance.IsDynamicMaxZoom = GetBool(KEY_IS_DYNAMIC_MAX_ZOOM);
     }
 
@@ -621,7 +620,6 @@ public class RemoteConfigManager : MonoBehaviour
             : string.Empty;
     public string ShareText => GetString(KEY_SHARE_TEXT);
     public string ShareUrl => GetString(KEY_SHARE_URL);
-    public bool IsInterstitialActive => GetBool(KEY_IS_INTERSTITIAL_ACTIVE);
     public bool IsDynamicMaxZoom => GetBool(KEY_IS_DYNAMIC_MAX_ZOOM);
 
     public int FirstPlayOn => (int)GetLong(KEY_FIRST_PLAY_ON);
@@ -630,6 +628,14 @@ public class RemoteConfigManager : MonoBehaviour
     public int CoinsRewardedAd => (int)GetLong(KEY_COINS_REWARDED_AD);
     public int RewardedAdCoinsCooldown => (int)GetLong(KEY_REWARDED_AD_COINS_COOLDOWN);
     public int AdCooldown => (int)GetLong(KEY_AD_COOLDOWN);
+    public int AdsStartLevel
+    {
+        get
+        {
+            int value = (int)GetLong(KEY_ADS_START_LEVEL);
+            return value > 0 ? value : 12;
+        }
+    }
     public bool AllLevelsTimer => GetBool(KEY_ALL_LEVELS_TIMER);
     public bool IsPostWinLevelChoiceEnabled => GetBool(KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED);
     public bool OneLifePlayOn => GetBool(KEY_ONE_LIFE_PLAY_ON);

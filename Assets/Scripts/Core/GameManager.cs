@@ -33,7 +33,11 @@ namespace Assets.Scripts.Core
 
         [Header("References")]
         public LevelManager levelManager;
-        public const int ADS_START_LEVEL = 12;
+        public const int DEFAULT_ADS_START_LEVEL = 12;
+        public static int ADS_START_LEVEL =>
+            RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.IsConfigReady
+                ? RemoteConfigManager.Instance.AdsStartLevel
+                : DEFAULT_ADS_START_LEVEL;
         public const int HINT_BOOSTER_UNLOCK_LEVEL = 9;
         public const int COINS_START_LEVEL = 5;
         public const int MAGIC_BOOSTER_UNLOCK_LEVEL = 18;

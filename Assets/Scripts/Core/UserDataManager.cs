@@ -57,7 +57,6 @@ namespace Assets.Scripts.Core
         private const string RefillBoosterKey = "RefillBoosterBalance";
         private const string ShuffleBoosterKey = "ShuffleBoosterBalance";
         private const string BoostersInitializedKey = "BoostersInitialized";
-        private const string IsInterstitialActiveKey = "IsInterstitialActive";
         private const string IsDynamicMaxZoomKey = "IsDynamicMaxZoom";
         private const string SessionCountKey = "TotalSessionCount";
         private const string HasSentSession7Key = "HasSentSession7Event";
@@ -67,18 +66,6 @@ namespace Assets.Scripts.Core
 
         public int CurrentLevel { get; private set; } = 1;
         public int ArrowsCurrency { get; private set; } = 0;
-        private bool _isInterstitialActive = true;
-        public bool IsInterstitialActive 
-        { 
-            get => _isInterstitialActive; 
-            set 
-            {
-                _isInterstitialActive = value;
-                PlayerPrefs.SetInt(IsInterstitialActiveKey, _isInterstitialActive ? 1 : 0);
-                PlayerPrefs.Save();
-            }
-        }
-
         private bool _isDynamicMaxZoom = true;
         public bool IsDynamicMaxZoom 
         { 
@@ -228,7 +215,6 @@ namespace Assets.Scripts.Core
             LegendPassClaimedFreeMask = PlayerPrefs.GetInt(LegendPassClaimedFreeKey, 0);
             LegendPassClaimedPremiumMask = PlayerPrefs.GetInt(LegendPassClaimedPremiumKey, 0);
             LegendPassStartDate = PlayerPrefs.GetString(LegendPassStartDateKey, string.Empty);
-            _isInterstitialActive = PlayerPrefs.GetInt(IsInterstitialActiveKey, 1) == 1;
             _isDynamicMaxZoom = PlayerPrefs.GetInt(IsDynamicMaxZoomKey, 1) == 1;
 
             // Increment and save session count

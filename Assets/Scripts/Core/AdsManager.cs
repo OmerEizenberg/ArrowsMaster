@@ -1133,11 +1133,6 @@ namespace Assets.Scripts.Core
                 if (!isInitializing) _ = InitializeSDK();
                 return;
             }
-            if (UserDataManager.Instance != null && !UserDataManager.Instance.IsInterstitialActive)
-            {
-                Debug.Log("[AdsManager] Skipping Interstitial Load: IsInterstitialActive is false (Remote Config).");
-                return;
-            }
             // Loaded even for No Ads buyers so interstitials remain available as a rewarded fallback.
             Debug.Log("[AdsManager] Loading Interstitial Ad...");
             if (UseLiftEngineAdPath)
@@ -1151,12 +1146,6 @@ namespace Assets.Scripts.Core
 
         public void ShowInterstitial(bool isAuto = false)
         {
-            if (UserDataManager.Instance != null && !UserDataManager.Instance.IsInterstitialActive)
-            {
-                Debug.Log("[AdsManager] Skipping Interstitial Show: IsInterstitialActive is false (Remote Config).");
-                return;
-            }
-
             bool shouldShowThisTime = _showNextInterstitial;
             _showNextInterstitial = !_showNextInterstitial;
 

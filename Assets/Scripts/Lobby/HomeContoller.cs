@@ -1562,7 +1562,7 @@ namespace Assets.Scripts.Lobby
 
             if (IAPManager.Instance == null || IAPManager.Instance.HasNoAds) return;
 
-            if (UserDataManager.Instance == null || UserDataManager.Instance.CurrentLevel <= 16 || UserDataManager.Instance.ArrowsCurrency >= 1200) return;
+            if (UserDataManager.Instance == null || UserDataManager.Instance.CurrentLevel <= 16 || UserDataManager.Instance.ArrowsCurrency >= 5000) return;
 
             string lastSeenTimeStr = PlayerPrefs.GetString("LastNoAdsOfferTime", string.Empty);
             if (!string.IsNullOrEmpty(lastSeenTimeStr))
