@@ -39,6 +39,18 @@ namespace Assets.Scripts.Core
         
         private static Material s_SharedLineMaterial;
 
+        private static readonly Color[] s_ShuffledColorPalette =
+        {
+            new Color32(0xfe, 0xd3, 0x30, 0xff), // #fed330
+            new Color32(0xfc, 0x5c, 0x65, 0xff), // #fc5c65
+            new Color32(0xfd, 0x96, 0x44, 0xff), // #fd9644
+            new Color32(0x26, 0xde, 0x81, 0xff), // #26de81
+            new Color32(0x2b, 0xcb, 0xba, 0xff), // #2bcbba
+            new Color32(0x45, 0xaa, 0xf2, 0xff), // #45aaf2
+            new Color32(0x4b, 0x7b, 0xec, 0xff), // #4b7bec
+            new Color32(0xa5, 0x5e, 0xea, 0xff), // #a55eea
+        };
+
         public static void EnsureSharedLineMaterialFromPrefab(ArrowController prefab)
         {
             if (s_SharedLineMaterial != null) return;
@@ -178,11 +190,15 @@ namespace Assets.Scripts.Core
             hasReducedLife = false;
             m_IsMarkedBlocked = false;
 
-            // Parse color from data
+            // Parse color from data, or pick a random palette color when ShuffeledColors is on
             m_OriginalColor = Color.black;
             m_OriginalColor.a = 1.0f;
 
-            if (!string.IsNullOrWhiteSpace(data.color))
+            if (IsShuffeledColorsEnabled())
+            {
+                m_OriginalColor = s_ShuffledColorPalette[Random.Range(0, s_ShuffledColorPalette.Length)];
+            }
+            else if (!string.IsNullOrWhiteSpace(data.color))
             {
                 if (ColorUtility.TryParseHtmlString(data.color, out Color parsedColor))
                 {
@@ -893,6 +909,12 @@ namespace Assets.Scripts.Core
         {
             currentArrowColor = color;
             SetArrowColorRaw(color);
+        }
+
+        private static bool IsShuffeledColorsEnabled()
+        {
+            // Default is true when RemoteConfig is unavailable
+            return RemoteConfigManager.Instance == null || RemoteConfigManager.Instance.ShuffeledColors;
         }
 
         private void SetArrowColorRaw(Color color)
