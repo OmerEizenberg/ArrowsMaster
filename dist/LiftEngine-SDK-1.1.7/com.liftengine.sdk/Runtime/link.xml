@@ -1,0 +1,3 @@
+<linker>
+  <assembly fullname="LiftEngine.Runtime" preserve="all"/>
+</linker>

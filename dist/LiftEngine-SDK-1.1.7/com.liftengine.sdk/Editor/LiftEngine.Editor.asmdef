@@ -1,0 +1,16 @@
+{
+  "name": "LiftEngine.Editor.Package",
+  "rootNamespace": "LiftEngine.Editor",
+  "references": [
+    "Newtonsoft.Json"
+  ],
+  "precompiledReferences": [
+    "LiftEngine.Editor.dll",
+    "LiftEngine.Runtime.dll"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true,
+  "overrideReferences": false
+}

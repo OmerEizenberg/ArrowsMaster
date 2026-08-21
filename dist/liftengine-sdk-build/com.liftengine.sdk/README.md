@@ -1,6 +1,6 @@
 # LiftEngine SDK for Unity
 
-Ad monetization layer for **AppLovin MAX**. LiftEngine sits on top of your existing MAX integration: you keep control of when ads show, and you route load/show through `LiftEngineSdk` after MAX is initialized.
+**First official LiftEngine Unity SDK** (1.1.7). Ad monetization layer for **AppLovin MAX**. LiftEngine sits on top of your existing MAX integration: you keep control of when ads show, and you route load/show through `LiftEngineSdk` after MAX is initialized.
 
 ---
 
@@ -21,7 +21,7 @@ LiftEngine runs **on top of** MAX — you must already have MAX initialized in y
 1. Unzip the SDK and install with **Package Manager → Add package from disk** → select `com.liftengine.sdk/package.json`. After import, `using LiftEngine;` in `Assets/` scripts must compile with no `csc.rsp` or `extern alias`.
 2. Install **AppLovin MAX** and **Newtonsoft JSON** if not already present
 3. Open **Window → LiftEngine → Integration Manager**
-4. Create `Assets/Resources/LiftEngineSettings.asset` and enter your API key + MAX ad unit IDs
+4. Copy the example `LiftEngineSettings` to `Assets/Resources/LiftEngineSettings.asset` (or create it from Integration Manager) and enter your API key + MAX ad unit IDs
 5. Initialize LiftEngine **after** `MaxSdk.InitializeSdk()` succeeds
 6. Route ad load/show calls through `LiftEngineSdk`
 
@@ -49,6 +49,7 @@ LiftEngineSdk.ShowAd(LiftEngineAdFormat.Rewarded, null, new LiftEngineShowAdCall
 |----------|----------|
 | [Integration Guide](Documentation~/INTEGRATION.md) | Full setup, API reference, QA checklist |
 | [AI Integration Prompt](Documentation~/CURSOR_INTEGRATION_PROMPT.md) | One-shot Cursor prompt for automatic wiring |
+| [Changelog](CHANGELOG.md) | First official release notes |
 
 ---
 

@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-VERSION="${1:-1.1.6}"
+VERSION="${1:-1.1.7}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$PKG_DIR/../.." && pwd)"
@@ -204,7 +204,7 @@ with open(p, 'w') as f: json.dump(d, f, indent=2); f.write('\n')
 "
 
 cat > "$PKG_STAGE/INSTALL.md" << EOF
-# LiftEngine SDK ${VERSION} — Install
+# LiftEngine SDK ${VERSION} — First official release
 
 Use **Add package from disk**. Do not use Add package from tarball.
 
@@ -217,8 +217,8 @@ Use **Add package from disk**. Do not use Add package from tarball.
 1. Unzip the LiftEngine SDK zip and keep the \`com.liftengine.sdk\` folder on disk.
 2. In Unity: **Window → Package Manager → + → Add package from disk…**
 3. Select \`com.liftengine.sdk/package.json\`.
-4. Create settings: **Assets/Resources/LiftEngineSettings.asset** (or **Window → LiftEngine → Integration Manager**).
-5. Paste your LiftEngine API key, set environment, and enter MAX ad unit IDs.
+4. Create settings: copy the example from **Package Manager → LiftEngine SDK → Samples → Example LiftEngineSettings** to \`Assets/Resources/LiftEngineSettings.asset\`, or use **Window → LiftEngine → Integration Manager**.
+5. Replace placeholders with your LiftEngine API key, environment, and MAX ad unit IDs.
 6. Initialize **after** MAX is initialized. See \`Documentation~/INTEGRATION.md\`.
 7. Optional: paste \`Documentation~/CURSOR_INTEGRATION_PROMPT.md\` into Cursor after the package is imported.
 
@@ -254,6 +254,9 @@ cp "$PKG_STAGE/LICENSE.md" "$SHIP_DIR/LICENSE.txt" 2>/dev/null || true
 cp "$PKG_STAGE/Documentation~/PACKAGING.md" "$SHIP_DIR/PACKAGING.md" 2>/dev/null || true
 cp "$PKG_STAGE/Documentation~/INTEGRATION.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
 cp "$PKG_STAGE/Documentation~/CURSOR_INTEGRATION_PROMPT.md" "$SHIP_DIR/Documentation/" 2>/dev/null || true
+mkdir -p "$SHIP_DIR/Examples"
+cp "$PKG_STAGE/Samples~/LiftEngineSettings/LiftEngineSettings.asset" "$SHIP_DIR/Examples/" 2>/dev/null || true
+cp "$PKG_STAGE/Samples~/LiftEngineSettings/README.md" "$SHIP_DIR/Examples/" 2>/dev/null || true
 
 SHIP_ZIP="$REPO_ROOT/dist/LiftEngine-SDK-${VERSION}.zip"
 rm -f "$SHIP_ZIP"

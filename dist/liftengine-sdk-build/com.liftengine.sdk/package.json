@@ -1,8 +1,8 @@
 {
   "name": "com.liftengine.sdk",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "displayName": "LiftEngine SDK",
-  "description": "Ad monetization layer for AppLovin MAX. Route ads through LiftEngineSdk after MAX is initialized, with automatic preloading and MAX fallback.",
+  "description": "First official LiftEngine Unity SDK. Ad monetization layer for AppLovin MAX. Route ads through LiftEngineSdk after MAX is initialized, with automatic preloading and MAX fallback.",
   "unity": "2021.3",
   "documentationUrl": "Documentation~/INTEGRATION.md",
   "changelogUrl": "CHANGELOG.md",
@@ -27,6 +27,11 @@
       "displayName": "Basic Integration",
       "description": "Minimal sample driver for testing LiftEngine with MAX.",
       "path": "Samples~/BasicIntegration"
+    },
+    {
+      "displayName": "Example LiftEngineSettings",
+      "description": "Placeholder LiftEngineSettings asset. Copy it to Assets/Resources/LiftEngineSettings.asset and fill in your API key and MAX ad unit IDs.",
+      "path": "Samples~/LiftEngineSettings"
     }
   ]
 }
