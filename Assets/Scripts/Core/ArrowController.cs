@@ -913,8 +913,8 @@ namespace Assets.Scripts.Core
 
         private static bool IsShuffeledColorsEnabled()
         {
-            // Default is true when RemoteConfig is unavailable
-            return RemoteConfigManager.Instance == null || RemoteConfigManager.Instance.ShuffeledColors;
+            // Only on when remote config explicitly sends true
+            return RemoteConfigManager.Instance != null && RemoteConfigManager.Instance.ShuffeledColors;
         }
 
         private void SetArrowColorRaw(Color color)

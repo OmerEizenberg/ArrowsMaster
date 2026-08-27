@@ -110,7 +110,7 @@ public class RemoteConfigManager : MonoBehaviour
         defaults[KEY_IS_POST_WIN_LEVEL_CHOICE_ENABLED] = true;
         defaults[KEY_ONE_LIFE_PLAY_ON] = true;
         defaults[KEY_IS_SHUFFLE_ON] = true;
-        defaults[KEY_SHUFFELED_COLORS] = true;
+        defaults[KEY_SHUFFELED_COLORS] = false;
         defaults[KEY_NETFLIX_EFFECT] = true;
         defaults[KEY_IS_GAE] = true;
         defaults[KEY_IS_OFFLINE] = false;
@@ -644,7 +644,7 @@ public class RemoteConfigManager : MonoBehaviour
     public bool IsShuffleOn => GetBool(KEY_IS_SHUFFLE_ON);
     /// <summary>
     /// When true, each arrow picks a random color from the shuffled palette on construction.
-    /// When false, arrows use their level data color. Defaults to true.
+    /// When false, arrows use their level data color. Defaults to false; enable only via remote config.
     /// </summary>
     public bool ShuffeledColors => GetBool(KEY_SHUFFELED_COLORS);
     public bool IsNetflixEffectEnabled => GetBool(KEY_NETFLIX_EFFECT);
