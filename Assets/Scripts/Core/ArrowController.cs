@@ -39,6 +39,18 @@ namespace Assets.Scripts.Core
         
         private static Material s_SharedLineMaterial;
 
+        private static readonly Color[] s_ShuffledColorPalette =
+        {
+            new Color32(0xd5, 0x50, 0x4e, 0xff), // #d5504e
+            new Color32(0xa8, 0x42, 0x6b, 0xff), // #a8426b
+            new Color32(0x00, 0xcf, 0x00, 0xff), // #00cf00
+            new Color32(0x0e, 0x95, 0xe3, 0xff), // #0e95e3
+            new Color32(0x3b, 0x50, 0xd7, 0xff), // #3b50d7
+            new Color32(0xf3, 0xe5, 0x3d, 0xff), // #f3e53d
+            new Color32(0xf6, 0x62, 0xdb, 0xff), // #f662db
+            new Color32(0xc5, 0x9b, 0x2a, 0xff), // #c59b2a
+        };
+
         public static void EnsureSharedLineMaterialFromPrefab(ArrowController prefab)
         {
             if (s_SharedLineMaterial != null) return;
@@ -178,17 +190,7 @@ namespace Assets.Scripts.Core
             hasReducedLife = false;
             m_IsMarkedBlocked = false;
 
-            // Parse color from data
-            m_OriginalColor = Color.black;
-            m_OriginalColor.a = 1.0f;
-
-            if (!string.IsNullOrWhiteSpace(data.color))
-            {
-                if (ColorUtility.TryParseHtmlString(data.color, out Color parsedColor))
-                {
-                    m_OriginalColor = parsedColor;
-                }
-            }
+            m_OriginalColor = s_ShuffledColorPalette[Random.Range(0, s_ShuffledColorPalette.Length)];
             SetArrowColor(m_OriginalColor);
 
             // Setup Preview LineRenderer
